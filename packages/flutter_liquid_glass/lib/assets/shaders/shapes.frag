@@ -66,7 +66,7 @@ float smoothUnion(float d1, float d2, float k) {
 }
 
 float sceneSDF(vec2 p) {
-    float d1 = sdfRRect(p - squircle1Center, squircle1Size, squircle1CornerRadius);
+    float d1 = sdfSquircle(p - squircle1Center, squircle1Size, squircle1CornerRadius, .62);
     float d2 = sdfSquircle(p - squircle2Center, squircle2Size, squircle2CornerRadius, .62);
     return smoothUnion(d1, d2, uBlend);
 }
@@ -104,28 +104,21 @@ void main() {
     float alpha = smoothstep(-4.0, 0.0, sd);
     
     if (alpha < 1.0) {
-        float refractiveIndex = 1.5;
-        float baseHeight = uThickness * 8.0;
-        
         vec3 normal = getNormal(sd, uThickness);
-        
-        // Calculate refraction using same method as reference
-        vec3 incident = vec3(0.0, 0.0, -1.0);
-        vec3 refractVec = refract(incident, normal, 1.0 / refractiveIndex);
-        
         float h = getHeight(sd, uThickness);
-        float refractLength = (h + baseHeight) / max(0.001, dot(vec3(0.0, 0.0, -1.0), refractVec));
         
-        // Calculate the 2D refraction displacement
-        vec2 refractionDisplacement = refractVec.xy * refractLength;
+        // Encode normal components in RGB channels (map from [-1,1] to [0,1])
+        vec3 encodedNormal = normal * 0.5 + 0.5;
         
-        vec2 scaledDisplacement = refractionDisplacement * ENCODING_SCALE;
+        // Encode height and alpha information in the alpha channel
+        // We need to preserve both height and alpha, so we'll pack them
+        // Height is normalized by thickness for encoding
+        float normalizedHeight = h / uThickness;
         
-        // Encode displacement values to 0-1 range (from approximately -1 to 1)
-        vec2 encodedDisplacement = scaledDisplacement * 0.5 + 0.5;
+        // Pack height and alpha: use most significant bits for alpha, least for height
+        float packedAlpha = (1.0 - alpha) * 0.9 + normalizedHeight * 0.1;
         
-        // Encode displacement in red and green channels, normal.z in blue for reflection
-        fragColor = vec4(encodedDisplacement.x, encodedDisplacement.y, normal.z, 1.0 - alpha);
+        fragColor = vec4(encodedNormal.x, encodedNormal.y, encodedNormal.z, normalizedHeight);
     } else {
         discard;
     }

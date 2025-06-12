@@ -14,6 +14,8 @@ layout(location = 6) uniform float uLightAngle = 0.785398;
 layout(location = 7) uniform float uLightIntensity = 1.0;
 layout(location = 8) uniform float uAmbientStrength = 0.1;
 layout(location = 9) uniform float uOutlineIntensity = 3.3;
+layout(location = 10) uniform float uThickness;
+layout(location = 11) uniform float uRefractiveIndex = 1.2;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -57,26 +59,35 @@ vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplaceme
 void main() {
     vec2 uv = FlutterFragCoord().xy / uSize;
     
-    vec4 displacementData = texture(uDisplacementTexture, uv);
+    vec4 normalHeightData = texture(uDisplacementTexture, uv);
     
     // Check if we're outside the liquid glass area
-    if (displacementData.a == 0.0) {
+    if (normalHeightData.a == 0.0) {
         discard;
     }
     
-    // Extract encoded displacement from red and green channels
-    vec2 encodedDisplacement = vec2(displacementData.r, displacementData.g);
+    // Decode normal from RGB channels (map from [0,1] back to [-1,1])
+    vec3 normal = (normalHeightData.rgb - 0.5) * 2.0;
     
-    // Extract normal.z from blue channel for reflection
-    float normalZ = displacementData.b;
+
+   
+    float normalizedHeight = normalHeightData.a;; // Extract height
+    float height = normalizedHeight * uThickness;
     
-    // Decode displacement values from 0-1 range back to original range
-    vec2 decodedDisplacement = (encodedDisplacement - 0.5) * 2.0;
+    // Calculate refraction using the decoded normal and height
+    float baseHeight = uThickness * 8.0;
+    vec3 incident = vec3(0.0, 0.0, -1.0);
+    vec3 refractVec = refract(incident, normal, 1.0 / uRefractiveIndex);
     
+    float refractLength = (height + baseHeight) / max(0.001, dot(vec3(0.0, 0.0, -1.0), refractVec));
     
-    vec2 refractionDisplacement = (decodedDisplacement / ENCODING_SCALE) * uDisplacementScale;
+    // Calculate the 2D refraction displacement
+    vec2 refractionDisplacement = refractVec.xy * refractLength;
     
-    // Apply displacement more aggressively - multiply by a factor to make it visible
+    // Apply displacement scaling
+    refractionDisplacement *= uDisplacementScale;
+    
+    // Apply displacement to UV coordinates
     vec2 displacementUV = refractionDisplacement / uSize;
     vec2 refractedUV = uv + displacementUV;
     
@@ -104,9 +115,9 @@ void main() {
             float blue = texture(uBackgroundTexture, blueUV).b;
             
             // Get alpha from the center sample
-            float alpha = texture(uBackgroundTexture, refractedUV).a;
+            float bgAlpha = texture(uBackgroundTexture, refractedUV).a;
             
-            refractColor = vec4(red, green, blue, alpha);
+            refractColor = vec4(red, green, blue, bgAlpha);
         } else {
             // No significant displacement - sample normally
             refractColor = texture(uBackgroundTexture, refractedUV);
@@ -124,10 +135,10 @@ void main() {
     reflectColor = vec4(reflectionIntensity, reflectionIntensity, reflectionIntensity, 0.0);
     
     // Mix refraction and reflection based on normal.z (surface angle)
-    vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normalZ) * 0.2);
+    vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normal.z) * 0.2);
     
     // Calculate lighting effects
-    vec3 lighting = calculateLighting(uv, displacementData, refractionDisplacement);
+    vec3 lighting = calculateLighting(uv, normalHeightData, refractionDisplacement);
     
     // Apply realistic glass color influence
     vec4 finalColor = liquidColor;
@@ -148,9 +159,11 @@ void main() {
             vec3 invLiquid = vec3(1.0) - liquidColor.rgb;
             vec3 invGlass = vec3(1.0) - uGlassColor.rgb;
             vec3 screened = vec3(1.0) - (invLiquid * invGlass);
+
+            float thicknessFactor = clamp(uThickness / 20.0, 0.0, 1.0);
             
             // Blend between original and screened result
-            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a * 0.8);
+            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a * thicknessFactor);
         }
         
         // Preserve the original alpha
@@ -167,11 +180,10 @@ void main() {
     float falloff = clamp(length(refractionDisplacement) / 100.0, 0.0, 1.0) * 0.1 + 0.9;
     vec4 falloffColor = mix(vec4(0.0), originalBgColor, falloff);
     
-    // Use displacement alpha to control the liquid glass effect
-    float liquidAlpha = 1.0 - displacementData.a;
+
     
     // Final mix: displaced liquid color where alpha is low, falloff background where alpha is high
     finalColor = clamp(finalColor, 0.0, 1.0);
     falloffColor = clamp(falloffColor, 0.0, 1.0);
-    fragColor = mix(finalColor, falloffColor, liquidAlpha);
+    fragColor = mix(finalColor, falloffColor, 0);
 }

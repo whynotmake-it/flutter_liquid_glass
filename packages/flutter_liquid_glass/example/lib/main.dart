@@ -29,7 +29,7 @@ class MainApp extends HookWidget {
     const size2 = Size(150, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 48 : 0,
+      value: thicknessVisible.value ? 18 : 0,
       motion: SpringMotion(spring),
     );
 
@@ -75,9 +75,11 @@ class MainApp extends HookWidget {
           },
           child: Stack(
             children: [
-              Positioned.fill(
-                child: Image.asset('assets/iphone.png', fit: BoxFit.cover),
-              ),
+              Positioned.fill(child: Container(color: Colors.transparent)),
+              if (!debug.value)
+                Positioned.fill(
+                  child: Image.asset('assets/iphone.png', fit: BoxFit.cover),
+                ),
               RawSquircles(
                 debugRenderRefractionMap: debug.value,
                 squircle1: Squircle(
@@ -92,7 +94,7 @@ class MainApp extends HookWidget {
                 ),
                 settings: LiquidGlassSettings(
                   thickness: thickness,
-                  chromaticAberration: 0.0,
+                  chromaticAberration: 0.01,
                   blend: 50,
                   lightAngle: lightAngle,
                 ),

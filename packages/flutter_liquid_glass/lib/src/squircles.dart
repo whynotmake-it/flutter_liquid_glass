@@ -23,13 +23,13 @@ class Squircle with EquatableMixin {
 
 class LiquidGlassSettings with EquatableMixin {
   const LiquidGlassSettings({
-    this.glassColor = const Color.fromARGB(0, 10, 41, 49),
+    this.glassColor = const Color.fromARGB(35, 255, 255, 255),
     this.thickness = 20,
     this.chromaticAberration = .01,
     this.blend = 20,
     this.lightAngle = 0.5 * pi,
-    this.lightIntensity = 30,
-    this.ambientStrength = 0,
+    this.lightIntensity = 10,
+    this.ambientStrength = .005,
     this.outlineIntensity = 0,
   });
 
@@ -245,7 +245,9 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(8, _settings.lightAngle)
       ..setFloat(9, _settings.lightIntensity)
       ..setFloat(10, _settings.ambientStrength)
-      ..setFloat(11, _settings.outlineIntensity);
+      ..setFloat(11, _settings.outlineIntensity)
+      ..setFloat(12, _settings.thickness)
+      ..setFloat(13, 1.51);
 
     context.pushLayer(
       BackdropFilterLayer(
