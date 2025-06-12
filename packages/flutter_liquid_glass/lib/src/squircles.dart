@@ -209,7 +209,6 @@ class _RenderRawShapes extends RenderBox {
 
     final glassColor = Color.fromARGB(0, 255, 255, 255);
 
-    final lightAngle = 0.5 * pi;
     _displacementShader
       ..setImageSampler(
         1,
@@ -220,8 +219,7 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(4, glassColor.r)
       ..setFloat(5, glassColor.g)
       ..setFloat(6, glassColor.b)
-      ..setFloat(7, glassColor.a)
-      ..setFloat(8, lightAngle);
+      ..setFloat(7, glassColor.a);
 
     context.pushLayer(
       BackdropFilterLayer(

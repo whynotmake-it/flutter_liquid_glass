@@ -9,7 +9,6 @@ layout(location = 2) uniform vec2 uSize;
 layout(location = 3) uniform float uDisplacementScale = 1.0;
 layout(location = 4) uniform float uChromaticAberration = 0.0;
 layout(location = 5) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
-layout(location = 6) uniform float uLightAngle = 0.785398; // 45 degrees in radians
 
 layout(location = 0) out vec4 fragColor;
 
@@ -78,43 +77,6 @@ void main() {
         refractColor = texture(uBackgroundTexture, refractedUV);
     }
     
-    // Calculate edge highlights based on light angle and surface normals
-    vec2 lightDirection = vec2(cos(uLightAngle), sin(uLightAngle));
-    
-    // Reconstruct approximate surface normal from displacement
-    vec2 surfaceNormal = normalize(refractionDisplacement);
-    
-    // Calculate fresnel-like effect for edge highlights
-    float viewDot = abs(dot(surfaceNormal, vec2(0.0, 1.0))); // View direction approximation
-    float lightDot = dot(surfaceNormal, lightDirection);
-    
-    // Create edge highlight based on surface curvature and light direction
-    float edgeHighlight = 0.0;
-    if (length(refractionDisplacement) > 0.1) {
-        // Calculate edge intensity based on displacement magnitude (edge detection)
-        float edgeIntensity = smoothstep(0.0, 3.0, length(refractionDisplacement) * 0.01);
-        
-        // Fresnel-like falloff for realistic edge lighting
-        float fresnelFactor = pow(1.0 - viewDot, 2.0);
-        
-        // Light reflection based on surface normal and light direction
-        // Create highlights on both light-facing and opposite sides
-        float frontLight = max(0.0, lightDot);
-        float backLight = max(0.0, -lightDot); // Rim lighting on opposite side
-        
-        // Combine front and back lighting with different intensities
-        float reflectionFactor = frontLight * 0.8 + backLight * 0.6 + 0.3;
-        
-        // Combine factors for final edge highlight
-        edgeHighlight = edgeIntensity * fresnelFactor * reflectionFactor;
-        
-        // Make highlights more prominent and create falloff
-        edgeHighlight = pow(edgeHighlight, 0.8) * 1;
-    }
-    
-    // Create highlight color that bleeds inward
-    vec4 highlightColor = vec4(1.0, 1.0, 1.0, edgeHighlight);
-    
     // Calculate reflection effect - much more subtle
     vec4 reflectColor = vec4(0.0);
     
@@ -124,9 +86,6 @@ void main() {
     
     // Mix refraction and reflection based on normal.z (surface angle)
     vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normalZ) * 0.2);
-    
-    // Add edge highlights to the liquid color
-    liquidColor.rgb = mix(liquidColor.rgb, highlightColor.rgb, highlightColor.a);
     
     // Apply realistic glass color influence
     vec4 finalColor = liquidColor;
