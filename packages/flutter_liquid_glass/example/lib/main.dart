@@ -21,7 +21,7 @@ class MainApp extends HookWidget {
 
     final flip = useKeyedState(false, keys: []);
 
-    final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
+    final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3);
 
     const offset1 = Offset(100, 150);
     const offset2 = Offset(200, 550);
@@ -30,9 +30,11 @@ class MainApp extends HookWidget {
     const size2 = Size(300, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 40 : 0,
+      value: thicknessVisible.value ? 20 : 0,
       motion: SpringMotion(spring),
     );
+
+    final blur = thickness * .1;
 
     final lightAngleController = useAnimationController(
       duration: const Duration(seconds: 5),
@@ -53,7 +55,7 @@ class MainApp extends HookWidget {
     );
 
     final cornerRadius = useSingleMotion(
-      value: flip.value ? 50 : 20,
+      value: flip.value ? 15 : 20,
       motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
     );
 
@@ -97,10 +99,7 @@ class MainApp extends HookWidget {
                 child: ClipRSuperellipse(
                   borderRadius: BorderRadiusGeometry.circular(cornerRadius),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: thickness,
-                      sigmaY: thickness,
-                    ),
+                    filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                     child: SizedBox(width: size1.width, height: size1.height),
                   ),
                 ),
@@ -112,24 +111,29 @@ class MainApp extends HookWidget {
                 child: ClipRSuperellipse(
                   borderRadius: BorderRadiusGeometry.circular(cornerRadius),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: thickness,
-                      sigmaY: thickness,
-                    ),
+                    filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                     child: SizedBox(
                       width: size.width,
                       height: size.height,
 
                       child: AnimatedSizeSwitcher(
-                        child: flip.value
-                            ? SizedBox.shrink()
-                            : Center(
-                                child: Text(
-                                  "Hello from Flutter",
-                                  style: Theme.of(context).textTheme.bodyLarge!
-                                      .copyWith(color: Colors.white),
-                                ),
+                        duration: const Duration(milliseconds: 500),
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(
+                              scale: animation.drive(
+                                Tween<double>(begin: 2, end: 1),
                               ),
+                              child: FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeInOut,
+                                ),
+                                child: child,
+                              ),
+                            ),
+                        child: flip.value || thicknessVisible.value == false
+                            ? SizedBox.shrink()
+                            : Center(child: FlutterLogo(size: 50)),
                       ),
                     ),
                   ),
