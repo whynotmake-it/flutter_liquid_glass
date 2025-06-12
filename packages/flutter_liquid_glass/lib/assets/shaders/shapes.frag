@@ -2,6 +2,7 @@
 precision highp float;
 
 #include <flutter/runtime_effect.glsl>
+#include "common.glsl"
 
 layout(location = 0) uniform vec2 uSize;
 
@@ -17,8 +18,6 @@ layout(location = 7) uniform float uBlend;
 layout(location = 8) uniform float uThickness;
 
 layout(location = 0) out vec4 fragColor;
-
-#define ENCODING_SCALE 0.005
 
 mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));

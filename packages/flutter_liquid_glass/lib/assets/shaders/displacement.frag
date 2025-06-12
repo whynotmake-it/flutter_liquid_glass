@@ -2,6 +2,7 @@
 precision highp float;
 
 #include <flutter/runtime_effect.glsl>
+#include "common.glsl"
 
 layout(location = 0) uniform sampler2D uBackgroundTexture;
 layout(location = 1) uniform sampler2D uDisplacementTexture;
@@ -15,9 +16,6 @@ layout(location = 8) uniform float uAmbientStrength = 0.1;
 layout(location = 9) uniform float uOutlineIntensity = 3.3;
 
 layout(location = 0) out vec4 fragColor;
-
-#define ENCODING_SCALE 0.005
-#define PX(a) a / uSize.y
 
 // Calculate lighting effects based on displacement data
 vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplacement) {

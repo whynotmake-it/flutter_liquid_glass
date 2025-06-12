@@ -227,6 +227,10 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
+    if (_settings.thickness <= 0) {
+      super.paint(context, offset);
+    }
+
     _displacementShader
       ..setImageSampler(
         1,

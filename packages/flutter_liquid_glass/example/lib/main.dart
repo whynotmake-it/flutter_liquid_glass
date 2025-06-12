@@ -16,6 +16,8 @@ class MainApp extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final debug = useState(false);
+    final thicknessVisible = useState(true);
+
     final flip = useKeyedState(false, keys: []);
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
@@ -25,6 +27,11 @@ class MainApp extends HookWidget {
 
     const size1 = Size(50, 50);
     const size2 = Size(150, 100);
+
+    final thickness = useSingleMotion(
+      value: thicknessVisible.value ? 18 : 0,
+      motion: SpringMotion(spring),
+    );
 
     final lightAngleController = useAnimationController(
       duration: const Duration(seconds: 5),
@@ -55,6 +62,9 @@ class MainApp extends HookWidget {
           child: const Icon(Icons.flip),
         ),
         body: GestureDetector(
+          onTap: () {
+            thicknessVisible.value = !thicknessVisible.value;
+          },
           onLongPress: () {
             debug.value = !debug.value;
           },
@@ -76,7 +86,7 @@ class MainApp extends HookWidget {
                   cornerRadius: 30,
                 ),
                 settings: LiquidGlassSettings(
-                  thickness: 18,
+                  thickness: thickness,
                   chromaticAberration: 0.1,
                   blend: 50,
                   lightAngle: lightAngle,
