@@ -1,0 +1,17 @@
+version: 2
+enable-beta-ecosystems: true
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "pub"
+    directory: "/"
+    labels:
+      - dependabot
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope

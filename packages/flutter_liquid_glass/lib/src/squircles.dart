@@ -1,0 +1,160 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_shaders/flutter_shaders.dart';
+
+class Squircle {
+  const Squircle({
+    required this.topLeft,
+    required this.size,
+    required this.cornerRadius,
+  });
+
+  final Offset topLeft;
+  final Size size;
+  final double cornerRadius;
+}
+
+class RawSquircles extends StatelessWidget {
+  const RawSquircles({
+    super.key,
+    required this.squircle1,
+    required this.squircle2,
+    this.blend = 20,
+  });
+
+  final Squircle squircle1;
+  final Squircle squircle2;
+  final double blend;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderBuilder(
+      assetKey: 'packages/flutter_liquid_glass/lib/assets/shaders/shapes.frag',
+      (context, shader, child) {
+        return _RawShapes(
+          shader: shader,
+          squircle1: squircle1,
+          squircle2: squircle2,
+          blend: blend,
+        );
+      },
+    );
+  }
+}
+
+class _RawShapes extends LeafRenderObjectWidget {
+  const _RawShapes({
+    required this.shader,
+    required this.squircle1,
+    required this.squircle2,
+    required this.blend,
+  });
+
+  final FragmentShader shader;
+  final Squircle squircle1;
+  final Squircle squircle2;
+  final double blend;
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderRawShapes(
+      shader: shader,
+      squircle1: squircle1,
+      squircle2: squircle2,
+      blend: blend,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderRawShapes renderObject,
+  ) {
+    renderObject
+      ..shader = shader
+      ..squircle1 = squircle1
+      ..squircle2 = squircle2
+      ..blend = blend;
+  }
+}
+
+class _RenderRawShapes extends RenderBox {
+  _RenderRawShapes({
+    required FragmentShader shader,
+    required Squircle squircle1,
+    required Squircle squircle2,
+    required double blend,
+  })  : _shader = shader,
+        _squircle1 = squircle1,
+        _squircle2 = squircle2,
+        _blend = blend;
+
+  FragmentShader _shader;
+
+  set shader(FragmentShader value) {
+    if (_shader == value) return;
+    _shader = value;
+    markNeedsPaint();
+  }
+
+  Squircle _squircle1;
+  set squircle1(Squircle value) {
+    if (_squircle1 == value) return;
+    _squircle1 = value;
+    markNeedsPaint();
+  }
+
+  Squircle _squircle2;
+  set squircle2(Squircle value) {
+    if (_squircle2 == value) return;
+    _squircle2 = value;
+    markNeedsPaint();
+  }
+
+  double _blend;
+  set blend(double value) {
+    if (_blend == value) return;
+    _blend = value;
+    markNeedsPaint();
+  }
+
+  @override
+  bool get sizedByParent => true;
+
+  @override
+  void performResize() {
+    size = constraints.biggest;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    context.pushLayer(
+      OffsetLayer(),
+      (context, offset) {
+        final paint = Paint();
+
+        _shader
+          ..setFloat(0, size.width)
+          ..setFloat(1, size.height)
+          ..setFloat(2, _squircle1.topLeft.dx)
+          ..setFloat(3, _squircle1.topLeft.dy)
+          ..setFloat(4, _squircle1.size.width)
+          ..setFloat(5, _squircle1.size.height)
+          ..setFloat(6, _squircle1.cornerRadius)
+          ..setFloat(7, _squircle2.topLeft.dx)
+          ..setFloat(8, _squircle2.topLeft.dy)
+          ..setFloat(9, _squircle2.size.width)
+          ..setFloat(10, _squircle2.size.height)
+          ..setFloat(11, _squircle2.cornerRadius)
+          ..setFloat(12, _blend);
+
+        paint.shader = _shader;
+        context.canvas.drawRect(offset & size, paint);
+      },
+      offset,
+    );
+  }
+}

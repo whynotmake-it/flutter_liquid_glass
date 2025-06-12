@@ -1,0 +1,67 @@
+name: liquid_glass_workspace_workspace
+
+packages:
+  - packages/*
+  - "packages/**/example/"
+
+command:
+  version:
+    updateGitTagRefs: true
+    workspaceChangelog: false
+    hooks:
+      preCommit: |
+        melos run generate
+        git add .
+
+scripts:
+  analyze:
+    run: |
+      dart analyze . --fatal-infos
+    exec:
+      # We are setting the concurrency to 1 because a higher concurrency can crash
+      # the analysis server on low performance machines (like GitHub Actions).
+      concurrency: 1
+    description: |
+      Run `dart analyze` in all packages.
+       - Note: you can also rely on your IDEs Dart Analysis / Issues window.
+  
+  test:select:
+    run: flutter test
+    exec:
+      failFast: true
+      concurrency: 6
+    packageFilters:
+      dirExists: test
+    description: Run `flutter test test` for selected packages.
+
+  test:
+    run: melos run test:select --no-select
+    description: Run all tests in this project.
+
+  coverage:select:
+    run: |
+      flutter test --coverage
+    exec:
+      failFast: true
+      concurrency: 6
+    packageFilters:
+      dirExists: test
+    description: Generate coverage for the selected package.
+
+  coverage:
+    run: melos run coverage:select --no-select
+    description: Generate coverage for all packages.
+  
+  generate:select:
+    description: Run code generation for selected packages.
+    run: dart run build_runner build --delete-conflicting-outputs
+    exec:
+      concurrency: 1
+      failFast: true
+    packageFilters:
+      dependsOn:
+        - build_runner
+
+  generate:
+    description: Run code generation for all packages.
+    run: melos run generate:select --no-select

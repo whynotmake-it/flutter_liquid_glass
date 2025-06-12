@@ -1,0 +1,25 @@
+name: Tag release
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish-packages:
+    name: Create tag for a release
+    permissions:
+      contents: write
+    runs-on: [ ubuntu-latest ]
+    if: contains(github.event.head_commit.message, 'chore(release)')
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+        with:
+          tag: true
