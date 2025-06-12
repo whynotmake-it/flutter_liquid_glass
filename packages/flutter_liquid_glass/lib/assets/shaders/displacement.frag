@@ -9,11 +9,52 @@ layout(location = 2) uniform vec2 uSize;
 layout(location = 3) uniform float uDisplacementScale = 1.0;
 layout(location = 4) uniform float uChromaticAberration = 0.0;
 layout(location = 5) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
+layout(location = 6) uniform float uLightAngle = 0.785398;
+layout(location = 7) uniform float uLightIntensity = 1.0;
+layout(location = 8) uniform float uAmbientStrength = 0.1;
+layout(location = 9) uniform float uOutlineIntensity = 3.3;
 
 layout(location = 0) out vec4 fragColor;
 
-#define ENCODING_SCALE 0.01
+#define ENCODING_SCALE 0.005
+#define PX(a) a / uSize.y
 
+// Calculate lighting effects based on displacement data
+vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplacement) {
+    float alpha = 1.0 - displacementData.a;
+    
+    // Create a shape mask based on alpha
+    float shape = smoothstep(0.1, 0.9, alpha);
+    
+    // Calculate distance from edge for ambient lighting
+    // Use displacement magnitude as a proxy for distance from edge
+    float displacementMag = length(refractionDisplacement);
+    float edgeDistance = smoothstep(0.0, 50.0, displacementMag);
+    
+    // Ambient lighting - subtle glow throughout the shape
+    float ambientLight = shape * smoothstep(0.2, 0.8, edgeDistance) * uAmbientStrength;
+    
+    // Calculate light direction (matching reference shader)
+    vec2 lightDir = normalize(vec2(cos(uLightAngle), sin(uLightAngle)));
+    
+    // Use normalized displacement as surface normal approximation
+    vec2 surfaceNormal = length(refractionDisplacement) > 0.001 ? 
+                        normalize(refractionDisplacement) : vec2(0.0, 1.0);
+    
+    // Diffuse lighting for outline effect
+    float diffuseLight = uOutlineIntensity * dot(surfaceNormal, lightDir);
+    diffuseLight *= shape * smoothstep(0.3, 0.0, edgeDistance) * 0.3;
+    
+    // Combine lighting effects
+    vec3 lighting = vec3(ambientLight + abs(diffuseLight));
+    
+    // Add subtle rim lighting based on normal.z for extra definition
+    float normalZ = displacementData.b;
+    float rimLight = pow(1.0 - normalZ, 2.0) * shape * 0.05;
+    lighting += vec3(rimLight);
+    
+    return lighting * uLightIntensity;
+}
 
 void main() {
     vec2 uv = FlutterFragCoord().xy / uSize;
@@ -87,6 +128,9 @@ void main() {
     // Mix refraction and reflection based on normal.z (surface angle)
     vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normalZ) * 0.2);
     
+    // Calculate lighting effects
+    vec3 lighting = calculateLighting(uv, displacementData, refractionDisplacement);
+    
     // Apply realistic glass color influence
     vec4 finalColor = liquidColor;
     
@@ -114,6 +158,9 @@ void main() {
         // Preserve the original alpha
         finalColor.a = liquidColor.a;
     }
+    
+    // Add lighting effects to final color
+    finalColor.rgb += lighting;
     
     // Sample original background for falloff areas
     vec4 originalBgColor = texture(uBackgroundTexture, uv);

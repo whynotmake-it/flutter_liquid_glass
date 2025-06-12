@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:equatable/equatable.dart';
@@ -22,17 +23,36 @@ class Squircle with EquatableMixin {
 
 class LiquidGlassSettings with EquatableMixin {
   const LiquidGlassSettings({
+    this.glassColor = const Color.fromARGB(0, 10, 41, 49),
     this.thickness = 20,
     this.chromaticAberration = .01,
     this.blend = 20,
+    this.lightAngle = 0.5 * pi,
+    this.lightIntensity = 30,
+    this.ambientStrength = 0,
+    this.outlineIntensity = 0,
   });
 
+  final Color glassColor;
   final double thickness;
   final double chromaticAberration;
   final double blend;
+  final double lightAngle;
+  final double lightIntensity;
+  final double ambientStrength;
+  final double outlineIntensity;
 
   @override
-  List<Object?> get props => [thickness, chromaticAberration, blend];
+  List<Object?> get props => [
+        glassColor,
+        thickness,
+        chromaticAberration,
+        blend,
+        lightAngle,
+        lightIntensity,
+        ambientStrength,
+        outlineIntensity,
+      ];
 }
 
 class RawSquircles extends StatelessWidget {
@@ -207,8 +227,6 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
-    final glassColor = Color.fromARGB(0, 255, 255, 255);
-
     _displacementShader
       ..setImageSampler(
         1,
@@ -216,10 +234,14 @@ class _RenderRawShapes extends RenderBox {
       )
       ..setFloat(2, 4.0)
       ..setFloat(3, _settings.chromaticAberration)
-      ..setFloat(4, glassColor.r)
-      ..setFloat(5, glassColor.g)
-      ..setFloat(6, glassColor.b)
-      ..setFloat(7, glassColor.a);
+      ..setFloat(4, _settings.glassColor.r)
+      ..setFloat(5, _settings.glassColor.g)
+      ..setFloat(6, _settings.glassColor.b)
+      ..setFloat(7, _settings.glassColor.a)
+      ..setFloat(8, _settings.lightAngle)
+      ..setFloat(9, _settings.lightIntensity)
+      ..setFloat(10, _settings.ambientStrength)
+      ..setFloat(11, _settings.outlineIntensity);
 
     context.pushLayer(
       BackdropFilterLayer(

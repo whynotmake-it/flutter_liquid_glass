@@ -18,7 +18,7 @@ layout(location = 8) uniform float uThickness;
 
 layout(location = 0) out vec4 fragColor;
 
-#define ENCODING_SCALE 0.01
+#define ENCODING_SCALE 0.005
 
 mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));

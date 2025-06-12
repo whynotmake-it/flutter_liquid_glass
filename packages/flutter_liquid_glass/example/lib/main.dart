@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_liquid_glass/flutter_liquid_glass.dart';
@@ -23,6 +25,14 @@ class MainApp extends HookWidget {
 
     const size1 = Size(50, 50);
     const size2 = Size(150, 100);
+
+    final lightAngleController = useAnimationController(
+      duration: const Duration(seconds: 5),
+      lowerBound: 0,
+      upperBound: 2 * pi,
+    )..repeat();
+
+    final lightAngle = useAnimation(lightAngleController);
 
     final offset = useOffsetMotion(
       value: flip.value ? offset1 : offset2,
@@ -67,8 +77,9 @@ class MainApp extends HookWidget {
                 ),
                 settings: LiquidGlassSettings(
                   thickness: 18,
-                  chromaticAberration: 0.2,
+                  chromaticAberration: 0.1,
                   blend: 50,
+                  lightAngle: lightAngle,
                 ),
               ),
             ],
