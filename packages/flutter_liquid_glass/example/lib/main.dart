@@ -63,7 +63,7 @@ class MainApp extends HookWidget {
                 squircle2: Squircle(
                   center: offset,
                   size: size,
-                  cornerRadius: 100,
+                  cornerRadius: 30,
                 ),
                 blend: 50,
               ),

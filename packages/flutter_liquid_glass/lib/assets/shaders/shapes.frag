@@ -14,6 +14,7 @@ layout(location = 5) uniform vec2 squircle2Size;
 layout(location = 6) uniform float squircle2CornerRadius;
 
 layout(location = 7) uniform float uBlend;
+layout(location = 8) uniform float uThickness;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -79,17 +80,16 @@ void main() {
     float alpha = smoothstep(-4.0, 0.0, sd);
     
     if (alpha < 1.0) {
-        float thickness = 20.0;
         float refractiveIndex = 1.5;
-        float baseHeight = thickness * 8.0;
+        float baseHeight = uThickness * 8.0;
         
-        vec3 normal = getNormal(sd, thickness);
+        vec3 normal = getNormal(sd, uThickness);
         
         // Calculate refraction using same method as reference
         vec3 incident = vec3(0.0, 0.0, -1.0);
         vec3 refractVec = refract(incident, normal, 1.0 / refractiveIndex);
         
-        float h = getHeight(sd, thickness);
+        float h = getHeight(sd, uThickness);
         float refractLength = (h + baseHeight) / max(0.001, dot(vec3(0.0, 0.0, -1.0), refractVec));
         
         // Calculate the 2D refraction displacement

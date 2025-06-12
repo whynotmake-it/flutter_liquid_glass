@@ -8,6 +8,7 @@ environment:
   flutter: ">=3.10.0"
 
 dependencies:
+  equatable: ^2.0.7
   flutter:
     sdk: flutter
   flutter_shaders: ^0.1.3

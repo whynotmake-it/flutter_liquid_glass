@@ -189,7 +189,8 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(9, _squircle2.size.width)
       ..setFloat(10, _squircle2.size.height)
       ..setFloat(11, _squircle2.cornerRadius)
-      ..setFloat(12, _blend);
+      ..setFloat(12, _blend)
+      ..setFloat(13, 20.0);
 
     paint.shader = _shapesShader;
     canvas.drawRect(offset & size, paint);
@@ -209,7 +210,6 @@ class _RenderRawShapes extends RenderBox {
     final glassColor = Color.fromARGB(0, 255, 255, 255);
 
     final lightAngle = 0.5 * pi;
-
     _displacementShader
       ..setImageSampler(
         1,
