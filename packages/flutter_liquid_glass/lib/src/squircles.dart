@@ -236,18 +236,17 @@ class _RenderRawShapes extends RenderBox {
         1,
         liquidShapes.toImageSync(size.width.toInt(), size.height.toInt()),
       )
-      ..setFloat(2, 4.0)
-      ..setFloat(3, _settings.chromaticAberration)
-      ..setFloat(4, _settings.glassColor.r)
-      ..setFloat(5, _settings.glassColor.g)
-      ..setFloat(6, _settings.glassColor.b)
-      ..setFloat(7, _settings.glassColor.a)
-      ..setFloat(8, _settings.lightAngle)
-      ..setFloat(9, _settings.lightIntensity)
-      ..setFloat(10, _settings.ambientStrength)
-      ..setFloat(11, _settings.outlineIntensity)
-      ..setFloat(12, _settings.thickness)
-      ..setFloat(13, 1.51);
+      ..setFloat(2, _settings.chromaticAberration)
+      ..setFloat(3, _settings.glassColor.r)
+      ..setFloat(4, _settings.glassColor.g)
+      ..setFloat(5, _settings.glassColor.b)
+      ..setFloat(6, _settings.glassColor.a)
+      ..setFloat(7, _settings.lightAngle)
+      ..setFloat(8, _settings.lightIntensity)
+      ..setFloat(9, _settings.ambientStrength)
+      ..setFloat(10, _settings.outlineIntensity)
+      ..setFloat(11, _settings.thickness)
+      ..setFloat(12, 1.51);
 
     context.pushLayer(
       BackdropFilterLayer(

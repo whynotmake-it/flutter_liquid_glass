@@ -7,15 +7,14 @@ precision highp float;
 layout(location = 0) uniform sampler2D uBackgroundTexture;
 layout(location = 1) uniform sampler2D uDisplacementTexture;
 layout(location = 2) uniform vec2 uSize;
-layout(location = 3) uniform float uDisplacementScale = 1.0;
-layout(location = 4) uniform float uChromaticAberration = 0.0;
-layout(location = 5) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
-layout(location = 6) uniform float uLightAngle = 0.785398;
-layout(location = 7) uniform float uLightIntensity = 1.0;
-layout(location = 8) uniform float uAmbientStrength = 0.1;
-layout(location = 9) uniform float uOutlineIntensity = 3.3;
-layout(location = 10) uniform float uThickness;
-layout(location = 11) uniform float uRefractiveIndex = 1.2;
+layout(location = 3) uniform float uChromaticAberration = 0.0;
+layout(location = 4) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
+layout(location = 5) uniform float uLightAngle = 0.785398;
+layout(location = 6) uniform float uLightIntensity = 1.0;
+layout(location = 7) uniform float uAmbientStrength = 0.1;
+layout(location = 8) uniform float uOutlineIntensity = 3.3;
+layout(location = 9) uniform float uThickness;
+layout(location = 10) uniform float uRefractiveIndex = 1.2;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -56,38 +55,11 @@ vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplaceme
     return lighting * uLightIntensity;
 }
 
-// Multi-sample normals for anti-aliasing
-vec4 sampleNormalHeightDataAA(vec2 uv, vec2 uSize) {
-    vec2 texelSize = 1.0 / uSize;
-    // Sample in a cross pattern for better performance while maintaining quality
-    vec4 center = texture(uDisplacementTexture, uv);
-    if (center.a == 0.0) {
-        return center;
-    }
-    vec4 left = texture(uDisplacementTexture, uv + vec2(-texelSize.x, 0.0));
-    vec4 right = texture(uDisplacementTexture, uv + vec2(texelSize.x, 0.0));
-    vec4 up = texture(uDisplacementTexture, uv + vec2(0.0, -texelSize.y));
-    vec4 down = texture(uDisplacementTexture, uv + vec2(0.0, texelSize.y));
-    
-    // Additional diagonal samples for higher quality
-    vec4 topLeft = texture(uDisplacementTexture, uv + vec2(-texelSize.x, -texelSize.y));
-    vec4 topRight = texture(uDisplacementTexture, uv + vec2(texelSize.x, -texelSize.y));
-    vec4 bottomLeft = texture(uDisplacementTexture, uv + vec2(-texelSize.x, texelSize.y));
-    vec4 bottomRight = texture(uDisplacementTexture, uv + vec2(texelSize.x, texelSize.y));
-    
-    // Weighted average with center getting more weight
-    vec4 result = center * 0.4 + 
-                  (left + right + up + down) * 0.1 + 
-                  (topLeft + topRight + bottomLeft + bottomRight) * 0.025;
-    
-    return result;
-}
 
 void main() {
     vec2 uv = FlutterFragCoord().xy / uSize;
     
-    // Use anti-aliased normal sampling
-    vec4 normalHeightData = sampleNormalHeightDataAA(uv, uSize);
+    vec4 normalHeightData = texture(uDisplacementTexture, uv);
     
     // Check if we're outside the liquid glass area
     if (normalHeightData.a == 0.0) {
@@ -95,12 +67,8 @@ void main() {
     }
     
     // Decode normal from RGB channels (map from [0,1] back to [-1,1])
-    vec3 normal = (normalHeightData.rgb - 0.5) * 2.0;
-    
-    // Additional smoothing for the normal vector itself
+    vec3 normal = (normalHeightData.rgb - 0.5) * 2.0;    
     normal = normalize(normal);
-    
-
    
     float normalizedHeight = normalHeightData.a;; // Extract height
     float height = normalizedHeight * uThickness;
@@ -114,9 +82,6 @@ void main() {
     
     // Calculate the 2D refraction displacement
     vec2 refractionDisplacement = refractVec.xy * refractLength;
-    
-    // Apply displacement scaling
-    refractionDisplacement *= uDisplacementScale;
     
     // Apply displacement to UV coordinates
     vec2 displacementUV = refractionDisplacement / uSize;
@@ -191,10 +156,8 @@ void main() {
             vec3 invGlass = vec3(1.0) - uGlassColor.rgb;
             vec3 screened = vec3(1.0) - (invLiquid * invGlass);
 
-            float thicknessFactor = clamp(uThickness / 20.0, 0.0, 1.0);
-            
             // Blend between original and screened result
-            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a * thicknessFactor);
+            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a);
         }
         
         // Preserve the original alpha

@@ -29,7 +29,7 @@ class MainApp extends HookWidget {
     const size2 = Size(150, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 12 : 0,
+      value: thicknessVisible.value ? 15 : 0,
       motion: SpringMotion(spring),
     );
 
@@ -54,6 +54,14 @@ class MainApp extends HookWidget {
     final cornerRadius = useSingleMotion(
       value: flip.value ? 50 : 20,
       motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
+    );
+
+    final baseColor = Theme.of(
+      context,
+    ).colorScheme.surface.withValues(alpha: 0.1);
+
+    final color = useTweenAnimation(
+      ColorTween(begin: baseColor, end: baseColor),
     );
 
     return MaterialApp(
@@ -94,6 +102,9 @@ class MainApp extends HookWidget {
                 ),
                 settings: LiquidGlassSettings(
                   thickness: thickness,
+                  glassColor: color!.withValues(
+                    alpha: color.a * (thickness / 20).clamp(0, 1),
+                  ),
                   chromaticAberration: 0.01,
                   blend: 50,
                   lightAngle: lightAngle,
