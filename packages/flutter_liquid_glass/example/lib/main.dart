@@ -51,7 +51,7 @@ class MainApp extends HookWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                child: Image.asset('assets/background.jpg', fit: BoxFit.cover),
+                child: Image.asset('assets/iphone.png', fit: BoxFit.cover),
               ),
               RawSquircles(
                 debugRenderRefractionMap: debug.value,

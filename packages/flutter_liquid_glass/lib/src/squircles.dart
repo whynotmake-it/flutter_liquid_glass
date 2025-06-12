@@ -24,7 +24,7 @@ class RawSquircles extends StatelessWidget {
     required this.squircle1,
     required this.squircle2,
     this.blend = 20,
-    this.chromaticAberration = .1,
+    this.chromaticAberration = .040,
     this.debugRenderRefractionMap = false,
   });
 
@@ -205,7 +205,7 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
-    final glassColor = ui.Color.fromARGB(56, 255, 255, 255);
+    final glassColor = ui.Color.fromARGB(32, 73, 73, 73);
 
     _displacementShader
       ..setImageSampler(
