@@ -28,6 +28,31 @@ float sdfRRect( in vec2 p, in vec2 b, in float r ) {
     return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
 
+float sdfSquircle(vec2 p, vec2 b, float r, float squareness) {
+    // squareness: 0.0 = circle, 1.0 = square
+    // Apple uses something around 0.6-0.8
+
+    float radius = r * 3;
+    
+    vec2 q = abs(p) - b + vec2(radius);
+    
+    if (q.x <= 0.0 && q.y <= 0.0) {
+        return max(q.x, q.y) - radius;  // Fixed: subtract r here
+    }
+    
+    vec2 corner = max(q, vec2(0.0));
+    
+    // Interpolate between circle (k=2) and higher k values
+    float k = mix(2.0, 8.0, squareness);
+    
+    // Calculate the squircle distance
+    float d = pow(pow(corner.x/radius, k) + pow(corner.y/radius, k), 1.0/k) * radius;
+    
+    return d - radius;
+}
+
+
+
 float sdfEllipse(vec2 p, vec2 r) {
     r = max(r, 1e-4);
     float k1 = length(p / r);
@@ -42,7 +67,7 @@ float smoothUnion(float d1, float d2, float k) {
 
 float sceneSDF(vec2 p) {
     float d1 = sdfRRect(p - squircle1Center, squircle1Size, squircle1CornerRadius);
-    float d2 = sdfRRect(p - squircle2Center, squircle2Size, squircle2CornerRadius);
+    float d2 = sdfSquircle(p - squircle2Center, squircle2Size, squircle2CornerRadius, .62);
     return smoothUnion(d1, d2, uBlend);
 }
 

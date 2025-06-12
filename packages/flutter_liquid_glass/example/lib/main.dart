@@ -22,14 +22,14 @@ class MainApp extends HookWidget {
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
 
-    const offset1 = Offset(150, 200);
+    const offset1 = Offset(200, 200);
     const offset2 = Offset(200, 450);
 
-    const size1 = Size(50, 50);
+    const size1 = Size(150, 100);
     const size2 = Size(150, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 18 : 0,
+      value: thicknessVisible.value ? 48 : 0,
       motion: SpringMotion(spring),
     );
 
@@ -48,6 +48,11 @@ class MainApp extends HookWidget {
 
     final size = useSizeMotion(
       value: flip.value ? size1 : size2,
+      motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
+    );
+
+    final cornerRadius = useSingleMotion(
+      value: flip.value ? 50 : 20,
       motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
     );
 
@@ -77,17 +82,17 @@ class MainApp extends HookWidget {
                 debugRenderRefractionMap: debug.value,
                 squircle1: Squircle(
                   center: offset1,
-                  size: const Size(100, 100),
-                  cornerRadius: 100,
+                  size: size1,
+                  cornerRadius: cornerRadius,
                 ),
                 squircle2: Squircle(
                   center: offset,
                   size: size,
-                  cornerRadius: 30,
+                  cornerRadius: cornerRadius,
                 ),
                 settings: LiquidGlassSettings(
                   thickness: thickness,
-                  chromaticAberration: 0.1,
+                  chromaticAberration: 0.0,
                   blend: 50,
                   lightAngle: lightAngle,
                 ),
