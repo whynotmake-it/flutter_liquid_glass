@@ -247,8 +247,8 @@ class _RenderRawShapes extends RenderBox {
       ..setImageSampler(
         1,
         liquidShapes.toImageSync(
-          size.width.toInt(),
-          size.height.toInt(),
+          (size).width.toInt(),
+          (size).height.toInt(),
         ),
       )
       ..setFloat(2, _settings.chromaticAberration)
@@ -262,8 +262,8 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(10, _settings.outlineIntensity)
       ..setFloat(11, _settings.thickness)
       ..setFloat(12, 1.51)
-      ..setFloat(13, size.width * _devicePixelRatio)
-      ..setFloat(14, size.height * _devicePixelRatio)
+      ..setFloat(13, size.width)
+      ..setFloat(14, size.height)
       ..setFloat(15, 0)
       ..setFloat(16, 0);
 

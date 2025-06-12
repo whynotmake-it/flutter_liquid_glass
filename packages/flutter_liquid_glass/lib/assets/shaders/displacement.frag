@@ -61,16 +61,9 @@ vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplaceme
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
     
-    // Transform screen coordinates to viewport coordinates
-    vec2 viewportUV = (FlutterFragCoord().xy - uViewportOffset) / uViewportSize;
+
     
-    // Check if we're outside the viewport
-    if (viewportUV.x < 0.0 || viewportUV.x > 1.0 || viewportUV.y < 0.0 || viewportUV.y > 1.0) {
-        fragColor = texture(uBackgroundTexture, screenUV);
-        return;
-    }
-    
-    vec4 normalHeightData = texture(uDisplacementTexture, viewportUV);
+    vec4 normalHeightData = texture(uDisplacementTexture, screenUV);
     
     // Check if we're outside the liquid glass area
     if (normalHeightData.a == 0.0) {
@@ -95,12 +88,9 @@ void main() {
     vec2 refractionDisplacement = refractVec.xy * refractLength;
     
     // Apply displacement to UV coordinates, scaling by viewport size
-    vec2 displacementUV = refractionDisplacement / uViewportSize;
-    vec2 refractedUV = viewportUV + displacementUV;
+    vec2 displacementUV = refractionDisplacement / uSize;
+    vec2 refractedUV = screenUV + displacementUV;
     
-    // Transform back to screen coordinates for background sampling
-    vec2 screenRefractedUV = refractedUV * uViewportSize + uViewportOffset;
-    screenRefractedUV /= uSize;
     
     // Chromatic aberration: sample each color channel with slightly different offsets
     vec4 refractColor;
@@ -115,27 +105,27 @@ void main() {
             vec2 chromaticOffset = normalize(displacementUV) * chromaticStrength;
             
             // Sample red channel with positive offset
-            vec2 redUV = screenRefractedUV + chromaticOffset;
+            vec2 redUV = refractedUV + chromaticOffset;
             float red = texture(uBackgroundTexture, redUV).r;
             
             // Sample green channel with no additional offset
-            float green = texture(uBackgroundTexture, screenRefractedUV).g;
+            float green = texture(uBackgroundTexture, refractedUV).g;
             
             // Sample blue channel with negative offset
-            vec2 blueUV = screenRefractedUV - chromaticOffset;
+            vec2 blueUV = refractedUV - chromaticOffset;
             float blue = texture(uBackgroundTexture, blueUV).b;
             
             // Get alpha from the center sample
-            float bgAlpha = texture(uBackgroundTexture, screenRefractedUV).a;
+            float bgAlpha = texture(uBackgroundTexture, refractedUV).a;
             
             refractColor = vec4(red, green, blue, bgAlpha);
         } else {
             // No significant displacement - sample normally
-            refractColor = texture(uBackgroundTexture, screenRefractedUV);
+            refractColor = texture(uBackgroundTexture, refractedUV);
         }
     } else {
         // No chromatic aberration - sample normally
-        refractColor = texture(uBackgroundTexture, screenRefractedUV);
+        refractColor = texture(uBackgroundTexture, refractedUV);
     }
     
     // Calculate reflection effect - much more subtle
@@ -149,7 +139,7 @@ void main() {
     vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normal.z) * 0.2);
     
     // Calculate lighting effects
-    vec3 lighting = calculateLighting(viewportUV, normalHeightData, refractionDisplacement);
+    vec3 lighting = calculateLighting(screenUV, normalHeightData, refractionDisplacement);
     
     // Apply realistic glass color influence
     vec4 finalColor = liquidColor;

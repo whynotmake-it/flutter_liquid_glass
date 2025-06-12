@@ -101,6 +101,7 @@ class MainApp extends HookWidget {
 
               child: const Icon(Icons.flip),
             ),
+
             body: GestureDetector(
               onTap: () {
                 thicknessVisible.value = !thicknessVisible.value;
