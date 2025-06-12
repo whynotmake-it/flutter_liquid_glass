@@ -53,7 +53,11 @@ class MainApp extends HookWidget {
                 size: const Size(100, 100),
                 cornerRadius: 100,
               ),
-              squircle2: Squircle(center: offset, size: size, cornerRadius: 20),
+              squircle2: Squircle(
+                center: offset,
+                size: size,
+                cornerRadius: 100,
+              ),
               blend: 50,
             ),
           ],
