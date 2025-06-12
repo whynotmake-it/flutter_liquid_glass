@@ -156,6 +156,8 @@ void main() {
             vec3 invGlass = vec3(1.0) - uGlassColor.rgb;
             vec3 screened = vec3(1.0) - (invLiquid * invGlass);
 
+      
+            
             // Blend between original and screened result
             finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a);
         }

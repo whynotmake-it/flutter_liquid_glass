@@ -199,8 +199,8 @@ class _RenderRawShapes extends RenderBox {
     _shapesShader
       ..setFloat(0, size.width)
       ..setFloat(1, size.height)
-      ..setFloat(2, _squircle1.center.dx)
-      ..setFloat(3, _squircle1.center.dy)
+      ..setFloat(2, _squircle1.center.dx + offset.dx)
+      ..setFloat(3, _squircle1.center.dy + offset.dy)
       ..setFloat(4, _squircle1.size.width)
       ..setFloat(5, _squircle1.size.height)
       ..setFloat(6, _squircle1.cornerRadius)
