@@ -65,7 +65,11 @@ class MainApp extends HookWidget {
                   size: size,
                   cornerRadius: 30,
                 ),
-                blend: 50,
+                settings: LiquidGlassSettings(
+                  thickness: 18,
+                  chromaticAberration: 0.2,
+                  blend: 50,
+                ),
               ),
             ],
           ),

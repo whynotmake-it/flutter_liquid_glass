@@ -1,1 +1,6 @@
 include: package:lintervention/analysis_options.yaml
+
+# Public member api docs are unnecessary
+linter:
+  rules:
+    - public_member_api_docs: false
