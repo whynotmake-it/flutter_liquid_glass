@@ -23,13 +23,13 @@ class MainApp extends HookWidget {
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
 
     const offset1 = Offset(200, 200);
-    const offset2 = Offset(200, 450);
+    const offset2 = Offset(200, 550);
 
     const size1 = Size(150, 100);
     const size2 = Size(150, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 18 : 0,
+      value: thicknessVisible.value ? 12 : 0,
       motion: SpringMotion(spring),
     );
 
@@ -47,7 +47,7 @@ class MainApp extends HookWidget {
     );
 
     final size = useSizeMotion(
-      value: flip.value ? size1 : size2,
+      value: flip.value ? size1 * 0.5 : size2,
       motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
     );
 

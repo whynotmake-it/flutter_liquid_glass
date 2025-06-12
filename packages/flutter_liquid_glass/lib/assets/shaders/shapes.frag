@@ -32,7 +32,7 @@ float sdfSquircle(vec2 p, vec2 b, float r, float squareness) {
     // squareness: 0.0 = circle, 1.0 = square
     // Apple uses something around 0.6-0.8
 
-    float radius = r * 3;
+    float radius = r * (2 / squareness);
     
     vec2 q = abs(p) - b + vec2(radius);
     
@@ -66,8 +66,8 @@ float smoothUnion(float d1, float d2, float k) {
 }
 
 float sceneSDF(vec2 p) {
-    float d1 = sdfSquircle(p - squircle1Center, squircle1Size, squircle1CornerRadius, .62);
-    float d2 = sdfSquircle(p - squircle2Center, squircle2Size, squircle2CornerRadius, .62);
+    float d1 = sdfSquircle(p - squircle1Center, squircle1Size, squircle1CornerRadius, .7);
+    float d2 = sdfSquircle(p - squircle2Center, squircle2Size, squircle2CornerRadius, .7);
     return smoothUnion(d1, d2, uBlend);
 }
 

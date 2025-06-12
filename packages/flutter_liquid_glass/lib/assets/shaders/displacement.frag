@@ -56,10 +56,38 @@ vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplaceme
     return lighting * uLightIntensity;
 }
 
+// Multi-sample normals for anti-aliasing
+vec4 sampleNormalHeightDataAA(vec2 uv, vec2 uSize) {
+    vec2 texelSize = 1.0 / uSize;
+    // Sample in a cross pattern for better performance while maintaining quality
+    vec4 center = texture(uDisplacementTexture, uv);
+    if (center.a == 0.0) {
+        return center;
+    }
+    vec4 left = texture(uDisplacementTexture, uv + vec2(-texelSize.x, 0.0));
+    vec4 right = texture(uDisplacementTexture, uv + vec2(texelSize.x, 0.0));
+    vec4 up = texture(uDisplacementTexture, uv + vec2(0.0, -texelSize.y));
+    vec4 down = texture(uDisplacementTexture, uv + vec2(0.0, texelSize.y));
+    
+    // Additional diagonal samples for higher quality
+    vec4 topLeft = texture(uDisplacementTexture, uv + vec2(-texelSize.x, -texelSize.y));
+    vec4 topRight = texture(uDisplacementTexture, uv + vec2(texelSize.x, -texelSize.y));
+    vec4 bottomLeft = texture(uDisplacementTexture, uv + vec2(-texelSize.x, texelSize.y));
+    vec4 bottomRight = texture(uDisplacementTexture, uv + vec2(texelSize.x, texelSize.y));
+    
+    // Weighted average with center getting more weight
+    vec4 result = center * 0.4 + 
+                  (left + right + up + down) * 0.1 + 
+                  (topLeft + topRight + bottomLeft + bottomRight) * 0.025;
+    
+    return result;
+}
+
 void main() {
     vec2 uv = FlutterFragCoord().xy / uSize;
     
-    vec4 normalHeightData = texture(uDisplacementTexture, uv);
+    // Use anti-aliased normal sampling
+    vec4 normalHeightData = sampleNormalHeightDataAA(uv, uSize);
     
     // Check if we're outside the liquid glass area
     if (normalHeightData.a == 0.0) {
@@ -68,6 +96,9 @@ void main() {
     
     // Decode normal from RGB channels (map from [0,1] back to [-1,1])
     vec3 normal = (normalHeightData.rgb - 0.5) * 2.0;
+    
+    // Additional smoothing for the normal vector itself
+    normal = normalize(normal);
     
 
    

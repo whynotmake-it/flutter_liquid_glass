@@ -23,7 +23,7 @@ class Squircle with EquatableMixin {
 
 class LiquidGlassSettings with EquatableMixin {
   const LiquidGlassSettings({
-    this.glassColor = const Color.fromARGB(35, 255, 255, 255),
+    this.glassColor = const Color.fromARGB(16, 255, 255, 255),
     this.thickness = 20,
     this.chromaticAberration = .01,
     this.blend = 20,
