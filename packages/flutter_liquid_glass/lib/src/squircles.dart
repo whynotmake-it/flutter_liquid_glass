@@ -205,7 +205,7 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
-    final glassColor = ui.Color.fromARGB(32, 73, 73, 73);
+    final glassColor = ui.Color.fromARGB(0, 255, 255, 255);
 
     _displacementShader
       ..setImageSampler(

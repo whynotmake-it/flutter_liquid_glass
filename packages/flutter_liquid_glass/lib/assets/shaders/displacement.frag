@@ -87,8 +87,33 @@ void main() {
     // Mix refraction and reflection based on normal.z (surface angle)
     vec4 liquidColor = mix(refractColor, reflectColor, (1.0 - normalZ) * 0.2);
     
-
-    vec4 finalColor = mix(liquidColor, uGlassColor, uGlassColor.a);
+    // Apply realistic glass color influence
+    vec4 finalColor = liquidColor;
+    
+    if (uGlassColor.a > 0.0) {
+        // Calculate luminance of glass color to determine if it's light or dark
+        float glassLuminance = dot(uGlassColor.rgb, vec3(0.299, 0.587, 0.114));
+        
+        // For realistic glass behavior:
+        // - Dark glass colors should darken the refracted light (multiply)
+        // - Light glass colors should tint while preserving brightness (overlay/screen)
+        if (glassLuminance < 0.5) {
+            // Dark glass: use multiply blending to darken
+            vec3 darkened = liquidColor.rgb * (uGlassColor.rgb * 2.0);
+            finalColor.rgb = mix(liquidColor.rgb, darkened, uGlassColor.a);
+        } else {
+            // Light glass: use screen blending to lighten and tint
+            vec3 invLiquid = vec3(1.0) - liquidColor.rgb;
+            vec3 invGlass = vec3(1.0) - uGlassColor.rgb;
+            vec3 screened = vec3(1.0) - (invLiquid * invGlass);
+            
+            // Blend between original and screened result
+            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a * 0.8);
+        }
+        
+        // Preserve the original alpha
+        finalColor.a = liquidColor.a;
+    }
     
     // Sample original background for falloff areas
     vec4 originalBgColor = texture(uBackgroundTexture, uv);
