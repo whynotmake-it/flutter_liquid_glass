@@ -9,8 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_hooks: ^0.20.5
   flutter_liquid_glass:
     path: ../
+  rivership: ^0.3.0-dev.3
   springster: ^1.0.0-dev.3
 
 dev_dependencies:

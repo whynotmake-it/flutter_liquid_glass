@@ -8,12 +8,12 @@ import 'package:flutter_shaders/flutter_shaders.dart';
 
 class Squircle {
   const Squircle({
-    required this.topLeft,
+    required this.center,
     required this.size,
     required this.cornerRadius,
   });
 
-  final Offset topLeft;
+  final Offset center;
   final Size size;
   final double cornerRadius;
 }
@@ -24,22 +24,34 @@ class RawSquircles extends StatelessWidget {
     required this.squircle1,
     required this.squircle2,
     this.blend = 20,
+    this.debugRenderRefractionMap = false,
   });
 
   final Squircle squircle1;
   final Squircle squircle2;
   final double blend;
 
+  final bool debugRenderRefractionMap;
+
   @override
   Widget build(BuildContext context) {
     return ShaderBuilder(
       assetKey: 'packages/flutter_liquid_glass/lib/assets/shaders/shapes.frag',
-      (context, shader, child) {
-        return _RawShapes(
-          shader: shader,
-          squircle1: squircle1,
-          squircle2: squircle2,
-          blend: blend,
+      (context, shapesShader, child) {
+        return ShaderBuilder(
+          assetKey:
+              'packages/flutter_liquid_glass/lib/assets/shaders/displacement.frag',
+          (context, displacementShader, child) {
+            return _RawShapes(
+              shapesShader: shapesShader,
+              displacementShader: displacementShader,
+              squircle1: squircle1,
+              squircle2: squircle2,
+              blend: blend,
+              debugRenderRefractionMap: debugRenderRefractionMap,
+            );
+          },
+          child: child,
         );
       },
     );
@@ -48,23 +60,30 @@ class RawSquircles extends StatelessWidget {
 
 class _RawShapes extends LeafRenderObjectWidget {
   const _RawShapes({
-    required this.shader,
+    required this.shapesShader,
+    required this.displacementShader,
     required this.squircle1,
     required this.squircle2,
     required this.blend,
+    required this.debugRenderRefractionMap,
   });
 
-  final FragmentShader shader;
+  final FragmentShader shapesShader;
+  final FragmentShader displacementShader;
   final Squircle squircle1;
   final Squircle squircle2;
   final double blend;
+  final bool debugRenderRefractionMap;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return _RenderRawShapes(
-      shader: shader,
+      shapesShader: shapesShader,
+      displacementShader: displacementShader,
       squircle1: squircle1,
       squircle2: squircle2,
       blend: blend,
+      debugRenderRefractionMap: debugRenderRefractionMap,
     );
   }
 
@@ -74,31 +93,29 @@ class _RawShapes extends LeafRenderObjectWidget {
     _RenderRawShapes renderObject,
   ) {
     renderObject
-      ..shader = shader
       ..squircle1 = squircle1
       ..squircle2 = squircle2
-      ..blend = blend;
+      ..blend = blend
+      ..debugRenderRefractionMap = debugRenderRefractionMap;
   }
 }
 
 class _RenderRawShapes extends RenderBox {
   _RenderRawShapes({
-    required FragmentShader shader,
+    required FragmentShader shapesShader,
+    required FragmentShader displacementShader,
     required Squircle squircle1,
     required Squircle squircle2,
     required double blend,
-  })  : _shader = shader,
+    bool debugRenderRefractionMap = false,
+  })  : _shapesShader = shapesShader,
+        _displacementShader = displacementShader,
         _squircle1 = squircle1,
         _squircle2 = squircle2,
         _blend = blend;
 
-  FragmentShader _shader;
-
-  set shader(FragmentShader value) {
-    if (_shader == value) return;
-    _shader = value;
-    markNeedsPaint();
-  }
+  final FragmentShader _shapesShader;
+  final FragmentShader _displacementShader;
 
   Squircle _squircle1;
   set squircle1(Squircle value) {
@@ -121,6 +138,13 @@ class _RenderRawShapes extends RenderBox {
     markNeedsPaint();
   }
 
+  bool _debugRenderRefractionMap = false;
+  set debugRenderRefractionMap(bool value) {
+    if (_debugRenderRefractionMap == value) return;
+    _debugRenderRefractionMap = value;
+    markNeedsPaint();
+  }
+
   @override
   bool get sizedByParent => true;
 
@@ -129,30 +153,56 @@ class _RenderRawShapes extends RenderBox {
     size = constraints.biggest;
   }
 
+  ui.Picture _drawLiquidShapes(Offset offset, Size size) {
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
+
+    final paint = Paint();
+
+    _shapesShader
+      ..setFloat(0, size.width)
+      ..setFloat(1, size.height)
+      ..setFloat(2, _squircle1.center.dx)
+      ..setFloat(3, _squircle1.center.dy)
+      ..setFloat(4, _squircle1.size.width)
+      ..setFloat(5, _squircle1.size.height)
+      ..setFloat(6, _squircle1.cornerRadius)
+      ..setFloat(7, _squircle2.center.dx)
+      ..setFloat(8, _squircle2.center.dy)
+      ..setFloat(9, _squircle2.size.width)
+      ..setFloat(10, _squircle2.size.height)
+      ..setFloat(11, _squircle2.cornerRadius)
+      ..setFloat(12, _blend);
+
+    paint.shader = _shapesShader;
+    canvas.drawRect(offset & size, paint);
+
+    return recorder.endRecording();
+  }
+
   @override
   void paint(PaintingContext context, Offset offset) {
+    final liquidShapes = _drawLiquidShapes(offset, size);
+
+    if (_debugRenderRefractionMap) {
+      context.canvas.drawPicture(liquidShapes);
+      return;
+    }
+
+    _displacementShader
+      ..setImageSampler(
+        1,
+        liquidShapes.toImageSync(size.width.toInt(), size.height.toInt()),
+      );
+
     context.pushLayer(
-      OffsetLayer(),
+      BackdropFilterLayer(
+        filter: ui.ImageFilter.shader(
+          _displacementShader,
+        ),
+      ),
       (context, offset) {
-        final paint = Paint();
-
-        _shader
-          ..setFloat(0, size.width)
-          ..setFloat(1, size.height)
-          ..setFloat(2, _squircle1.topLeft.dx)
-          ..setFloat(3, _squircle1.topLeft.dy)
-          ..setFloat(4, _squircle1.size.width)
-          ..setFloat(5, _squircle1.size.height)
-          ..setFloat(6, _squircle1.cornerRadius)
-          ..setFloat(7, _squircle2.topLeft.dx)
-          ..setFloat(8, _squircle2.topLeft.dy)
-          ..setFloat(9, _squircle2.size.width)
-          ..setFloat(10, _squircle2.size.height)
-          ..setFloat(11, _squircle2.cornerRadius)
-          ..setFloat(12, _blend);
-
-        paint.shader = _shader;
-        context.canvas.drawRect(offset & size, paint);
+        super.paint(context, offset);
       },
       offset,
     );
