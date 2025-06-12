@@ -115,6 +115,7 @@ class _RawShapes extends LeafRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) {
     return _RenderRawShapes(
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       shapesShader: shapesShader,
       displacementShader: displacementShader,
       squircle1: squircle1,
@@ -130,6 +131,7 @@ class _RawShapes extends LeafRenderObjectWidget {
     _RenderRawShapes renderObject,
   ) {
     renderObject
+      ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..squircle1 = squircle1
       ..squircle2 = squircle2
       ..settings = settings
@@ -139,17 +141,26 @@ class _RawShapes extends LeafRenderObjectWidget {
 
 class _RenderRawShapes extends RenderBox {
   _RenderRawShapes({
+    required double devicePixelRatio,
     required FragmentShader shapesShader,
     required FragmentShader displacementShader,
     required Squircle squircle1,
     required Squircle squircle2,
     required LiquidGlassSettings settings,
     bool debugRenderRefractionMap = false,
-  })  : _shapesShader = shapesShader,
+  })  : _devicePixelRatio = devicePixelRatio,
+        _shapesShader = shapesShader,
         _displacementShader = displacementShader,
         _squircle1 = squircle1,
         _squircle2 = squircle2,
         _settings = settings;
+
+  double _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
+    markNeedsPaint();
+  }
 
   final FragmentShader _shapesShader;
   final FragmentShader _displacementShader;
@@ -197,15 +208,15 @@ class _RenderRawShapes extends RenderBox {
     final paint = Paint();
 
     _shapesShader
-      ..setFloat(0, size.width)
-      ..setFloat(1, size.height)
+      ..setFloat(0, size.width * _devicePixelRatio)
+      ..setFloat(1, size.height * _devicePixelRatio)
       ..setFloat(2, _squircle1.center.dx + offset.dx)
       ..setFloat(3, _squircle1.center.dy + offset.dy)
       ..setFloat(4, _squircle1.size.width)
       ..setFloat(5, _squircle1.size.height)
       ..setFloat(6, _squircle1.cornerRadius)
-      ..setFloat(7, _squircle2.center.dx)
-      ..setFloat(8, _squircle2.center.dy)
+      ..setFloat(7, _squircle2.center.dx + offset.dx)
+      ..setFloat(8, _squircle2.center.dy + offset.dy)
       ..setFloat(9, _squircle2.size.width)
       ..setFloat(10, _squircle2.size.height)
       ..setFloat(11, _squircle2.cornerRadius)
@@ -231,10 +242,14 @@ class _RenderRawShapes extends RenderBox {
       super.paint(context, offset);
     }
 
+    // Get screen size
     _displacementShader
       ..setImageSampler(
         1,
-        liquidShapes.toImageSync(size.width.toInt(), size.height.toInt()),
+        liquidShapes.toImageSync(
+          size.width.toInt(),
+          size.height.toInt(),
+        ),
       )
       ..setFloat(2, _settings.chromaticAberration)
       ..setFloat(3, _settings.glassColor.r)
@@ -246,7 +261,11 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(9, _settings.ambientStrength)
       ..setFloat(10, _settings.outlineIntensity)
       ..setFloat(11, _settings.thickness)
-      ..setFloat(12, 1.51);
+      ..setFloat(12, 1.51)
+      ..setFloat(13, size.width * _devicePixelRatio)
+      ..setFloat(14, size.height * _devicePixelRatio)
+      ..setFloat(15, 0)
+      ..setFloat(16, 0);
 
     context.pushLayer(
       BackdropFilterLayer(

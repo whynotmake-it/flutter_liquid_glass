@@ -25,7 +25,7 @@ class MainApp extends HookWidget {
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3);
 
-    const offset1 = Offset(100, 150);
+    const offset1 = Offset(50, 50);
     const offset2 = Offset(200, 550);
 
     const size1 = Size(100, 100);
