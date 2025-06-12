@@ -24,12 +24,14 @@ class RawSquircles extends StatelessWidget {
     required this.squircle1,
     required this.squircle2,
     this.blend = 20,
+    this.chromaticAberration = .1,
     this.debugRenderRefractionMap = false,
   });
 
   final Squircle squircle1;
   final Squircle squircle2;
   final double blend;
+  final double chromaticAberration;
 
   final bool debugRenderRefractionMap;
 
@@ -48,6 +50,7 @@ class RawSquircles extends StatelessWidget {
               squircle1: squircle1,
               squircle2: squircle2,
               blend: blend,
+              chromaticAberration: chromaticAberration,
               debugRenderRefractionMap: debugRenderRefractionMap,
             );
           },
@@ -65,6 +68,7 @@ class _RawShapes extends LeafRenderObjectWidget {
     required this.squircle1,
     required this.squircle2,
     required this.blend,
+    required this.chromaticAberration,
     required this.debugRenderRefractionMap,
   });
 
@@ -73,6 +77,7 @@ class _RawShapes extends LeafRenderObjectWidget {
   final Squircle squircle1;
   final Squircle squircle2;
   final double blend;
+  final double chromaticAberration;
   final bool debugRenderRefractionMap;
 
   @override
@@ -83,6 +88,7 @@ class _RawShapes extends LeafRenderObjectWidget {
       squircle1: squircle1,
       squircle2: squircle2,
       blend: blend,
+      chromaticAberration: chromaticAberration,
       debugRenderRefractionMap: debugRenderRefractionMap,
     );
   }
@@ -96,6 +102,7 @@ class _RawShapes extends LeafRenderObjectWidget {
       ..squircle1 = squircle1
       ..squircle2 = squircle2
       ..blend = blend
+      ..chromaticAberration = chromaticAberration
       ..debugRenderRefractionMap = debugRenderRefractionMap;
   }
 }
@@ -107,12 +114,14 @@ class _RenderRawShapes extends RenderBox {
     required Squircle squircle1,
     required Squircle squircle2,
     required double blend,
+    required double chromaticAberration,
     bool debugRenderRefractionMap = false,
   })  : _shapesShader = shapesShader,
         _displacementShader = displacementShader,
         _squircle1 = squircle1,
         _squircle2 = squircle2,
-        _blend = blend;
+        _blend = blend,
+        _chromaticAberration = chromaticAberration;
 
   final FragmentShader _shapesShader;
   final FragmentShader _displacementShader;
@@ -135,6 +144,13 @@ class _RenderRawShapes extends RenderBox {
   set blend(double value) {
     if (_blend == value) return;
     _blend = value;
+    markNeedsPaint();
+  }
+
+  double _chromaticAberration;
+  set chromaticAberration(double value) {
+    if (_chromaticAberration == value) return;
+    _chromaticAberration = value;
     markNeedsPaint();
   }
 
@@ -197,10 +213,11 @@ class _RenderRawShapes extends RenderBox {
         liquidShapes.toImageSync(size.width.toInt(), size.height.toInt()),
       )
       ..setFloat(2, 4.0)
-      ..setFloat(3, glassColor.r)
-      ..setFloat(4, glassColor.g)
-      ..setFloat(5, glassColor.b)
-      ..setFloat(6, glassColor.a);
+      ..setFloat(3, _chromaticAberration)
+      ..setFloat(4, glassColor.r)
+      ..setFloat(5, glassColor.g)
+      ..setFloat(6, glassColor.b)
+      ..setFloat(7, glassColor.a);
 
     context.pushLayer(
       BackdropFilterLayer(

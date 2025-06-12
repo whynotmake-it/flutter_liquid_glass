@@ -7,8 +7,8 @@ layout(location = 0) uniform sampler2D uBackgroundTexture;
 layout(location = 1) uniform sampler2D uDisplacementTexture;
 layout(location = 2) uniform vec2 uSize;
 layout(location = 3) uniform float uDisplacementScale = 1.0;
-
-layout(location = 4) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
+layout(location = 4) uniform float uChromaticAberration = 0.0;
+layout(location = 5) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
 
 layout(location = 0) out vec4 fragColor;
 
@@ -41,8 +41,31 @@ void main() {
     vec2 displacementUV = refractionDisplacement / uSize;
     vec2 refractedUV = uv + displacementUV;
     
-    // Sample the refracted background
-    vec4 refractColor = texture(uBackgroundTexture, refractedUV);
+    // Chromatic aberration: sample each color channel with slightly different offsets
+    vec4 refractColor;
+    if (uChromaticAberration > 0.0) {
+        // Calculate chromatic aberration offsets for each color channel
+        vec2 chromaticOffset = normalize(displacementUV) * uChromaticAberration;
+        
+        // Sample red channel with positive offset
+        vec2 redUV = refractedUV + chromaticOffset;
+        float red = texture(uBackgroundTexture, redUV).r;
+        
+        // Sample green channel with no additional offset
+        float green = texture(uBackgroundTexture, refractedUV).g;
+        
+        // Sample blue channel with negative offset
+        vec2 blueUV = refractedUV - chromaticOffset;
+        float blue = texture(uBackgroundTexture, blueUV).b;
+        
+        // Get alpha from the center sample
+        float alpha = texture(uBackgroundTexture, refractedUV).a;
+        
+        refractColor = vec4(red, green, blue, alpha);
+    } else {
+        // No chromatic aberration - sample normally
+        refractColor = texture(uBackgroundTexture, refractedUV);
+    }
     
     // Calculate reflection effect - much more subtle
     vec4 reflectColor = vec4(0.0);
