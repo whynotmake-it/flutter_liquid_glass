@@ -24,7 +24,7 @@ class RawSquircles extends StatelessWidget {
     required this.squircle1,
     required this.squircle2,
     this.blend = 20,
-    this.chromaticAberration = .040,
+    this.chromaticAberration = .01,
     this.debugRenderRefractionMap = false,
   });
 

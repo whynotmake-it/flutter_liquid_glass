@@ -44,24 +44,34 @@ void main() {
     // Chromatic aberration: sample each color channel with slightly different offsets
     vec4 refractColor;
     if (uChromaticAberration > 0.0) {
-        // Calculate chromatic aberration offsets for each color channel
-        vec2 chromaticOffset = normalize(displacementUV) * uChromaticAberration;
+        // Calculate chromatic aberration strength based on displacement magnitude
+        float displacementMagnitude = length(refractionDisplacement);
+        float chromaticStrength = displacementMagnitude * uChromaticAberration * 0.001;
         
-        // Sample red channel with positive offset
-        vec2 redUV = refractedUV + chromaticOffset;
-        float red = texture(uBackgroundTexture, redUV).r;
-        
-        // Sample green channel with no additional offset
-        float green = texture(uBackgroundTexture, refractedUV).g;
-        
-        // Sample blue channel with negative offset
-        vec2 blueUV = refractedUV - chromaticOffset;
-        float blue = texture(uBackgroundTexture, blueUV).b;
-        
-        // Get alpha from the center sample
-        float alpha = texture(uBackgroundTexture, refractedUV).a;
-        
-        refractColor = vec4(red, green, blue, alpha);
+        // Only apply chromatic aberration if there's significant displacement
+        if (chromaticStrength > 0.0001) {
+            // Calculate chromatic aberration offsets for each color channel
+            vec2 chromaticOffset = normalize(displacementUV) * chromaticStrength;
+            
+            // Sample red channel with positive offset
+            vec2 redUV = refractedUV + chromaticOffset;
+            float red = texture(uBackgroundTexture, redUV).r;
+            
+            // Sample green channel with no additional offset
+            float green = texture(uBackgroundTexture, refractedUV).g;
+            
+            // Sample blue channel with negative offset
+            vec2 blueUV = refractedUV - chromaticOffset;
+            float blue = texture(uBackgroundTexture, blueUV).b;
+            
+            // Get alpha from the center sample
+            float alpha = texture(uBackgroundTexture, refractedUV).a;
+            
+            refractColor = vec4(red, green, blue, alpha);
+        } else {
+            // No significant displacement - sample normally
+            refractColor = texture(uBackgroundTexture, refractedUV);
+        }
     } else {
         // No chromatic aberration - sample normally
         refractColor = texture(uBackgroundTexture, refractedUV);
