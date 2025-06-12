@@ -95,9 +95,7 @@ void main() {
         // Calculate the 2D refraction displacement
         vec2 refractionDisplacement = refractVec.xy * refractLength;
         
-        // Scale factor to control displacement strength and fit in texture range
-        float displacementScale = ENCODING_SCALE;
-        vec2 scaledDisplacement = refractionDisplacement * displacementScale;
+        vec2 scaledDisplacement = refractionDisplacement * ENCODING_SCALE;
         
         // Encode displacement values to 0-1 range (from approximately -1 to 1)
         vec2 encodedDisplacement = scaledDisplacement * 0.5 + 0.5;

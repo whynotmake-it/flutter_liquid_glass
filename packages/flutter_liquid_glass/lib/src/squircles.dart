@@ -189,14 +189,14 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
-    final glassColor = Color(0xFFFFFFFF);
+    final glassColor = ui.Color.fromARGB(56, 255, 255, 255);
 
     _displacementShader
       ..setImageSampler(
         1,
         liquidShapes.toImageSync(size.width.toInt(), size.height.toInt()),
       )
-      ..setFloat(2, 1.0)
+      ..setFloat(2, 4.0)
       ..setFloat(3, glassColor.r)
       ..setFloat(4, glassColor.g)
       ..setFloat(5, glassColor.b)

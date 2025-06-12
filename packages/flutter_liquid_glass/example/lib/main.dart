@@ -13,6 +13,7 @@ class MainApp extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final debug = useState(false);
     final flip = useKeyedState(false, keys: []);
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
@@ -40,27 +41,34 @@ class MainApp extends HookWidget {
           onPressed: () {
             flip.value = !flip.value;
           },
+
           child: const Icon(Icons.flip),
         ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset('assets/background.jpg', fit: BoxFit.cover),
-            ),
-            RawSquircles(
-              squircle1: Squircle(
-                center: offset1,
-                size: const Size(100, 100),
-                cornerRadius: 100,
+        body: GestureDetector(
+          onLongPress: () {
+            debug.value = !debug.value;
+          },
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset('assets/background.jpg', fit: BoxFit.cover),
               ),
-              squircle2: Squircle(
-                center: offset,
-                size: size,
-                cornerRadius: 100,
+              RawSquircles(
+                debugRenderRefractionMap: debug.value,
+                squircle1: Squircle(
+                  center: offset1,
+                  size: const Size(100, 100),
+                  cornerRadius: 100,
+                ),
+                squircle2: Squircle(
+                  center: offset,
+                  size: size,
+                  cornerRadius: 100,
+                ),
+                blend: 50,
               ),
-              blend: 50,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

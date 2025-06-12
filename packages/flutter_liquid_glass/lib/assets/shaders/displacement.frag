@@ -35,7 +35,7 @@ void main() {
     vec2 decodedDisplacement = (encodedDisplacement - 0.5) * 2.0;
     
     
-    vec2 refractionDisplacement = (decodedDisplacement / ENCODING_SCALE) * 10;
+    vec2 refractionDisplacement = (decodedDisplacement / ENCODING_SCALE) * uDisplacementScale;
     
     // Apply displacement more aggressively - multiply by a factor to make it visible
     vec2 displacementUV = refractionDisplacement / uSize;
