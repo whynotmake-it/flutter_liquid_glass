@@ -79,7 +79,7 @@ void main() {
     float alpha = smoothstep(-4.0, 0.0, sd);
     
     if (alpha < 1.0) {
-        float thickness = 15.0;
+        float thickness = 20.0;
         float refractiveIndex = 1.5;
         float baseHeight = thickness * 8.0;
         

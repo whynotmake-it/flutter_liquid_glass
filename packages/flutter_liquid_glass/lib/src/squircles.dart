@@ -1,5 +1,6 @@
+import 'dart:math';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -169,9 +170,9 @@ class _RenderRawShapes extends RenderBox {
     size = constraints.biggest;
   }
 
-  ui.Picture _drawLiquidShapes(Offset offset, Size size) {
-    final recorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(recorder);
+  Picture _drawLiquidShapes(Offset offset, Size size) {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
 
     final paint = Paint();
 
@@ -205,7 +206,9 @@ class _RenderRawShapes extends RenderBox {
       return;
     }
 
-    final glassColor = ui.Color.fromARGB(0, 255, 255, 255);
+    final glassColor = Color.fromARGB(0, 255, 255, 255);
+
+    final lightAngle = 0.5 * pi;
 
     _displacementShader
       ..setImageSampler(
@@ -217,11 +220,12 @@ class _RenderRawShapes extends RenderBox {
       ..setFloat(4, glassColor.r)
       ..setFloat(5, glassColor.g)
       ..setFloat(6, glassColor.b)
-      ..setFloat(7, glassColor.a);
+      ..setFloat(7, glassColor.a)
+      ..setFloat(8, lightAngle);
 
     context.pushLayer(
       BackdropFilterLayer(
-        filter: ui.ImageFilter.shader(
+        filter: ImageFilter.shader(
           _displacementShader,
         ),
       ),
