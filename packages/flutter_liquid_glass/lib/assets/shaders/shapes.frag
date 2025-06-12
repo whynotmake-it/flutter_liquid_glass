@@ -66,8 +66,8 @@ float smoothUnion(float d1, float d2, float k) {
 }
 
 float sceneSDF(vec2 p) {
-    float d1 = sdfSquircle(p - squircle1Center, squircle1Size, squircle1CornerRadius, .7);
-    float d2 = sdfSquircle(p - squircle2Center, squircle2Size, squircle2CornerRadius, .7);
+    float d1 = sdfSquircle(p - squircle1Center, squircle1Size / 2, squircle1CornerRadius, .7);
+    float d2 = sdfSquircle(p - squircle2Center, squircle2Size / 2, squircle2CornerRadius, .7);
     return smoothUnion(d1, d2, uBlend);
 }
 

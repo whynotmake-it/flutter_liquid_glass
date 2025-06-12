@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -22,14 +23,14 @@ class MainApp extends HookWidget {
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.4);
 
-    const offset1 = Offset(200, 200);
+    const offset1 = Offset(100, 150);
     const offset2 = Offset(200, 550);
 
-    const size1 = Size(150, 100);
-    const size2 = Size(150, 100);
+    const size1 = Size(100, 100);
+    const size2 = Size(300, 100);
 
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 15 : 0,
+      value: thicknessVisible.value ? 40 : 0,
       motion: SpringMotion(spring),
     );
 
@@ -88,6 +89,52 @@ class MainApp extends HookWidget {
                 Positioned.fill(
                   child: Image.asset('assets/iphone.png', fit: BoxFit.cover),
                 ),
+
+              Positioned(
+                top: offset1.dy - size1.height / 2,
+                left: offset1.dx - size1.width / 2,
+
+                child: ClipRSuperellipse(
+                  borderRadius: BorderRadiusGeometry.circular(cornerRadius),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: thickness,
+                      sigmaY: thickness,
+                    ),
+                    child: SizedBox(width: size1.width, height: size1.height),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: offset.dy - size.height / 2,
+                left: offset.dx - size.width / 2,
+
+                child: ClipRSuperellipse(
+                  borderRadius: BorderRadiusGeometry.circular(cornerRadius),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: thickness,
+                      sigmaY: thickness,
+                    ),
+                    child: SizedBox(
+                      width: size.width,
+                      height: size.height,
+
+                      child: AnimatedSizeSwitcher(
+                        child: flip.value
+                            ? SizedBox.shrink()
+                            : Center(
+                                child: Text(
+                                  "Hello from Flutter",
+                                  style: Theme.of(context).textTheme.bodyLarge!
+                                      .copyWith(color: Colors.white),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               RawSquircles(
                 debugRenderRefractionMap: debug.value,
                 squircle1: Squircle(
@@ -106,7 +153,6 @@ class MainApp extends HookWidget {
                     alpha: color.a * (thickness / 20).clamp(0, 1),
                   ),
                   chromaticAberration: 0.01,
-                  blend: 50,
                   lightAngle: lightAngle,
                 ),
               ),
