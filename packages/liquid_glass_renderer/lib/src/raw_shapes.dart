@@ -2,7 +2,7 @@
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_shape.dart';
+import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
 @internal
@@ -23,12 +23,12 @@ class RawShape with EquatableMixin {
   });
 
   factory RawShape.fromLiquidGlassShape(
-    LiquidGlassShape shape, {
+    LiquidShape shape, {
     required Offset center,
     required Size size,
   }) {
     switch (shape) {
-      case LiquidGlassSquircle():
+      case LiquidRoundedSuperellipse():
         _assertSameRadius(shape.borderRadius);
         return RawShape(
           type: RawShapeType.squircle,
@@ -36,14 +36,14 @@ class RawShape with EquatableMixin {
           size: size,
           cornerRadius: shape.borderRadius.x,
         );
-      case LiquidGlassEllipse():
+      case LiquidOval():
         return RawShape(
           type: RawShapeType.ellipse,
           center: center,
           size: size,
           cornerRadius: 0,
         );
-      case LiquidGlassRoundedRectangle():
+      case LiquidRoundedRectangle():
         _assertSameRadius(shape.borderRadius);
         return RawShape(
           type: RawShapeType.roundedRectangle,
