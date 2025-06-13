@@ -160,8 +160,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   }
 
   void registerShape(RenderLiquidGlass shape) {
-    if (registeredShapes.length >= 2) {
-      throw UnsupportedError('Only two shapes are supported at the moment!');
+    if (registeredShapes.length >= 3) {
+      throw UnsupportedError('Only three shapes are supported at the moment!');
     }
     registeredShapes.add(shape);
     layerRegistry[shape] = this;
@@ -219,7 +219,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     }
 
     final shape1 = shapes.firstOrNull?.$2 ?? RawShape.none;
-    final shape2 = shapes.lastOrNull?.$2 ?? RawShape.none;
+    final shape2 = shapes.length > 1 ? shapes.elementAt(1).$2 : RawShape.none;
+    final shape3 = shapes.length > 2 ? shapes.elementAt(2).$2 : RawShape.none;
 
     _shader
       ..setFloat(2, _settings.chromaticAberration)
@@ -247,7 +248,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(22, shape2.size.width * _devicePixelRatio)
       ..setFloat(23, shape2.size.height * _devicePixelRatio)
       ..setFloat(24, shape2.cornerRadius * _devicePixelRatio)
-      ..setFloat(25, _settings.blend * _devicePixelRatio);
+      ..setFloat(25, shape3.type.index.toDouble())
+      ..setFloat(26, shape3.center.dx * _devicePixelRatio)
+      ..setFloat(27, shape3.center.dy * _devicePixelRatio)
+      ..setFloat(28, shape3.size.width * _devicePixelRatio)
+      ..setFloat(29, shape3.size.height * _devicePixelRatio)
+      ..setFloat(30, shape3.cornerRadius * _devicePixelRatio)
+      ..setFloat(31, _settings.blend * _devicePixelRatio);
 
     _paintShapeBlurs(context, offset, shapes);
 

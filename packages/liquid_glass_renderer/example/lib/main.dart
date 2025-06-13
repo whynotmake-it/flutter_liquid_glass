@@ -151,6 +151,24 @@ class MainApp extends HookWidget {
                           ),
                         ),
                       ),
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: DragDismissable(
+                          threshold: double.maxFinite,
+                          velocityThreshold: double.maxFinite,
+                          spring: Spring.bouncy,
+                          child: LiquidGlass.inLayer(
+                            glassContainsChild: false,
+                            blur: blur,
+                            shape: LiquidOval(),
+                            child: Container(
+                              width: 100,
+                              height: 80,
+                              color: Colors.transparent,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
