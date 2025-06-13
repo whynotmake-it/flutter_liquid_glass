@@ -19,12 +19,14 @@ final blurFactorNotifier = ValueNotifier<double>(.02);
 final cornerRadiusNotifier = ValueNotifier<double>(100);
 
 final glassColorNotifier = ValueNotifier<Color>(
-  const Color.fromARGB(33, 255, 255, 255),
+  const Color.fromARGB(0, 255, 255, 255),
 );
 
-final lightIntensityNotifier = ValueNotifier<double>(1);
+final lightIntensityNotifier = ValueNotifier<double>(5);
 
 final blendNotifier = ValueNotifier<double>(50);
+
+final chromaticAberrationNotifier = ValueNotifier<double>(1);
 
 class MainApp extends HookWidget {
   const MainApp({super.key});
@@ -34,6 +36,8 @@ class MainApp extends HookWidget {
     final thicknessVisible = useState(true);
 
     final blend = useValueListenable(blendNotifier);
+
+    final chromaticAberration = useValueListenable(chromaticAberrationNotifier);
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3);
 
@@ -105,6 +109,7 @@ class MainApp extends HookWidget {
                     ambientStrength: 0.8,
                     outlineIntensity: 2,
                     blend: blend,
+                    chromaticAberration: chromaticAberration,
                   ),
                   child: Stack(
                     alignment: Alignment.bottomLeft,
@@ -303,7 +308,7 @@ class SettingsSheet extends StatelessWidget {
                         lightIntensityNotifier.value = value;
                       },
                       min: 0,
-                      max: 1,
+                      max: 5,
                     ),
 
                     Text('Blur:'),
@@ -321,6 +326,15 @@ class SettingsSheet extends StatelessWidget {
                       },
                       min: 0,
                       max: 100,
+                    ),
+                    Text('Chromatic Aberration:'),
+                    CupertinoSlider(
+                      value: chromaticAberrationNotifier.value,
+                      onChanged: (value) {
+                        chromaticAberrationNotifier.value = value;
+                      },
+                      min: 0,
+                      max: 10,
                     ),
                   ],
                 ),

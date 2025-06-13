@@ -150,9 +150,11 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     }
     
     // 1. Sharp surface glint (tinted by the environment)
-    float sharpFactor = pow(specDot1, 512.0) + pow(specDot2, 512.0);
+    float glintExponent = mix(350.0, 512.0, smoothstep(5.0, 25.0, uThickness));
+    float sharpFactor = pow(specDot1, glintExponent) + pow(specDot2, glintExponent * 1.2);
+
     // First, calculate the pure white glint intensity.
-    vec3 whiteGlint = vec3(sharpFactor) * uLightIntensity * 2.0;
+    vec3 whiteGlint = vec3(sharpFactor) * uLightIntensity * 2.5;
     // Then, multiply by the reflected color to tint the glint. This is the key change.
     vec3 sharpGlint = whiteGlint * reflectedColor;
 
@@ -202,44 +204,48 @@ void main() {
     vec3 normal = getNormal(sd, uThickness);
     float height = getHeight(sd, uThickness);
     
-    // Calculate refraction using the normal and height
+    // --- Refraction & Chromatic Aberration ---
     float baseHeight = uThickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
-    vec3 refractVec = refract(incident, normal, 1.0 / uRefractiveIndex);
     
-    float refractLength = (height + baseHeight) / max(0.001, abs(refractVec.z));
-    
-    // Calculate the 2D refraction displacement
-    vec2 refractionDisplacement = refractVec.xy * refractLength;
-    
-    // Apply displacement to UV coordinates, scaling by viewport size
-    vec2 displacementUV = refractionDisplacement / uSize;
-    vec2 refractedUV = screenUV + displacementUV;
-    
-    // Chromatic aberration: sample each color channel with slightly different offsets
     vec4 refractColor;
-    if (uChromaticAberration > 0.0) {
-        float displacementMagnitude = length(refractionDisplacement);
-        float chromaticStrength = displacementMagnitude * uChromaticAberration * 0.001;
+    vec2 refractionDisplacement;
+
+    // To simulate a prism, we calculate refraction separately for each color channel
+    // by slightly varying the refractive index.
+    if (uChromaticAberration > 0.001) {
+        float iorR = uRefractiveIndex - uChromaticAberration * 0.04; // Less deviation for red
+        float iorG = uRefractiveIndex;
+        float iorB = uRefractiveIndex + uChromaticAberration * 0.08; // More deviation for blue
+
+        // Red channel
+        vec3 refractVecR = refract(incident, normal, 1.0 / iorR);
+        float refractLengthR = (height + baseHeight) / max(0.001, abs(refractVecR.z));
+        vec2 refractedUVR = screenUV + (refractVecR.xy * refractLengthR) / uSize;
+        float red = texture(uBackgroundTexture, refractedUVR).r;
+
+        // Green channel (we'll use this for the main displacement and alpha)
+        vec3 refractVecG = refract(incident, normal, 1.0 / iorG);
+        float refractLengthG = (height + baseHeight) / max(0.001, abs(refractVecG.z));
+        refractionDisplacement = refractVecG.xy * refractLengthG; 
+        vec2 refractedUVG = screenUV + refractionDisplacement / uSize;
+        vec4 greenSample = texture(uBackgroundTexture, refractedUVG);
+        float green = greenSample.g;
+        float bgAlpha = greenSample.a;
+
+        // Blue channel
+        vec3 refractVecB = refract(incident, normal, 1.0 / iorB);
+        float refractLengthB = (height + baseHeight) / max(0.001, abs(refractVecB.z));
+        vec2 refractedUVB = screenUV + (refractVecB.xy * refractLengthB) / uSize;
+        float blue = texture(uBackgroundTexture, refractedUVB).b;
         
-        if (chromaticStrength > 0.0001) {
-            vec2 chromaticOffset = normalize(displacementUV) * chromaticStrength;
-            
-            vec2 redUV = refractedUV + chromaticOffset;
-            float red = texture(uBackgroundTexture, redUV).r;
-            
-            float green = texture(uBackgroundTexture, refractedUV).g;
-            
-            vec2 blueUV = refractedUV - chromaticOffset;
-            float blue = texture(uBackgroundTexture, blueUV).b;
-            
-            float bgAlpha = texture(uBackgroundTexture, refractedUV).a;
-            
-            refractColor = vec4(red, green, blue, bgAlpha);
-        } else {
-            refractColor = texture(uBackgroundTexture, refractedUV);
-        }
+        refractColor = vec4(red, green, blue, bgAlpha);
     } else {
+        // Default path for no chromatic aberration
+        vec3 refractVec = refract(incident, normal, 1.0 / uRefractiveIndex);
+        float refractLength = (height + baseHeight) / max(0.001, abs(refractVec.z));
+        refractionDisplacement = refractVec.xy * refractLength;
+        vec2 refractedUV = screenUV + refractionDisplacement / uSize;
         refractColor = texture(uBackgroundTexture, refractedUV);
     }
     
