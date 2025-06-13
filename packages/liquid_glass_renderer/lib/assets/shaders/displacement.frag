@@ -40,7 +40,16 @@ float sdfRRect( in vec2 p, in vec2 b, in float r ) {
     return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
 
+float sdfRect(vec2 p, vec2 b) {
+    vec2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
 float sdfSquircle(vec2 p, vec2 b, float r, float k) {
+    if (r < 0.001) {
+        return sdfRect(p, b);
+    }
+
     float shortest = min(b.x, b.y);
     r = min(r, shortest);
 

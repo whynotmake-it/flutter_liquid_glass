@@ -141,8 +141,8 @@ class MainApp extends HookWidget {
                           child: LiquidGlass.inLayer(
                             glassContainsChild: false,
                             blur: blur,
-                            shape: LiquidRoundedRectangle(
-                              borderRadius: Radius.circular(0),
+                            shape: LiquidRoundedSuperellipse(
+                              borderRadius: Radius.circular(cornerRadius),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(64.0),
@@ -298,7 +298,7 @@ class SettingsSheet extends StatelessWidget {
                       onChanged: (value) {
                         cornerRadiusNotifier.value = value;
                       },
-                      min: 1,
+                      min: 0,
                       max: 100,
                     ),
                     Text('Light Intensity:'),
