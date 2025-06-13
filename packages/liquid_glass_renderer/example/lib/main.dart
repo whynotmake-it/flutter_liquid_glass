@@ -69,6 +69,7 @@ class MainApp extends HookWidget {
       seedColor: Color(0xFF287390),
     );
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData.from(
         colorScheme: colorScheme,
         textTheme: GoogleFonts.lexendDecaTextTheme().apply(
@@ -186,6 +187,7 @@ class Background extends HookWidget {
       }
       return null;
     }, [showHint]);
+
     return SizedBox.expand(
       child: Container(
         color: Theme.of(context).colorScheme.surface,
