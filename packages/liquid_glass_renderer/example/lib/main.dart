@@ -122,7 +122,7 @@ class MainApp extends HookWidget {
                           spring: Spring.bouncy,
                           child: LiquidGlass.inLayer(
                             blur: blur,
-                            shape: LiquidGlassSquircle(
+                            shape: LiquidRoundedSuperellipse(
                               borderRadius: Radius.circular(cornerRadius),
                             ),
                             child: Container(
@@ -141,7 +141,7 @@ class MainApp extends HookWidget {
                           child: LiquidGlass.inLayer(
                             glassContainsChild: false,
                             blur: blur,
-                            shape: LiquidGlassRoundedRectangle(
+                            shape: LiquidRoundedRectangle(
                               borderRadius: Radius.circular(0),
                             ),
                             child: Padding(
@@ -270,7 +270,7 @@ class SettingsSheet extends StatelessWidget {
                 context,
               ).colorScheme.surface.withValues(alpha: 0.4),
             ),
-            shape: LiquidGlassSquircle(borderRadius: Radius.circular(24)),
+            shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
             child: DefaultTextStyle(
               style: Theme.of(context).textTheme.bodyLarge!,
               child: Padding(

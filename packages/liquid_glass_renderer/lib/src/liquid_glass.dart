@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_shape.dart';
+import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
 /// A liquid glass shape.
@@ -71,7 +71,7 @@ class LiquidGlass extends StatelessWidget {
   /// The shape of this glass.
   ///
   /// This is the shape of the glass that will be rendered.
-  final LiquidGlassShape shape;
+  final LiquidShape shape;
 
   /// Whether this glass should be rendered "inside" of the glass, or on top.
   ///
@@ -116,7 +116,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required this.glassContainsChild,
   });
 
-  final LiquidGlassShape shape;
+  final LiquidShape shape;
 
   final double blur;
 
@@ -146,16 +146,16 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 @internal
 class RenderLiquidGlass extends RenderProxyBox {
   RenderLiquidGlass({
-    required LiquidGlassShape shape,
+    required LiquidShape shape,
     required double blur,
     required bool glassContainsChild,
   })  : _shape = shape,
         _blur = blur,
         _glassContainsChild = glassContainsChild;
 
-  late LiquidGlassShape _shape;
-  LiquidGlassShape get shape => _shape;
-  set shape(LiquidGlassShape value) {
+  late LiquidShape _shape;
+  LiquidShape get shape => _shape;
+  set shape(LiquidShape value) {
     if (_shape == value) return;
     _shape = value;
     markNeedsPaint();
