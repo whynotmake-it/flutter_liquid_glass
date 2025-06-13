@@ -73,7 +73,7 @@ class LiquidGlassLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShaderBuilder(
       assetKey:
-          'packages/liquid_glass_renderer/lib/assets/shaders/displacement.frag',
+          'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass.frag',
       (context, shader, child) => _RawShapes(
         shader: shader,
         settings: settings,

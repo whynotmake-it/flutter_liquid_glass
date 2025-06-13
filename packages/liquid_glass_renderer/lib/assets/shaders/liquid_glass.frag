@@ -1,8 +1,17 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// This shader is based on a bunch of sources:
+// - https://www.shadertoy.com/view/wccSDf for the refraction
+// - https://iquilezles.org/articles/distfunctions2d/ for SDFs
+// - Gracious help from @dkwingsmt for the Squircle SDF
+//
+// Feel free to use this shader in your own projects, it'd be lovely if you could
+// give some credit like I did here.
+
 #version 320 es
 precision highp float;
 
 #include <flutter/runtime_effect.glsl>
-#include "common.glsl"
 
 layout(location = 0) uniform sampler2D uBackgroundTexture;
 layout(location = 1) uniform vec2 uSize;
