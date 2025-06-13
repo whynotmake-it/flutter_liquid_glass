@@ -31,8 +31,10 @@ class MainApp extends HookWidget {
     const size1 = Size(100, 100);
     const size2 = Size(300, 100);
 
+    final expandedThickness = useState(20.0);
+
     final thickness = useSingleMotion(
-      value: thicknessVisible.value ? 20 : 0,
+      value: thicknessVisible.value ? expandedThickness.value : 0,
       motion: SpringMotion(spring),
     );
 
@@ -195,13 +197,26 @@ class MainApp extends HookWidget {
                   SafeArea(
                     child: Align(
                       alignment: Alignment.bottomCenter,
-                      child: CupertinoSlider(
-                        value: blurFactor.value,
-                        onChanged: (value) {
-                          blurFactor.value = value;
-                        },
-                        min: 0,
-                        max: 1,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CupertinoSlider(
+                            value: expandedThickness.value,
+                            onChanged: (value) {
+                              expandedThickness.value = value;
+                            },
+                            min: 0,
+                            max: 100,
+                          ),
+                          CupertinoSlider(
+                            value: blurFactor.value,
+                            onChanged: (value) {
+                              blurFactor.value = value;
+                            },
+                            min: 0,
+                            max: 1,
+                          ),
+                        ],
                       ),
                     ),
                   ),
