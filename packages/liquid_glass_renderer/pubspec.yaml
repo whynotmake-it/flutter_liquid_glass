@@ -1,5 +1,5 @@
-name: flutter_liquid_glass
-description: Liquid Glass Effect for Flutter
+name: liquid_glass_renderer
+description: The raw renderer for a liquid glass effect in Flutter.
 version: 0.1.0
 
 

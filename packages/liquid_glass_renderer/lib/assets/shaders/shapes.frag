@@ -23,7 +23,7 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
-float sdfRRect( in vec2 p, in vec2 b, in float r ) {
+float sdfRRect( in vec2 p, in vec2 b, in float r) {
     vec2 q = abs(p)-b+r;
     return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }

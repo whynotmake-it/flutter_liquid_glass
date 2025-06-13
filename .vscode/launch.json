@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "example",
-            "cwd": "packages/flutter_liquid_glass/example",
+            "cwd": "packages/liquid_glass_renderer/example",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -15,7 +15,7 @@
         },
         {
             "name": "example (profile mode)",
-            "cwd": "packages/flutter_liquid_glass/example",
+            "cwd": "packages/liquid_glass_renderer/example",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile",
@@ -25,7 +25,7 @@
         },
         {
             "name": "example (release mode)",
-            "cwd": "packages/flutter_liquid_glass/example",
+            "cwd": "packages/liquid_glass_renderer/example",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release",

@@ -1,4 +1,4 @@
-# Flutter Liquid Glass
+# Liquid Glass Renderer
 
 [![Code Coverage](./coverage.svg)](./test/)
 [![Powered by Mason][mason_badge]][mason_link]
@@ -13,7 +13,7 @@ Liquid Glass Effect for Flutter
 Install via `flutter pub add`:
 
 ```sh
-flutter pub add flutter_liquid_glass
+flutter pub add liquid_glass_renderer
 ```
 
 
