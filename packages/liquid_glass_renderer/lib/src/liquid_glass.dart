@@ -44,6 +44,7 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = true,
     this.blur = 0,
+    this.clipBehavior = Clip.hardEdge,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
   }) : _settings = settings;
@@ -60,6 +61,7 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = true,
     this.blur = 0,
+    this.clipBehavior = Clip.hardEdge,
   }) : _settings = null;
 
   /// The child of this widget.
@@ -82,6 +84,11 @@ class LiquidGlass extends StatelessWidget {
   /// How much blur this glass element applies to its background.
   final double blur;
 
+  /// The clip behavior of this glass.
+  ///
+  /// Defaults to [Clip.none], so [child] will not be clipped.
+  final Clip clipBehavior;
+
   final LiquidGlassSettings? _settings;
 
   @override
@@ -92,7 +99,11 @@ class LiquidGlass extends StatelessWidget {
           shape: shape,
           blur: blur,
           glassContainsChild: glassContainsChild,
-          child: child,
+          child: ClipPath(
+            clipper: ShapeBorderClipper(shape: shape),
+            clipBehavior: clipBehavior,
+            child: child,
+          ),
         );
       case final settings:
         return LiquidGlassLayer(
@@ -101,7 +112,11 @@ class LiquidGlass extends StatelessWidget {
             shape: shape,
             blur: blur,
             glassContainsChild: glassContainsChild,
-            child: child,
+            child: ClipPath(
+              clipper: ShapeBorderClipper(shape: shape),
+              clipBehavior: clipBehavior,
+              child: child,
+            ),
           ),
         );
     }
