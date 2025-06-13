@@ -49,26 +49,22 @@ float sdfRect(vec2 p, vec2 b) {
     return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
 }
 
-float sdfSquircle(vec2 p, vec2 b, float r, float k) {
-    if (r < 0.001) {
-        return sdfRect(p, b);
-    }
-
+float sdfSquircle(vec2 p, vec2 b, float r, float n) {
     float shortest = min(b.x, b.y);
     r = min(r, shortest);
 
-    vec2 d = abs(p) - b + r;
-    float s = max(d.x, d.y);
-    
-    if (s <= 0.0) {
-        // Inside the shape
-        return s - r;
-    }
-
-    // In corner region - apply squircle shaping
-    vec2 q = max(d, 0.0);
-    float cornerDist = pow(pow(q.x/r, k) + pow(q.y/r, k), 1.0/k);
-    return (cornerDist - 1.0) * r;
+    vec2 q = abs(p) - b + r;
+    // The component-wise power function `pow(max(q, 0.0), n)` calculates the
+    // superelliptical curve for the corner. The result is then raised to `1.0/n`
+    // to get the final distance, which is equivalent to the Lp-norm. This
+    // provides a distance field for a rectangle with superelliptical corners. A
+    // value of n=2.0 results in standard circular corners. The
+    // `min(max(q.x, q.y), 0.0)` part handles the distance inside the shape
+    // correctly.
+    return min(max(q.x, q.y), 0.0) + pow(
+        pow(max(q.x, 0.0), n) + pow(max(q.y, 0.0), n),
+        1.0 / n
+    ) - r;
 }
 
 float sdfEllipse(vec2 p, vec2 r) {
