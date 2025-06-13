@@ -64,7 +64,7 @@ void main() {
     vec4 normalHeightData = texture(uDisplacementTexture, screenUV);
     
     // Calculate edge falloff using smoothstep for anti-aliasing
-    float edgeAlpha = smoothstep(0.0, .5, normalHeightData.a);
+    float edgeAlpha = smoothstep(0.0, .3, normalHeightData.a);
     
     // If we're completely outside the glass area (with smooth transition)
     if (edgeAlpha < 0.001) {
