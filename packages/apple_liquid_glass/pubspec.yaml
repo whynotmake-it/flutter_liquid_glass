@@ -1,6 +1,6 @@
 name: apple_liquid_glass
 description: Liquid Glass Implementation according to Apple's Guidelines
-version: 0.1.0
+version: 0.1.0-dev.0
 
 
 environment:
