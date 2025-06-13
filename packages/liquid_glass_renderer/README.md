@@ -1,6 +1,7 @@
 # Liquid Glass Renderer
 
 <!-- [![Code Coverage](./coverage.svg)](./test/) -->
+![Pub Version](https://img.shields.io/pub/v/liquid_glass_renderer)
 [![lints by lintervention][lintervention_badge]][lintervention_link]
 
 A Flutter package for creating a stunning "liquid glass" or "frosted glass" effect. This package allows you to transform your widgets into beautiful, customizable glass-like surfaces that can blend and interact with each other.
