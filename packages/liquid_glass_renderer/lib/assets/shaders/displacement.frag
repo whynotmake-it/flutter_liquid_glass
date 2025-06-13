@@ -16,13 +16,15 @@ layout(location = 8) uniform float uThickness;
 layout(location = 9) uniform float uRefractiveIndex = 1.2;
 
 // Shape uniforms
-layout(location = 10) uniform vec2 squircle1Center;
-layout(location = 11) uniform vec2 squircle1Size;
-layout(location = 12) uniform float squircle1CornerRadius;
-layout(location = 13) uniform vec2 squircle2Center;
-layout(location = 14) uniform vec2 squircle2Size;
-layout(location = 15) uniform float squircle2CornerRadius;
-layout(location = 16) uniform float uBlend;
+layout(location = 10) uniform float uShape1Type;
+layout(location = 11) uniform vec2 uShape1Center;
+layout(location = 12) uniform vec2 uShape1Size;
+layout(location = 13) uniform float uShape1CornerRadius;
+layout(location = 14) uniform float uShape2Type;
+layout(location = 15) uniform vec2 uShape2Center;
+layout(location = 16) uniform vec2 uShape2Size;
+layout(location = 17) uniform float uShape2CornerRadius;
+layout(location = 18) uniform float uBlend;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -32,6 +34,8 @@ mat2 rotate2d(float angle) {
 }
 
 float sdfRRect( in vec2 p, in vec2 b, in float r ) {
+    float shortest = min(b.x, b.y);
+    r = min(r, shortest);
     vec2 q = abs(p)-b+r;
     return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
@@ -48,7 +52,6 @@ float sdfSquircle(vec2 p, vec2 b, float r, float k) {
         return s - r;
     }
 
-    
     // In corner region - apply squircle shaping
     vec2 q = max(d, 0.0);
     float cornerDist = pow(pow(q.x/r, k) + pow(q.y/r, k), 1.0/k);
@@ -67,9 +70,22 @@ float smoothUnion(float d1, float d2, float k) {
     return min(d1, d2) - e * e * 0.25 / k;
 }
 
+float getShapeSDF(float type, vec2 p, vec2 center, vec2 size, float r) {
+    if (type == 1.0) { // squircle
+        return sdfSquircle(p - center, size / 2.0, r, 2.0);
+    }
+    if (type == 2.0) { // ellipse
+        return sdfEllipse(p - center, size / 2.0);
+    }
+    if (type == 3.0) { // rounded rectangle
+        return sdfRRect(p - center, size / 2.0, r);
+    }
+    return 1e9; // none
+}
+
 float sceneSDF(vec2 p) {
-    float d1 = sdfSquircle(p - squircle1Center, squircle1Size / 2, squircle1CornerRadius, 2);
-    float d2 = sdfSquircle(p - squircle2Center, squircle2Size / 2, squircle2CornerRadius, 2);
+    float d1 = getShapeSDF(uShape1Type, p, uShape1Center, uShape1Size, uShape1CornerRadius);
+    float d2 = getShapeSDF(uShape2Type, p, uShape2Center, uShape2Size, uShape2CornerRadius);
     return smoothUnion(d1, d2, uBlend);
 }
 
