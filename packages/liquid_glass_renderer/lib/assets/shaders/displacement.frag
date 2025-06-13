@@ -24,7 +24,11 @@ layout(location = 14) uniform float uShape2Type;
 layout(location = 15) uniform vec2 uShape2Center;
 layout(location = 16) uniform vec2 uShape2Size;
 layout(location = 17) uniform float uShape2CornerRadius;
-layout(location = 18) uniform float uBlend;
+layout(location = 18) uniform float uShape3Type;
+layout(location = 19) uniform vec2 uShape3Center;
+layout(location = 20) uniform vec2 uShape3Size;
+layout(location = 21) uniform float uShape3CornerRadius;
+layout(location = 22) uniform float uBlend;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -95,7 +99,8 @@ float getShapeSDF(float type, vec2 p, vec2 center, vec2 size, float r) {
 float sceneSDF(vec2 p) {
     float d1 = getShapeSDF(uShape1Type, p, uShape1Center, uShape1Size, uShape1CornerRadius);
     float d2 = getShapeSDF(uShape2Type, p, uShape2Center, uShape2Size, uShape2CornerRadius);
-    return smoothUnion(d1, d2, uBlend);
+    float d3 = getShapeSDF(uShape3Type, p, uShape3Center, uShape3Size, uShape3CornerRadius);
+    return smoothUnion(smoothUnion(d1, d2, uBlend), d3, uBlend);
 }
 
 // Calculate 3D normal using derivatives
