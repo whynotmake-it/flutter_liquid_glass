@@ -61,20 +61,22 @@ vec3 calculateLighting(vec2 uv, vec4 displacementData, vec2 refractionDisplaceme
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
     
-
-    
     vec4 normalHeightData = texture(uDisplacementTexture, screenUV);
     
-    // Check if we're outside the liquid glass area
-    if (normalHeightData.a == 0.0) {
-        discard;
+    // Calculate edge falloff using smoothstep for anti-aliasing
+    float edgeAlpha = smoothstep(0.0, .5, normalHeightData.a);
+    
+    // If we're completely outside the glass area (with smooth transition)
+    if (edgeAlpha < 0.001) {
+        fragColor = texture(uBackgroundTexture, screenUV);
+        return;
     }
     
     // Decode normal from RGB channels (map from [0,1] back to [-1,1])
     vec3 normal = (normalHeightData.rgb - 0.5) * 2.0;    
     normal = normalize(normal);
    
-    float normalizedHeight = normalHeightData.a;; // Extract height
+    float normalizedHeight = normalHeightData.a; // Extract height
     float height = normalizedHeight * uThickness;
     
     // Calculate refraction using the decoded normal and height
@@ -181,10 +183,11 @@ void main() {
     float falloff = clamp(length(refractionDisplacement) / 100.0, 0.0, 1.0) * 0.1 + 0.9;
     vec4 falloffColor = mix(vec4(0.0), originalBgColor, falloff);
     
-
-    
-    // Final mix: displaced liquid color where alpha is low, falloff background where alpha is high
+    // Final mix: blend between displaced liquid color and background based on edge alpha
     finalColor = clamp(finalColor, 0.0, 1.0);
     falloffColor = clamp(falloffColor, 0.0, 1.0);
-    fragColor = mix(finalColor, falloffColor, 0);
+    
+    // Use edgeAlpha for smooth transition at boundaries
+    vec4 backgroundColor = texture(uBackgroundTexture, screenUV);
+    fragColor = mix(backgroundColor, finalColor, edgeAlpha);
 }

@@ -93,7 +93,7 @@ class MainApp extends HookWidget {
                 ),
               ],
             ),
-            extendBodyBehindAppBar: false,
+            extendBodyBehindAppBar: true,
             floatingActionButton: FloatingActionButton(
               onPressed: () {
                 flip.value = !flip.value;
