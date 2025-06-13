@@ -1,10 +1,10 @@
-# Apple Liquid Glass
+# Apple Liquid Glass (WIP)
 
 [![Code Coverage](./coverage.svg)](./test/)
 [![Powered by Mason][mason_badge]][mason_link]
 [![lints by lintervention][lintervention_badge]][lintervention_link]
 
-Liquid Glass Implementation according to Apple's Guidelines
+Liquid Glass Implementation according to Apple's Guidelines.
 
 ## Installation 💻
 
