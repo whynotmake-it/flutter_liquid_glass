@@ -1,3 +1,5 @@
+include: ../analysis_options.yaml
+
 # No Public Member API Docs
 linter:
   rules:
