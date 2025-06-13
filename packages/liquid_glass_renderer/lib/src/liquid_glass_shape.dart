@@ -84,10 +84,8 @@ class LiquidGlassSquircle extends LiquidGlassShape {
 /// Represents an ellipse shape that can be used by a [LiquidGlass] widget.
 ///
 /// Works like an [OvalBorder].
-@Deprecated('Not supported yet!')
 class LiquidGlassEllipse extends LiquidGlassShape {
   /// Creates a new [LiquidGlassEllipse] with the given [side].
-  @Deprecated('Not supported yet!')
   const LiquidGlassEllipse({super.side = BorderSide.none});
 
   @override
@@ -112,10 +110,8 @@ class LiquidGlassEllipse extends LiquidGlassShape {
 /// widget.
 ///
 /// Works like a [RoundedRectangleBorder].
-@Deprecated('Not supported yet!')
 class LiquidGlassRoundedRectangle extends LiquidGlassShape {
   /// Creates a new [LiquidGlassRoundedRectangle] with the given [borderRadius].
-  @Deprecated('Not supported yet!')
   const LiquidGlassRoundedRectangle({
     required this.borderRadius,
     super.side = BorderSide.none,

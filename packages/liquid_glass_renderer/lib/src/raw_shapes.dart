@@ -37,7 +37,6 @@ class RawShape with EquatableMixin {
           cornerRadius: shape.borderRadius.x,
         );
       case LiquidGlassEllipse():
-        throw UnsupportedError('Ellipse shape is not supported yet!');
         return RawShape(
           type: RawShapeType.ellipse,
           center: center,
@@ -45,7 +44,6 @@ class RawShape with EquatableMixin {
           cornerRadius: 0,
         );
       case LiquidGlassRoundedRectangle():
-        throw UnsupportedError('RoundedRectangle shape is not supported yet!');
         _assertSameRadius(shape.borderRadius);
         return RawShape(
           type: RawShapeType.roundedRectangle,

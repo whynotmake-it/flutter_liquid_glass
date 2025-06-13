@@ -141,8 +141,8 @@ class MainApp extends HookWidget {
                           child: LiquidGlass.inLayer(
                             glassContainsChild: false,
                             blur: blur,
-                            shape: LiquidGlassSquircle(
-                              borderRadius: Radius.circular(cornerRadius),
+                            shape: LiquidGlassRoundedRectangle(
+                              borderRadius: Radius.circular(0),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.all(64.0),

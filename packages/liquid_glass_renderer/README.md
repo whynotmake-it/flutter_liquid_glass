@@ -7,7 +7,10 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 
 > **Note:** This package is currently in a pre-release stage. The API may change, and there are some limitations. Feedback and contributions are highly welcome!
 
+
+
 ![Example GIF](doc/example.gif)
+> Note that the actual performance of this effect is much better, the GIF just has a low framerate.
 
 ## Features
 
@@ -21,9 +24,8 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 
 As this is a pre-release, there are a few things to keep in mind:
 
--   **Maximum of two shapes** can be blended in a `LiquidGlassLayer`.
--   Only the **`LiquidGlassSquircle` shape is currently supported**. Support for circles and rectangles is planned.
--   The **`chromaticAberration` effect is still a work-in-progress** and might not look perfect.
+- **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
+- **Maximum of two shapes** can be blended in a `LiquidGlassLayer`.
 
 ## Installation 💻
 
