@@ -122,9 +122,7 @@ class MainApp extends HookWidget {
                               child: LiquidGlass.inLayer(
                                 blur: blur,
                                 shape: LiquidGlassSquircle(
-                                  borderRadius: BorderRadius.circular(
-                                    cornerRadius,
-                                  ),
+                                  borderRadius: Radius.circular(cornerRadius),
                                 ),
                                 child: Container(
                                   color: Colors.transparent,
@@ -142,9 +140,7 @@ class MainApp extends HookWidget {
                                 glassContainsChild: false,
                                 blur: blur,
                                 shape: LiquidGlassSquircle(
-                                  borderRadius: BorderRadius.circular(
-                                    cornerRadius,
-                                  ),
+                                  borderRadius: Radius.circular(cornerRadius),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(24.0),
@@ -190,7 +186,7 @@ class SettingsSheet extends StatelessWidget {
                 context,
               ).colorScheme.surface.withValues(alpha: 0.4),
             ),
-            shape: LiquidGlassSquircle(borderRadius: BorderRadius.circular(24)),
+            shape: LiquidGlassSquircle(borderRadius: Radius.circular(24)),
             child: DefaultTextStyle(
               style: Theme.of(context).textTheme.bodyLarge!,
               child: Padding(

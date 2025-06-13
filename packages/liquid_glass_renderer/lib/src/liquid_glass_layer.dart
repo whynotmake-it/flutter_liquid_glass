@@ -1,21 +1,72 @@
+// ignore_for_file: avoid_setters_without_getters
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/raw_shapes.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
+import 'package:meta/meta.dart';
 
+/// Represents a layer of multiple [LiquidGlass] shapes that can flow together
+/// and have shared [LiquidGlassSettings].
+///
+/// If you create a [LiquidGlassLayer] with one or more [LiquidGlass.inLayer]
+/// widgets, the liquid glass effect will be rendered where this layer is.
+/// Make sure not to stack any other widgets between the [LiquidGlassLayer] and
+/// the [LiquidGlass] widgets, otherwise the liquid glass effect will be behind
+/// them.
+///
+/// > [!WARNING]
+/// > A maximum of two shapes are supported per layer at the moment.
+/// >
+/// > This will likely increase to at least four in the future.
+///
+/// ## Example
+///
+/// ```dart
+/// Widget build(BuildContext context) {
+///   return LiquidGlassLayer(
+///     child: Column(
+///       children: [
+///         LiquidGlass.inLayer(
+///           shape: LiquidGlassSquircle(
+///             borderRadius: Radius.circular(10),
+///           ),
+///           child: SizedBox.square(
+///             dimension: 100,
+///           ),
+///         ),
+///         const SizedBox(height: 100),
+///         LiquidGlass.inLayer(
+///           shape: LiquidGlassSquircle(
+///             borderRadius: Radius.circular(50),
+///           ),
+///           child: SizedBox.square(
+///             dimension: 100,
+///           ),
+///         ),
+///       ],
+///     ),
+///   );
+/// }
 class LiquidGlassLayer extends StatelessWidget {
+  /// Creates a new [LiquidGlassLayer] with the given [child] and [settings].
   const LiquidGlassLayer({
-    super.key,
     required this.child,
     this.settings = const LiquidGlassSettings(),
+    super.key,
   });
 
+  /// The subtree in which you should include at least one [LiquidGlass] widget.
+  ///
+  /// The [LiquidGlassLayer] will automatically register all [LiquidGlass]
+  /// widgets in the subtree as shapes and render them.
   final Widget child;
 
+  /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
 
   @override
@@ -68,6 +119,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   }
 }
 
+@internal
 class RenderLiquidGlassLayer extends RenderProxyBox {
   RenderLiquidGlassLayer({
     required double devicePixelRatio,
@@ -232,8 +284,11 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     }
   }
 
-  void _paintShapeBlurs(PaintingContext context, Offset offset,
-      List<(RenderLiquidGlass, RawShape)> shapes) {
+  void _paintShapeBlurs(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlass, RawShape)> shapes,
+  ) {
     final layerGlobalOffset = localToGlobal(Offset.zero);
     for (final (render, _) in shapes) {
       final shapeGlobalOffset = render.localToGlobal(Offset.zero);

@@ -1,9 +1,11 @@
-// ignore_for_file: dead_code
+// ignore_for_file: dead_code, deprecated_member_use_from_same_package
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_shape.dart';
+import 'package:meta/meta.dart';
 
+@internal
 enum RawShapeType {
   none,
   squircle,
@@ -11,6 +13,7 @@ enum RawShapeType {
   roundedRectangle,
 }
 
+@internal
 class RawShape with EquatableMixin {
   const RawShape({
     required this.type,
@@ -18,13 +21,6 @@ class RawShape with EquatableMixin {
     required this.size,
     required this.cornerRadius,
   });
-
-  static const none = RawShape(
-    type: RawShapeType.none,
-    center: Offset.zero,
-    size: Size.zero,
-    cornerRadius: 0,
-  );
 
   factory RawShape.fromLiquidGlassShape(
     LiquidGlassShape shape, {
@@ -35,10 +31,11 @@ class RawShape with EquatableMixin {
       case LiquidGlassSquircle():
         _assertSameRadius(shape.borderRadius);
         return RawShape(
-            type: RawShapeType.squircle,
-            center: center,
-            size: size,
-            cornerRadius: shape.borderRadius.topLeft.x);
+          type: RawShapeType.squircle,
+          center: center,
+          size: size,
+          cornerRadius: shape.borderRadius.x,
+        );
       case LiquidGlassEllipse():
         throw UnsupportedError('Ellipse shape is not supported yet!');
         return RawShape(
@@ -54,10 +51,17 @@ class RawShape with EquatableMixin {
           type: RawShapeType.roundedRectangle,
           center: center,
           size: size,
-          cornerRadius: shape.borderRadius.topLeft.x,
+          cornerRadius: shape.borderRadius.x,
         );
     }
   }
+
+  static const none = RawShape(
+    type: RawShapeType.none,
+    center: Offset.zero,
+    size: Size.zero,
+    cornerRadius: 0,
+  );
 
   final RawShapeType type;
   final Offset center;
@@ -73,10 +77,9 @@ class RawShape with EquatableMixin {
   List<Object?> get props => [type, center, size, cornerRadius];
 }
 
-void _assertSameRadius(BorderRadius borderRadius) {
+void _assertSameRadius(Radius borderRadius) {
   assert(
-    borderRadius.topLeft == borderRadius.topRight &&
-        borderRadius.bottomLeft == borderRadius.bottomRight,
-    'All corners must have the same radius for a liquid glass shape.',
+    borderRadius.x == borderRadius.y,
+    'The radius must have equal x and y values for a liquid glass shape.',
   );
 }

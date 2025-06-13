@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_setters_without_getters
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -5,31 +7,79 @@ import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_shape.dart';
+import 'package:meta/meta.dart';
 
+/// A liquid glass shape.
+///
+/// This can either be used on its own, or be part of a shared
+/// [LiquidGlassLayer], where all shapes will blend together.
+///
+/// The simplest use of this widget is to create a [LiquidGlass] on its own
+/// layer:
+///
+/// ```dart
+/// Widget build(BuildContext context) {
+///   return LiquidGlass(
+///     shape: LiquidGlassSquircle(
+///       borderRadius: Radius.circular(10),
+///     ),
+///     child: FlutterLogo(),
+///   );
+/// }
+/// ```
+///
+/// If you want multiple shapes to blend together, you need to construct your
+/// own [LiquidGlassLayer], and place this widget inside of there using the
+/// [LiquidGlass.inLayer] constructor.
+///
+/// See the [LiquidGlassLayer] documentation for more information.
 class LiquidGlass extends StatelessWidget {
+  /// Creates a new [LiquidGlass] on its own layer with the given [child],
+  /// [shape], and [settings].
+  ///
+  /// This shape will not blend together with other shapes, so
+  /// [LiquidGlassSettings.blend] will be ignored.
   const LiquidGlass({
-    super.key,
     required this.child,
     required this.shape,
     this.glassContainsChild = true,
     this.blur = 0,
+    super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
   }) : _settings = settings;
 
+  /// Creates a new [LiquidGlass] on a shared layer with the given [child] and
+  /// [shape].
+  ///
+  /// This widget will assume that it is a child of a [LiquidGlassLayer], from
+  /// where it will take the [LiquidGlassSettings].
+  /// It will also blend together with other shapes in that layer.
   const LiquidGlass.inLayer({
-    super.key,
     required this.child,
     required this.shape,
+    super.key,
     this.glassContainsChild = true,
     this.blur = 0,
   }) : _settings = null;
 
+  /// The child of this widget.
+  ///
+  /// You can choose whether this should be rendered "inside" of the glass, or
+  /// on top using [glassContainsChild].
   final Widget child;
 
+  /// The shape of this glass.
+  ///
+  /// This is the shape of the glass that will be rendered.
   final LiquidGlassShape shape;
 
+  /// Whether this glass should be rendered "inside" of the glass, or on top.
+  ///
+  /// If it is rendered inside, it will be on top of [blur], but the color tint
+  /// of the glass will affect the child, and it will also be refracted.
   final bool glassContainsChild;
 
+  /// How much blur this glass element applies to its background.
   final double blur;
 
   final LiquidGlassSettings? _settings;
@@ -44,14 +94,15 @@ class LiquidGlass extends StatelessWidget {
           glassContainsChild: glassContainsChild,
           child: child,
         );
-      case LiquidGlassSettings settings:
+      case final settings:
         return LiquidGlassLayer(
           settings: settings,
           child: _RawLiquidGlass(
-              child: child,
-              shape: shape,
-              blur: blur,
-              glassContainsChild: glassContainsChild),
+            shape: shape,
+            blur: blur,
+            glassContainsChild: glassContainsChild,
+            child: child,
+          ),
         );
     }
   }
@@ -59,13 +110,11 @@ class LiquidGlass extends StatelessWidget {
 
 class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   const _RawLiquidGlass({
-    required this.child,
+    required super.child,
     required this.shape,
     required this.blur,
     required this.glassContainsChild,
   });
-
-  final Widget child;
 
   final LiquidGlassShape shape;
 
@@ -84,13 +133,17 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, RenderLiquidGlass renderObject) {
-    renderObject.shape = shape;
-    renderObject.blur = blur;
-    renderObject.glassContainsChild = glassContainsChild;
+    BuildContext context,
+    RenderLiquidGlass renderObject,
+  ) {
+    renderObject
+      ..shape = shape
+      ..blur = blur
+      ..glassContainsChild = glassContainsChild;
   }
 }
 
+@internal
 class RenderLiquidGlass extends RenderProxyBox {
   RenderLiquidGlass({
     required LiquidGlassShape shape,
@@ -143,7 +196,7 @@ class RenderLiquidGlass extends RenderProxyBox {
 
   void _registerWithParentLayer() {
     // Walk up the render tree to find the nearest RenderLiquidGlassLayer
-    RenderObject? ancestor = parent;
+    var ancestor = parent;
     while (ancestor != null) {
       if (ancestor is RenderLiquidGlassLayer) {
         ancestor.registerShape(this);
