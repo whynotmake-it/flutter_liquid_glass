@@ -7,7 +7,7 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 
 > **Note:** This package is currently in a pre-release stage. The API may change, and there are some limitations. Feedback and contributions are highly welcome!
 
-![Example GIF](docs/example.gif)
+![Example GIF](doc/example.gif)
 
 ## Features
 
