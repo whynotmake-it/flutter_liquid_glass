@@ -91,6 +91,7 @@ class MainApp extends HookWidget {
                   ModalSheetRoute(
                     barrierColor: Colors.black26,
                     swipeDismissible: true,
+                    viewportPadding: const EdgeInsets.all(100),
                     builder: (context) {
                       return SettingsSheet();
                     },
@@ -273,88 +274,93 @@ class SettingsSheet extends StatelessWidget {
       dragConfiguration: SheetDragConfiguration(),
       scrollConfiguration: const SheetScrollConfiguration(),
       initialOffset: SheetOffset(1),
+      shrinkChildToAvoidDynamicOverlap: true,
+      shrinkChildToAvoidStaticOverlap: true,
       snapGrid: SheetSnapGrid(snaps: [SheetOffset(0.5), SheetOffset(1)]),
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: SafeArea(
-          child: LiquidGlass(
-            blur: 20,
-            glassContainsChild: false,
-            settings: LiquidGlassSettings(
-              thickness: 40,
-              lightIntensity: .1,
-              ambientStrength: 0,
-              glassColor: Theme.of(
-                context,
-              ).colorScheme.surface.withValues(alpha: 0.4),
-            ),
-            shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
-            child: DefaultTextStyle(
-              style: Theme.of(context).textTheme.bodyLarge!,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Settings',
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Thickness:'),
-                    CupertinoSlider(
-                      value: thicknessNotifier.value,
-                      onChanged: (value) {
-                        thicknessNotifier.value = value;
-                      },
-                      min: 0,
-                      max: 100,
-                    ),
-                    Text('Corner Radius:'),
-                    CupertinoSlider(
-                      value: cornerRadiusNotifier.value,
-                      onChanged: (value) {
-                        cornerRadiusNotifier.value = value;
-                      },
-                      min: 0,
-                      max: 100,
-                    ),
-                    Text('Light Intensity:'),
-                    CupertinoSlider(
-                      value: lightIntensityNotifier.value,
-                      onChanged: (value) {
-                        lightIntensityNotifier.value = value;
-                      },
-                      min: 0,
-                      max: 5,
-                    ),
+      child: SafeArea(
+        child: LiquidGlass(
+          blur: 10,
+          glassContainsChild: false,
+          settings: LiquidGlassSettings(
+            thickness: 40,
+            lightIntensity: .4,
+            ambientStrength: 2,
+            chromaticAberration: 4,
+            glassColor: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.4),
+          ),
+          shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
+          child: DefaultTextStyle(
+            style: Theme.of(context).textTheme.bodyLarge!,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Settings',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Thickness:'),
+                      CupertinoSlider(
+                        value: thicknessNotifier.value,
+                        onChanged: (value) {
+                          thicknessNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 100,
+                      ),
+                      Text('Corner Radius:'),
+                      CupertinoSlider(
+                        value: cornerRadiusNotifier.value,
+                        onChanged: (value) {
+                          cornerRadiusNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 100,
+                      ),
+                      Text('Light Intensity:'),
+                      CupertinoSlider(
+                        value: lightIntensityNotifier.value,
+                        onChanged: (value) {
+                          lightIntensityNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 5,
+                      ),
 
-                    Text('Blur:'),
-                    CupertinoSlider(
-                      value: blurFactorNotifier.value,
-                      onChanged: (value) {
-                        blurFactorNotifier.value = value;
-                      },
-                    ),
-                    Text('Liquid Factor™:'),
-                    CupertinoSlider(
-                      value: blendNotifier.value,
-                      onChanged: (value) {
-                        blendNotifier.value = value;
-                      },
-                      min: 0,
-                      max: 100,
-                    ),
-                    Text('Chromatic Aberration:'),
-                    CupertinoSlider(
-                      value: chromaticAberrationNotifier.value,
-                      onChanged: (value) {
-                        chromaticAberrationNotifier.value = value;
-                      },
-                      min: 0,
-                      max: 10,
-                    ),
-                  ],
+                      Text('Blur:'),
+                      CupertinoSlider(
+                        value: blurFactorNotifier.value,
+                        onChanged: (value) {
+                          blurFactorNotifier.value = value;
+                        },
+                      ),
+                      Text('Liquid Factor™:'),
+                      CupertinoSlider(
+                        value: blendNotifier.value,
+                        onChanged: (value) {
+                          blendNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 100,
+                      ),
+                      Text('Chromatic Aberration:'),
+                      CupertinoSlider(
+                        value: chromaticAberrationNotifier.value,
+                        onChanged: (value) {
+                          chromaticAberrationNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 10,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
