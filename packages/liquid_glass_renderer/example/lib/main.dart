@@ -28,6 +28,8 @@ final blendNotifier = ValueNotifier<double>(50);
 
 final chromaticAberrationNotifier = ValueNotifier<double>(1);
 
+final ambientStrengthNotifier = ValueNotifier<double>(0.5);
+
 class MainApp extends HookWidget {
   const MainApp({super.key});
 
@@ -107,8 +109,7 @@ class MainApp extends HookWidget {
                       alpha: color.a * thickness / 20,
                     ),
                     lightIntensity: lightIntensityNotifier.value,
-                    ambientStrength: 0.8,
-                    outlineIntensity: 2,
+                    ambientStrength: ambientStrengthNotifier.value,
                     blend: blend,
                     chromaticAberration: chromaticAberration,
                   ),
@@ -358,6 +359,15 @@ class SettingsSheet extends StatelessWidget {
                         },
                         min: 0,
                         max: 10,
+                      ),
+                      Text('Ambient Strength:'),
+                      CupertinoSlider(
+                        value: ambientStrengthNotifier.value,
+                        onChanged: (value) {
+                          ambientStrengthNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 5,
                       ),
                     ],
                   ),
