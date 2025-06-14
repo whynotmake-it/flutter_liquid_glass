@@ -1,3 +1,7 @@
+## 0.1.1-dev.3
+
+ - **DOCS**: new shape names.
+
 ## 0.1.1-dev.2
 
 > Note: This release has breaking changes.
