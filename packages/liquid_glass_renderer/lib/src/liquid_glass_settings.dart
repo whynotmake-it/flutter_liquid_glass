@@ -14,7 +14,6 @@ class LiquidGlassSettings with EquatableMixin {
     this.lightAngle = 0.5 * pi,
     this.lightIntensity = 1,
     this.ambientStrength = .01,
-    this.outlineIntensity = .1,
   });
 
   /// The color tint of the glass effect.
@@ -52,11 +51,6 @@ class LiquidGlassSettings with EquatableMixin {
   /// Higher values create more pronounced ambient light.
   final double ambientStrength;
 
-  /// The intensity of the outline of the glass effect.
-  ///
-  /// Higher values create more pronounced outlines.
-  final double outlineIntensity;
-
   @override
   List<Object?> get props => [
         glassColor,
@@ -66,6 +60,5 @@ class LiquidGlassSettings with EquatableMixin {
         lightAngle,
         lightIntensity,
         ambientStrength,
-        outlineIntensity,
       ];
 }

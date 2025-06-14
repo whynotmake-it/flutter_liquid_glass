@@ -13,13 +13,11 @@ precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
 
-layout(location = 0) uniform sampler2D uBackgroundTexture;
 
-layout(location = 0) uniform vec2 uSizeW;
-layout(location = 1) uniform vec2 uSizeH;
+layout(location = 0) uniform float uSizeW;
+layout(location = 1) uniform float uSizeH;
 
 vec2 uSize = vec2(uSizeW, uSizeH);
-
 
 layout(location = 2) uniform float uChromaticAberration = 0.0;
 
@@ -43,33 +41,33 @@ layout(location = 14) uniform float uShape1CenterY;
 layout(location = 15) uniform float uShape1SizeW;
 layout(location = 16) uniform float uShape1SizeH;
 layout(location = 17) uniform float uShape1CornerRadius;
-layout(location = 18) uniform float uShape2Type;
 
 vec2 uShape1Center = vec2(uShape1CenterX, uShape1CenterY);
 vec2 uShape1Size = vec2(uShape1SizeW, uShape1SizeH);
 
-layout(location = 19) uniform float uShape2Type;
-layout(location = 20) uniform float uShape2CenterX;
-layout(location = 21) uniform float uShape2CenterY;
-layout(location = 22) uniform float uShape2SizeW;
-layout(location = 23) uniform float uShape2SizeH;
-layout(location = 24) uniform float uShape2CornerRadius;
+layout(location = 18) uniform float uShape2Type;
+layout(location = 19) uniform float uShape2CenterX;
+layout(location = 20) uniform float uShape2CenterY;
+layout(location = 21) uniform float uShape2SizeW;
+layout(location = 22) uniform float uShape2SizeH;
+layout(location = 23) uniform float uShape2CornerRadius;
 
 vec2 uShape2Center = vec2(uShape2CenterX, uShape2CenterY);
 vec2 uShape2Size = vec2(uShape2SizeW, uShape2SizeH);
 
-layout(location = 25) uniform float uShape3Type;
-layout(location = 26) uniform float uShape3CenterX;
-layout(location = 27) uniform float uShape3CenterY;
-layout(location = 28) uniform float uShape3SizeW;
-layout(location = 29) uniform float uShape3SizeH;
-layout(location = 30) uniform float uShape3CornerRadius;
+layout(location = 24) uniform float uShape3Type;
+layout(location = 25) uniform float uShape3CenterX;
+layout(location = 26) uniform float uShape3CenterY;
+layout(location = 27) uniform float uShape3SizeW;
+layout(location = 28) uniform float uShape3SizeH;
+layout(location = 29) uniform float uShape3CornerRadius;
 
 vec2 uShape3Center = vec2(uShape3CenterX, uShape3CenterY);
 vec2 uShape3Size = vec2(uShape3SizeW, uShape3SizeH);
 
-layout(location = 31) uniform float uBlend;
+layout(location = 30) uniform float uBlend;
 
+layout(location = 32) uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
 
 
