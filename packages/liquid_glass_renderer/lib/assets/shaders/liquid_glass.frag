@@ -9,7 +9,7 @@
 // give some credit like I did here.
 
 #version 320 es
-precision highp float;
+precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
 
