@@ -231,30 +231,29 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(7, _settings.lightAngle)
       ..setFloat(8, _settings.lightIntensity)
       ..setFloat(9, _settings.ambientStrength)
-      ..setFloat(10, _settings.outlineIntensity)
-      ..setFloat(11, _settings.thickness)
-      ..setFloat(12, 1.51) // refractive index
+      ..setFloat(10, _settings.thickness)
+      ..setFloat(11, 1.51) // refractive index
 
       // Shape uniforms
-      ..setFloat(13, shape1.type.index.toDouble())
-      ..setFloat(14, shape1.center.dx * _devicePixelRatio)
-      ..setFloat(15, shape1.center.dy * _devicePixelRatio)
-      ..setFloat(16, shape1.size.width * _devicePixelRatio)
-      ..setFloat(17, shape1.size.height * _devicePixelRatio)
-      ..setFloat(18, shape1.cornerRadius * _devicePixelRatio)
-      ..setFloat(19, shape2.type.index.toDouble())
-      ..setFloat(20, shape2.center.dx * _devicePixelRatio)
-      ..setFloat(21, shape2.center.dy * _devicePixelRatio)
-      ..setFloat(22, shape2.size.width * _devicePixelRatio)
-      ..setFloat(23, shape2.size.height * _devicePixelRatio)
-      ..setFloat(24, shape2.cornerRadius * _devicePixelRatio)
-      ..setFloat(25, shape3.type.index.toDouble())
-      ..setFloat(26, shape3.center.dx * _devicePixelRatio)
-      ..setFloat(27, shape3.center.dy * _devicePixelRatio)
-      ..setFloat(28, shape3.size.width * _devicePixelRatio)
-      ..setFloat(29, shape3.size.height * _devicePixelRatio)
-      ..setFloat(30, shape3.cornerRadius * _devicePixelRatio)
-      ..setFloat(31, _settings.blend * _devicePixelRatio);
+      ..setFloat(12, shape1.type.index.toDouble())
+      ..setFloat(13, shape1.center.dx * _devicePixelRatio)
+      ..setFloat(14, shape1.center.dy * _devicePixelRatio)
+      ..setFloat(15, shape1.size.width * _devicePixelRatio)
+      ..setFloat(16, shape1.size.height * _devicePixelRatio)
+      ..setFloat(17, shape1.cornerRadius * _devicePixelRatio)
+      ..setFloat(18, shape2.type.index.toDouble())
+      ..setFloat(19, shape2.center.dx * _devicePixelRatio)
+      ..setFloat(20, shape2.center.dy * _devicePixelRatio)
+      ..setFloat(21, shape2.size.width * _devicePixelRatio)
+      ..setFloat(22, shape2.size.height * _devicePixelRatio)
+      ..setFloat(23, shape2.cornerRadius * _devicePixelRatio)
+      ..setFloat(24, shape3.type.index.toDouble())
+      ..setFloat(25, shape3.center.dx * _devicePixelRatio)
+      ..setFloat(26, shape3.center.dy * _devicePixelRatio)
+      ..setFloat(27, shape3.size.width * _devicePixelRatio)
+      ..setFloat(28, shape3.size.height * _devicePixelRatio)
+      ..setFloat(29, shape3.cornerRadius * _devicePixelRatio)
+      ..setFloat(30, _settings.blend * _devicePixelRatio);
 
     _paintShapeBlurs(context, offset, shapes);
 

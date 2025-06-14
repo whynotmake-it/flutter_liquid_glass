@@ -14,32 +14,65 @@ precision highp float;
 #include <flutter/runtime_effect.glsl>
 
 layout(location = 0) uniform sampler2D uBackgroundTexture;
-layout(location = 1) uniform vec2 uSize;
+
+layout(location = 0) uniform vec2 uSizeW;
+layout(location = 1) uniform vec2 uSizeH;
+
+vec2 uSize = vec2(uSizeW, uSizeH);
+
+
 layout(location = 2) uniform float uChromaticAberration = 0.0;
-layout(location = 3) uniform vec4 uGlassColor = vec4(1.0, 1.0, 1.0, 1.0);
-layout(location = 4) uniform float uLightAngle = 0.785398;
-layout(location = 5) uniform float uLightIntensity = 1.0;
-layout(location = 6) uniform float uAmbientStrength = 0.1;
-layout(location = 7) uniform float uOutlineIntensity = 3.3;
-layout(location = 8) uniform float uThickness;
-layout(location = 9) uniform float uRefractiveIndex = 1.2;
+
+layout(location = 3) uniform float uGlassColorR;
+layout(location = 4) uniform float uGlassColorG;
+layout(location = 5) uniform float uGlassColorB;
+layout(location = 6) uniform float uGlassColorA;
+
+vec4 uGlassColor = vec4(uGlassColorR, uGlassColorG, uGlassColorB, uGlassColorA);
+
+layout(location = 7) uniform float uLightAngle = 0.785398;
+layout(location = 8) uniform float uLightIntensity = 1.0;
+layout(location = 9) uniform float uAmbientStrength = 0.1;
+layout(location = 10) uniform float uThickness;
+layout(location = 11) uniform float uRefractiveIndex = 1.2;
 
 // Shape uniforms
-layout(location = 10) uniform float uShape1Type;
-layout(location = 11) uniform vec2 uShape1Center;
-layout(location = 12) uniform vec2 uShape1Size;
-layout(location = 13) uniform float uShape1CornerRadius;
-layout(location = 14) uniform float uShape2Type;
-layout(location = 15) uniform vec2 uShape2Center;
-layout(location = 16) uniform vec2 uShape2Size;
-layout(location = 17) uniform float uShape2CornerRadius;
-layout(location = 18) uniform float uShape3Type;
-layout(location = 19) uniform vec2 uShape3Center;
-layout(location = 20) uniform vec2 uShape3Size;
-layout(location = 21) uniform float uShape3CornerRadius;
-layout(location = 22) uniform float uBlend;
+layout(location = 12) uniform float uShape1Type;
+layout(location = 13) uniform float uShape1CenterX;
+layout(location = 14) uniform float uShape1CenterY;
+layout(location = 15) uniform float uShape1SizeW;
+layout(location = 16) uniform float uShape1SizeH;
+layout(location = 17) uniform float uShape1CornerRadius;
+layout(location = 18) uniform float uShape2Type;
+
+vec2 uShape1Center = vec2(uShape1CenterX, uShape1CenterY);
+vec2 uShape1Size = vec2(uShape1SizeW, uShape1SizeH);
+
+layout(location = 19) uniform float uShape2Type;
+layout(location = 20) uniform float uShape2CenterX;
+layout(location = 21) uniform float uShape2CenterY;
+layout(location = 22) uniform float uShape2SizeW;
+layout(location = 23) uniform float uShape2SizeH;
+layout(location = 24) uniform float uShape2CornerRadius;
+
+vec2 uShape2Center = vec2(uShape2CenterX, uShape2CenterY);
+vec2 uShape2Size = vec2(uShape2SizeW, uShape2SizeH);
+
+layout(location = 25) uniform float uShape3Type;
+layout(location = 26) uniform float uShape3CenterX;
+layout(location = 27) uniform float uShape3CenterY;
+layout(location = 28) uniform float uShape3SizeW;
+layout(location = 29) uniform float uShape3SizeH;
+layout(location = 30) uniform float uShape3CornerRadius;
+
+vec2 uShape3Center = vec2(uShape3CenterX, uShape3CenterY);
+vec2 uShape3Size = vec2(uShape3SizeW, uShape3SizeH);
+
+layout(location = 31) uniform float uBlend;
 
 layout(location = 0) out vec4 fragColor;
+
+
 
 // Shape generation functions from shapes.frag
 mat2 rotate2d(float angle) {
@@ -150,7 +183,7 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     // --- Rim lighting (Fresnel) ---
     // This creates a constant, soft outline.
     float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
-    vec3 rimLight = vec3(fresnel * uOutlineIntensity * 0.5);
+    vec3 rimLight = vec3(fresnel * uAmbientStrength * 0.5);
 
     // --- Light-dependent effects ---
     vec3 lightDir = normalize(vec3(cos(uLightAngle), sin(uLightAngle), -0.7));
