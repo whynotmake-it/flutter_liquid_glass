@@ -1,3 +1,10 @@
+## 0.1.1-dev.5
+
+> Note: This release has breaking changes.
+
+ - **FEAT**: decrease precision in shader to mediump, which should increase performance.
+ - **BREAKING** **FIX**: shader compilation and removed unused outline strength parameter.
+
 ## 0.1.1-dev.4
 
  - **FIX**: fix shader on flutter stable.
