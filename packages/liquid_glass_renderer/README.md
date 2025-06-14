@@ -26,7 +26,7 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
-- **Maximum of two shapes** can be blended in a `LiquidGlassLayer`.
+- **Maximum of three shapes** can be blended in a `LiquidGlassLayer`.
 
 ## Installation 💻
 
@@ -69,7 +69,7 @@ class MyGlassWidget extends StatelessWidget {
           // The LiquidGlass widget sits on top
           Center(
             child: LiquidGlass(
-              shape: LiquidGlassSquircle(
+              shape: LiquidRoundedSuperellipse(
                 borderRadius: Radius.circular(50),
               ),
               child: const SizedBox(
@@ -134,14 +134,14 @@ Widget build(BuildContext context) {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             LiquidGlass.inLayer(
-              shape: LiquidGlassSquircle(
+              shape: LiquidRoundedSuperellipse(
                 borderRadius: Radius.circular(40),
               ),
               child: const SizedBox.square(dimension: 100),
             ),
             const SizedBox(height: 100),
             LiquidGlass.inLayer(
-              shape: LiquidGlassSquircle(
+              shape: LiquidRoundedSuperellipse(
                 borderRadius: Radius.circular(40),
               ),
               child: const SizedBox.square(dimension: 100),
@@ -206,7 +206,7 @@ The main components of this package are:
 -   **`LiquidGlass`**: The primary widget for creating a glass effect.
 -   **`LiquidGlassLayer`**: A widget that enables blending between multiple `LiquidGlass` shapes.
 -   **`LiquidGlassSettings`**: A class to configure the visual properties of the glass.
--   **`LiquidGlassShape`**: The base class for shapes. Currently, only `LiquidGlassSquircle` is implemented.
+-   **`LiquidGlassShape`**: The base class for shapes. The currently supported shapes are `LiquidRoundedSuperellipse`, `LiquidOval`, and `LiquidRoundedRectangle`.
 
 For more details, check out the API documentation in the source code.
 
