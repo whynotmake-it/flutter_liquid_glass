@@ -1,3 +1,8 @@
+## 0.1.1-dev.4
+
+ - **FIX**: fix shader on flutter stable.
+ - **DOCS**: new shape names.
+
 ## 0.1.1-dev.3
 
  - **DOCS**: new shape names.
