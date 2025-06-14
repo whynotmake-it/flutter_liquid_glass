@@ -14,7 +14,7 @@ void main() {
 
 final thicknessNotifier = ValueNotifier<double>(20);
 
-final blurFactorNotifier = ValueNotifier<double>(.02);
+final blurFactorNotifier = ValueNotifier<double>(0.0);
 
 final cornerRadiusNotifier = ValueNotifier<double>(100);
 

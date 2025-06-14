@@ -67,7 +67,7 @@ vec2 uShape3Size = vec2(uShape3SizeW, uShape3SizeH);
 
 layout(location = 30) uniform float uBlend;
 
-layout(location = 32) uniform sampler2D uBackgroundTexture;
+uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
 
 
