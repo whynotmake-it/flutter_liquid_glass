@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
@@ -52,7 +53,7 @@ import 'package:meta/meta.dart';
 ///     ),
 ///   );
 /// }
-class LiquidGlassLayer extends StatelessWidget {
+class LiquidGlassLayer extends StatefulWidget {
   /// Creates a new [LiquidGlassLayer] with the given [child] and [settings].
   const LiquidGlassLayer({
     required this.child,
@@ -70,17 +71,24 @@ class LiquidGlassLayer extends StatelessWidget {
   final LiquidGlassSettings settings;
 
   @override
+  State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
+}
+
+class _LiquidGlassLayerState extends State<LiquidGlassLayer>
+    with SingleTickerProviderStateMixin {
+  @override
   Widget build(BuildContext context) {
     return ShaderBuilder(
       assetKey:
           'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass.frag',
       (context, shader, child) => _RawShapes(
         shader: shader,
-        settings: settings,
+        settings: widget.settings,
         debugRenderRefractionMap: false,
+        vsync: this,
         child: child!,
       ),
-      child: child,
+      child: widget.child,
     );
   }
 }
@@ -90,12 +98,15 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.shader,
     required this.settings,
     required this.debugRenderRefractionMap,
+    required this.vsync,
     required Widget super.child,
   });
 
   final FragmentShader shader;
   final LiquidGlassSettings settings;
   final bool debugRenderRefractionMap;
+
+  final TickerProvider vsync;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -104,6 +115,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       shader: shader,
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
+      ticker: vsync,
     );
   }
 
@@ -115,6 +127,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     renderObject
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
+      ..ticker = vsync
       ..debugRenderRefractionMap = debugRenderRefractionMap;
   }
 }
@@ -125,11 +138,17 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     required double devicePixelRatio,
     required FragmentShader shader,
     required LiquidGlassSettings settings,
+    required TickerProvider ticker,
     bool debugRenderRefractionMap = false,
   })  : _devicePixelRatio = devicePixelRatio,
         _shader = shader,
         _settings = settings,
-        _debugRenderRefractionMap = debugRenderRefractionMap;
+        _tickerProvider = ticker,
+        _debugRenderRefractionMap = debugRenderRefractionMap {
+    _ticker = _tickerProvider.createTicker((_) {
+      markNeedsPaint();
+    });
+  }
 
   // Registry to allow shapes to find their parent layer
   static final Expando<RenderLiquidGlassLayer> layerRegistry = Expando();
@@ -159,6 +178,19 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  TickerProvider _tickerProvider;
+  set ticker(TickerProvider value) {
+    if (_tickerProvider == value) return;
+    _tickerProvider = value;
+    markNeedsPaint();
+  }
+
+  /// Ticker to animate the liquid glass effect.
+  ///
+  // TODO(timcreatedit): this is maybe not the best for performance, but I can't
+  // come up with a better solution right now.
+  Ticker? _ticker;
+
   void registerShape(RenderLiquidGlass shape) {
     if (registeredShapes.length >= 3) {
       throw UnsupportedError('Only three shapes are supported at the moment!');
@@ -166,12 +198,19 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     registeredShapes.add(shape);
     layerRegistry[shape] = this;
     markNeedsPaint();
+
+    if (registeredShapes.length == 1) {
+      _ticker?.start();
+    }
   }
 
   void unregisterShape(RenderLiquidGlass shape) {
     registeredShapes.remove(shape);
     layerRegistry[shape] = null;
     markNeedsPaint();
+    if (registeredShapes.isEmpty) {
+      _ticker?.stop();
+    }
   }
 
   List<(RenderLiquidGlass, RawShape)> collectShapes() {
@@ -274,6 +313,14 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       },
       offset,
     );
+  }
+
+  @override
+  void dispose() {
+    _ticker?.stop();
+    _ticker?.dispose();
+    _ticker = null;
+    super.dispose();
   }
 
   void _paintShapeContents(
