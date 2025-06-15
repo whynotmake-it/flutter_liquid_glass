@@ -298,21 +298,37 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     _paintShapeContents(context, offset, shapes, glassContainsChild: true);
 
-    context.pushLayer(
-      BackdropFilterLayer(
-        filter: ImageFilter.shader(_shader),
-      ),
-      (context, offset) {
-        super.paint(context, offset);
-        _paintShapeContents(
-          context,
-          offset,
-          shapes,
-          glassContainsChild: false,
-        );
-      },
-      offset,
-    );
+    try {
+      context.pushLayer(
+        BackdropFilterLayer(
+          filter: ImageFilter.shader(_shader),
+        ),
+        (context, offset) {
+          super.paint(context, offset);
+          _paintShapeContents(
+            context,
+            offset,
+            shapes,
+            glassContainsChild: false,
+          );
+        },
+        offset,
+      );
+      // ignore: avoid_catching_errors
+    } on UnsupportedError {
+      assert(
+        false,
+        'Unsupported: liquid_glass_renderer is only supported when using '
+        'Impeller at the moment.',
+      );
+      super.paint(context, offset);
+      _paintShapeContents(
+        context,
+        offset,
+        shapes,
+        glassContainsChild: false,
+      );
+    }
   }
 
   @override

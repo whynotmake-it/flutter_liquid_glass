@@ -17,7 +17,13 @@ topics:
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  flutter: ">=3.32.4"
+
+# We only support Platforms that support Impeller.
+platforms:
+  macos:
+  ios:
+  android:
 
 dependencies:
   equatable: ^2.0.7
