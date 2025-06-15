@@ -198,9 +198,7 @@ class RenderLiquidGlass extends RenderProxyBox {
   void attach(PipelineOwner owner) {
     super.attach(owner);
     // Register with parent layer after attaching
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _registerWithParentLayer();
-    });
+    _registerWithParentLayer();
   }
 
   @override
