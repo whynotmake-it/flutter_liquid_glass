@@ -1,3 +1,7 @@
+## 0.1.1-dev.6
+
+ - **FIX**: liquid glass not repainting in route transitions (#16).
+
 ## 0.1.1-dev.5
 
 > Note: This release has breaking changes.
