@@ -1,3 +1,8 @@
+## 0.1.1-dev.7
+
+ - **FIX**: throw `AssertionError` when used without Impeller.
+ - **DOCS**: update pubspec.yaml to reflect minimum SDK and supported platforms.
+
 ## 0.1.1-dev.6
 
  - **FIX**: liquid glass not repainting in route transitions (#16).
