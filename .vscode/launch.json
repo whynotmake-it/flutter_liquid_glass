@@ -14,6 +14,15 @@
             ]
         },
         {
+            "name": "example (no impeller)",
+            "cwd": "packages/liquid_glass_renderer/example",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--no-enable-impeller"
+            ]
+        },
+        {
             "name": "example (profile mode)",
             "cwd": "packages/liquid_glass_renderer/example",
             "request": "launch",

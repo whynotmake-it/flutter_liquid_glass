@@ -78,6 +78,17 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
+    if (!ImageFilter.isShaderFilterSupported) {
+      assert(
+        ImageFilter.isShaderFilterSupported,
+        'liquid_glass_renderer is only supported when using Impeller at the '
+        'moment. Please enable Impeller, or check '
+        'ImageFilter.isShaderFilterSupported before you use liquid glass '
+        'widgets.',
+      );
+      return widget.child;
+    }
+
     return ShaderBuilder(
       assetKey:
           'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass.frag',
@@ -298,37 +309,21 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     _paintShapeContents(context, offset, shapes, glassContainsChild: true);
 
-    try {
-      context.pushLayer(
-        BackdropFilterLayer(
-          filter: ImageFilter.shader(_shader),
-        ),
-        (context, offset) {
-          super.paint(context, offset);
-          _paintShapeContents(
-            context,
-            offset,
-            shapes,
-            glassContainsChild: false,
-          );
-        },
-        offset,
-      );
-      // ignore: avoid_catching_errors
-    } on UnsupportedError {
-      assert(
-        false,
-        'Unsupported: liquid_glass_renderer is only supported when using '
-        'Impeller at the moment.',
-      );
-      super.paint(context, offset);
-      _paintShapeContents(
-        context,
-        offset,
-        shapes,
-        glassContainsChild: false,
-      );
-    }
+    context.pushLayer(
+      BackdropFilterLayer(
+        filter: ImageFilter.shader(_shader),
+      ),
+      (context, offset) {
+        super.paint(context, offset);
+        _paintShapeContents(
+          context,
+          offset,
+          shapes,
+          glassContainsChild: false,
+        );
+      },
+      offset,
+    );
   }
 
   @override
