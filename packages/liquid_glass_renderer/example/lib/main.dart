@@ -56,7 +56,9 @@ class MainApp extends HookWidget {
       upperBound: 2 * pi,
     )..repeat();
 
-    final lightAngle = useAnimation(lightAngleController);
+    useAnimation(lightAngleController);
+
+    final lightAngle = 0.0;
 
     final cornerRadius = useSingleMotion(
       value: cornerRadiusNotifier.value,
@@ -117,7 +119,7 @@ class MainApp extends HookWidget {
                     alignment: Alignment.bottomLeft,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 90, left: 140),
+                        padding: const EdgeInsets.only(bottom: 105, left: 130),
                         child: DragDismissable(
                           threshold: double.maxFinite,
                           velocityThreshold: double.maxFinite,
@@ -129,7 +131,7 @@ class MainApp extends HookWidget {
                             ),
                             child: Container(
                               color: Colors.transparent,
-                              child: SizedBox.square(dimension: 160),
+                              child: SizedBox(height: 120, width: 180),
                             ),
                           ),
                         ),
@@ -243,6 +245,14 @@ class Background extends HookWidget {
                 fit: StackFit.expand,
                 children: [
                   Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      color: Colors.red,
+                    ),
+                  ),
+                  Align(
                     alignment: Alignment.bottomLeft,
                     child: Text(
                       'Liquid\nGlass\nRenderer',
@@ -314,7 +324,7 @@ class SettingsSheet extends StatelessWidget {
                           thicknessNotifier.value = value;
                         },
                         min: 0,
-                        max: 100,
+                        max: 160,
                       ),
                       Text('Corner Radius:'),
                       CupertinoSlider(
