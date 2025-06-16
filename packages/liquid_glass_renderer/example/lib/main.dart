@@ -56,9 +56,7 @@ class MainApp extends HookWidget {
       upperBound: 2 * pi,
     )..repeat();
 
-    useAnimation(lightAngleController);
-
-    final lightAngle = 0.0;
+    final lightAngle = useAnimation(lightAngleController);
 
     final cornerRadius = useSingleMotion(
       value: cornerRadiusNotifier.value,
