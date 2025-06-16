@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -14,7 +15,7 @@ void main() {
 
 final thicknessNotifier = ValueNotifier<double>(20);
 
-final blurFactorNotifier = ValueNotifier<double>(0.0);
+final blurNotifier = ValueNotifier<double>(0.0);
 
 final cornerRadiusNotifier = ValueNotifier<double>(100);
 
@@ -22,13 +23,15 @@ final glassColorNotifier = ValueNotifier<Color>(
   const Color.fromARGB(0, 255, 255, 255),
 );
 
-final lightIntensityNotifier = ValueNotifier<double>(5);
+final lightIntensityNotifier = ValueNotifier<double>(1);
 
 final blendNotifier = ValueNotifier<double>(50);
 
 final chromaticAberrationNotifier = ValueNotifier<double>(1);
 
 final ambientStrengthNotifier = ValueNotifier<double>(0.5);
+
+final refractiveIndexNotifier = ValueNotifier<double>(1.51);
 
 class MainApp extends HookWidget {
   const MainApp({super.key});
@@ -48,7 +51,7 @@ class MainApp extends HookWidget {
       motion: SpringMotion(spring),
     );
 
-    final blur = thickness * blurFactorNotifier.value;
+    final blur = useValueListenable(blurNotifier);
 
     final lightAngleController = useAnimationController(
       duration: const Duration(seconds: 5),
@@ -74,109 +77,124 @@ class MainApp extends HookWidget {
       brightness: Brightness.dark,
       seedColor: Color(0xFF287390),
     );
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.from(
-        colorScheme: colorScheme,
-        textTheme: GoogleFonts.lexendDecaTextTheme().apply(
-          displayColor: colorScheme.onSurface,
-          bodyColor: colorScheme.onSurface,
+
+    final settings = LiquidGlassSettings(
+      thickness: thickness,
+      lightAngle: lightAngle,
+      glassColor: color.withValues(alpha: color.a * thickness / 20),
+      lightIntensity: lightIntensityNotifier.value,
+      ambientStrength: ambientStrengthNotifier.value,
+      blend: blend,
+      chromaticAberration: chromaticAberration,
+      refractiveIndex: refractiveIndexNotifier.value,
+    );
+    return CallbackShortcuts(
+      bindings: {
+        LogicalKeySet(LogicalKeyboardKey.space): () {
+          thicknessVisible.value = !thicknessVisible.value;
+        },
+      },
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.from(
+          colorScheme: colorScheme,
+          textTheme: GoogleFonts.lexendDecaTextTheme().apply(
+            displayColor: colorScheme.onSurface,
+            bodyColor: colorScheme.onSurface,
+          ),
         ),
-      ),
-      home: Scaffold(
-        body: Builder(
-          builder: (context) {
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  ModalSheetRoute(
-                    barrierColor: Colors.black26,
-                    swipeDismissible: true,
-                    viewportPadding: const EdgeInsets.all(100),
-                    builder: (context) {
-                      return SettingsSheet();
-                    },
-                  ),
-                );
-              },
-              child: Background(
-                child: LiquidGlassLayer(
-                  settings: LiquidGlassSettings(
-                    thickness: thickness,
-                    lightAngle: lightAngle,
-                    glassColor: color.withValues(
-                      alpha: color.a * thickness / 20,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    ModalSheetRoute(
+                      barrierColor: Colors.black26,
+                      swipeDismissible: true,
+                      viewportPadding: const EdgeInsets.all(100),
+                      builder: (context) {
+                        return SettingsSheet();
+                      },
                     ),
-                    lightIntensity: lightIntensityNotifier.value,
-                    ambientStrength: ambientStrengthNotifier.value,
-                    blend: blend,
-                    chromaticAberration: chromaticAberration,
-                  ),
-                  child: Stack(
-                    alignment: Alignment.bottomLeft,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 105, left: 130),
-                        child: DragDismissable(
-                          threshold: double.maxFinite,
-                          velocityThreshold: double.maxFinite,
-                          spring: Spring.bouncy,
-                          child: LiquidGlass.inLayer(
-                            blur: blur,
-                            shape: LiquidRoundedSuperellipse(
-                              borderRadius: Radius.circular(cornerRadius),
-                            ),
-                            child: Container(
-                              color: Colors.transparent,
-                              child: SizedBox(height: 120, width: 180),
+                  );
+                },
+                child: Background(
+                  child: LiquidGlassLayer(
+                    settings: settings,
+                    child: Stack(
+                      alignment: Alignment.bottomLeft,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: 105,
+                            left: 130,
+                          ),
+                          child: DragDismissable(
+                            threshold: double.maxFinite,
+                            velocityThreshold: double.maxFinite,
+                            spring: Spring.bouncy,
+                            child: LiquidGlass.inLayer(
+                              blur: blur,
+                              shape: LiquidRoundedSuperellipse(
+                                borderRadius: Radius.circular(cornerRadius),
+                              ),
+                              child: Container(
+                                color: Colors.transparent,
+                                child: SizedBox(height: 120, width: 180),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: DragDismissable(
-                          threshold: double.maxFinite,
-                          velocityThreshold: double.maxFinite,
-                          spring: Spring.bouncy,
-                          child: LiquidGlass.inLayer(
-                            glassContainsChild: false,
-                            blur: blur,
-                            shape: LiquidRoundedSuperellipse(
-                              borderRadius: Radius.circular(cornerRadius),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(64.0),
-                              child: FlutterLogo(size: 200),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: DragDismissable(
-                          threshold: double.maxFinite,
-                          velocityThreshold: double.maxFinite,
-                          spring: Spring.bouncy,
-                          child: LiquidGlass.inLayer(
-                            glassContainsChild: false,
-                            blur: blur,
-                            shape: LiquidOval(),
-                            child: Container(
-                              width: 100,
-                              height: 80,
-                              color: Colors.transparent,
+
+                        Align(
+                          alignment: Alignment.center,
+                          child: DragDismissable(
+                            threshold: double.maxFinite,
+                            velocityThreshold: double.maxFinite,
+                            spring: Spring.bouncy,
+                            child: LiquidGlass.inLayer(
+                              glassContainsChild: false,
+                              blur: blur,
+                              shape: LiquidRoundedSuperellipse(
+                                borderRadius: Radius.circular(cornerRadius),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(64.0),
+                                child: LiquidGlassWidget(
+                                  settings: settings,
+                                  child: FlutterLogo(size: 200),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: DragDismissable(
+                            threshold: double.maxFinite,
+                            velocityThreshold: double.maxFinite,
+                            spring: Spring.bouncy,
+                            child: LiquidGlass.inLayer(
+                              glassContainsChild: false,
+                              blur: blur,
+                              shape: LiquidOval(),
+                              child: Container(
+                                width: 100,
+                                height: 80,
+                                color: Colors.transparent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -243,14 +261,6 @@ class Background extends HookWidget {
                 fit: StackFit.expand,
                 children: [
                   Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      color: Colors.red,
-                    ),
-                  ),
-                  Align(
                     alignment: Alignment.bottomLeft,
                     child: Text(
                       'Liquid\nGlass\nRenderer',
@@ -274,11 +284,20 @@ class Background extends HookWidget {
   }
 }
 
-class SettingsSheet extends StatelessWidget {
+class SettingsSheet extends HookWidget {
   const SettingsSheet({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final thickness = useValueListenable(thicknessNotifier);
+    final cornerRadius = useValueListenable(cornerRadiusNotifier);
+    final lightIntensity = useValueListenable(lightIntensityNotifier);
+    final blurFactor = useValueListenable(blurNotifier);
+    final blend = useValueListenable(blendNotifier);
+    final chromaticAberration = useValueListenable(chromaticAberrationNotifier);
+    final ambientStrength = useValueListenable(ambientStrengthNotifier);
+    final refractionStrength = useValueListenable(refractiveIndexNotifier);
+
     return Sheet(
       dragConfiguration: SheetDragConfiguration(),
       scrollConfiguration: const SheetScrollConfiguration(),
@@ -288,13 +307,15 @@ class SettingsSheet extends StatelessWidget {
       snapGrid: SheetSnapGrid(snaps: [SheetOffset(0.5), SheetOffset(1)]),
       child: SafeArea(
         child: LiquidGlass(
-          blur: 10,
+          blur: 20,
           glassContainsChild: false,
           settings: LiquidGlassSettings(
-            thickness: 40,
-            lightIntensity: .4,
+            thickness: 30,
+            lightIntensity: .2,
+            lightAngle: .2 * pi,
+
             ambientStrength: 2,
-            chromaticAberration: 4,
+            chromaticAberration: 2,
             glassColor: Theme.of(
               context,
             ).colorScheme.surface.withValues(alpha: 0.4),
@@ -315,67 +336,127 @@ class SettingsSheet extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineLarge,
                       ),
                       const SizedBox(height: 16),
-                      Text('Thickness:'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Thickness:'),
+                          Text(thickness.toStringAsFixed(2)),
+                        ],
+                      ),
                       CupertinoSlider(
-                        value: thicknessNotifier.value,
+                        value: thickness,
                         onChanged: (value) {
                           thicknessNotifier.value = value;
                         },
                         min: 0,
                         max: 160,
                       ),
-                      Text('Corner Radius:'),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Corner Radius:'),
+                          Text(cornerRadius.toStringAsFixed(2)),
+                        ],
+                      ),
                       CupertinoSlider(
-                        value: cornerRadiusNotifier.value,
+                        value: cornerRadius,
                         onChanged: (value) {
                           cornerRadiusNotifier.value = value;
                         },
                         min: 0,
                         max: 100,
                       ),
-                      Text('Light Intensity:'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Light Intensity:'),
+                          Text(lightIntensity.toStringAsFixed(2)),
+                        ],
+                      ),
                       CupertinoSlider(
-                        value: lightIntensityNotifier.value,
+                        value: lightIntensity,
                         onChanged: (value) {
                           lightIntensityNotifier.value = value;
                         },
                         min: 0,
                         max: 5,
                       ),
-
-                      Text('Blur:'),
-                      CupertinoSlider(
-                        value: blurFactorNotifier.value,
-                        onChanged: (value) {
-                          blurFactorNotifier.value = value;
-                        },
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Ambient Strength:'),
+                          Text(ambientStrength.toStringAsFixed(2)),
+                        ],
                       ),
-                      Text('Liquid Factor™:'),
                       CupertinoSlider(
-                        value: blendNotifier.value,
+                        value: ambientStrength,
+                        onChanged: (value) {
+                          ambientStrengthNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 5,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Blur:'),
+                          Text(blurFactor.toStringAsFixed(2)),
+                        ],
+                      ),
+                      CupertinoSlider(
+                        value: blurFactor,
+                        onChanged: (value) {
+                          blurNotifier.value = value;
+                        },
+                        min: 0,
+                        max: 40,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Liquid Factor™:'),
+                          Text(blend.toStringAsFixed(2)),
+                        ],
+                      ),
+                      CupertinoSlider(
+                        value: blend,
                         onChanged: (value) {
                           blendNotifier.value = value;
                         },
                         min: 0,
                         max: 100,
                       ),
-                      Text('Chromatic Aberration:'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Chromatic Aberration:'),
+                          Text(chromaticAberration.toStringAsFixed(2)),
+                        ],
+                      ),
                       CupertinoSlider(
-                        value: chromaticAberrationNotifier.value,
+                        value: chromaticAberration,
                         onChanged: (value) {
                           chromaticAberrationNotifier.value = value;
                         },
                         min: 0,
                         max: 10,
                       ),
-                      Text('Ambient Strength:'),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Refractive Index:'),
+                          Text(refractionStrength.toStringAsFixed(2)),
+                        ],
+                      ),
                       CupertinoSlider(
-                        value: ambientStrengthNotifier.value,
+                        value: refractionStrength,
                         onChanged: (value) {
-                          ambientStrengthNotifier.value = value;
+                          refractiveIndexNotifier.value = value;
                         },
-                        min: 0,
-                        max: 5,
+                        min: 1,
+                        max: 3,
                       ),
                     ],
                   ),

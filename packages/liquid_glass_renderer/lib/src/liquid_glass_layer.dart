@@ -282,7 +282,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(8, _settings.lightIntensity)
       ..setFloat(9, _settings.ambientStrength)
       ..setFloat(10, _settings.thickness)
-      ..setFloat(11, 1.51) // refractive index
+      ..setFloat(11, _settings.refractiveIndex) // refractive index
 
       // Shape uniforms
       ..setFloat(12, shape1.type.index.toDouble())

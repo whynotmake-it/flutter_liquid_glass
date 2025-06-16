@@ -14,6 +14,7 @@ class LiquidGlassSettings with EquatableMixin {
     this.lightAngle = 0.5 * pi,
     this.lightIntensity = 1,
     this.ambientStrength = .01,
+    this.refractiveIndex = 1.51,
   });
 
   /// The color tint of the glass effect.
@@ -51,6 +52,12 @@ class LiquidGlassSettings with EquatableMixin {
   /// Higher values create more pronounced ambient light.
   final double ambientStrength;
 
+  /// The strength of the refraction.
+  ///
+  /// Higher values create more pronounced refraction.
+  /// Defaults to 1.51
+  final double refractiveIndex;
+
   @override
   List<Object?> get props => [
         glassColor,
@@ -60,5 +67,6 @@ class LiquidGlassSettings with EquatableMixin {
         lightAngle,
         lightIntensity,
         ambientStrength,
+        refractiveIndex,
       ];
 }

@@ -12,7 +12,7 @@
 precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
-
+#include "shared.glsl"
 
 layout(location = 0) uniform float uSizeW;
 layout(location = 1) uniform float uSizeH;
@@ -70,13 +70,7 @@ layout(location = 30) uniform float uBlend;
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
 
-
-
-// Shape generation functions from shapes.frag
-mat2 rotate2d(float angle) {
-    return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-}
-
+// SDF functions (shader-specific)
 float sdfRRect( in vec2 p, in vec2 b, in float r ) {
     float shortest = min(b.x, b.y);
     r = min(r, shortest);
@@ -139,7 +133,7 @@ float sceneSDF(vec2 p) {
     return smoothUnion(smoothUnion(d1, d2, uBlend), d3, uBlend);
 }
 
-// Calculate 3D normal using derivatives
+// Calculate 3D normal using derivatives (shader-specific normal calculation)
 vec3 getNormal(float sd, float thickness) {
     float dx = dFdx(sd);
     float dy = dFdy(sd);
@@ -152,166 +146,28 @@ vec3 getNormal(float sd, float thickness) {
     return normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
 }
 
-// Calculate height/depth of the liquid surface
-float getHeight(float sd, float thickness) {
-    if (sd >= 0.0 || thickness <= 0.0) {
-        return 0.0;
-    }
-    if (sd < -thickness) {
-        return thickness;
-    }
-    
-    float x = thickness + sd;
-    return sqrt(max(0.0, thickness * thickness - x * x));
-}
-
-// Calculate lighting effects based on displacement data
-vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDisplacement, float thickness) {
-    // Basic shape mask
-    float normalizedHeight = thickness > 0.0 ? height / thickness : 0.0;
-    float shape = smoothstep(0.0, 0.9, 1.0 - normalizedHeight);
-
-    // If we're outside the shape, no lighting.
-    if (shape < 0.01) {
-        return vec3(0.0);
-    }
-    
-    vec3 viewDir = vec3(0.0, 0.0, 1.0);
-
-    // --- Rim lighting (Fresnel) ---
-    // This creates a constant, soft outline.
-    float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
-    vec3 rimLight = vec3(fresnel * uAmbientStrength * 0.5);
-
-    // --- Light-dependent effects ---
-    vec3 lightDir = normalize(vec3(cos(uLightAngle), sin(uLightAngle), -0.7));
-    vec3 oppositeLightDir = normalize(vec3(-lightDir.xy, lightDir.z));
-
-    // Common vectors needed for both light sources
-    vec3 halfwayDir1 = normalize(lightDir + viewDir);
-    float specDot1 = max(0.0, dot(normal, halfwayDir1));
-    vec3 halfwayDir2 = normalize(oppositeLightDir + viewDir);
-    float specDot2 = max(0.0, dot(normal, halfwayDir2));
-
-    // 1. Sharp surface glint (pure white)
-    float glintExponent = mix(120.0, 200.0, smoothstep(5.0, 25.0, uThickness));
-    float sharpFactor = pow(specDot1, glintExponent) + 0.4 * pow(specDot2, glintExponent);
-
-    // Pure white glint without environment tinting
-    vec3 sharpGlint = vec3(sharpFactor) * uLightIntensity * 2.5;
-
-    // 2. Soft internal bleed, for a subtle "glow"
-    float softFactor = pow(specDot1, 20.0) + 0.5 * pow(specDot2, 20.0);
-    vec3 softBleed = vec3(softFactor) * uLightIntensity * 0.4;
-    
-    // Combine lighting components
-    vec3 lighting = rimLight + sharpGlint + softBleed;
-
-    // Final combination
-    return lighting * shape;
-}
-
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
     vec2 p = FlutterFragCoord().xy;
     
-    // Generate shape and calculate normal/height directly
+    // Generate shape and calculate normal using shader-specific method
     float sd = sceneSDF(p);
-    float alpha = smoothstep(-4.0, 0.0, sd);
-    
-    // If we're completely outside the glass area (with smooth transition)
-    if (alpha > 0.999) {
-        fragColor = texture(uBackgroundTexture, screenUV);
-        return;
-    }
-    
-    // If thickness is effectively zero, behave like a simple blur
-    if (uThickness < 0.01) {
-        fragColor = texture(uBackgroundTexture, screenUV);
-        return;
-    }
-    
-    // Calculate normal and height directly - use normal as is
     vec3 normal = getNormal(sd, uThickness);
-    float height = getHeight(sd, uThickness);
     
-    // --- Refraction & Chromatic Aberration ---
-    float baseHeight = uThickness * 8.0;
-    vec3 incident = vec3(0.0, 0.0, -1.0);
-    
-    vec4 refractColor;
-    vec2 refractionDisplacement;
-
-    // To simulate a prism, we calculate refraction separately for each color channel
-    // by slightly varying the refractive index.
-    if (uChromaticAberration > 0.001) {
-        float iorR = uRefractiveIndex - uChromaticAberration * 0.04; // Less deviation for red
-        float iorG = uRefractiveIndex;
-        float iorB = uRefractiveIndex + uChromaticAberration * 0.08; // More deviation for blue
-
-        // Red channel
-        vec3 refractVecR = refract(incident, normal, 1.0 / iorR);
-        float refractLengthR = (height + baseHeight) / max(0.001, abs(refractVecR.z));
-        vec2 refractedUVR = screenUV + (refractVecR.xy * refractLengthR) / uSize;
-        float red = texture(uBackgroundTexture, refractedUVR).r;
-
-        // Green channel (we'll use this for the main displacement and alpha)
-        vec3 refractVecG = refract(incident, normal, 1.0 / iorG);
-        float refractLengthG = (height + baseHeight) / max(0.001, abs(refractVecG.z));
-        refractionDisplacement = refractVecG.xy * refractLengthG; 
-        vec2 refractedUVG = screenUV + refractionDisplacement / uSize;
-        vec4 greenSample = texture(uBackgroundTexture, refractedUVG);
-        float green = greenSample.g;
-        float bgAlpha = greenSample.a;
-
-        // Blue channel
-        vec3 refractVecB = refract(incident, normal, 1.0 / iorB);
-        float refractLengthB = (height + baseHeight) / max(0.001, abs(refractVecB.z));
-        vec2 refractedUVB = screenUV + (refractVecB.xy * refractLengthB) / uSize;
-        float blue = texture(uBackgroundTexture, refractedUVB).b;
-        
-        refractColor = vec4(red, green, blue, bgAlpha);
-    } else {
-        // Default path for no chromatic aberration
-        vec3 refractVec = refract(incident, normal, 1.0 / uRefractiveIndex);
-        float refractLength = (height + baseHeight) / max(0.001, abs(refractVec.z));
-        refractionDisplacement = refractVec.xy * refractLength;
-        vec2 refractedUV = screenUV + refractionDisplacement / uSize;
-        refractColor = texture(uBackgroundTexture, refractedUV);
-    }
-    
-    // Mix refraction and reflection based on normal.z
-    vec4 liquidColor = refractColor;
-    
-    // Calculate lighting effects
-    vec3 lighting = calculateLighting(screenUV, normal, height, refractionDisplacement, uThickness);
-    
-    // Apply realistic glass color influence
-    vec4 finalColor = liquidColor;
-    
-    if (uGlassColor.a > 0.0) {
-        float glassLuminance = dot(uGlassColor.rgb, vec3(0.299, 0.587, 0.114));
-        
-        if (glassLuminance < 0.5) {
-            vec3 darkened = liquidColor.rgb * (uGlassColor.rgb * 2.0);
-            finalColor.rgb = mix(liquidColor.rgb, darkened, uGlassColor.a);
-        } else {
-            vec3 invLiquid = vec3(1.0) - liquidColor.rgb;
-            vec3 invGlass = vec3(1.0) - uGlassColor.rgb;
-            vec3 screened = vec3(1.0) - (invLiquid * invGlass);
-            finalColor.rgb = mix(liquidColor.rgb, screened, uGlassColor.a);
-        }
-        
-        finalColor.a = liquidColor.a;
-    }
-    
-    // Add lighting effects to final color
-    finalColor.rgb += lighting;
-    
-    // Sample original background for falloff areas
-    vec4 originalBgColor = texture(uBackgroundTexture, screenUV);
-        
-    // Use alpha for smooth transition at boundaries
-    vec4 backgroundColor = texture(uBackgroundTexture, screenUV);
-    fragColor = mix(backgroundColor, finalColor, 1.0 - alpha);
+    // Use shared rendering pipeline
+    fragColor = renderLiquidGlass(
+        screenUV, 
+        p, 
+        uSize, 
+        sd, 
+        uThickness, 
+        uRefractiveIndex, 
+        uChromaticAberration, 
+        uGlassColor, 
+        uLightAngle, 
+        uLightIntensity, 
+        uAmbientStrength, 
+        uBackgroundTexture, 
+        normal
+    );
 }
