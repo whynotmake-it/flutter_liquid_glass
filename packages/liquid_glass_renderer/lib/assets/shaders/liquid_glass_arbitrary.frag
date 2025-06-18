@@ -6,6 +6,8 @@
 #version 320 es
 precision mediump float;
 
+#define DEBUG_NORMALS 0
+
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
 
@@ -37,11 +39,21 @@ layout(location = 14) uniform float uOffsetX;
 layout(location = 15) uniform float uOffsetY;
 vec2 uOffset = vec2(uOffsetX, uOffsetY);
 
+// New uniform for normal calculation method selection
+layout(location = 16) uniform float uNormalMethod; // 0.0 = center-based, 1.0 = reconstructed
+
+// Gaussian blur uniform
+layout(location = 17) uniform float uGaussianBlur;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uForegroundTexture;
+
+// A pre-blurred version of the foreground texture.
+// This will be eroded, so that the alpha is always 0 at the edge.
+// This is used to calculate the normal.
 uniform sampler2D uForegroundBlurredTexture;
 layout(location = 0) out vec4 fragColor;
+
 
 // Convert blurred alpha to approximate SDF that matches real SDF behavior
 float approximateSDF(float blurredAlpha, float thickness) {
@@ -50,6 +62,39 @@ float approximateSDF(float blurredAlpha, float thickness) {
     float normalizedDistance = smoothstep(0.0, 1.0, blurredAlpha);
     return -normalizedDistance * thickness;
 }
+
+
+
+// Find the center of mass of the shape
+vec2 findShapeCenter(vec2 currentUV) {
+    vec2 texelSize = 2.0 / uForegroundSize;
+    vec2 centerSum = vec2(0.0);
+    float totalAlpha = 0.0;
+    
+    // Sample in a reasonable radius around the current point
+    int sampleRadius = 10;
+    for (int y = -sampleRadius; y <= sampleRadius; y++) {
+        for (int x = -sampleRadius; x <= sampleRadius; x++) {
+            vec2 sampleUV = currentUV + vec2(float(x), float(y)) * texelSize;
+            
+            // Make sure we're within texture bounds
+            if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+                float alpha = texture(uForegroundTexture, sampleUV).a;
+                if (alpha > 0.1) {
+                    centerSum += sampleUV * alpha;
+                    totalAlpha += alpha;
+                }
+            }
+        }
+    }
+    
+    // Return center of mass, or current UV if no valid samples found
+    return totalAlpha > 0.0 ? centerSum / totalAlpha : currentUV;
+}
+
+
+
+
 
 // Helper for robust, multi-scale gradient calculation using a Sobel operator.
 // This is more noise-resistant than simple central differences.
@@ -86,60 +131,48 @@ vec2 calculateGradient(sampler2D tex, vec2 uv, vec2 texelSize) {
     return (gradient / totalWeight) * 0.125;
 }
 
-// Sharp-edge normal calculation with subsampling for improved quality.
-vec3 getNormal(vec2 p, float thickness) {
+vec3 getReconstructedNormal(vec2 p, float thickness) {
     vec2 uv = p / uForegroundSize;
-    vec2 texelSize = 1.0 / uForegroundSize;
-
-    // Early exit for fragments outside the shape.
+    
     if (texture(uForegroundTexture, uv).a < 0.01) {
         return vec3(0.0, 0.0, 1.0);
     }
-
-    // Get distance from edge using blurred texture.
-    float blurredAlpha = texture(uForegroundBlurredTexture, uv).a;
-    float sdf = approximateSDF(blurredAlpha, thickness); // 0 at edge, -thickness in center
-
-    // Calculate gradients from both sharp and blurred textures using the robust Sobel operator.
-    // The sharp gradient gives accurate edge direction, while the blurred one provides smooth inner normals.
-    vec2 grad_sharp = calculateGradient(uForegroundTexture, uv, texelSize);
-    vec2 grad_blur = calculateGradient(uForegroundBlurredTexture, uv, texelSize);
-
-    // Blend between the two gradients. At the very edge (sdf near 0), we rely on the sharp gradient.
-    // As we move inwards (sdf becomes negative), we transition to the smoother, blurred gradient.
-    // The smoothstep range (-thickness * 0.2) is a tweakable parameter for controlling the blend.
-    float edgeProximity = smoothstep(0.0, -thickness * 0.2, sdf);
-    vec2 blended_grad = mix(grad_sharp, grad_blur, edgeProximity);
-
-    // If gradient is zero, normal is straight up.
-    if (length(blended_grad) < 0.0001) {
+    
+    // Find the center of the shape
+    vec2 shapeCenter = findShapeCenter(uv);
+    
+    // Calculate direction from center to current point
+    vec2 centerToPoint = uv - shapeCenter;
+    
+    // If we're at the center, default to pointing up
+    if (length(centerToPoint) < 0.001) {
         return vec3(0.0, 0.0, 1.0);
     }
+    
+    // Normalize the direction
+    vec2 outwardDirection = normalize(centerToPoint);
+    
+    // Get blurred alpha to determine curvature strength
+    float blurredAlpha = texture(uForegroundBlurredTexture, uv).a;
+    float sharpAlpha = texture(uForegroundTexture, uv).a;
+    
+    // Calculate distance from edge (0 = at edge, 1 = at center)
+    float edgeDistance = smoothstep(0.0, 1.0, blurredAlpha);
+    
+    // At edges, normals should be parallel to xy plane (z approaches 0)
+    // At center, normals should point more upward (z approaches 1)
+    // Adjust this exponent to decide how gradual this transition should be. Higher values are more abrupt
+    float normalExponent = .2;
+    float normalZ = pow(edgeDistance, normalExponent);
+    
+    // Scale xy components to maintain unit length
+    float xyScale = sqrt(max(0.0, 1.0 - normalZ * normalZ));
+    
+    return normalize(vec3(outwardDirection * xyScale, normalZ));
+}
 
-    // The gradient points inward (towards higher alpha). We need it to point outward.
-    vec2 outward_dir = -normalize(blended_grad);
-
-    // Model the surface profile. We want the surface to be steep at the edges
-    // and flat in the center, like a liquid drop, to produce strong edge highlights.
-    // We can model the angle of the normal with the Z-axis (theta).
-    float t = -sdf / max(thickness, 0.001); // t is 0 at edge, 1 in center
-
-    // A cosine-based profile gives this effect.
-    // cos(t * PI/2) is 1 at t=0 (edge) and 0 at t=1 (center).
-    // This makes the surface steepest at the edge.
-    float slope = cos(t * 1.57079632679); // PI/2
-
-    // The maximum slope angle at the edge of the shape (the "contact angle").
-    // Controls how "bubbly" the glass is. A larger angle makes the sides steeper.
-    // Let's use 60 degrees.
-    float max_angle = 3.14159265359 / 3.0;
-    float theta = slope * max_angle;
-
-    // Construct the normal from the angle and the outward direction.
-    float n_z = cos(theta);
-    float n_xy_magnitude = sin(theta);
-
-    return vec3(outward_dir.x * n_xy_magnitude, outward_dir.y * n_xy_magnitude, n_z);
+vec3 getNormal(vec2 p, float thickness) {
+    return getReconstructedNormal(p, thickness);
 }
 
 void main() {
@@ -150,10 +183,17 @@ void main() {
     vec2 layerLocalCoord = FlutterFragCoord().xy - uOffset;
     vec2 layerUV = layerLocalCoord / uForegroundSize;
 
+    // If we are sampling outside of the foreground matte we should just treat the
+    // pixel as skipped
+    if (layerUV.x < 0.0 || layerUV.x > 1.0 || layerUV.y < 0.0 || layerUV.y > 1.0) {
+        fragColor = texture(uBackgroundTexture, screenUV);
+        return;
+    }
+
     vec4 foregroundColor = texture(uForegroundTexture, layerUV);
     
     // If the fragment is transparent (based on the sharp alpha), we can skip all calculations.
-    if (foregroundColor.a == 0.0) {
+    if (foregroundColor.a < 0.001) {
         fragColor = texture(uBackgroundTexture, screenUV);
         return;
     }
@@ -177,9 +217,14 @@ void main() {
         uLightIntensity, 
         uAmbientStrength, 
         uBackgroundTexture, 
-        normal
+        normal,
+        foregroundColor.a,
+        uGaussianBlur
     );
-
-    // fragColor = mix(texture(uBackgroundTexture, screenUV), blurred, 0.5);
+    
+    // Apply debug normals visualization using shared function
+    #if DEBUG_NORMALS
+        fragColor = debugNormals(fragColor, normal, true);
+    #endif
 }
 

@@ -121,6 +121,7 @@ class MainApp extends HookWidget {
                   );
                 },
                 child: Background(
+                  lightAngle: lightAngle,
                   child: LiquidGlassLayer(
                     settings: settings,
                     child: Stack(
@@ -149,7 +150,7 @@ class MainApp extends HookWidget {
                         ),
 
                         Align(
-                          alignment: Alignment.center,
+                          alignment: Alignment.topRight,
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
@@ -162,7 +163,8 @@ class MainApp extends HookWidget {
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(64.0),
-                                child: LiquidGlassWidget(
+                                child: Glassify(
+                                  blur: thickness / 5,
                                   settings: settings,
                                   child: FlutterLogo(size: 200),
                                 ),
@@ -202,9 +204,11 @@ class MainApp extends HookWidget {
 }
 
 class Background extends HookWidget {
-  const Background({super.key, required this.child});
+  const Background({super.key, required this.child, required this.lightAngle});
 
   final Widget child;
+
+  final double lightAngle;
 
   @override
   Widget build(BuildContext context) {
@@ -262,15 +266,28 @@ class Background extends HookWidget {
                 children: [
                   Align(
                     alignment: Alignment.bottomLeft,
-                    child: Text(
-                      'Liquid\nGlass\nRenderer',
-                      style: GoogleFonts.lexendDecaTextTheme().headlineLarge
-                          ?.copyWith(
-                            fontSize: 120,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF287390),
-                          ),
+                    child: Glassify(
+                      blur: 3,
+                      settings: LiquidGlassSettings(
+                        thickness: 8,
+                        lightAngle: lightAngle,
+                        lightIntensity: 1,
+                        ambientStrength: 0.3,
+                        chromaticAberration: 0,
+                        glassColor: Theme.of(
+                          context,
+                        ).colorScheme.inversePrimary.withValues(alpha: .8),
+                        refractiveIndex: 1.3,
+                      ),
+                      child: Text(
+                        'Liquid\nGlass\nRenderer',
+                        style: GoogleFonts.lexendDecaTextTheme().headlineLarge
+                            ?.copyWith(
+                              fontSize: 120,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
                     ),
                   ),
                   child,

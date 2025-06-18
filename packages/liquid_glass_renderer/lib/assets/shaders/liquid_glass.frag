@@ -11,6 +11,8 @@
 #version 320 es
 precision mediump float;
 
+#define DEBUG_NORMALS 0
+
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
 
@@ -153,6 +155,11 @@ void main() {
     // Generate shape and calculate normal using shader-specific method
     float sd = sceneSDF(p);
     vec3 normal = getNormal(sd, uThickness);
+    float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
+
+    if (foregroundAlpha < 0.01) {
+        discard;
+    }
     
     // Use shared rendering pipeline
     fragColor = renderLiquidGlass(
@@ -168,6 +175,13 @@ void main() {
         uLightIntensity, 
         uAmbientStrength, 
         uBackgroundTexture, 
-        normal
+        normal,
+        foregroundAlpha,
+        0.0
     );
+    
+    // Apply debug normals visualization using shared function
+    #if DEBUG_NORMALS
+        fragColor = debugNormals(fragColor, normal, true);
+    #endif
 }

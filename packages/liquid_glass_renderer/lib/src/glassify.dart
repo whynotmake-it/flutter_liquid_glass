@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_setters_without_getters
 
-import 'dart:ui';
 import 'dart:ui' as ui;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -9,31 +9,53 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
-import 'package:liquid_glass_renderer/src/raw_shapes.dart';
 import 'package:meta/meta.dart';
 
-class LiquidGlassWidget extends StatefulWidget {
-  /// Creates a new [LiquidGlassWidget] with the given [child] and [settings].
-  const LiquidGlassWidget({
+/// An experimental widget that turns its child into liquid glass.
+///
+/// If you apply this to a widget that has a simple shape, you will absolutely
+/// want to use [LiquidGlass] instead.
+/// It will be higher visual quality and faster.
+///
+/// This widget is useful if you want to apply the liquid glass effect to a
+/// widget that has a complex shape, or if you want to apply the liquid glass
+/// effect to a widget that is not a [LiquidGlass] widget.
+@experimental
+class Glassify extends StatefulWidget {
+  /// Creates a new [Glassify] with the given [child] and [settings].
+  const Glassify({
     required this.child,
-    this.settings = const LiquidGlassSettings(thickness: 100),
+    this.settings = const LiquidGlassSettings(),
+    this.blur = 10,
     super.key,
   });
 
   /// The subtree in which you should include at least one [LiquidGlass] widget.
   ///
-  /// The [LiquidGlassWidget] will automatically register all [LiquidGlass]
+  /// The [Glassify] will automatically register all [LiquidGlass]
   /// widgets in the subtree as shapes and render them.
   final Widget child;
 
   /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
 
+  /// How much blur the shape should apply.
+  ///
+  /// The blur is ugly at the moment, since we have to do it from within the
+  /// shader:
+  ///
+  /// Until one of those is fixed, blur will stay ugly here:
+  /// - https://github.com/flutter/flutter/issues/170820
+  /// - https://github.com/flutter/flutter/issues/170792
+  ///
+  /// Defaults to 10 pixels.
+  final double blur;
+
   @override
-  State<LiquidGlassWidget> createState() => _LiquidGlassWidgetState();
+  State<Glassify> createState() => _GlassifyState();
 }
 
-class _LiquidGlassWidgetState extends State<LiquidGlassWidget>
+class _GlassifyState extends State<Glassify>
     with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
@@ -56,6 +78,7 @@ class _LiquidGlassWidgetState extends State<LiquidGlassWidget>
         settings: widget.settings,
         debugRenderRefractionMap: false,
         vsync: this,
+        blur: widget.blur,
         child: child!,
       ),
       child: widget.child,
@@ -69,12 +92,14 @@ class _RawGlassWidget extends SingleChildRenderObjectWidget {
     required this.settings,
     required this.debugRenderRefractionMap,
     required this.vsync,
+    required this.blur,
     required Widget super.child,
   });
 
   final FragmentShader shader;
   final LiquidGlassSettings settings;
   final bool debugRenderRefractionMap;
+  final double blur;
 
   final TickerProvider vsync;
 
@@ -86,6 +111,7 @@ class _RawGlassWidget extends SingleChildRenderObjectWidget {
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
       ticker: vsync,
+      blur: this.blur,
     );
   }
 
@@ -98,7 +124,8 @@ class _RawGlassWidget extends SingleChildRenderObjectWidget {
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
       ..ticker = vsync
-      ..debugRenderRefractionMap = debugRenderRefractionMap;
+      ..debugRenderRefractionMap = debugRenderRefractionMap
+      ..blur = blur;
   }
 }
 
@@ -109,11 +136,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     required FragmentShader shader,
     required LiquidGlassSettings settings,
     required TickerProvider ticker,
+    required double blur,
     bool debugRenderRefractionMap = false,
   })  : _devicePixelRatio = devicePixelRatio,
         _shader = shader,
         _settings = settings,
         _tickerProvider = ticker,
+        _blur = blur,
         _debugRenderRefractionMap = debugRenderRefractionMap {
     _ticker = _tickerProvider.createTicker((_) {
       markNeedsPaint();
@@ -150,22 +179,41 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  double _blur;
+  set blur(double value) {
+    if (_blur == value) return;
+    _blur = value;
+    markNeedsPaint();
+  }
+
   /// Ticker to animate the liquid glass effect.
   ///
   // TODO(timcreatedit): this is maybe not the best for performance, but I can't
   // come up with a better solution right now.
   Ticker? _ticker;
 
+  late final layerHandle = LayerHandle<_LiquidGlassShaderLayer>()
+    ..layer = _LiquidGlassShaderLayer(
+      offset: Offset.zero,
+      shader: _shader,
+      settings: _settings,
+      devicePixelRatio: _devicePixelRatio,
+      layerSize: size,
+      matteBlur: _blur,
+    );
+
   @override
   void paint(PaintingContext context, Offset offset) {
+    layerHandle.layer!
+      ..offset = offset
+      ..shader = _shader
+      ..settings = _settings
+      ..devicePixelRatio = _devicePixelRatio
+      ..layerSize = size
+      ..blur = _blur;
+
     context.pushLayer(
-      _LiquidGlassShaderLayer(
-        offset: offset,
-        shader: _shader,
-        settings: _settings,
-        devicePixelRatio: _devicePixelRatio,
-        layerSize: size,
-      ),
+      layerHandle.layer!,
       (context, offset) {
         super.paint(context, offset);
       },
@@ -178,6 +226,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     _ticker?.stop();
     _ticker?.dispose();
     _ticker = null;
+    layerHandle.layer?.dispose();
+    layerHandle.layer = null;
     super.dispose();
   }
 }
@@ -186,21 +236,69 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 /// with a captured child image
 class _LiquidGlassShaderLayer extends ContainerLayer {
   _LiquidGlassShaderLayer({
-    required this.offset,
-    required this.shader,
-    required this.settings,
-    required this.devicePixelRatio,
-    required this.layerSize,
-  });
+    required Offset offset,
+    required FragmentShader shader,
+    required LiquidGlassSettings settings,
+    required double devicePixelRatio,
+    required Size layerSize,
+    required double matteBlur,
+  })  : _offset = offset,
+        _shader = shader,
+        _settings = settings,
+        _devicePixelRatio = devicePixelRatio,
+        _layerSize = layerSize,
+        _blur = matteBlur;
 
-  final Offset offset;
-  final FragmentShader shader;
-  final LiquidGlassSettings settings;
-  final double devicePixelRatio;
-  final Size layerSize;
+  Offset _offset;
+  Offset get offset => _offset;
+  set offset(Offset value) {
+    if (_offset == value) return;
+    _offset = value;
+    markNeedsAddToScene();
+  }
 
-  late ui.Image _childImage;
-  late ui.Image _childBlurredImage;
+  FragmentShader _shader;
+  FragmentShader get shader => _shader;
+  set shader(FragmentShader value) {
+    if (_shader == value) return;
+    _shader = value;
+    markNeedsAddToScene();
+  }
+
+  LiquidGlassSettings _settings;
+  LiquidGlassSettings get settings => _settings;
+  set settings(LiquidGlassSettings value) {
+    if (_settings == value) return;
+    _settings = value;
+    markNeedsAddToScene();
+  }
+
+  double _devicePixelRatio;
+  double get devicePixelRatio => _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
+    markNeedsAddToScene();
+  }
+
+  Size _layerSize;
+  Size get layerSize => _layerSize;
+  set layerSize(Size value) {
+    if (_layerSize == value) return;
+    _layerSize = value;
+    markNeedsAddToScene();
+  }
+
+  double _blur;
+  double get blur => _blur;
+  set blur(double value) {
+    if (_blur == value) return;
+    _blur = value;
+    markNeedsAddToScene();
+  }
+
+  ui.Image? childImage;
+  ui.Image? childBlurredImage;
 
   @override
   void addToScene(ui.SceneBuilder builder) {
@@ -218,13 +316,14 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
   }
 
   void _captureChildLayer() {
+    childImage?.dispose();
     // Create a scene builder for the child
-    final childSceneBuilder = ui.SceneBuilder();
-    childSceneBuilder.pushOffset(-offset.dx, -offset.dy);
+    final childSceneBuilder = ui.SceneBuilder()
+      ..pushOffset(-offset.dx, -offset.dy);
     firstChild!.addToScene(childSceneBuilder);
     final childScene = childSceneBuilder.build();
 
-    _childImage = childScene.toImageSync(
+    childImage = childScene.toImageSync(
       layerSize.width.round(),
       layerSize.height.round(),
     );
@@ -235,26 +334,29 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
   }
 
   void _captureChildBlurredLayer() {
+    childBlurredImage?.dispose();
     final blurSceneBuilder = ui.SceneBuilder();
 
     // paint child image
     final recorder = ui.PictureRecorder();
-    Canvas(recorder).drawImage(_childImage!, Offset.zero, Paint());
+    Canvas(recorder).drawImage(childImage!, Offset.zero, Paint());
 
     final picture = recorder.endRecording();
 
-    // Calculate blur strength based on thickness and device pixel ratio
-    // The blur should create a gradient that spans roughly half the thickness
-    // to properly approximate the SDF used in the shader
-    final blur = 10.0;
+    final matteBlur = settings.thickness / 6;
 
     blurSceneBuilder
-      ..pushImageFilter(ImageFilter.blur(sigmaX: blur, sigmaY: blur))
+      ..pushImageFilter(
+        ImageFilter.compose(
+          outer: ImageFilter.blur(sigmaX: matteBlur, sigmaY: matteBlur),
+          inner: ImageFilter.erode(radiusX: matteBlur, radiusY: matteBlur),
+        ),
+      )
       ..addPicture(Offset.zero, picture);
 
     final blurScene = blurSceneBuilder.build();
 
-    _childBlurredImage = blurScene.toImageSync(
+    childBlurredImage = blurScene.toImageSync(
       layerSize.width.round(),
       layerSize.height.round(),
     );
@@ -264,8 +366,8 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
 
   void _setupShaderUniforms() {
     shader
-      ..setImageSampler(1, _childImage) // uForegroundTexture
-      ..setImageSampler(2, _childBlurredImage) // uForegroundBlurredTexture
+      ..setImageSampler(1, childImage!) // uForegroundTexture
+      ..setImageSampler(2, childBlurredImage!) // uForegroundBlurredTexture
       ..setFloat(2, layerSize.width * devicePixelRatio)
       ..setFloat(3, layerSize.height * devicePixelRatio)
       ..setFloat(4, settings.chromaticAberration)
@@ -276,15 +378,17 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
       ..setFloat(9, settings.lightAngle)
       ..setFloat(10, settings.lightIntensity)
       ..setFloat(11, settings.ambientStrength)
-      ..setFloat(12, settings.thickness * 4)
+      ..setFloat(12, settings.thickness * 2)
       ..setFloat(13, settings.refractiveIndex)
       ..setFloat(14, offset.dx * devicePixelRatio)
-      ..setFloat(15, offset.dy * devicePixelRatio);
+      ..setFloat(15, offset.dy * devicePixelRatio)
+      ..setFloat(16, blur);
   }
 
   @override
   void dispose() {
-    _childImage?.dispose();
+    childImage?.dispose();
+    childBlurredImage?.dispose();
     super.dispose();
   }
 }

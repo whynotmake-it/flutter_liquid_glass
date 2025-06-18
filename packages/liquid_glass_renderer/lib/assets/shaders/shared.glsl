@@ -7,6 +7,76 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
+// Multi-sampled Kawase blur function - much more performance friendly than Gaussian
+vec4 applyKawaseBlur(sampler2D tex, vec2 uv, vec2 texelSize, float blurRadius) {
+    if (blurRadius < 0.001) {
+        return texture(tex, uv);
+    }
+    
+    vec4 color = vec4(0.0);
+    float totalWeight = 0.0;
+    
+    // Kawase blur uses fewer samples with specific offset patterns
+    // This creates multiple "passes" in a single shader call
+    float offset = blurRadius;
+    
+    // Pass 1: Diamond pattern (4 samples)
+    vec2 offsets1[4] = vec2[4](
+        vec2(-offset, -offset),
+        vec2(offset, -offset),
+        vec2(-offset, offset),
+        vec2(offset, offset)
+    );
+    
+    for (int i = 0; i < 4; i++) {
+        vec2 sampleUV = uv + offsets1[i] * texelSize;
+        if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+            color += texture(tex, sampleUV);
+            totalWeight += 1.0;
+        }
+    }
+    
+    // Pass 2: Cross pattern with larger offset (4 samples)
+    float offset2 = offset * 1.5;
+    vec2 offsets2[4] = vec2[4](
+        vec2(0.0, -offset2),
+        vec2(0.0, offset2),
+        vec2(-offset2, 0.0),
+        vec2(offset2, 0.0)
+    );
+    
+    for (int i = 0; i < 4; i++) {
+        vec2 sampleUV = uv + offsets2[i] * texelSize;
+        if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+            color += texture(tex, sampleUV) * 0.8; // Slightly less weight for outer samples
+            totalWeight += 0.8;
+        }
+    }
+    
+    // Pass 3: Intermediate diagonal samples (4 samples)
+    float offset3 = offset * 0.7;
+    vec2 offsets3[4] = vec2[4](
+        vec2(-offset3, 0.0),
+        vec2(offset3, 0.0),
+        vec2(0.0, -offset3),
+        vec2(0.0, offset3)
+    );
+    
+    for (int i = 0; i < 4; i++) {
+        vec2 sampleUV = uv + offsets3[i] * texelSize;
+        if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+            color += texture(tex, sampleUV) * 0.6;
+            totalWeight += 0.6;
+        }
+    }
+    
+    // Center sample with higher weight
+    color += texture(tex, uv) * 2.0;
+    totalWeight += 2.0;
+    
+    return totalWeight > 0.0 ? color / totalWeight : texture(tex, uv);
+}
+
 // Calculate height/depth of the liquid surface
 float getHeight(float sd, float thickness) {
     if (sd >= 0.0 || thickness <= 0.0) {
@@ -66,12 +136,13 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     return lighting * shape;
 }
 
-// Calculate refraction with chromatic aberration
-vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickness, float refractiveIndex, float chromaticAberration, vec2 uSize, sampler2D backgroundTexture, out vec2 refractionDisplacement) {
+// Calculate refraction with chromatic aberration and optional blur
+vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickness, float refractiveIndex, float chromaticAberration, vec2 uSize, sampler2D backgroundTexture, float blurRadius, out vec2 refractionDisplacement) {
     float baseHeight = thickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
     
     vec4 refractColor;
+    vec2 texelSize = 1.0 / uSize;
 
     // To simulate a prism, we calculate refraction separately for each color channel
     // by slightly varying the refractive index.
@@ -84,14 +155,18 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
         vec3 refractVecR = refract(incident, normal, 1.0 / iorR);
         float refractLengthR = (height + baseHeight) / max(0.001, abs(refractVecR.z));
         vec2 refractedUVR = screenUV + (refractVecR.xy * refractLengthR) / uSize;
-        float red = texture(backgroundTexture, refractedUVR).r;
+        float red = (blurRadius > 0.001) ? 
+            applyKawaseBlur(backgroundTexture, refractedUVR, texelSize, blurRadius).r :
+            texture(backgroundTexture, refractedUVR).r;
 
         // Green channel (we'll use this for the main displacement and alpha)
         vec3 refractVecG = refract(incident, normal, 1.0 / iorG);
         float refractLengthG = (height + baseHeight) / max(0.001, abs(refractVecG.z));
         refractionDisplacement = refractVecG.xy * refractLengthG; 
         vec2 refractedUVG = screenUV + refractionDisplacement / uSize;
-        vec4 greenSample = texture(backgroundTexture, refractedUVG);
+        vec4 greenSample = (blurRadius > 0.001) ? 
+            applyKawaseBlur(backgroundTexture, refractedUVG, texelSize, blurRadius) :
+            texture(backgroundTexture, refractedUVG);
         float green = greenSample.g;
         float bgAlpha = greenSample.a;
 
@@ -99,7 +174,9 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
         vec3 refractVecB = refract(incident, normal, 1.0 / iorB);
         float refractLengthB = (height + baseHeight) / max(0.001, abs(refractVecB.z));
         vec2 refractedUVB = screenUV + (refractVecB.xy * refractLengthB) / uSize;
-        float blue = texture(backgroundTexture, refractedUVB).b;
+        float blue = (blurRadius > 0.001) ? 
+            applyKawaseBlur(backgroundTexture, refractedUVB, texelSize, blurRadius).b :
+            texture(backgroundTexture, refractedUVB).b;
         
         refractColor = vec4(red, green, blue, bgAlpha);
     } else {
@@ -108,7 +185,9 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
         float refractLength = (height + baseHeight) / max(0.001, abs(refractVec.z));
         refractionDisplacement = refractVec.xy * refractLength;
         vec2 refractedUV = screenUV + refractionDisplacement / uSize;
-        refractColor = texture(backgroundTexture, refractedUV);
+        refractColor = (blurRadius > 0.001) ? 
+            applyKawaseBlur(backgroundTexture, refractedUV, texelSize, blurRadius) :
+            texture(backgroundTexture, refractedUV);
     }
     
     return refractColor;
@@ -138,11 +217,9 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 }
 
 // Complete liquid glass rendering pipeline
-vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, float lightAngle, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal) {
-    float alpha = smoothstep(-2.0, 0.0, sd);
-    
+vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, float lightAngle, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur) {
     // If we're completely outside the glass area (with smooth transition)
-    if (alpha > 0.999) {
+    if (foregroundAlpha < 0.001) {
         return texture(backgroundTexture, screenUV);
     }
     
@@ -153,9 +230,9 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     
     float height = getHeight(sd, thickness);
     
-    // Calculate refraction & chromatic aberration
+    // Calculate refraction & chromatic aberration with blur applied to the sampling
     vec2 refractionDisplacement;
-    vec4 refractColor = calculateRefraction(screenUV, normal, height, thickness, refractiveIndex, chromaticAberration, uSize, backgroundTexture, refractionDisplacement);
+    vec4 refractColor = calculateRefraction(screenUV, normal, height, thickness, refractiveIndex, chromaticAberration, uSize, backgroundTexture, gaussianBlur, refractionDisplacement);
     
     // Mix refraction and reflection based on normal.z
     vec4 liquidColor = refractColor;
@@ -171,5 +248,16 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     
     // Use alpha for smooth transition at boundaries
     vec4 backgroundColor = texture(backgroundTexture, screenUV);
-    return mix(backgroundColor, finalColor, 1.0 - alpha);
+    return mix(backgroundColor, finalColor, foregroundAlpha);
+}
+
+// Debug function to visualize normals as colors
+vec4 debugNormals(vec4 originalColor, vec3 normal, bool enableDebug) {
+    if (enableDebug) {
+        // Convert normal from [-1,1] to [0,1] range for color visualization
+        vec3 normalColor = (normal + 1.0) * 0.5;
+        // Mix with 99% normal visibility
+        return mix(originalColor, vec4(normalColor, 1.0), 0.99);
+    }
+    return originalColor;
 }
