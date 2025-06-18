@@ -73,7 +73,7 @@ class _GlassifyState extends State<Glassify>
     return ShaderBuilder(
       assetKey:
           'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass_arbitrary.frag',
-      (context, shader, child) => _RawGlassWidget(
+      (context, shader, child) => _RawGlassify(
         shader: shader,
         settings: widget.settings,
         debugRenderRefractionMap: false,
@@ -86,8 +86,8 @@ class _GlassifyState extends State<Glassify>
   }
 }
 
-class _RawGlassWidget extends SingleChildRenderObjectWidget {
-  const _RawGlassWidget({
+class _RawGlassify extends SingleChildRenderObjectWidget {
+  const _RawGlassify({
     required this.shader,
     required this.settings,
     required this.debugRenderRefractionMap,
@@ -105,20 +105,20 @@ class _RawGlassWidget extends SingleChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return RenderLiquidGlassLayer(
+    return RenderGlassify(
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       shader: shader,
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
       ticker: vsync,
-      blur: this.blur,
+      blur: blur,
     );
   }
 
   @override
   void updateRenderObject(
     BuildContext context,
-    RenderLiquidGlassLayer renderObject,
+    RenderGlassify renderObject,
   ) {
     renderObject
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
@@ -130,8 +130,8 @@ class _RawGlassWidget extends SingleChildRenderObjectWidget {
 }
 
 @internal
-class RenderLiquidGlassLayer extends RenderProxyBox {
-  RenderLiquidGlassLayer({
+class RenderGlassify extends RenderProxyBox {
+  RenderGlassify({
     required double devicePixelRatio,
     required FragmentShader shader,
     required LiquidGlassSettings settings,
@@ -192,19 +192,21 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   // come up with a better solution right now.
   Ticker? _ticker;
 
-  late final layerHandle = LayerHandle<_LiquidGlassShaderLayer>()
-    ..layer = _LiquidGlassShaderLayer(
-      offset: Offset.zero,
+  @override
+  // ignore: library_private_types_in_public_api
+  _GlassifyShaderLayer? get layer => super.layer as _GlassifyShaderLayer?;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    layer ??= _GlassifyShaderLayer(
+      offset: offset,
       shader: _shader,
       settings: _settings,
       devicePixelRatio: _devicePixelRatio,
       layerSize: size,
       matteBlur: _blur,
     );
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    layerHandle.layer!
+    layer!
       ..offset = offset
       ..shader = _shader
       ..settings = _settings
@@ -213,7 +215,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..blur = _blur;
 
     context.pushLayer(
-      layerHandle.layer!,
+      layer!,
       (context, offset) {
         super.paint(context, offset);
       },
@@ -226,36 +228,25 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     _ticker?.stop();
     _ticker?.dispose();
     _ticker = null;
-    layerHandle.layer?.dispose();
-    layerHandle.layer = null;
     super.dispose();
   }
 }
 
 /// Custom composited layer that handles the liquid glass shader effect
 /// with a captured child image
-class _LiquidGlassShaderLayer extends ContainerLayer {
-  _LiquidGlassShaderLayer({
-    required Offset offset,
+class _GlassifyShaderLayer extends OffsetLayer {
+  _GlassifyShaderLayer({
     required FragmentShader shader,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
     required Size layerSize,
     required double matteBlur,
-  })  : _offset = offset,
-        _shader = shader,
+    required super.offset,
+  })  : _shader = shader,
         _settings = settings,
         _devicePixelRatio = devicePixelRatio,
         _layerSize = layerSize,
         _blur = matteBlur;
-
-  Offset _offset;
-  Offset get offset => _offset;
-  set offset(Offset value) {
-    if (_offset == value) return;
-    _offset = value;
-    markNeedsAddToScene();
-  }
 
   FragmentShader _shader;
   FragmentShader get shader => _shader;
@@ -300,68 +291,87 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
   ui.Image? childImage;
   ui.Image? childBlurredImage;
 
+  ui.BackdropFilterEngineLayer? _backdropFilterLayer;
+
+  ImageFilterEngineLayer? _imageFilterLayer;
+
   @override
   void addToScene(ui.SceneBuilder builder) {
-    // First, let the child layers render normally
-    _captureChildLayer();
-    _captureChildBlurredLayer();
+    engineLayer;
 
-    // Then apply the shader effect as a backdrop filter
-    _setupShaderUniforms();
-    builder
-      ..pushBackdropFilter(
+    final offsetLayer = builder.pushOffset(
+      offset.dx,
+      offset.dy,
+      oldLayer: engineLayer as ui.OffsetEngineLayer?,
+    );
+    engineLayer = offsetLayer;
+    {
+      // First, let the child layers render normally
+      _captureChildLayer();
+      _captureChildBlurredLayer();
+
+      // Then apply the shader effect as a backdrop filter
+      _setupShaderUniforms();
+      _backdropFilterLayer = builder.pushBackdropFilter(
         ImageFilter.shader(shader),
-      )
-      ..pop(); // Close the backdrop filter
+        oldLayer: _backdropFilterLayer,
+      );
+
+      builder.pop();
+    }
+    builder.pop();
   }
 
   void _captureChildLayer() {
     childImage?.dispose();
-    // Create a scene builder for the child
-    final childSceneBuilder = ui.SceneBuilder()
-      ..pushOffset(-offset.dx, -offset.dy);
-    firstChild!.addToScene(childSceneBuilder);
-    final childScene = childSceneBuilder.build();
-
-    childImage = childScene.toImageSync(
-      layerSize.width.round(),
-      layerSize.height.round(),
-    );
-
-    // Trigger a repaint to use the captured image
-    markNeedsAddToScene();
-    childScene.dispose();
+    childImage = _buildMaskImage();
   }
 
   void _captureChildBlurredLayer() {
     childBlurredImage?.dispose();
-    final blurSceneBuilder = ui.SceneBuilder();
-
-    // paint child image
-    final recorder = ui.PictureRecorder();
-    Canvas(recorder).drawImage(childImage!, Offset.zero, Paint());
-
-    final picture = recorder.endRecording();
 
     final matteBlur = settings.thickness / 6;
+    childBlurredImage = _buildMaskImage(matteBlur);
+  }
 
-    blurSceneBuilder
-      ..pushImageFilter(
+  ui.Image _buildMaskImage([double? blur]) {
+    final builder = ui.SceneBuilder();
+    final transform =
+        Matrix4.diagonal3Values(devicePixelRatio, devicePixelRatio, 1);
+    final bounds = offset & layerSize;
+
+    builder.pushTransform(transform.storage);
+    _addMaskToScene(builder, blur);
+    builder.pop();
+
+    return builder.build().toImageSync(
+          (devicePixelRatio * bounds.width).floor(),
+          (devicePixelRatio * bounds.height).floor(),
+        );
+  }
+
+  void _addMaskToScene(ui.SceneBuilder builder, [double? blur]) {
+    final mask = firstChild;
+
+    builder.pushOffset(-offset.dx, -offset.dy);
+
+    if (blur != null) {
+      _imageFilterLayer = builder.pushImageFilter(
         ImageFilter.compose(
-          outer: ImageFilter.blur(sigmaX: matteBlur, sigmaY: matteBlur),
-          inner: ImageFilter.erode(radiusX: matteBlur, radiusY: matteBlur),
+          outer: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          inner: ImageFilter.erode(radiusX: blur, radiusY: blur),
         ),
-      )
-      ..addPicture(Offset.zero, picture);
+        oldLayer: _imageFilterLayer,
+      );
+    }
 
-    final blurScene = blurSceneBuilder.build();
+    mask?.addToScene(builder);
 
-    childBlurredImage = blurScene.toImageSync(
-      layerSize.width.round(),
-      layerSize.height.round(),
-    );
+    if (blur != null) {
+      builder.pop();
+    }
 
-    blurScene.dispose();
+    builder.pop();
   }
 
   void _setupShaderUniforms() {
@@ -389,6 +399,8 @@ class _LiquidGlassShaderLayer extends ContainerLayer {
   void dispose() {
     childImage?.dispose();
     childBlurredImage?.dispose();
+    _imageFilterLayer?.dispose();
+    _backdropFilterLayer?.dispose();
     super.dispose();
   }
 }

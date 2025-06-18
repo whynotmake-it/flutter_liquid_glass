@@ -39,6 +39,7 @@ class MainApp extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final thicknessVisible = useState(true);
+    final flutterLogoVisible = useState(true);
 
     final blend = useValueListenable(blendNotifier);
 
@@ -48,6 +49,11 @@ class MainApp extends HookWidget {
 
     final thickness = useSingleMotion(
       value: thicknessVisible.value ? thicknessNotifier.value : 0,
+      motion: SpringMotion(spring),
+    );
+
+    final flutterLogoThickness = useSingleMotion(
+      value: flutterLogoVisible.value ? thicknessNotifier.value : 0,
       motion: SpringMotion(spring),
     );
 
@@ -93,6 +99,9 @@ class MainApp extends HookWidget {
         LogicalKeySet(LogicalKeyboardKey.space): () {
           thicknessVisible.value = !thicknessVisible.value;
         },
+        LogicalKeySet(LogicalKeyboardKey.keyF): () {
+          flutterLogoVisible.value = !flutterLogoVisible.value;
+        },
       },
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -122,11 +131,22 @@ class MainApp extends HookWidget {
                 },
                 child: Background(
                   lightAngle: lightAngle,
+                  textVisible: thicknessVisible.value,
                   child: LiquidGlassLayer(
                     settings: settings,
                     child: Stack(
                       alignment: Alignment.bottomLeft,
                       children: [
+                        Align(
+                          alignment: Alignment.center,
+                          child: Glassify(
+                            blur: flutterLogoThickness / 5,
+                            settings: settings.copyWith(
+                              thickness: flutterLogoThickness,
+                            ),
+                            child: FlutterLogo(size: 200),
+                          ),
+                        ),
                         Padding(
                           padding: const EdgeInsets.only(
                             bottom: 105,
@@ -161,11 +181,11 @@ class MainApp extends HookWidget {
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(64.0),
-                                child: Glassify(
-                                  blur: thickness / 5,
-                                  settings: settings,
+                              child: Glassify(
+                                blur: flutterLogoThickness / 5,
+                                settings: settings,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(64.0),
                                   child: FlutterLogo(size: 200),
                                 ),
                               ),
@@ -204,11 +224,18 @@ class MainApp extends HookWidget {
 }
 
 class Background extends HookWidget {
-  const Background({super.key, required this.child, required this.lightAngle});
+  const Background({
+    super.key,
+    required this.child,
+    required this.lightAngle,
+    required this.textVisible,
+  });
 
   final Widget child;
 
   final double lightAngle;
+
+  final bool textVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +262,13 @@ class Background extends HookWidget {
       return null;
     }, [showHint]);
 
+    final textThickness = useSingleMotion(
+      value: textVisible ? 8 : 0,
+      motion: SpringMotion(
+        Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3),
+      ),
+    );
+
     return SizedBox.expand(
       child: Container(
         color: Theme.of(context).colorScheme.surface,
@@ -246,57 +280,93 @@ class Background extends HookWidget {
               borderRadius: BorderRadius.only(bottomLeft: Radius.circular(80)),
             ),
           ),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16, left: 16),
-            decoration: ShapeDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/wallpaper.webp'),
-                fit: BoxFit.cover,
-              ),
-              shape: RoundedSuperellipseBorder(
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(64),
-                ),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(64.0),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Glassify(
-                      blur: 3,
-                      settings: LiquidGlassSettings(
-                        thickness: 8,
-                        lightAngle: lightAngle,
-                        lightIntensity: 1,
-                        ambientStrength: 0.3,
-                        chromaticAberration: 0,
-                        glassColor: Theme.of(
-                          context,
-                        ).colorScheme.inversePrimary.withValues(alpha: .8),
-                        refractiveIndex: 1.3,
-                      ),
-                      child: Text(
-                        'Liquid\nGlass\nRenderer',
-                        style: GoogleFonts.lexendDecaTextTheme().headlineLarge
-                            ?.copyWith(
-                              fontSize: 120,
-                              height: 1,
-                              fontWeight: FontWeight.w900,
-                            ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16, left: 16),
+            child: Stack(
+              children: [
+                Container(
+                  clipBehavior: Clip.hardEdge,
+                  decoration: ShapeDecoration(
+                    shape: RoundedSuperellipseBorder(
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(64),
                       ),
                     ),
                   ),
-                  child,
-                ],
-              ),
+
+                  child: ImagePageView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(64.0),
+                      child: Stack(
+                        children: [
+                          Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Glassify(
+                              blur: 3,
+                              settings: LiquidGlassSettings(
+                                thickness: textThickness,
+                                lightAngle: lightAngle,
+                                lightIntensity: 1,
+                                ambientStrength: 0.3,
+                                chromaticAberration: 0,
+                                glassColor: Theme.of(context)
+                                    .colorScheme
+                                    .inversePrimary
+                                    .withValues(alpha: .8),
+                                refractiveIndex: 1.3,
+                              ),
+                              child: Text(
+                                'Liquid\nGlass\nRenderer',
+                                style: GoogleFonts.lexendDecaTextTheme()
+                                    .headlineLarge
+                                    ?.copyWith(
+                                      fontSize: 120,
+                                      height: 1,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(padding: EdgeInsetsGeometry.all(64), child: child),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class ImagePageView extends HookWidget {
+  const ImagePageView({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        PageView.builder(
+          itemBuilder: (context, index) {
+            return switch (index) {
+              <= 0 => Image.asset('assets/wallpaper.webp', fit: BoxFit.cover),
+              1 => Image.asset('assets/rainbow.png', fit: BoxFit.cover),
+              _ => LayoutBuilder(
+                builder: (context, constraints) => Image.network(
+                  'https://picsum.photos/2000/2000?random=$index',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            };
+          },
+        ),
+        child,
+      ],
     );
   }
 }

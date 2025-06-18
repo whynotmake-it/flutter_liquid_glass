@@ -58,6 +58,28 @@ class LiquidGlassSettings with EquatableMixin {
   /// Defaults to 1.51
   final double refractiveIndex;
 
+  /// Creates a new [LiquidGlassSettings] with the given settings.
+  LiquidGlassSettings copyWith({
+    Color? glassColor,
+    double? thickness,
+    double? chromaticAberration,
+    double? blend,
+    double? lightAngle,
+    double? lightIntensity,
+    double? ambientStrength,
+    double? refractiveIndex,
+  }) =>
+      LiquidGlassSettings(
+        glassColor: glassColor ?? this.glassColor,
+        thickness: thickness ?? this.thickness,
+        chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+        blend: blend ?? this.blend,
+        lightAngle: lightAngle ?? this.lightAngle,
+        lightIntensity: lightIntensity ?? this.lightIntensity,
+        ambientStrength: ambientStrength ?? this.ambientStrength,
+        refractiveIndex: refractiveIndex ?? this.refractiveIndex,
+      );
+
   @override
   List<Object?> get props => [
         glassColor,

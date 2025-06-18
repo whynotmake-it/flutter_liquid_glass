@@ -7,6 +7,7 @@
 precision mediump float;
 
 #define DEBUG_NORMALS 0
+#define DEBUG_BLUR_MATTE 0
 
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
@@ -225,6 +226,10 @@ void main() {
     // Apply debug normals visualization using shared function
     #if DEBUG_NORMALS
         fragColor = debugNormals(fragColor, normal, true);
+    #endif
+
+    #if DEBUG_BLUR_MATTE
+        fragColor = mix(fragColor, blurred, 0.99);
     #endif
 }
 

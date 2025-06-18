@@ -265,6 +265,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     if (_settings.thickness <= 0) {
       _paintShapeContents(context, offset, shapes, glassContainsChild: true);
       _paintShapeContents(context, offset, shapes, glassContainsChild: false);
+      super.paint(context, offset);
       return;
     }
 
@@ -314,7 +315,6 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         filter: ImageFilter.shader(_shader),
       ),
       (context, offset) {
-        super.paint(context, offset);
         _paintShapeContents(
           context,
           offset,
@@ -324,6 +324,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       },
       offset,
     );
+    super.paint(context, offset);
   }
 
   @override
