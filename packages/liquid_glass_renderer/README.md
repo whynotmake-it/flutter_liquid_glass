@@ -55,6 +55,9 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 ## How To Use
 
+![Showcase](doc/showcase.gif)
+> Demo by [Souvik Biswas](https://github.com/sbis04/liquid_glass_demo)
+
 The liquid glass effect is achieved by taking the pixels of the content *behind* the glass widget and distorting them. For the effect to be visible, you **must** place your glass widget on top of other content. The easiest way to do this is with a `Stack`.
 
 ```dart
