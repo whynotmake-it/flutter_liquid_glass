@@ -28,12 +28,12 @@ As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
 - **Maximum of three shapes** can be blended in a `LiquidGlassLayer`.
-- The experimental `Glassify` widget has lower performance and visual quality than `LiquidGlass`.
+- **Blur** introduces artifacts when blending shapes, and looks suboptimal for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
 
 ## Acknowledgements
 
-A huge shoutout to [Renan Aurujo (@renancaraujo)](https://github.com/renancaraujo) for contributing key ideas to the implementation of [`Glassify`](#glassify-glass-effect-on-any-shape-experimental).
-Check out is work, he's pretty cool and nice too :)
+A huge shoutout to [Renan Araujo (@renancaraujo)](https://github.com/renancaraujo) for contributing key ideas to the implementation of [`Glassify`](#glassify-glass-effect-on-any-shape-experimental).
+Check out is work, it's pretty cool and he's nice too :)
 
 Also, thank you to [Tong Mu (@dkwingsmt)](https://github.com/dkwingsmt) for helping me with rounded superellipses.
 
