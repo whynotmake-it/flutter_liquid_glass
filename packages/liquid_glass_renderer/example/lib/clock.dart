@@ -25,7 +25,8 @@ class ClockExample extends HookWidget {
   @override
   Widget build(BuildContext context) {
     useStream(Stream.periodic(const Duration(seconds: 1)));
-    final lightAngle = useAnimation(useRotatingAnimationController());
+    final lightAngleController = useRotatingAnimationController();
+    final lightAngle = useAnimation(lightAngleController);
 
     final settings = useValueListenable(
       settingsNotifier,
@@ -35,20 +36,24 @@ class ClockExample extends HookWidget {
 
     final format = DateFormat('HH:mm');
 
-    return ImagePageView(
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Glassify(
-              settings: settings,
-              child: Text(
-                format.format(time),
-                style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
-                    .copyWith(fontSize: 200),
+    return GestureDetector(
+      onTap: () {
+        SettingsSheet(
+          settingsNotifier: settingsNotifier,
+          lightAngleAnimation: lightAngleController,
+        ).show(context);
+      },
+      child: ImagePageView(
+        child: Center(
+          child: Glassify(
+            settings: settings,
+            child: Text(
+              format.format(time),
+              style: GoogleFonts.lexendGigaTextTheme().headlineLarge!.copyWith(
+                fontSize: 200,
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
