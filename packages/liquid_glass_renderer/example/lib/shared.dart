@@ -28,6 +28,7 @@ class ImagePageView extends HookWidget {
             return switch (index) {
               <= 0 => Image.asset('assets/wallpaper.webp', fit: BoxFit.cover),
               1 => Image.asset('assets/rainbow.png', fit: BoxFit.cover),
+              2 => const Grid(),
               _ => LayoutBuilder(
                 builder: (context, constraints) => Image.network(
                   'https://picsum.photos/2000/2000?random=$index',
@@ -235,6 +236,27 @@ class SettingsSheet extends HookWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class Grid extends StatelessWidget {
+  const Grid({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFCEC5B4), Color(0xFFF2F0EA)],
+        ),
+      ),
+      child: GridPaper(
+        color: Color(0xFF0F0B0A).withValues(alpha: 0.2),
+        interval: 100,
       ),
     );
   }
