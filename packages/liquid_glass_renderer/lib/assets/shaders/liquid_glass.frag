@@ -111,6 +111,9 @@ float sdfEllipse(vec2 p, vec2 r) {
 }
 
 float smoothUnion(float d1, float d2, float k) {
+    if (k <= 0.0) {
+        return min(d1, d2);
+    }
     float e = max(k - abs(d1 - d2), 0.0);
     return min(d1, d2) - e * e * 0.25 / k;
 }
