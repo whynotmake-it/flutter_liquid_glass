@@ -8,7 +8,7 @@ import 'package:meta/meta.dart';
 final String _shadersRoot =
     !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')
         ? ''
-        : 'packages/flutter_image_filters/';
+        : 'packages/liquid_glass_renderer/';
 
 @internal
 final String liquidGlassShader =

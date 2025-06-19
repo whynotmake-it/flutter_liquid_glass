@@ -1,21 +1,27 @@
 import 'dart:math';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:rivership/rivership.dart';
-import 'package:smooth_sheets/smooth_sheets.dart';
 
 void main() {
   runApp(const MainApp());
 }
 
-final thicknessNotifier = ValueNotifier<double>(20);
-
-final blurNotifier = ValueNotifier<double>(0.0);
+final settingsNotifier = ValueNotifier<LiquidGlassSettings>(
+  LiquidGlassSettings(
+    thickness: 20,
+    lightAngle: 0.5 * pi,
+    lightIntensity: 1,
+    ambientStrength: 0.5,
+    blend: 50,
+    chromaticAberration: 1,
+  ),
+);
 
 final cornerRadiusNotifier = ValueNotifier<double>(100);
 
@@ -23,41 +29,22 @@ final glassColorNotifier = ValueNotifier<Color>(
   const Color.fromARGB(0, 255, 255, 255),
 );
 
-final lightIntensityNotifier = ValueNotifier<double>(1);
-
-final blendNotifier = ValueNotifier<double>(50);
-
-final chromaticAberrationNotifier = ValueNotifier<double>(1);
-
-final ambientStrengthNotifier = ValueNotifier<double>(0.5);
-
-final refractiveIndexNotifier = ValueNotifier<double>(1.51);
-
 class MainApp extends HookWidget {
   const MainApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     final thicknessVisible = useState(true);
-    final flutterLogoVisible = useState(true);
+    final flutterLogoVisible = useState(false);
 
-    final blend = useValueListenable(blendNotifier);
-
-    final chromaticAberration = useValueListenable(chromaticAberrationNotifier);
+    final userSettings = useValueListenable(settingsNotifier);
 
     final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3);
 
-    final thickness = useSingleMotion(
-      value: thicknessVisible.value ? thicknessNotifier.value : 0,
-      motion: SpringMotion(spring),
-    );
-
     final flutterLogoThickness = useSingleMotion(
-      value: flutterLogoVisible.value ? thicknessNotifier.value : 0,
+      value: flutterLogoVisible.value ? userSettings.thickness : 0,
       motion: SpringMotion(spring),
     );
-
-    final blur = useValueListenable(blurNotifier);
 
     final lightAngleController = useAnimationController(
       duration: const Duration(seconds: 5),
@@ -72,28 +59,12 @@ class MainApp extends HookWidget {
       motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
     );
 
-    final color = useTweenAnimation(
-      ColorTween(
-        begin: glassColorNotifier.value,
-        end: glassColorNotifier.value,
-      ),
-    )!;
-
     final colorScheme = ColorScheme.fromSeed(
       brightness: Brightness.dark,
       seedColor: Color(0xFF287390),
     );
 
-    final settings = LiquidGlassSettings(
-      thickness: thickness,
-      lightAngle: lightAngle,
-      glassColor: color.withValues(alpha: color.a * thickness / 20),
-      lightIntensity: lightIntensityNotifier.value,
-      ambientStrength: ambientStrengthNotifier.value,
-      blend: blend,
-      chromaticAberration: chromaticAberration,
-      refractiveIndex: refractiveIndexNotifier.value,
-    );
+    final settings = userSettings.copyWith(lightAngle: lightAngle);
     return CallbackShortcuts(
       bindings: {
         LogicalKeySet(LogicalKeyboardKey.space): () {
@@ -116,19 +87,10 @@ class MainApp extends HookWidget {
           body: Builder(
             builder: (context) {
               return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    ModalSheetRoute(
-                      barrierColor: Colors.black26,
-                      swipeDismissible: true,
-                      viewportPadding: const EdgeInsets.all(100),
-                      builder: (context) {
-                        return SettingsSheet();
-                      },
-                    ),
-                  );
-                },
+                onTap: () => SettingsSheet(
+                  settingsNotifier: settingsNotifier,
+                  lightAngleAnimation: lightAngleController,
+                ).show(context),
                 child: Background(
                   lightAngle: lightAngle,
                   textVisible: thicknessVisible.value,
@@ -140,8 +102,8 @@ class MainApp extends HookWidget {
                         Align(
                           alignment: Alignment.center,
                           child: Glassify(
-                            blur: flutterLogoThickness / 5,
                             settings: settings.copyWith(
+                              blur: flutterLogoThickness / 5,
                               thickness: flutterLogoThickness,
                             ),
                             child: FlutterLogo(size: 200),
@@ -157,7 +119,6 @@ class MainApp extends HookWidget {
                             velocityThreshold: double.maxFinite,
                             spring: Spring.bouncy,
                             child: LiquidGlass.inLayer(
-                              blur: blur,
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
                               ),
@@ -177,12 +138,10 @@ class MainApp extends HookWidget {
                             spring: Spring.bouncy,
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
-                              blur: blur,
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
                               ),
                               child: Glassify(
-                                blur: flutterLogoThickness / 5,
                                 settings: settings,
                                 child: Padding(
                                   padding: const EdgeInsets.all(64.0),
@@ -200,7 +159,6 @@ class MainApp extends HookWidget {
                             spring: Spring.bouncy,
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
-                              blur: blur,
                               shape: LiquidOval(),
                               child: Container(
                                 width: 100,
@@ -302,8 +260,8 @@ class Background extends HookWidget {
                           Align(
                             alignment: Alignment.bottomLeft,
                             child: Glassify(
-                              blur: 3,
                               settings: LiquidGlassSettings(
+                                blur: 3,
                                 thickness: textThickness,
                                 lightAngle: lightAngle,
                                 lightIntensity: 1,
@@ -334,221 +292,6 @@ class Background extends HookWidget {
                 ),
                 Padding(padding: EdgeInsetsGeometry.all(64), child: child),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ImagePageView extends HookWidget {
-  const ImagePageView({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        PageView.builder(
-          itemBuilder: (context, index) {
-            return switch (index) {
-              <= 0 => Image.asset('assets/wallpaper.webp', fit: BoxFit.cover),
-              1 => Image.asset('assets/rainbow.png', fit: BoxFit.cover),
-              _ => LayoutBuilder(
-                builder: (context, constraints) => Image.network(
-                  'https://picsum.photos/2000/2000?random=$index',
-                  fit: BoxFit.cover,
-                ),
-              ),
-            };
-          },
-        ),
-        child,
-      ],
-    );
-  }
-}
-
-class SettingsSheet extends HookWidget {
-  const SettingsSheet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final thickness = useValueListenable(thicknessNotifier);
-    final cornerRadius = useValueListenable(cornerRadiusNotifier);
-    final lightIntensity = useValueListenable(lightIntensityNotifier);
-    final blurFactor = useValueListenable(blurNotifier);
-    final blend = useValueListenable(blendNotifier);
-    final chromaticAberration = useValueListenable(chromaticAberrationNotifier);
-    final ambientStrength = useValueListenable(ambientStrengthNotifier);
-    final refractionStrength = useValueListenable(refractiveIndexNotifier);
-
-    return Sheet(
-      dragConfiguration: SheetDragConfiguration(),
-      scrollConfiguration: const SheetScrollConfiguration(),
-      initialOffset: SheetOffset(1),
-      shrinkChildToAvoidDynamicOverlap: true,
-      shrinkChildToAvoidStaticOverlap: true,
-      snapGrid: SheetSnapGrid(snaps: [SheetOffset(0.5), SheetOffset(1)]),
-      child: SafeArea(
-        child: LiquidGlass(
-          blur: 20,
-          glassContainsChild: false,
-          settings: LiquidGlassSettings(
-            thickness: 30,
-            lightIntensity: .2,
-            lightAngle: .2 * pi,
-
-            ambientStrength: 2,
-            chromaticAberration: 2,
-            glassColor: Theme.of(
-              context,
-            ).colorScheme.surface.withValues(alpha: 0.4),
-          ),
-          shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
-          child: DefaultTextStyle(
-            style: Theme.of(context).textTheme.bodyLarge!,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Settings',
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Thickness:'),
-                          Text(thickness.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: thickness,
-                        onChanged: (value) {
-                          thicknessNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 160,
-                      ),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Corner Radius:'),
-                          Text(cornerRadius.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: cornerRadius,
-                        onChanged: (value) {
-                          cornerRadiusNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 100,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Light Intensity:'),
-                          Text(lightIntensity.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: lightIntensity,
-                        onChanged: (value) {
-                          lightIntensityNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 5,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Ambient Strength:'),
-                          Text(ambientStrength.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: ambientStrength,
-                        onChanged: (value) {
-                          ambientStrengthNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 5,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Blur:'),
-                          Text(blurFactor.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: blurFactor,
-                        onChanged: (value) {
-                          blurNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 40,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Liquid Factor™:'),
-                          Text(blend.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: blend,
-                        onChanged: (value) {
-                          blendNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 100,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Chromatic Aberration:'),
-                          Text(chromaticAberration.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: chromaticAberration,
-                        onChanged: (value) {
-                          chromaticAberrationNotifier.value = value;
-                        },
-                        min: 0,
-                        max: 10,
-                      ),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Refractive Index:'),
-                          Text(refractionStrength.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: refractionStrength,
-                        onChanged: (value) {
-                          refractiveIndexNotifier.value = value;
-                        },
-                        min: 1,
-                        max: 3,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
         ),

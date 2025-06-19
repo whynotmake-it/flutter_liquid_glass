@@ -43,7 +43,6 @@ class LiquidGlass extends StatelessWidget {
     required this.child,
     required this.shape,
     this.glassContainsChild = true,
-    this.blur = 0,
     this.clipBehavior = Clip.hardEdge,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
@@ -60,7 +59,6 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     super.key,
     this.glassContainsChild = true,
-    this.blur = 0,
     this.clipBehavior = Clip.hardEdge,
   }) : _settings = null;
 
@@ -81,9 +79,6 @@ class LiquidGlass extends StatelessWidget {
   /// of the glass will affect the child, and it will also be refracted.
   final bool glassContainsChild;
 
-  /// How much blur this glass element applies to its background.
-  final double blur;
-
   /// The clip behavior of this glass.
   ///
   /// Defaults to [Clip.none], so [child] will not be clipped.
@@ -97,7 +92,6 @@ class LiquidGlass extends StatelessWidget {
       case null:
         return _RawLiquidGlass(
           shape: shape,
-          blur: blur,
           glassContainsChild: glassContainsChild,
           child: ClipPath(
             clipper: ShapeBorderClipper(shape: shape),
@@ -110,7 +104,6 @@ class LiquidGlass extends StatelessWidget {
           settings: settings,
           child: _RawLiquidGlass(
             shape: shape,
-            blur: blur,
             glassContainsChild: glassContainsChild,
             child: ClipPath(
               clipper: ShapeBorderClipper(shape: shape),
@@ -127,13 +120,10 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   const _RawLiquidGlass({
     required super.child,
     required this.shape,
-    required this.blur,
     required this.glassContainsChild,
   });
 
   final LiquidShape shape;
-
-  final double blur;
 
   final bool glassContainsChild;
 
@@ -141,7 +131,6 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   RenderObject createRenderObject(BuildContext context) {
     return RenderLiquidGlass(
       shape: shape,
-      blur: blur,
       glassContainsChild: glassContainsChild,
     );
   }
@@ -153,7 +142,6 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   ) {
     renderObject
       ..shape = shape
-      ..blur = blur
       ..glassContainsChild = glassContainsChild;
   }
 }
@@ -162,10 +150,8 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 class RenderLiquidGlass extends RenderProxyBox {
   RenderLiquidGlass({
     required LiquidShape shape,
-    required double blur,
     required bool glassContainsChild,
   })  : _shape = shape,
-        _blur = blur,
         _glassContainsChild = glassContainsChild;
 
   late LiquidShape _shape;
@@ -173,14 +159,6 @@ class RenderLiquidGlass extends RenderProxyBox {
   set shape(LiquidShape value) {
     if (_shape == value) return;
     _shape = value;
-    markNeedsPaint();
-    _notifyLayerIfNeeded();
-  }
-
-  double _blur = 0;
-  set blur(double value) {
-    if (_blur == value) return;
-    _blur = value;
     markNeedsPaint();
     _notifyLayerIfNeeded();
   }
@@ -243,8 +221,8 @@ class RenderLiquidGlass extends RenderProxyBox {
     super.paint(context, offset);
   }
 
-  void paintBlur(PaintingContext context, Offset offset) {
-    if (_blur <= 0) return;
+  void paintBlur(PaintingContext context, Offset offset, double blur) {
+    if (blur <= 0) return;
 
     context.pushClipPath(
       true,
@@ -254,7 +232,7 @@ class RenderLiquidGlass extends RenderProxyBox {
       (context, offset) {
         context.pushLayer(
           BackdropFilterLayer(
-            filter: ImageFilter.blur(sigmaX: _blur, sigmaY: _blur),
+            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           ),
           (context, offset) {},
           offset,

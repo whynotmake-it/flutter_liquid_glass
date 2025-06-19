@@ -360,7 +360,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     for (final (render, _) in shapes) {
       final shapeGlobalOffset = render.localToGlobal(Offset.zero);
       final relativeOffset = shapeGlobalOffset - layerGlobalOffset;
-      render.paintBlur(context, offset + relativeOffset);
+      render.paintBlur(context, offset + relativeOffset, _settings.blur);
     }
   }
 }

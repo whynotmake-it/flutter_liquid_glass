@@ -21,13 +21,19 @@ import 'package:meta/meta.dart';
 /// This widget is useful if you want to apply the liquid glass effect to a
 /// widget that has a complex shape, or if you want to apply the liquid glass
 /// effect to a widget that is not a [LiquidGlass] widget.
+///
+/// The blur is ugly at the moment, since we have to do it from within the
+/// shader:
+///
+/// Until one of those is fixed, blur will stay ugly here:
+/// - https://github.com/flutter/flutter/issues/170820
+/// - https://github.com/flutter/flutter/issues/170792
 @experimental
 class Glassify extends StatefulWidget {
   /// Creates a new [Glassify] with the given [child] and [settings].
   const Glassify({
     required this.child,
     this.settings = const LiquidGlassSettings(),
-    this.blur = 10,
     super.key,
   });
 
@@ -39,18 +45,6 @@ class Glassify extends StatefulWidget {
 
   /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
-
-  /// How much blur the shape should apply.
-  ///
-  /// The blur is ugly at the moment, since we have to do it from within the
-  /// shader:
-  ///
-  /// Until one of those is fixed, blur will stay ugly here:
-  /// - https://github.com/flutter/flutter/issues/170820
-  /// - https://github.com/flutter/flutter/issues/170792
-  ///
-  /// Defaults to 10 pixels.
-  final double blur;
 
   @override
   State<Glassify> createState() => _GlassifyState();
@@ -78,7 +72,6 @@ class _GlassifyState extends State<Glassify>
         settings: widget.settings,
         debugRenderRefractionMap: false,
         vsync: this,
-        blur: widget.blur,
         child: child!,
       ),
       child: widget.child,
@@ -92,14 +85,12 @@ class _RawGlassify extends SingleChildRenderObjectWidget {
     required this.settings,
     required this.debugRenderRefractionMap,
     required this.vsync,
-    required this.blur,
     required Widget super.child,
   });
 
   final FragmentShader shader;
   final LiquidGlassSettings settings;
   final bool debugRenderRefractionMap;
-  final double blur;
 
   final TickerProvider vsync;
 
@@ -111,7 +102,6 @@ class _RawGlassify extends SingleChildRenderObjectWidget {
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
       ticker: vsync,
-      blur: blur,
     );
   }
 
@@ -124,8 +114,7 @@ class _RawGlassify extends SingleChildRenderObjectWidget {
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
       ..ticker = vsync
-      ..debugRenderRefractionMap = debugRenderRefractionMap
-      ..blur = blur;
+      ..debugRenderRefractionMap = debugRenderRefractionMap;
   }
 }
 
@@ -136,13 +125,11 @@ class RenderGlassify extends RenderProxyBox {
     required FragmentShader shader,
     required LiquidGlassSettings settings,
     required TickerProvider ticker,
-    required double blur,
     bool debugRenderRefractionMap = false,
   })  : _devicePixelRatio = devicePixelRatio,
         _shader = shader,
         _settings = settings,
         _tickerProvider = ticker,
-        _blur = blur,
         _debugRenderRefractionMap = debugRenderRefractionMap {
     _ticker = _tickerProvider.createTicker((_) {
       markNeedsPaint();
@@ -179,13 +166,6 @@ class RenderGlassify extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  double _blur;
-  set blur(double value) {
-    if (_blur == value) return;
-    _blur = value;
-    markNeedsPaint();
-  }
-
   /// Ticker to animate the liquid glass effect.
   ///
   // TODO(timcreatedit): this is maybe not the best for performance, but I can't
@@ -204,16 +184,13 @@ class RenderGlassify extends RenderProxyBox {
       settings: _settings,
       devicePixelRatio: _devicePixelRatio,
       layerSize: size,
-      matteBlur: _blur,
     );
     layer!
       ..offset = offset
       ..shader = _shader
       ..settings = _settings
       ..devicePixelRatio = _devicePixelRatio
-      ..layerSize = size
-      ..blur = _blur;
-
+      ..layerSize = size;
     context.pushLayer(
       layer!,
       (context, offset) {
@@ -240,13 +217,11 @@ class _GlassifyShaderLayer extends OffsetLayer {
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
     required Size layerSize,
-    required double matteBlur,
     required super.offset,
   })  : _shader = shader,
         _settings = settings,
         _devicePixelRatio = devicePixelRatio,
-        _layerSize = layerSize,
-        _blur = matteBlur;
+        _layerSize = layerSize;
 
   FragmentShader _shader;
   FragmentShader get shader => _shader;
@@ -277,14 +252,6 @@ class _GlassifyShaderLayer extends OffsetLayer {
   set layerSize(Size value) {
     if (_layerSize == value) return;
     _layerSize = value;
-    markNeedsAddToScene();
-  }
-
-  double _blur;
-  double get blur => _blur;
-  set blur(double value) {
-    if (_blur == value) return;
-    _blur = value;
     markNeedsAddToScene();
   }
 
@@ -392,7 +359,7 @@ class _GlassifyShaderLayer extends OffsetLayer {
       ..setFloat(13, settings.refractiveIndex)
       ..setFloat(14, offset.dx * devicePixelRatio)
       ..setFloat(15, offset.dy * devicePixelRatio)
-      ..setFloat(16, blur);
+      ..setFloat(16, settings.blur);
   }
 
   @override

@@ -9,6 +9,7 @@ class LiquidGlassSettings with EquatableMixin {
   const LiquidGlassSettings({
     this.glassColor = const Color.fromARGB(0, 255, 255, 255),
     this.thickness = 20,
+    this.blur = 0,
     this.chromaticAberration = .01,
     this.blend = 20,
     this.lightAngle = 0.5 * pi,
@@ -26,6 +27,13 @@ class LiquidGlassSettings with EquatableMixin {
   ///
   /// Thicker surfaces refract the light more intensely.
   final double thickness;
+
+  /// The blur of the glass effect.
+  ///
+  /// Higher values create a more frosted appearance.
+  ///
+  /// Defaults to 0.
+  final double blur;
 
   /// The chromatic aberration of the glass effect (WIP).
   ///
@@ -62,6 +70,7 @@ class LiquidGlassSettings with EquatableMixin {
   LiquidGlassSettings copyWith({
     Color? glassColor,
     double? thickness,
+    double? blur,
     double? chromaticAberration,
     double? blend,
     double? lightAngle,
@@ -72,6 +81,7 @@ class LiquidGlassSettings with EquatableMixin {
       LiquidGlassSettings(
         glassColor: glassColor ?? this.glassColor,
         thickness: thickness ?? this.thickness,
+        blur: blur ?? this.blur,
         chromaticAberration: chromaticAberration ?? this.chromaticAberration,
         blend: blend ?? this.blend,
         lightAngle: lightAngle ?? this.lightAngle,
@@ -84,6 +94,7 @@ class LiquidGlassSettings with EquatableMixin {
   List<Object?> get props => [
         glassColor,
         thickness,
+        blur,
         chromaticAberration,
         blend,
         lightAngle,
