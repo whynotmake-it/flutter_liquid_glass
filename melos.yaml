@@ -51,6 +51,19 @@ scripts:
   coverage:
     run: melos run coverage:select --no-select
     description: Generate coverage for all packages.
+
+  test-without-goldens:select:
+    run: flutter test --enable-impeller --exclude-tags=golden
+    exec:
+      failFast: true
+      concurrency: 6
+    packageFilters:
+      dirExists: test
+    description: Run `flutter test` for selected packages without golden tests.
+
+  test-without-goldens:
+    run: melos run test-without-goldens:select --no-select
+    description: Run all tests in this project without golden tests.
   
   generate:select:
     description: Run code generation for selected packages.

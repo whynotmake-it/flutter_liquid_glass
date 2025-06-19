@@ -42,9 +42,9 @@ jobs:
       - name: 🧪 Run Analyze
         run: melos run analyze
 
-      - name: 📝 Run Test
+      - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
-        run: melos run coverage -- --exclude-tags=golden
+        run: melos run test-without-goldens
       
   
   check_generation:

@@ -34,6 +34,13 @@ void main() {
       );
     }
 
+    test('can be used', () async {
+      expect(
+        const LiquidGlass(shape: LiquidOval(), child: SizedBox()),
+        isA<Widget>(),
+      );
+    });
+
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
         'should render a rounded superellipse with different thickness',
