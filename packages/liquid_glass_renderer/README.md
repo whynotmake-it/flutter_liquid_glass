@@ -88,6 +88,9 @@ This package provides three main widgets to create the glass effect:
 
 ### `LiquidGlass`: A Single Glass Shape
 
+![Shapes Demo](doc/shapes.png)
+
+
 The quickest way to get started is to wrap your widget with `LiquidGlass`. This creates a single glass object with a defined shape.
 
 ```dart
@@ -130,11 +133,11 @@ class MyGlassWidget extends StatelessWidget {
 }
 ```
 
-#### Supported Shapes
+#### Supported Shapes (in order of appearance)
 
 The LiquidGlass widget supports the following shapes at the moment:
 
--   `LiquidRoundedSuperellipse`
+-   `LiquidRoundedSuperellipse` (recommended)
 -   `LiquidOval`
 -   `LiquidRoundedRectangle`
 
@@ -143,6 +146,8 @@ All shapes only support uniform `Radius.circular` for now.
 
 
 ### `LiquidGlassLayer`: Blending Multiple Shapes
+
+![Blending Demo](doc/blended.png)
 
 For shapes to blend, they must be children of the same `LiquidGlassLayer`. Use `LiquidGlass.inLayer` for each shape.
 

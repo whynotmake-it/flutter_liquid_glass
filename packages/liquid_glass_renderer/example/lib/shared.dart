@@ -192,7 +192,7 @@ class SettingsSheet extends HookWidget {
                           );
                         },
                         min: 0,
-                        max: 100,
+                        max: 200,
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -211,7 +211,6 @@ class SettingsSheet extends HookWidget {
                         min: 0,
                         max: 10,
                       ),
-
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

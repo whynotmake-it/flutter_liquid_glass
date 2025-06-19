@@ -137,7 +137,12 @@ class MainApp extends HookWidget {
                                 borderRadius: Radius.circular(cornerRadius),
                               ),
                               child: Glassify(
-                                settings: settings,
+                                settings: settings.copyWith(
+                                  blur: 10,
+                                  glassColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: .2),
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(64.0),
                                   child: FlutterLogo(size: 200),
@@ -223,73 +228,45 @@ class Background extends HookWidget {
     );
 
     return SizedBox.expand(
-      child: Container(
-        color: Theme.of(context).colorScheme.surface,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 64, left: 64),
-          decoration: ShapeDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            shape: RoundedSuperellipseBorder(
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(80)),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 16, left: 16),
-            child: Stack(
-              children: [
-                Container(
-                  clipBehavior: Clip.hardEdge,
-                  decoration: ShapeDecoration(
-                    shape: RoundedSuperellipseBorder(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(64),
+      child: Stack(
+        children: [
+          ImagePageView(
+            child: Padding(
+              padding: const EdgeInsets.all(64.0),
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Glassify(
+                      settings: LiquidGlassSettings(
+                        blur: 3,
+                        thickness: textThickness,
+                        lightAngle: lightAngle,
+                        lightIntensity: 1,
+                        ambientStrength: 0.3,
+                        chromaticAberration: 0,
+                        glassColor: Theme.of(
+                          context,
+                        ).colorScheme.inversePrimary.withValues(alpha: .8),
+                        refractiveIndex: 1.3,
                       ),
-                    ),
-                  ),
-
-                  child: ImagePageView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(64.0),
-                      child: Stack(
-                        children: [
-                          Align(
-                            alignment: Alignment.bottomLeft,
-                            child: Glassify(
-                              settings: LiquidGlassSettings(
-                                blur: 3,
-                                thickness: textThickness,
-                                lightAngle: lightAngle,
-                                lightIntensity: 1,
-                                ambientStrength: 0.3,
-                                chromaticAberration: 0,
-                                glassColor: Theme.of(context)
-                                    .colorScheme
-                                    .inversePrimary
-                                    .withValues(alpha: .8),
-                                refractiveIndex: 1.3,
-                              ),
-                              child: Text(
-                                'Liquid\nGlass\nRenderer',
-                                style: GoogleFonts.lexendDecaTextTheme()
-                                    .headlineLarge
-                                    ?.copyWith(
-                                      fontSize: 120,
-                                      height: 1,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                              ),
+                      child: Text(
+                        'Liquid\nGlass\nRenderer',
+                        style: GoogleFonts.lexendDecaTextTheme().headlineLarge
+                            ?.copyWith(
+                              fontSize: 120,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
                             ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
-                ),
-                Padding(padding: EdgeInsetsGeometry.all(64), child: child),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+          Padding(padding: EdgeInsetsGeometry.all(64), child: child),
+        ],
       ),
     );
   }
