@@ -75,7 +75,7 @@ class LiquidGlass extends StatelessWidget {
 
   /// Whether this glass should be rendered "inside" of the glass, or on top.
   ///
-  /// If it is rendered inside, it will be on top of [blur], but the color tint
+  /// If it is rendered inside, the color tint
   /// of the glass will affect the child, and it will also be refracted.
   final bool glassContainsChild;
 
