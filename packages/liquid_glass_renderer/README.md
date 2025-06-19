@@ -171,12 +171,15 @@ LiquidGlassLayer(
 
 ### `Glassify`: Glass Effect on Any Shape (Experimental)
 
-The `Glassify` widget can apply the glass effect to any child widget, not just a predefined shape. This is useful for text, icons, or custom-painted widgets.
+
 
 > ⚠️ `Glassify` is experimental. It is significantly less performant and will produce lower-quality results than `LiquidGlass`. 
 > 
 > **Never use it for primitive shapes that could be rendered with `LiquidGlass`!**
 
+![Glassify Demo](doc/clock.gif)
+
+The `Glassify` widget can apply the glass effect to any child widget, not just a predefined shape. This is useful for text, icons, or custom-painted widgets.
 
 Apple themselves barely use this effect, one of their uses is the time on the lock screen. 
 To make it look best, consider a few key tips:
