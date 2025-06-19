@@ -1,3 +1,12 @@
+## 0.1.1-dev.8
+
+ - **FIX**: shader now also renders when blend is set to 0.
+ - **FIX**: sharp glass edges whithout background shining through.
+ - **FEAT**: added experimental `Glassify` widget that turns any child shape into liquid glass.
+ - **FEAT**: added refractive index to settings and show values in example.
+ - **FEAT**: nicer specular highlights.
+ - **DOCS**: update (#28).
+
 ## 0.1.1-dev.7
 
  - **FIX**: throw `AssertionError` when used without Impeller.
