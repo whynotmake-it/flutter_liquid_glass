@@ -1,0 +1,6 @@
+{
+  "dart.flutterTestAdditionalArgs": [
+    "--enable-impeller",
+    "--coverage"
+  ]
+}

@@ -41,6 +41,15 @@
             "toolArgs": [
                 "--enable-impeller"
             ]
+        },
+        {
+            "name": "Golden",
+            "request": "launch",
+            "type": "dart",
+            "codeLens": {
+              "for": ["debug-test", "debug-test-file"]
+            },
+            "args": ["--update-goldens", "--enable-impeller"]
         }
     ]
 }

@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
+import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// An experimental widget that turns its child into liquid glass.
@@ -71,8 +72,7 @@ class _GlassifyState extends State<Glassify>
     }
 
     return ShaderBuilder(
-      assetKey:
-          'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass_arbitrary.frag',
+      assetKey: arbitraryShader,
       (context, shader, child) => _RawGlassify(
         shader: shader,
         settings: widget.settings,

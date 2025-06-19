@@ -43,13 +43,8 @@ jobs:
         run: melos run analyze
 
       - name: 📝 Run Test
-        run: melos run coverage
-
-      - name: 📊 Generate Coverage
-        id: coverage-report
-        uses: whynotmake-it/dart-coverage-assistant@v1.1
-        with:
-          generate_badges: pr
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
+        run: melos run coverage -- --exclude-tags=golden
       
   
   check_generation:
@@ -74,4 +69,30 @@ jobs:
 
       - name: 🔎 Check there are no uncommitted changes
         run: git add . && git diff --cached --exit-code
-  
+
+  golden_tests:
+    name: Run Golden Tests
+    # Only run on main or if PR is labeled with "goldens"
+    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'goldens')
+    runs-on: macos-15
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+
+      - name: 📝 Run Test
+        run: melos run coverage
+
+      - name: 📊 Generate Coverage
+        id: coverage-report
+        uses: whynotmake-it/dart-coverage-assistant@v1.1
+        with:
+          generate_badges: pr

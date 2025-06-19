@@ -9,6 +9,7 @@ import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/raw_shapes.dart';
+import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// Represents a layer of multiple [LiquidGlass] shapes that can flow together
@@ -90,8 +91,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     }
 
     return ShaderBuilder(
-      assetKey:
-          'packages/liquid_glass_renderer/lib/assets/shaders/liquid_glass.frag',
+      assetKey: liquidGlassShader,
       (context, shader, child) => _RawShapes(
         shader: shader,
         settings: widget.settings,

@@ -33,6 +33,7 @@ dependencies:
   meta: ^1.16.0
 
 dev_dependencies:
+  alchemist: ^0.12.1
   flutter_test:
     sdk: flutter
   lintervention: ^0.3.1

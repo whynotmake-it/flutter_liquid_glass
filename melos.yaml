@@ -26,13 +26,13 @@ scripts:
        - Note: you can also rely on your IDEs Dart Analysis / Issues window.
   
   test:select:
-    run: flutter test
+    run: flutter test --enable-impeller
     exec:
       failFast: true
       concurrency: 6
     packageFilters:
       dirExists: test
-    description: Run `flutter test test` for selected packages.
+    description: Run `flutter test` for selected packages.
 
   test:
     run: melos run test:select --no-select
@@ -40,7 +40,7 @@ scripts:
 
   coverage:select:
     run: |
-      flutter test --coverage
+      flutter test --coverage --enable-impeller
     exec:
       failFast: true
       concurrency: 6
