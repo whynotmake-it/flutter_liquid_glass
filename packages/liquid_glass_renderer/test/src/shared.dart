@@ -8,3 +8,24 @@ const settingsWithoutLighting = LiquidGlassSettings(
   chromaticAberration: 0,
   lightIntensity: 0,
 );
+
+Widget buildWithGridPaper(Widget child) {
+  return ColoredBox(
+    color: Colors.white,
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        children: [
+          const Positioned.fill(
+            child: GridPaper(
+              color: Colors.black,
+            ),
+          ),
+          Center(
+            child: child,
+          ),
+        ],
+      ),
+    ),
+  );
+}

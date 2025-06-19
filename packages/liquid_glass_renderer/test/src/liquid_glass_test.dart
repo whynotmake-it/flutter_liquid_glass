@@ -1,39 +1,12 @@
 import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
 
 import 'shared.dart';
 
 void main() {
   group('LiquidGlass', () {
-    setUpAll(() async {
-      await ShaderBuilder.precacheShader(liquidGlassShader);
-    });
-
-    Widget buildWithGridPaper(Widget liquidGlass) {
-      return ColoredBox(
-        color: Colors.white,
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Stack(
-            children: [
-              const Positioned.fill(
-                child: GridPaper(
-                  color: Colors.black,
-                ),
-              ),
-              Center(
-                child: liquidGlass,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     test('can be used', () async {
       expect(
         const LiquidGlass(shape: LiquidOval(), child: SizedBox()),
