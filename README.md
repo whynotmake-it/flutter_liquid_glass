@@ -6,29 +6,11 @@
 
 Flutter Liquid Glass Workspace
 
-## Installation 💻
-
-**❗ In order to start using Liquid Glass Workspace you must have the [Dart SDK][dart_install_link] installed on your machine.**
-
-Install via `dart pub add`:
-
-```sh
-dart pub add liquid_glass_workspace
-```
-
----
-
-## Continuous Integration 🤖
-
-Liquid Glass Workspace comes with a built-in [GitHub Actions workflow][github_actions_link] but you can also add your preferred CI/CD solution.
+## Package overview
+| Package                                                                   | pub.dev                                                                                                                              | Description                                           |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| [liquid_glass_renderer](./packages/liquid_glass_renderer)                 | [![Pub Version](https://img.shields.io/pub/v/liquid_glass_renderer)](https://pub.dev/packages/liquid_glass_renderer)                 | A Flutter package for rendering liquid glass effects. |
+| [apple_liquid_glass](./packages/apple_liquid_glass) | [![Pub Version](https://img.shields.io/pub/v/apple_liquid_glass)](https://pub.dev/packages/apple_liquid_glass) | WIP, for now only exports `liquid_glass_renderer` |
 
 
 ---
-
-
-[dart_install_link]: https://dart.dev/get-dart
-[github_actions_link]: https://docs.github.com/en/actions/learn-github-actions
-[license_badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[license_link]: https://opensource.org/licenses/MIT
-[mason_link]: https://github.com/felangel/mason
-[very_good_ventures_link]: https://verygood.ventures
