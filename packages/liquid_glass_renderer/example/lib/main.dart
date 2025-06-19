@@ -46,12 +46,7 @@ class MainApp extends HookWidget {
       motion: SpringMotion(spring),
     );
 
-    final lightAngleController = useAnimationController(
-      duration: const Duration(seconds: 5),
-      lowerBound: 0,
-      upperBound: 2 * pi,
-    )..repeat();
-
+    final lightAngleController = useRotatingAnimationController();
     final lightAngle = useAnimation(lightAngleController);
 
     final cornerRadius = useSingleMotion(

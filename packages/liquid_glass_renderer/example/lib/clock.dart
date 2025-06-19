@@ -1,29 +1,54 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
 
 void main() {
-  runApp(const ClockApp());
+  runApp(MaterialApp(home: ClockExample()));
 }
 
-class ClockApp extends StatelessWidget {
-  const ClockApp({super.key});
+final settingsNotifier = ValueNotifier(
+  LiquidGlassSettings(
+    thickness: 20,
+    lightIntensity: 1,
+    ambientStrength: 1,
+    blur: 10,
+    glassColor: Colors.white.withValues(alpha: 0.1),
+  ),
+);
+
+class ClockExample extends HookWidget {
+  const ClockExample({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ImagePageView(
-      child: LiquidGlassLayer(
-        child: Center(
-          child: Row(
-            children: [
-              LiquidGlass(
-                shape: LiquidRoundedSuperellipse(
-                  borderRadius: Radius.circular(100),
-                ),
-                child: const SizedBox.square(dimension: 100),
+    useStream(Stream.periodic(const Duration(seconds: 1)));
+    final lightAngle = useAnimation(useRotatingAnimationController());
+
+    final settings = useValueListenable(
+      settingsNotifier,
+    ).copyWith(lightAngle: lightAngle);
+
+    final time = DateTime.now();
+
+    final format = DateFormat('HH:mm');
+
+    return ImagePageView(
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Glassify(
+              settings: settings,
+              child: Text(
+                format.format(time),
+                style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
+                    .copyWith(fontSize: 200),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

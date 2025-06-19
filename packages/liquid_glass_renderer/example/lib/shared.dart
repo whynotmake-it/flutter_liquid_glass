@@ -1,8 +1,18 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:smooth_sheets/smooth_sheets.dart';
+
+Animation<double> useRotatingAnimationController() {
+  return useAnimationController(
+    duration: const Duration(seconds: 5),
+    lowerBound: 0,
+    upperBound: 2 * pi,
+  )..repeat();
+}
 
 class ImagePageView extends HookWidget {
   const ImagePageView({super.key, required this.child});

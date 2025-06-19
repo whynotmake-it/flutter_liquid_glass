@@ -2,5 +2,8 @@
   "dart.flutterTestAdditionalArgs": [
     "--enable-impeller",
     "--coverage"
+  ],
+  "dart.flutterRunAdditionalArgs": [
+    "--enable-impeller"
   ]
 }
