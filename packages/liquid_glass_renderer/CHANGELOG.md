@@ -1,3 +1,7 @@
+## 0.1.1-dev.9
+
+ - **DOCS**: fix errors in README (#31).
+
 ## 0.1.1-dev.8
 
  - **FEAT**: added experimental `Glassify` widget that turns any child shape into liquid glass.
