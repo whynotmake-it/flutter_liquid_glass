@@ -119,14 +119,14 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     float specDot2 = max(0.0, dot(normal, halfwayDir2));
 
     // 1. Sharp surface glint (pure white)
-    float glintExponent = mix(120.0, 200.0, smoothstep(5.0, 25.0, thickness));
+    float glintExponent = mix(2.0, 5.0, smoothstep(1.0, 25.0, thickness));
     float sharpFactor = pow(specDot1, glintExponent) + 0.4 * pow(specDot2, glintExponent);
 
     // Pure white glint without environment tinting
     vec3 sharpGlint = vec3(sharpFactor) * lightIntensity * 2.5;
 
     // 2. Soft internal bleed, for a subtle "glow"
-    float softFactor = pow(specDot1, 20.0) + 0.5 * pow(specDot2, 20.0);
+    float softFactor = pow(specDot1, 5.0) + 0.5 * pow(specDot2, 7.0);
     vec3 softBleed = vec3(softFactor) * lightIntensity * 0.4;
     
     // Combine lighting components
