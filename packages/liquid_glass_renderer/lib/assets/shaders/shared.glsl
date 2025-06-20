@@ -77,7 +77,7 @@ vec4 applyKawaseBlur(sampler2D tex, vec2 uv, vec2 texelSize, float blurRadius) {
     return totalWeight > 0.0 ? color / totalWeight : texture(tex, uv);
 }
 
-// Determine if background color is bright or saturated enough to influence highlights
+// Determine highlight color with gradual transition from colored to white based on darkness
 vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
     float luminance = dot(backgroundColor, vec3(0.299, 0.587, 0.114));
     
@@ -86,32 +86,37 @@ vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
     float minComponent = min(min(backgroundColor.r, backgroundColor.g), backgroundColor.b);
     float saturation = maxComponent > 0.0 ? (maxComponent - minComponent) / maxComponent : 0.0;
     
-    // Use background hue only if it's bright enough OR saturated enough
-    bool useBrightness = luminance > 0.4;  // Bright enough threshold
-    bool useSaturation = saturation > 0.3; // Saturated enough threshold
+    // Create a colored highlight
+    vec3 coloredHighlight = vec3(targetBrightness); // Default to white
     
-    if (useBrightness || useSaturation) {
+    if (luminance > 0.001) {
         // Normalize the background color to extract hue/saturation
-        vec3 normalizedBackground = backgroundColor;
-        if (luminance > 0.001) {
-            normalizedBackground = backgroundColor / luminance;
-        } else {
-            normalizedBackground = vec3(1.0);
-        }
+        vec3 normalizedBackground = backgroundColor / luminance;
         
         // Apply consistent brightness to the normalized color
-        vec3 coloredHighlight = normalizedBackground * targetBrightness;
+        coloredHighlight = normalizedBackground * targetBrightness;
         
         // Boost saturation for more vivid highlights
         float saturationBoost = 1.3;
         vec3 gray = vec3(dot(coloredHighlight, vec3(0.299, 0.587, 0.114)));
         coloredHighlight = mix(gray, coloredHighlight, saturationBoost);
-        
-        return min(coloredHighlight, vec3(1.0));
-    } else {
-        // For dark, unsaturated colors, use neutral bright highlight
-        return vec3(targetBrightness);
+        coloredHighlight = min(coloredHighlight, vec3(1.0));
     }
+    
+    // Calculate how much to blend towards white based on darkness and saturation
+    // Darker colors (low luminance) should be more white
+    // Low saturation colors should also be more white
+    float luminanceFactor = smoothstep(0.0, 0.6, luminance); // 0 = very dark, 1 = bright
+    float saturationFactor = smoothstep(0.0, 0.4, saturation); // 0 = gray, 1 = saturated
+    
+    // Combine both factors - need both brightness AND saturation for color tinting
+    float colorInfluence = luminanceFactor * saturationFactor;
+    
+    // White highlight for reference
+    vec3 whiteHighlight = vec3(targetBrightness);
+    
+    // Blend between white and colored highlight based on color influence
+    return mix(whiteHighlight, coloredHighlight, colorInfluence);
 }
 
 // Calculate height/depth of the liquid surface
@@ -157,7 +162,7 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     float specDot2 = max(0.0, dot(normal, halfwayDir2));
 
     // 1. Sharp surface glint using smart color selection
-    float glintExponent = mix(2.0, 5.0, smoothstep(1.0, 25.0, thickness));
+    float glintExponent = mix(4.0, 8.0, smoothstep(1.0, 25.0, thickness));
     float sharpFactor = pow(specDot1, glintExponent) + 0.4 * pow(specDot2, glintExponent);
 
     // Get highlight color based on background brightness and saturation
@@ -165,7 +170,7 @@ vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDispla
     vec3 sharpGlint = glintHighlightColor * sharpFactor * lightIntensity * 2.0;
 
     // 2. Soft internal bleed using smart color selection
-    float softFactor = pow(specDot1, 5.0) + 0.5 * pow(specDot2, 7.0);
+    float softFactor = pow(specDot1, 8.0) + 0.5 * pow(specDot2, 10.0);
     vec3 softHighlightColor = getHighlightColor(backgroundColor, 0.5);
     vec3 softBleed = softHighlightColor * softFactor * lightIntensity * 0.4;
     
