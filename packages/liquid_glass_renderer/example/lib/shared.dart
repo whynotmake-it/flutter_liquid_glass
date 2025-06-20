@@ -27,8 +27,7 @@ class ImagePageView extends HookWidget {
           itemBuilder: (context, index) {
             return switch (index) {
               <= 0 => Image.asset('assets/wallpaper.webp', fit: BoxFit.cover),
-              1 => Image.asset('assets/rainbow.png', fit: BoxFit.cover),
-              2 => const Grid(),
+              1 => const Grid(),
               _ => LayoutBuilder(
                 builder: (context, constraints) => Image.network(
                   'https://picsum.photos/2000/2000?random=$index',

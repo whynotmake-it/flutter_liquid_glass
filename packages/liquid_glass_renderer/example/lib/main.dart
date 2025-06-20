@@ -16,8 +16,6 @@ final settingsNotifier = ValueNotifier<LiquidGlassSettings>(
   LiquidGlassSettings(
     thickness: 20,
     lightAngle: 0.5 * pi,
-    lightIntensity: 1,
-    ambientStrength: 0.5,
     blend: 50,
     chromaticAberration: 1,
   ),
@@ -138,7 +136,8 @@ class MainApp extends HookWidget {
                               ),
                               child: Glassify(
                                 settings: settings.copyWith(
-                                  blur: 10,
+                                  blur: 5,
+                                  thickness: 10,
                                   glassColor: Theme.of(
                                     context,
                                   ).colorScheme.primary.withValues(alpha: .2),
@@ -242,8 +241,6 @@ class Background extends HookWidget {
                         blur: 3,
                         thickness: textThickness,
                         lightAngle: lightAngle,
-                        lightIntensity: 1,
-                        ambientStrength: 0.3,
                         chromaticAberration: 0,
                         glassColor: Theme.of(
                           context,

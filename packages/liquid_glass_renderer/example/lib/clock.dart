@@ -12,8 +12,6 @@ void main() {
 final settingsNotifier = ValueNotifier(
   LiquidGlassSettings(
     thickness: 20,
-    lightIntensity: 1,
-    ambientStrength: 1,
     blur: 10,
     glassColor: Colors.white.withValues(alpha: 0.1),
   ),
@@ -48,10 +46,7 @@ class ClockExample extends HookWidget {
           child: FittedBox(
             fit: BoxFit.contain,
             child: LiquidGlass(
-              settings: settings.copyWith(
-                blur: 0,
-                glassColor: Colors.transparent,
-              ),
+              settings: settings.copyWith(glassColor: Colors.transparent),
               shape: LiquidRoundedRectangle(borderRadius: Radius.circular(64)),
               child: Padding(
                 padding: const EdgeInsets.all(64.0),
