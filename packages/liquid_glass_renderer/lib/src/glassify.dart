@@ -355,7 +355,7 @@ class _GlassifyShaderLayer extends OffsetLayer {
       ..setFloat(9, settings.lightAngle)
       ..setFloat(10, settings.lightIntensity)
       ..setFloat(11, settings.ambientStrength)
-      ..setFloat(12, settings.thickness * 2)
+      ..setFloat(12, settings.thickness)
       ..setFloat(13, settings.refractiveIndex)
       ..setFloat(14, offset.dx * devicePixelRatio)
       ..setFloat(15, offset.dy * devicePixelRatio)
