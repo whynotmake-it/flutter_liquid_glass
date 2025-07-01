@@ -6,7 +6,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
-import 'package:motor/motor.dart';
 import 'package:rivership/rivership.dart';
 
 void main() {
@@ -113,7 +112,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy(),
+                            motion: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
@@ -131,7 +130,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy(),
+                            motion: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidRoundedSuperellipse(
@@ -157,7 +156,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy(),
+                            motion: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidOval(),

@@ -9,9 +9,9 @@ Successfully migrated all Spring occurrences in the liquid glass renderer exampl
 - **File**: `packages/liquid_glass_renderer/example/pubspec.yaml`
 - **Change**: Already had `motor: ^1.0.0-dev.3` dependency (previously updated)
 
-### 2. Added Import
+### 2. Import Changes
 - **File**: `packages/liquid_glass_renderer/example/lib/main.dart`
-- **Added**: `import 'package:motor/motor.dart';`
+- **Change**: Motor package is re-exported by rivership, so no direct import needed
 
 ### 3. Migration Changes
 
@@ -41,7 +41,7 @@ motion: motion,
 motion: CupertinoMotion.smooth(),
 
 // Usage in DragDismissable
-spring: CupertinoMotion.bouncy(),
+motion: CupertinoMotion.bouncy(),
 
 // Usage in Background class
 motion: CupertinoMotion.bouncy(),
@@ -53,6 +53,7 @@ motion: CupertinoMotion.bouncy(),
 2. **SpringMotion(spring)** → **CupertinoMotion.bouncy()** (direct usage)
 3. **Spring.bouncy.copyWith(...)** → **CupertinoMotion.bouncy()** (simplified)
 4. **Spring.bouncy.copyWithDamping(...)** → **CupertinoMotion.smooth()** (appropriate alternative)
+5. **DragDismissable spring:** → **DragDismissable motion:** (parameter renamed)
 
 ## Files Modified
 - `packages/liquid_glass_renderer/example/lib/main.dart`
