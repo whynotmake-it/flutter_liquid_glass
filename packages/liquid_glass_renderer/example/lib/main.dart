@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
+import 'package:motor/motor.dart';
 import 'package:rivership/rivership.dart';
 
 void main() {
@@ -39,11 +40,11 @@ class MainApp extends HookWidget {
 
     final userSettings = useValueListenable(settingsNotifier);
 
-    final spring = Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3);
+    final motion = CupertinoMotion.bouncy;
 
     final flutterLogoThickness = useSingleMotion(
       value: flutterLogoVisible.value ? userSettings.thickness : 0,
-      motion: SpringMotion(spring),
+      motion: motion,
     );
 
     final lightAngleController = useRotatingAnimationController();
@@ -51,7 +52,7 @@ class MainApp extends HookWidget {
 
     final cornerRadius = useSingleMotion(
       value: cornerRadiusNotifier.value,
-      motion: SpringMotion(spring.copyWithDamping(durationSeconds: 1.2)),
+      motion: CupertinoMotion.smooth,
     );
 
     final colorScheme = ColorScheme.fromSeed(
@@ -112,7 +113,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: Spring.bouncy,
+                            spring: CupertinoMotion.bouncy,
                             child: LiquidGlass.inLayer(
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
@@ -130,7 +131,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: Spring.bouncy,
+                            spring: CupertinoMotion.bouncy,
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidRoundedSuperellipse(
@@ -156,7 +157,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: Spring.bouncy,
+                            spring: CupertinoMotion.bouncy,
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidOval(),
@@ -222,9 +223,7 @@ class Background extends HookWidget {
 
     final textThickness = useSingleMotion(
       value: textVisible ? 8 : 0,
-      motion: SpringMotion(
-        Spring.bouncy.copyWith(durationSeconds: .8, bounce: 0.3),
-      ),
+      motion: CupertinoMotion.bouncy,
     );
 
     return SizedBox.expand(
