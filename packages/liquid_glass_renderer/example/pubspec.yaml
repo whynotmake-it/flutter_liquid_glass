@@ -10,13 +10,13 @@ dependencies:
   flex_color_picker: ^3.7.1
   flutter:
     sdk: flutter
-  flutter_hooks: ^0.20.5
+  flutter_hooks: ^0.21.2
   liquid_glass_renderer:
     path: ../
   heroine: ^0.5.0-dev.3
   rivership: ^0.3.0-dev.3
   smooth_sheets: ^0.12.0
-  springster: ^1.0.0-dev.3
+  motor: ^1.0.0-dev.3
   google_fonts: ^6.2.1
 
 dev_dependencies:
