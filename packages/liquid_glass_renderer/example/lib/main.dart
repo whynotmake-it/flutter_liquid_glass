@@ -40,7 +40,7 @@ class MainApp extends HookWidget {
 
     final userSettings = useValueListenable(settingsNotifier);
 
-    final motion = CupertinoMotion.bouncy;
+    final motion = CupertinoMotion.bouncy();
 
     final flutterLogoThickness = useSingleMotion(
       value: flutterLogoVisible.value ? userSettings.thickness : 0,
@@ -52,7 +52,7 @@ class MainApp extends HookWidget {
 
     final cornerRadius = useSingleMotion(
       value: cornerRadiusNotifier.value,
-      motion: CupertinoMotion.smooth,
+      motion: CupertinoMotion.smooth(),
     );
 
     final colorScheme = ColorScheme.fromSeed(
@@ -113,7 +113,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy,
+                            spring: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
@@ -131,7 +131,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy,
+                            spring: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidRoundedSuperellipse(
@@ -157,7 +157,7 @@ class MainApp extends HookWidget {
                           child: DragDismissable(
                             threshold: double.maxFinite,
                             velocityThreshold: double.maxFinite,
-                            spring: CupertinoMotion.bouncy,
+                            spring: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
                               glassContainsChild: false,
                               shape: LiquidOval(),
@@ -223,7 +223,7 @@ class Background extends HookWidget {
 
     final textThickness = useSingleMotion(
       value: textVisible ? 8 : 0,
-      motion: CupertinoMotion.bouncy,
+      motion: CupertinoMotion.bouncy(),
     );
 
     return SizedBox.expand(

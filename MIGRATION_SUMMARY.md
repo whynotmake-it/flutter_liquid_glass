@@ -34,25 +34,25 @@ motion: SpringMotion(
 
 #### After (using motor):
 ```dart
-final motion = CupertinoMotion.bouncy;
+final motion = CupertinoMotion.bouncy();
 
 // Usage in motion (direct CupertinoMotion)
 motion: motion,
-motion: CupertinoMotion.smooth,
+motion: CupertinoMotion.smooth(),
 
 // Usage in DragDismissable
-spring: CupertinoMotion.bouncy,
+spring: CupertinoMotion.bouncy(),
 
 // Usage in Background class
-motion: CupertinoMotion.bouncy,
+motion: CupertinoMotion.bouncy(),
 ```
 
 ## Key Migration Points
 
-1. **Spring.bouncy** → **CupertinoMotion.bouncy**
-2. **SpringMotion(spring)** → **CupertinoMotion.bouncy** (direct usage)
-3. **Spring.bouncy.copyWith(...)** → **CupertinoMotion.bouncy** (simplified)
-4. **Spring.bouncy.copyWithDamping(...)** → **CupertinoMotion.smooth** (appropriate alternative)
+1. **Spring.bouncy** → **CupertinoMotion.bouncy()** (const constructor)
+2. **SpringMotion(spring)** → **CupertinoMotion.bouncy()** (direct usage)
+3. **Spring.bouncy.copyWith(...)** → **CupertinoMotion.bouncy()** (simplified)
+4. **Spring.bouncy.copyWithDamping(...)** → **CupertinoMotion.smooth()** (appropriate alternative)
 
 ## Files Modified
 - `packages/liquid_glass_renderer/example/lib/main.dart`
@@ -66,6 +66,7 @@ motion: CupertinoMotion.bouncy,
 
 ## Notes
 The migration follows the Motor package's new API where:
-- `CupertinoMotion` provides predefined motion constants matching iOS animations
+- `CupertinoMotion` provides predefined motion const constructors matching iOS animations
 - The API is simplified and more consistent
-- No custom spring parameters needed for most use cases - the predefined constructors cover common scenarios
+- No custom spring parameters needed for most use cases - the predefined const constructors cover common scenarios
+- All CupertinoMotion presets are const constructors that must be called with parentheses: `CupertinoMotion.bouncy()`
