@@ -10,7 +10,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 
   return AlchemistConfig.runWithConfig(
     config: AlchemistConfig(
-      ciGoldensConfig: const CiGoldensConfig(enabled: false),
+      ciGoldensConfig: const CiGoldensConfig(),
       platformGoldensConfig: PlatformGoldensConfig(
         platforms: {HostPlatform.macOS},
       ),
