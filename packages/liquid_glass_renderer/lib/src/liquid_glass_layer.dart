@@ -234,7 +234,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     for (final shapeRender in registeredShapes) {
       if (shapeRender.attached && shapeRender.hasSize) {
         try {
-          // Get transform relative to global coordinates
+          // Get transform relative to global coordinates, since the shader
+          // always covers the whole screen (BackdropFilter)
           final transform = shapeRender.getTransformTo(null);
 
           final rect = MatrixUtils.transformRect(
@@ -291,7 +292,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     for (var i = 0; i < shapeCount; i++) {
       final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex = 14 + (i * 6); // Updated base index after adding uNumShapes
+      final baseIndex =
+          14 + (i * 6); // Updated base index after adding uNumShapes
 
       _shader
         ..setFloat(baseIndex, shape.type.index.toDouble())
@@ -337,12 +339,18 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     List<(RenderLiquidGlass, RawShape)> shapes, {
     required bool glassContainsChild,
   }) {
-    final layerGlobalOffset = localToGlobal(Offset.zero);
-    for (final (render, _) in shapes) {
-      if (render.glassContainsChild == glassContainsChild) {
-        final shapeGlobalOffset = render.localToGlobal(Offset.zero);
-        final relativeOffset = shapeGlobalOffset - layerGlobalOffset;
-        render.paintFromLayer(context, offset + relativeOffset);
+    for (final (ro, _) in shapes) {
+      if (ro.glassContainsChild == glassContainsChild) {
+        // Get the transform from the shape to this layer
+        final transform = ro.getTransformTo(this);
+
+        // Apply the full transform to the painting context
+        context.pushTransform(
+          true,
+          offset,
+          transform,
+          ro.paintFromLayer,
+        );
       }
     }
   }
@@ -352,11 +360,19 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     Offset offset,
     List<(RenderLiquidGlass, RawShape)> shapes,
   ) {
-    final layerGlobalOffset = localToGlobal(Offset.zero);
     for (final (render, _) in shapes) {
-      final shapeGlobalOffset = render.localToGlobal(Offset.zero);
-      final relativeOffset = shapeGlobalOffset - layerGlobalOffset;
-      render.paintBlur(context, offset + relativeOffset, _settings.blur);
+      // Get the transform from the shape to this layer
+      final transform = render.getTransformTo(this);
+
+      // Apply the full transform to the painting context for blur
+      context.pushTransform(
+        true,
+        offset,
+        transform,
+        (context, offset) {
+          render.paintBlur(context, offset, _settings.blur);
+        },
+      );
     }
   }
 }
