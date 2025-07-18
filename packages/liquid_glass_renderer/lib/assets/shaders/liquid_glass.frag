@@ -35,12 +35,12 @@ layout(location = 8) uniform float uLightIntensity = 1.0;
 layout(location = 9) uniform float uAmbientStrength = 0.1;
 layout(location = 10) uniform float uThickness;
 layout(location = 11) uniform float uRefractiveIndex = 1.2;
+layout(location = 12) uniform float uBlend;
 
 // Shape array uniforms - 5 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 // With 30 uniform limit, we can fit 3 shapes (18 floats) plus other uniforms
-#define MAX_SHAPES 3
-layout(location = 12) uniform float uShapeData[18]; // 3 shapes * 6 floats each
-layout(location = 30) uniform float uBlend;
+#define MAX_SHAPES 64
+layout(location = 13) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;

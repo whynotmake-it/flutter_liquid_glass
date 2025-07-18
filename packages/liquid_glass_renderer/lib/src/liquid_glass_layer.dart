@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -22,10 +23,7 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of three shapes are supported per layer at the moment.
-/// >
-/// > This limit is due to Flutter's 30 uniform limit for shaders. Future
-/// > optimizations may allow for more shapes by using more efficient data packing.
+/// > A maximum of 10 shapes are supported per layer at the moment.
 ///
 /// ## Example
 ///
@@ -145,7 +143,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
 }
 
 /// Maximum number of shapes supported per layer due to Flutter's uniform limit
-const int _maxShapesPerLayer = 3;
+const int _maxShapesPerLayer = 64;
 
 @internal
 class RenderLiquidGlassLayer extends RenderProxyBox {
@@ -208,7 +206,9 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
   void registerShape(RenderLiquidGlass shape) {
     if (registeredShapes.length >= _maxShapesPerLayer) {
-      throw UnsupportedError('Only $_maxShapesPerLayer shapes are supported at the moment!');
+      throw UnsupportedError(
+        'Only $_maxShapesPerLayer shapes are supported at the moment!',
+      );
     }
     registeredShapes.add(shape);
     layerRegistry[shape] = this;
@@ -283,13 +283,15 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(8, _settings.lightIntensity)
       ..setFloat(9, _settings.ambientStrength)
       ..setFloat(10, _settings.thickness)
-      ..setFloat(11, _settings.refractiveIndex); // refractive index
+      ..setFloat(11, _settings.refractiveIndex)
+      ..setFloat(12, _settings.blend * _devicePixelRatio);
 
-    // Populate shape array - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
-    for (int i = 0; i < _maxShapesPerLayer; i++) {
+    final shapeCount = min(_maxShapesPerLayer, shapes.length);
+
+    for (var i = 0; i < shapeCount; i++) {
       final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex = 12 + (i * 6);
-      
+      final baseIndex = 13 + (i * 6);
+
       _shader
         ..setFloat(baseIndex, shape.type.index.toDouble())
         ..setFloat(baseIndex + 1, shape.center.dx * _devicePixelRatio)
@@ -298,8 +300,6 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         ..setFloat(baseIndex + 4, shape.size.height * _devicePixelRatio)
         ..setFloat(baseIndex + 5, shape.cornerRadius * _devicePixelRatio);
     }
-
-    _shader.setFloat(30, _settings.blend * _devicePixelRatio);
 
     _paintShapeBlurs(context, offset, shapes);
 
