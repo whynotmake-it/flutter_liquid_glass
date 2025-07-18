@@ -36,37 +36,10 @@ layout(location = 9) uniform float uAmbientStrength = 0.1;
 layout(location = 10) uniform float uThickness;
 layout(location = 11) uniform float uRefractiveIndex = 1.2;
 
-// Shape uniforms
-layout(location = 12) uniform float uShape1Type;
-layout(location = 13) uniform float uShape1CenterX;
-layout(location = 14) uniform float uShape1CenterY;
-layout(location = 15) uniform float uShape1SizeW;
-layout(location = 16) uniform float uShape1SizeH;
-layout(location = 17) uniform float uShape1CornerRadius;
-
-vec2 uShape1Center = vec2(uShape1CenterX, uShape1CenterY);
-vec2 uShape1Size = vec2(uShape1SizeW, uShape1SizeH);
-
-layout(location = 18) uniform float uShape2Type;
-layout(location = 19) uniform float uShape2CenterX;
-layout(location = 20) uniform float uShape2CenterY;
-layout(location = 21) uniform float uShape2SizeW;
-layout(location = 22) uniform float uShape2SizeH;
-layout(location = 23) uniform float uShape2CornerRadius;
-
-vec2 uShape2Center = vec2(uShape2CenterX, uShape2CenterY);
-vec2 uShape2Size = vec2(uShape2SizeW, uShape2SizeH);
-
-layout(location = 24) uniform float uShape3Type;
-layout(location = 25) uniform float uShape3CenterX;
-layout(location = 26) uniform float uShape3CenterY;
-layout(location = 27) uniform float uShape3SizeW;
-layout(location = 28) uniform float uShape3SizeH;
-layout(location = 29) uniform float uShape3CornerRadius;
-
-vec2 uShape3Center = vec2(uShape3CenterX, uShape3CenterY);
-vec2 uShape3Size = vec2(uShape3SizeW, uShape3SizeH);
-
+// Shape array uniforms - 5 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
+// With 30 uniform limit, we can fit 3 shapes (18 floats) plus other uniforms
+#define MAX_SHAPES 3
+layout(location = 12) uniform float uShapeData[18]; // 3 shapes * 6 floats each
 layout(location = 30) uniform float uBlend;
 
 uniform sampler2D uBackgroundTexture;
@@ -131,11 +104,29 @@ float getShapeSDF(float type, vec2 p, vec2 center, vec2 size, float r) {
     return 1e9; // none
 }
 
+float getShapeSDFFromArray(int index, vec2 p) {
+    int baseIndex = index * 6;
+    float type = uShapeData[baseIndex];
+    vec2 center = vec2(uShapeData[baseIndex + 1], uShapeData[baseIndex + 2]);
+    vec2 size = vec2(uShapeData[baseIndex + 3], uShapeData[baseIndex + 4]);
+    float cornerRadius = uShapeData[baseIndex + 5];
+    
+    return getShapeSDF(type, p, center, size, cornerRadius);
+}
+
 float sceneSDF(vec2 p) {
-    float d1 = getShapeSDF(uShape1Type, p, uShape1Center, uShape1Size, uShape1CornerRadius);
-    float d2 = getShapeSDF(uShape2Type, p, uShape2Center, uShape2Size, uShape2CornerRadius);
-    float d3 = getShapeSDF(uShape3Type, p, uShape3Center, uShape3Size, uShape3CornerRadius);
-    return smoothUnion(smoothUnion(d1, d2, uBlend), d3, uBlend);
+    float result = 1e9;
+    
+    for (int i = 0; i < MAX_SHAPES; i++) {
+        float shapeSDF = getShapeSDFFromArray(i, p);
+        if (i == 0) {
+            result = shapeSDF;
+        } else {
+            result = smoothUnion(result, shapeSDF, uBlend);
+        }
+    }
+    
+    return result;
 }
 
 // Calculate 3D normal using derivatives (shader-specific normal calculation)

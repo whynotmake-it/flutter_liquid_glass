@@ -22,9 +22,10 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of two shapes are supported per layer at the moment.
+/// > A maximum of three shapes are supported per layer at the moment.
 /// >
-/// > This will likely increase to at least four in the future.
+/// > This limit is due to Flutter's 30 uniform limit for shaders. Future
+/// > optimizations may allow for more shapes by using more efficient data packing.
 ///
 /// ## Example
 ///
@@ -143,6 +144,9 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   }
 }
 
+/// Maximum number of shapes supported per layer due to Flutter's uniform limit
+const int _maxShapesPerLayer = 3;
+
 @internal
 class RenderLiquidGlassLayer extends RenderProxyBox {
   RenderLiquidGlassLayer({
@@ -203,8 +207,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   Ticker? _ticker;
 
   void registerShape(RenderLiquidGlass shape) {
-    if (registeredShapes.length >= 3) {
-      throw UnsupportedError('Only three shapes are supported at the moment!');
+    if (registeredShapes.length >= _maxShapesPerLayer) {
+      throw UnsupportedError('Only $_maxShapesPerLayer shapes are supported at the moment!');
     }
     registeredShapes.add(shape);
     layerRegistry[shape] = this;
@@ -269,10 +273,6 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       return;
     }
 
-    final shape1 = shapes.firstOrNull?.$2 ?? RawShape.none;
-    final shape2 = shapes.length > 1 ? shapes.elementAt(1).$2 : RawShape.none;
-    final shape3 = shapes.length > 2 ? shapes.elementAt(2).$2 : RawShape.none;
-
     _shader
       ..setFloat(2, _settings.chromaticAberration)
       ..setFloat(3, _settings.glassColor.r)
@@ -283,28 +283,23 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(8, _settings.lightIntensity)
       ..setFloat(9, _settings.ambientStrength)
       ..setFloat(10, _settings.thickness)
-      ..setFloat(11, _settings.refractiveIndex) // refractive index
+      ..setFloat(11, _settings.refractiveIndex); // refractive index
 
-      // Shape uniforms
-      ..setFloat(12, shape1.type.index.toDouble())
-      ..setFloat(13, shape1.center.dx * _devicePixelRatio)
-      ..setFloat(14, shape1.center.dy * _devicePixelRatio)
-      ..setFloat(15, shape1.size.width * _devicePixelRatio)
-      ..setFloat(16, shape1.size.height * _devicePixelRatio)
-      ..setFloat(17, shape1.cornerRadius * _devicePixelRatio)
-      ..setFloat(18, shape2.type.index.toDouble())
-      ..setFloat(19, shape2.center.dx * _devicePixelRatio)
-      ..setFloat(20, shape2.center.dy * _devicePixelRatio)
-      ..setFloat(21, shape2.size.width * _devicePixelRatio)
-      ..setFloat(22, shape2.size.height * _devicePixelRatio)
-      ..setFloat(23, shape2.cornerRadius * _devicePixelRatio)
-      ..setFloat(24, shape3.type.index.toDouble())
-      ..setFloat(25, shape3.center.dx * _devicePixelRatio)
-      ..setFloat(26, shape3.center.dy * _devicePixelRatio)
-      ..setFloat(27, shape3.size.width * _devicePixelRatio)
-      ..setFloat(28, shape3.size.height * _devicePixelRatio)
-      ..setFloat(29, shape3.cornerRadius * _devicePixelRatio)
-      ..setFloat(30, _settings.blend * _devicePixelRatio);
+    // Populate shape array - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
+    for (int i = 0; i < _maxShapesPerLayer; i++) {
+      final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
+      final baseIndex = 12 + (i * 6);
+      
+      _shader
+        ..setFloat(baseIndex, shape.type.index.toDouble())
+        ..setFloat(baseIndex + 1, shape.center.dx * _devicePixelRatio)
+        ..setFloat(baseIndex + 2, shape.center.dy * _devicePixelRatio)
+        ..setFloat(baseIndex + 3, shape.size.width * _devicePixelRatio)
+        ..setFloat(baseIndex + 4, shape.size.height * _devicePixelRatio)
+        ..setFloat(baseIndex + 5, shape.cornerRadius * _devicePixelRatio);
+    }
+
+    _shader.setFloat(30, _settings.blend * _devicePixelRatio);
 
     _paintShapeBlurs(context, offset, shapes);
 
