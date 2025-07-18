@@ -178,8 +178,23 @@ class RenderGlassify extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    // Calculate global position for the shader
+    var globalOffset = offset;
+    try {
+      final transform = getTransformTo(null);
+      final globalRect = MatrixUtils.transformRect(
+        transform,
+        Offset.zero & size,
+      );
+      globalOffset = globalRect.topLeft;
+    } catch (e) {
+      // Fallback to the provided offset if transform calculation fails
+      debugPrint('Failed to calculate global transform for Glassify: $e');
+    }
+
     layer ??= _GlassifyShaderLayer(
       offset: offset,
+      globalOffset: globalOffset,
       shader: _shader,
       settings: _settings,
       devicePixelRatio: _devicePixelRatio,
@@ -187,6 +202,7 @@ class RenderGlassify extends RenderProxyBox {
     );
     layer!
       ..offset = offset
+      ..globalOffset = globalOffset
       ..shader = _shader
       ..settings = _settings
       ..devicePixelRatio = _devicePixelRatio
@@ -198,6 +214,17 @@ class RenderGlassify extends RenderProxyBox {
       },
       offset,
     );
+  }
+
+  @override
+  void markNeedsLayout() {
+    super.markNeedsLayout();
+    // Clear the layer to force rebuilding when layout changes
+    // This ensures that transform changes are properly handled
+    if (layer != null) {
+      layer = null;
+      markNeedsPaint();
+    }
   }
 
   @override
@@ -218,10 +245,12 @@ class _GlassifyShaderLayer extends OffsetLayer {
     required double devicePixelRatio,
     required Size layerSize,
     required super.offset,
+    required Offset globalOffset,
   })  : _shader = shader,
         _settings = settings,
         _devicePixelRatio = devicePixelRatio,
-        _layerSize = layerSize;
+        _layerSize = layerSize,
+        _globalOffset = globalOffset;
 
   FragmentShader _shader;
   FragmentShader get shader => _shader;
@@ -252,6 +281,14 @@ class _GlassifyShaderLayer extends OffsetLayer {
   set layerSize(Size value) {
     if (_layerSize == value) return;
     _layerSize = value;
+    markNeedsAddToScene();
+  }
+
+  Offset _globalOffset;
+  Offset get globalOffset => _globalOffset;
+  set globalOffset(Offset value) {
+    if (_globalOffset == value) return;
+    _globalOffset = value;
     markNeedsAddToScene();
   }
 
@@ -342,6 +379,8 @@ class _GlassifyShaderLayer extends OffsetLayer {
   }
 
   void _setupShaderUniforms() {
+    // Since BackdropFilter operates in global coordinate space,
+    // we need to pass the global offset to the shader
     shader
       ..setImageSampler(1, childImage!) // uForegroundTexture
       ..setImageSampler(2, childBlurredImage!) // uForegroundBlurredTexture
@@ -357,8 +396,8 @@ class _GlassifyShaderLayer extends OffsetLayer {
       ..setFloat(11, settings.ambientStrength)
       ..setFloat(12, settings.thickness)
       ..setFloat(13, settings.refractiveIndex)
-      ..setFloat(14, offset.dx * devicePixelRatio)
-      ..setFloat(15, offset.dy * devicePixelRatio)
+      ..setFloat(14, globalOffset.dx * devicePixelRatio)
+      ..setFloat(15, globalOffset.dy * devicePixelRatio)
       ..setFloat(16, settings.blur);
   }
 

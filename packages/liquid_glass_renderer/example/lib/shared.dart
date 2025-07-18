@@ -14,6 +14,49 @@ Animation<double> useRotatingAnimationController() {
   )..repeat();
 }
 
+class VerticalStripes extends StatelessWidget {
+  const VerticalStripes({super.key, this.stripeThickness = 40.0});
+
+  final double stripeThickness;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _VerticalStripesPainter(stripeThickness: stripeThickness),
+      size: Size.infinite,
+    );
+  }
+}
+
+class _VerticalStripesPainter extends CustomPainter {
+  const _VerticalStripesPainter({required this.stripeThickness});
+
+  final double stripeThickness;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final blackPaint = Paint()..color = Colors.black;
+    final whitePaint = Paint()..color = Colors.white;
+
+    double currentX = 0;
+    bool isBlack = true;
+
+    while (currentX < size.width) {
+      final rect = Rect.fromLTWH(currentX, 0, stripeThickness, size.height);
+
+      canvas.drawRect(rect, isBlack ? blackPaint : whitePaint);
+
+      currentX += stripeThickness;
+      isBlack = !isBlack;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VerticalStripesPainter oldDelegate) {
+    return oldDelegate.stripeThickness != stripeThickness;
+  }
+}
+
 class ImagePageView extends HookWidget {
   const ImagePageView({super.key, required this.child});
 
@@ -28,6 +71,7 @@ class ImagePageView extends HookWidget {
             return switch (index) {
               <= 0 => Image.asset('assets/wallpaper.webp', fit: BoxFit.cover),
               1 => const Grid(),
+              2 => const VerticalStripes(),
               _ => LayoutBuilder(
                 builder: (context, constraints) => Image.network(
                   'https://picsum.photos/2000/2000?random=$index',
@@ -84,9 +128,9 @@ class SettingsSheet extends HookWidget {
           settings: LiquidGlassSettings(
             thickness: 30,
             blur: 20,
-            lightIntensity: .2,
+            lightIntensity: .5,
             lightAngle: lightAngle,
-            ambientStrength: 2,
+            ambientStrength: .5,
             chromaticAberration: 2,
             glassColor: Theme.of(
               context,

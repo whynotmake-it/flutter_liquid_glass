@@ -177,7 +177,31 @@ vec3 calculateLighting(
     return totalRimLight * thicknessFactor;
 }
 
-// Calculate refraction with chromatic aberration and optional blur
+// Calculate wavelength-dependent refractive index using enhanced Cauchy dispersion formula
+// This simulates how real glass disperses light based on wavelength with stronger separation
+float calculateDispersiveIndex(float baseIndex, float chromaticAberration, float wavelength) {
+    if (chromaticAberration < 0.001) {
+        return baseIndex;
+    }
+    
+    // Enhanced Cauchy dispersion formula: n(λ) = A + B/λ² + C/λ⁴
+    // Using both quadratic and quartic terms for stronger dispersion
+    
+    // Typical wavelengths in micrometers: Red ~0.65, Green ~0.55, Blue ~0.45
+    float wavelengthSq = wavelength * wavelength;
+    float wavelengthQuad = wavelengthSq * wavelengthSq;
+    
+    // Enhanced dispersion coefficients for stronger chromatic aberration
+    // B coefficient (quadratic term) - primary dispersion
+    float B = chromaticAberration * 0.08 * (baseIndex - 1.0);
+    
+    // C coefficient (quartic term) - secondary dispersion for stronger blue separation
+    float C = chromaticAberration * 0.003 * (baseIndex - 1.0);
+    
+    return baseIndex + B / wavelengthSq + C / wavelengthQuad;
+}
+
+// Calculate refraction with physically-based chromatic aberration and optional blur
 vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickness, float refractiveIndex, float chromaticAberration, vec2 uSize, sampler2D backgroundTexture, float blurRadius, out vec2 refractionDisplacement) {
     float baseHeight = thickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
@@ -185,12 +209,13 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
     vec4 refractColor;
     vec2 texelSize = 1.0 / uSize;
 
-    // To simulate a prism, we calculate refraction separately for each color channel
-    // by slightly varying the refractive index.
+    // Use physically-based dispersion for chromatic aberration
     if (chromaticAberration > 0.001) {
-        float iorR = refractiveIndex - chromaticAberration * 0.04; // Less deviation for red
-        float iorG = refractiveIndex;
-        float iorB = refractiveIndex + chromaticAberration * 0.08; // More deviation for blue
+        // Calculate wavelength-dependent refractive indices with enhanced separation
+        // Using optimized wavelengths for stronger dispersion effect
+        float iorR = calculateDispersiveIndex(refractiveIndex, chromaticAberration, 0.68); // Red - longer wavelength
+        float iorG = calculateDispersiveIndex(refractiveIndex, chromaticAberration, 0.55); // Green - reference
+        float iorB = calculateDispersiveIndex(refractiveIndex, chromaticAberration, 0.42); // Blue - shorter wavelength
 
         // Red channel
         vec3 refractVecR = refract(incident, normal, 1.0 / iorR);
