@@ -23,7 +23,7 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of 10 shapes are supported per layer at the moment.
+/// > A maximum of 64 shapes are supported per layer at the moment.
 ///
 /// ## Example
 ///
@@ -273,6 +273,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       return;
     }
 
+    final shapeCount = min(_maxShapesPerLayer, shapes.length);
+
     _shader
       ..setFloat(2, _settings.chromaticAberration)
       ..setFloat(3, _settings.glassColor.r)
@@ -284,13 +286,12 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(9, _settings.ambientStrength)
       ..setFloat(10, _settings.thickness)
       ..setFloat(11, _settings.refractiveIndex)
-      ..setFloat(12, _settings.blend * _devicePixelRatio);
-
-    final shapeCount = min(_maxShapesPerLayer, shapes.length);
+      ..setFloat(12, _settings.blend * _devicePixelRatio)
+      ..setFloat(13, shapeCount.toDouble()); // Number of active shapes
 
     for (var i = 0; i < shapeCount; i++) {
       final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex = 13 + (i * 6);
+      final baseIndex = 14 + (i * 6); // Updated base index after adding uNumShapes
 
       _shader
         ..setFloat(baseIndex, shape.type.index.toDouble())

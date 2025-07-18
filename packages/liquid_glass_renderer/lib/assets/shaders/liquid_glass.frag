@@ -36,11 +36,11 @@ layout(location = 9) uniform float uAmbientStrength = 0.1;
 layout(location = 10) uniform float uThickness;
 layout(location = 11) uniform float uRefractiveIndex = 1.2;
 layout(location = 12) uniform float uBlend;
+layout(location = 13) uniform float uNumShapes;
 
-// Shape array uniforms - 5 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
-// With 30 uniform limit, we can fit 3 shapes (18 floats) plus other uniforms
+// Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 #define MAX_SHAPES 64
-layout(location = 13) uniform float uShapeData[MAX_SHAPES * 6];
+layout(location = 14) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
@@ -115,15 +115,16 @@ float getShapeSDFFromArray(int index, vec2 p) {
 }
 
 float sceneSDF(vec2 p) {
-    float result = 1e9;
+    int numShapes = int(uNumShapes);
+    if (numShapes == 0) {
+        return 1e9;
+    }
     
-    for (int i = 0; i < MAX_SHAPES; i++) {
+    float result = getShapeSDFFromArray(0, p);
+    
+    for (int i = 1; i < numShapes; i++) {
         float shapeSDF = getShapeSDFFromArray(i, p);
-        if (i == 0) {
-            result = shapeSDF;
-        } else {
-            result = smoothUnion(result, shapeSDF, uBlend);
-        }
+        result = smoothUnion(result, shapeSDF, uBlend);
     }
     
     return result;
