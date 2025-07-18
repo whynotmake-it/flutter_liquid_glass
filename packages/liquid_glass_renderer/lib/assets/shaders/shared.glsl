@@ -133,52 +133,48 @@ float getHeight(float sd, float thickness) {
 }
 
 // Calculate lighting effects based on displacement data
-vec3 calculateLighting(vec2 uv, vec3 normal, float height, vec2 refractionDisplacement, float thickness, float lightAngle, float lightIntensity, float ambientStrength, vec3 backgroundColor) {
-    // Basic shape mask
-    float normalizedHeight = thickness > 0.0 ? height / thickness : 0.0;
-    float shape = smoothstep(0.0, 0.9, 1.0 - normalizedHeight);
-
-    // If we're outside the shape, no lighting.
-    if (shape < 0.01) {
+vec3 calculateLighting(
+    vec2 uv, 
+    vec3 normal, 
+    float sd, 
+    float thickness, 
+    float lightAngle, 
+    float lightIntensity, 
+    float ambientStrength, 
+    vec3 backgroundColor
+) {
+    // Smoothly fade in the entire lighting effect based on thickness
+    float thicknessFactor = smoothstep(5.0, 7.0, thickness);
+    if (thicknessFactor < 0.01) {
         return vec3(0.0);
     }
-    
-    vec3 viewDir = vec3(0.0, 0.0, 1.0);
 
-    // --- Rim lighting (Fresnel) ---
-    // This creates a constant, soft outline using smart color selection
-    float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
-    vec3 rimHighlightColor = getHighlightColor(backgroundColor, 0.4);
-    vec3 rimLight = rimHighlightColor * fresnel * ambientStrength * 0.5;
+    // --- Rim lighting ---
+    float rimWidth = 3.0; // Controls the sigma of the gaussian for the rim light width.
+    float rimFactor = exp(-sd * sd / (2.0 * rimWidth * rimWidth)); // Gaussian falloff from the edge
 
-    // --- Light-dependent effects ---
-    vec3 lightDir = normalize(vec3(cos(lightAngle), sin(lightAngle), -0.7));
-    vec3 oppositeLightDir = normalize(vec3(-lightDir.xy, lightDir.z));
+    vec2 lightDir2D = vec2(cos(lightAngle), sin(lightAngle));
+    // We use normal.xy which represents the direction on the screen plane.
+    float mainLightInfluence = max(0.0, dot(normalize(normal.xy), lightDir2D));
 
-    // Common vectors needed for both light sources
-    vec3 halfwayDir1 = normalize(lightDir + viewDir);
-    float specDot1 = max(0.0, dot(normal, halfwayDir1));
-    vec3 halfwayDir2 = normalize(oppositeLightDir + viewDir);
-    float specDot2 = max(0.0, dot(normal, halfwayDir2));
+    // Add a secondary, weaker light from the opposite direction.
+    float oppositeLightInfluence = max(0.0, dot(normalize(normal.xy), -lightDir2D));
 
-    // 1. Sharp surface glint using smart color selection
-    float glintExponent = mix(4.0, 8.0, smoothstep(1.0, 25.0, thickness));
-    float sharpFactor = pow(specDot1, glintExponent) + 0.4 * pow(specDot2, glintExponent);
+    // Increase strength of opposite light
+    float totalInfluence = mainLightInfluence + oppositeLightInfluence * 0.8;
 
-    // Get highlight color based on background brightness and saturation
-    vec3 glintHighlightColor = getHighlightColor(backgroundColor, 0.7);
-    vec3 sharpGlint = glintHighlightColor * sharpFactor * lightIntensity * 2.0;
+    vec3 highlightColor = getHighlightColor(backgroundColor, 0.7);
 
-    // 2. Soft internal bleed using smart color selection
-    float softFactor = pow(specDot1, 8.0) + 0.5 * pow(specDot2, 10.0);
-    vec3 softHighlightColor = getHighlightColor(backgroundColor, 0.5);
-    vec3 softBleed = softHighlightColor * softFactor * lightIntensity * 0.4;
-    
-    // Combine lighting components
-    vec3 lighting = rimLight + sharpGlint + softBleed;
+    // Directional component. Increased brightness.
+    vec3 directionalRim = highlightColor * pow(totalInfluence, 2.0) * lightIntensity * 2.0;
 
-    // Final combination
-    return lighting * shape;
+    // Ambient component for the rim (from all sides)
+    vec3 ambientRim = getHighlightColor(backgroundColor, 0.4) * ambientStrength;
+
+    // Combine directional and ambient rim light, and apply rim falloff
+    vec3 totalRimLight = (directionalRim + ambientRim) * rimFactor;
+
+    return totalRimLight * thicknessFactor;
 }
 
 // Calculate refraction with chromatic aberration and optional blur
@@ -286,7 +282,7 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     vec4 backgroundColor = texture(backgroundTexture, screenUV);
     
     // Calculate lighting effects using background color
-    vec3 lighting = calculateLighting(screenUV, normal, height, refractionDisplacement, thickness, lightAngle, lightIntensity, ambientStrength, backgroundColor.rgb);
+    vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, lightAngle, lightIntensity, ambientStrength, backgroundColor.rgb);
     
     // Apply realistic glass color influence
     vec4 finalColor = applyGlassColor(liquidColor, glassColor);
