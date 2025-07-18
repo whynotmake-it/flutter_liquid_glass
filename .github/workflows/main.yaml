@@ -11,6 +11,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   semantic_pull_request:
