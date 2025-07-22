@@ -1,3 +1,7 @@
+## 0.1.1-dev.10
+
+ - **FEAT**: specular highlights now take the background color into account (#43).
+
 ## 0.1.1-dev.9
 
  - **DOCS**: fix errors in README (#31).
