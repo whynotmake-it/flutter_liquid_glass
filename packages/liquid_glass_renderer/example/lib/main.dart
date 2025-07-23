@@ -130,7 +130,7 @@ class MainApp extends HookWidget {
                             velocityThreshold: double.maxFinite,
                             motion: CupertinoMotion.bouncy(),
                             child: LiquidGlass.inLayer(
-                              glassContainsChild: true,
+                              glassContainsChild: false,
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: Radius.circular(cornerRadius),
                               ),
