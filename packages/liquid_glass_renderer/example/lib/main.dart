@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -14,10 +12,9 @@ void main() {
 
 final settingsNotifier = ValueNotifier<LiquidGlassSettings>(
   LiquidGlassSettings(
-    thickness: 20,
-    lightAngle: 0.5 * pi,
-    blend: 50,
-    chromaticAberration: 1,
+    ambientStrength: 0,
+    chromaticAberration: 0,
+    lightIntensity: 0,
   ),
 );
 

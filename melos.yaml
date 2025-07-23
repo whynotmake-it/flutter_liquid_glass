@@ -52,8 +52,21 @@ scripts:
     run: melos run coverage:select --no-select
     description: Generate coverage for all packages.
 
-  test-without-goldens:select:
-    run: flutter test --enable-impeller --exclude-tags=golden
+  update-goldens:select:
+    run: flutter test --enable-impeller --update-goldens
+    exec:
+      failFast: true
+      concurrency: 6
+    packageFilters:
+      dirExists: test
+    description: Update golden files for the selected packages.
+
+  update-goldens:
+    run: melos run update-goldens:select --no-select
+    description: Update golden files for all packages.
+
+  test-without-snaptests:select:
+    run: flutter test --enable-impeller --exclude-tags=snaptest
     exec:
       failFast: true
       concurrency: 6
@@ -61,7 +74,7 @@ scripts:
       dirExists: test
     description: Run `flutter test` for selected packages without golden tests.
 
-  test-without-goldens:
+  test-without-snaptests:
     run: melos run test-without-goldens:select --no-select
     description: Run all tests in this project without golden tests.
   

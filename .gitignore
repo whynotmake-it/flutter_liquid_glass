@@ -30,3 +30,6 @@ pubspec_overrides.yaml
 
 # FVM Version Cache
 .fvm/
+
+# Snaptest
+.snaptest/
