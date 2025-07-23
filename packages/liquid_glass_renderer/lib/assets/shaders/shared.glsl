@@ -259,6 +259,21 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
     return refractColor;
 }
 
+// Apply saturation and lightness adjustments to a color
+vec3 applySaturationLightness(vec3 color, float saturation, float lightness) {
+    // Convert to HSL-like adjustments
+    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+    
+    // Apply saturation adjustment (1.0 = no change)
+    vec3 saturatedColor = mix(vec3(luminance), color, saturation);
+    
+    // Apply lightness adjustment (1.0 = no change)
+    // Values > 1.0 brighten, values < 1.0 darken
+    vec3 adjustedColor = saturatedColor * lightness;
+    
+    return clamp(adjustedColor, 0.0, 1.0);
+}
+
 // Apply glass color tinting to the liquid color
 vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
     vec4 finalColor = liquidColor;
@@ -283,7 +298,7 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 }
 
 // Complete liquid glass rendering pipeline
-vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, float lightAngle, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur) {
+vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, float lightAngle, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation, float lightness) {
     // If we're completely outside the glass area (with smooth transition)
     if (foregroundAlpha < 0.001) {
         return texture(backgroundTexture, screenUV);
@@ -299,6 +314,9 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     // Calculate refraction & chromatic aberration with blur applied to the sampling
     vec2 refractionDisplacement;
     vec4 refractColor = calculateRefraction(screenUV, normal, height, thickness, refractiveIndex, chromaticAberration, uSize, backgroundTexture, gaussianBlur, refractionDisplacement);
+    
+    // Apply saturation and lightness adjustments to the refracted background
+    refractColor.rgb = applySaturationLightness(refractColor.rgb, saturation, lightness);
     
     // Mix refraction and reflection based on normal.z
     vec4 liquidColor = refractColor;

@@ -37,10 +37,12 @@ layout(location = 10) uniform float uThickness;
 layout(location = 11) uniform float uRefractiveIndex = 1.2;
 layout(location = 12) uniform float uBlend;
 layout(location = 13) uniform float uNumShapes;
+layout(location = 14) uniform float uSaturation;
+layout(location = 15) uniform float uLightness;
 
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 #define MAX_SHAPES 64
-layout(location = 14) uniform float uShapeData[MAX_SHAPES * 6];
+layout(location = 16) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
@@ -172,7 +174,9 @@ void main() {
         uBackgroundTexture, 
         normal,
         foregroundAlpha,
-        0.0
+        0.0,
+        uSaturation,
+        uLightness
     );
     
     // Apply debug normals visualization using shared function

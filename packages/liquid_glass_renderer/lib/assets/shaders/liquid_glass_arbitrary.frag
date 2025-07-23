@@ -40,11 +40,12 @@ layout(location = 14) uniform float uOffsetX;
 layout(location = 15) uniform float uOffsetY;
 vec2 uOffset = vec2(uOffsetX, uOffsetY);
 
-// New uniform for normal calculation method selection
-layout(location = 16) uniform float uNormalMethod; // 0.0 = center-based, 1.0 = reconstructed
+// Saturation and lightness uniforms
+layout(location = 16) uniform float uSaturation = 1.0;
+layout(location = 17) uniform float uLightness = 1.0;
 
 // Gaussian blur uniform
-layout(location = 17) uniform float uGaussianBlur;
+layout(location = 18) uniform float uGaussianBlur;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uForegroundTexture;
@@ -220,7 +221,9 @@ void main() {
         uBackgroundTexture, 
         normal,
         foregroundColor.a,
-        uGaussianBlur
+        uGaussianBlur,
+        uSaturation,
+        uLightness
     );
     
     // Apply debug normals visualization using shared function

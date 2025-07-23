@@ -288,12 +288,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(10, _settings.thickness)
       ..setFloat(11, _settings.refractiveIndex)
       ..setFloat(12, _settings.blend * _devicePixelRatio)
-      ..setFloat(13, shapeCount.toDouble()); // Number of active shapes
+      ..setFloat(13, shapeCount.toDouble())
+      ..setFloat(14, _settings.saturation)
+      ..setFloat(15, _settings.lightness);
 
     for (var i = 0; i < shapeCount; i++) {
       final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex =
-          14 + (i * 6); // Updated base index after adding uNumShapes
+      final baseIndex = 16 + (i * 6);
 
       _shader
         ..setFloat(baseIndex, shape.type.index.toDouble())
