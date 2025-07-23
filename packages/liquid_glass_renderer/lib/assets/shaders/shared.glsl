@@ -315,9 +315,6 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     vec2 refractionDisplacement;
     vec4 refractColor = calculateRefraction(screenUV, normal, height, thickness, refractiveIndex, chromaticAberration, uSize, backgroundTexture, gaussianBlur, refractionDisplacement);
     
-    // Apply saturation and lightness adjustments to the refracted background
-    refractColor.rgb = applySaturationLightness(refractColor.rgb, saturation, lightness);
-    
     // Mix refraction and reflection based on normal.z
     vec4 liquidColor = refractColor;
     
@@ -332,6 +329,9 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     
     // Add lighting effects to final color
     finalColor.rgb += lighting;
+    
+    // Apply saturation and lightness adjustments to the final color after tinting
+    finalColor.rgb = applySaturationLightness(finalColor.rgb, saturation, lightness);
     
     // Use alpha for smooth transition at boundaries
     return mix(backgroundColor, finalColor, foregroundAlpha);
