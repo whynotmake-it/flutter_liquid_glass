@@ -33,7 +33,7 @@ jobs:
       - name: Ⓜ️ Set up Melos
         uses: bluefireteam/melos-action@v3
         with:
-          run-versioning: ${{ inputs.prerelease == false }}
+          run-versioning: ${{ inputs.prerelease == false && inputs.graduate == false }}
           run-versioning-prerelease: ${{ inputs.prerelease == true }}
           run-versioning-graduate: ${{ inputs.graduate == true }}
           publish-dry-run: true
