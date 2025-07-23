@@ -1,6 +1,6 @@
 name: apple_liquid_glass
 description: Liquid Glass Implementation according to Apple's Guidelines
-version: 0.1.0-dev.10
+version: 0.1.0-dev.11
 
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/apple_liquid_glass
@@ -12,7 +12,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  liquid_glass_renderer: ^0.1.1-dev.9
+  liquid_glass_renderer: ^0.1.1-dev.10
 
 dev_dependencies:
   flutter_test:
