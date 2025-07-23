@@ -1,3 +1,14 @@
+## 0.1.1-dev.10
+
+> Note: This release has breaking changes.
+
+ - **REFACTOR**: move shader to uniform arrays for better shape support.
+ - **FIX**: transform children of liquid glass correctly.
+ - **FEAT**: better light dispersion.
+ - **FEAT**: support up to 64 shapes per layer.
+ - **FEAT**: specular highlights now take the background color into account (#43).
+ - **BREAKING** **FEAT**: cheat lighting that is independent from thickness.
+
 ## 0.1.1-dev.9
 
  - **DOCS**: fix errors in README (#31).
