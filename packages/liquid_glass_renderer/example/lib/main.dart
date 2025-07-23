@@ -122,7 +122,6 @@ class MainApp extends HookWidget {
                             ),
                           ),
                         ),
-
                         Align(
                           alignment: Alignment.topRight,
                           child: DragDismissable(
