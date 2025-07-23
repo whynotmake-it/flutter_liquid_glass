@@ -143,6 +143,18 @@ vec3 calculateLighting(
     float ambientStrength, 
     vec3 backgroundColor
 ) {
+    // Calculate height from sd to get proper shape mask
+    float height = getHeight(sd, thickness);
+    
+    // Basic shape mask (restored from old version)
+    float normalizedHeight = thickness > 0.0 ? height / thickness : 0.0;
+    float shape = smoothstep(0.0, 0.9, 1.0 - normalizedHeight);
+
+    // If we're outside the shape, no lighting.
+    if (shape < 0.01) {
+        return vec3(0.0);
+    }
+
     // Smoothly fade in the entire lighting effect based on thickness
     float thicknessFactor = smoothstep(5.0, 7.0, thickness);
     if (thicknessFactor < 0.01) {
@@ -174,7 +186,8 @@ vec3 calculateLighting(
     // Combine directional and ambient rim light, and apply rim falloff
     vec3 totalRimLight = (directionalRim + ambientRim) * rimFactor;
 
-    return totalRimLight * thicknessFactor;
+    // Apply shape mask like the original version
+    return totalRimLight * thicknessFactor * shape;
 }
 
 // Calculate wavelength-dependent refractive index using enhanced Cauchy dispersion formula
