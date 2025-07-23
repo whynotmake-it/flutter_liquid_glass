@@ -162,7 +162,7 @@ vec3 calculateLighting(
     }
 
     // --- Rim lighting ---
-    float rimWidth = 3.0; // Controls the sigma of the gaussian for the rim light width.
+    float rimWidth = 1.5; // Controls the sigma of the gaussian for the rim light width.
     float rimFactor = exp(-sd * sd / (2.0 * rimWidth * rimWidth)); // Gaussian falloff from the edge
 
     vec2 lightDir2D = vec2(cos(lightAngle), sin(lightAngle));
@@ -190,28 +190,28 @@ vec3 calculateLighting(
     return totalRimLight * thicknessFactor * shape;
 }
 
-// Calculate wavelength-dependent refractive index using enhanced Cauchy dispersion formula
-// This simulates how real glass disperses light based on wavelength with stronger separation
+// Calculate wavelength-dependent refractive index using inverted dispersion formula
+// This creates the desired dispersion effect where red refracts more than blue
 float calculateDispersiveIndex(float baseIndex, float chromaticAberration, float wavelength) {
     if (chromaticAberration < 0.001) {
         return baseIndex;
     }
     
-    // Enhanced Cauchy dispersion formula: n(λ) = A + B/λ² + C/λ⁴
-    // Using both quadratic and quartic terms for stronger dispersion
+    // Inverted dispersion formula: n(λ) = A - B/λ² - C/λ⁴
+    // This makes longer wavelengths (red) have higher refractive indices
     
     // Typical wavelengths in micrometers: Red ~0.65, Green ~0.55, Blue ~0.45
     float wavelengthSq = wavelength * wavelength;
     float wavelengthQuad = wavelengthSq * wavelengthSq;
     
-    // Enhanced dispersion coefficients for stronger chromatic aberration
-    // B coefficient (quadratic term) - primary dispersion
+    // Inverted dispersion coefficients for the desired chromatic aberration
+    // B coefficient (quadratic term) - primary dispersion (now negative)
     float B = chromaticAberration * 0.08 * (baseIndex - 1.0);
     
-    // C coefficient (quartic term) - secondary dispersion for stronger blue separation
+    // C coefficient (quartic term) - secondary dispersion (now negative)
     float C = chromaticAberration * 0.003 * (baseIndex - 1.0);
     
-    return baseIndex + B / wavelengthSq + C / wavelengthQuad;
+    return baseIndex - B / wavelengthSq - C / wavelengthQuad;
 }
 
 // Calculate refraction with physically-based chromatic aberration and optional blur
@@ -281,8 +281,15 @@ vec3 applySaturationLightness(vec3 color, float saturation, float lightness) {
     vec3 saturatedColor = mix(vec3(luminance), color, saturation);
     
     // Apply lightness adjustment (1.0 = no change)
-    // Values > 1.0 brighten, values < 1.0 darken
-    vec3 adjustedColor = saturatedColor * lightness;
+    // This properly lightens/darkens all colors including black
+    vec3 adjustedColor;
+    if (lightness > 1.0) {
+        // Lighten: blend towards white
+        adjustedColor = mix(saturatedColor, vec3(1.0), lightness - 1.0);
+    } else {
+        // Darken: multiply towards black
+        adjustedColor = saturatedColor * lightness;
+    }
     
     return clamp(adjustedColor, 0.0, 1.0);
 }

@@ -20,6 +20,32 @@ class LiquidGlassSettings with EquatableMixin {
     this.lightness = 1.0,
   });
 
+  /// Creates a new [LiquidGlassSettings] with the given settings where each
+  /// setting works like it does in Figma, where it is a percentage from
+  /// 0 to 100.
+  LiquidGlassSettings.figma({
+    required double refraction,
+    required double depth,
+    required double dispersion,
+    required double frost,
+    double lightIntensity = 50,
+    double lightAngle = 0.5 * pi,
+    double blend = 20,
+    Color glassColor = const Color.fromARGB(0, 255, 255, 255),
+  }) : this(
+          refractiveIndex: 1 + (refraction / 100) * 0.2,
+          thickness: depth,
+          chromaticAberration: 4 * (dispersion / 100),
+          lightIntensity: lightIntensity / 100,
+          blur: frost,
+          lightness: 1.08,
+          lightAngle: lightAngle,
+          ambientStrength: 0.1,
+          saturation: 1.05,
+          blend: blend,
+          glassColor: glassColor,
+        );
+
   /// The color tint of the glass effect.
   ///
   /// Opacity defines the intensity of the tint.

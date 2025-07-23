@@ -15,7 +15,7 @@ Animation<double> useRotatingAnimationController() {
 }
 
 class VerticalStripes extends StatelessWidget {
-  const VerticalStripes({super.key, this.stripeThickness = 40.0});
+  const VerticalStripes({super.key, this.stripeThickness = 100.0});
 
   final double stripeThickness;
 
