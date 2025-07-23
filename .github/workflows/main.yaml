@@ -45,7 +45,7 @@ jobs:
 
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
-        run: melos run test-without-goldens
+        run: melos run test-without-snaptests
       
   
   check_generation:
