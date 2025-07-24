@@ -58,6 +58,7 @@ class LiquidGlassLayer extends StatefulWidget {
   const LiquidGlassLayer({
     required this.child,
     this.settings = const LiquidGlassSettings(),
+    this.restrictThickness = true,
     super.key,
   });
 
@@ -69,6 +70,14 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
+
+  /// {@template liquid_glass_renderer.restrict_thickness}
+  /// If set to true, the thickness of all shapes in this layer will be
+  /// restricted to the dimensions of the smallest shape.
+  ///
+  /// This will prevent artifacts on shapes that are thicker than wide/tall
+  /// {@endtemplate}
+  final bool restrictThickness;
 
   @override
   State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
@@ -96,6 +105,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         debugRenderRefractionMap: false,
         vsync: this,
+        restrictThickness: widget.restrictThickness,
         child: child!,
       ),
       child: widget.child,
@@ -109,13 +119,14 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.settings,
     required this.debugRenderRefractionMap,
     required this.vsync,
+    required this.restrictThickness,
     required Widget super.child,
   });
 
   final FragmentShader shader;
   final LiquidGlassSettings settings;
   final bool debugRenderRefractionMap;
-
+  final bool restrictThickness;
   final TickerProvider vsync;
 
   @override
@@ -126,6 +137,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
       ticker: vsync,
+      restrictThickness: restrictThickness,
     );
   }
 
@@ -138,7 +150,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
       ..ticker = vsync
-      ..debugRenderRefractionMap = debugRenderRefractionMap;
+      ..debugRenderRefractionMap = debugRenderRefractionMap
+      ..restrictThickness = restrictThickness;
   }
 }
 
@@ -152,15 +165,24 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     required FragmentShader shader,
     required LiquidGlassSettings settings,
     required TickerProvider ticker,
+    required bool restrictThickness,
     bool debugRenderRefractionMap = false,
   })  : _devicePixelRatio = devicePixelRatio,
         _shader = shader,
         _settings = settings,
         _tickerProvider = ticker,
-        _debugRenderRefractionMap = debugRenderRefractionMap {
+        _debugRenderRefractionMap = debugRenderRefractionMap,
+        _restrictThickness = restrictThickness {
     _ticker = _tickerProvider.createTicker((_) {
       markNeedsPaint();
     });
+  }
+
+  bool _restrictThickness;
+  set restrictThickness(bool value) {
+    if (_restrictThickness == value) return;
+    _restrictThickness = value;
+    markNeedsPaint();
   }
 
   // Registry to allow shapes to find their parent layer
@@ -276,6 +298,15 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     final shapeCount = min(_maxShapesPerLayer, shapes.length);
 
+    var thickness = _settings.thickness;
+
+    if (_restrictThickness) {
+      final smallestShape = shapes.reduce(
+        (a, b) => a.$2.size.shortestSide < b.$2.size.shortestSide ? a : b,
+      );
+      thickness = min(thickness, smallestShape.$2.size.shortestSide);
+    }
+
     _shader
       ..setFloat(2, _settings.chromaticAberration)
       ..setFloat(3, _settings.glassColor.r)
@@ -285,7 +316,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(7, _settings.lightAngle)
       ..setFloat(8, _settings.lightIntensity)
       ..setFloat(9, _settings.ambientStrength)
-      ..setFloat(10, _settings.thickness)
+      ..setFloat(10, thickness)
       ..setFloat(11, _settings.refractiveIndex)
       ..setFloat(12, _settings.blend * _devicePixelRatio)
       ..setFloat(13, shapeCount.toDouble())

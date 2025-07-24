@@ -44,6 +44,7 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = true,
     this.clipBehavior = Clip.hardEdge,
+    this.restrictThickness = true,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
   }) : _settings = settings;
@@ -60,7 +61,8 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = true,
     this.clipBehavior = Clip.hardEdge,
-  }) : _settings = null;
+  })  : _settings = null,
+        restrictThickness = false;
 
   /// The child of this widget.
   ///
@@ -84,6 +86,9 @@ class LiquidGlass extends StatelessWidget {
   /// Defaults to [Clip.none], so [child] will not be clipped.
   final Clip clipBehavior;
 
+  /// {@macro liquid_glass_renderer.restrict_thickness}
+  final bool restrictThickness;
+
   final LiquidGlassSettings? _settings;
 
   @override
@@ -102,6 +107,7 @@ class LiquidGlass extends StatelessWidget {
       case final settings:
         return LiquidGlassLayer(
           settings: settings,
+          restrictThickness: restrictThickness,
           child: _RawLiquidGlass(
             shape: shape,
             glassContainsChild: glassContainsChild,
