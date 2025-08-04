@@ -221,8 +221,16 @@ class RenderLiquidGlass extends RenderProxyBox {
     super.paint(context, offset);
   }
 
-  void paintBlur(PaintingContext context, Offset offset, double blur) {
+  void paintBlur(
+    PaintingContext context,
+    Offset offset, {
+    required double blur,
+    required double scaleX,
+    required double scaleY,
+  }) {
     if (blur <= 0) return;
+
+    final shape = this.shape.scaleXY(scaleX, scaleY);
 
     context.pushClipPath(
       true,

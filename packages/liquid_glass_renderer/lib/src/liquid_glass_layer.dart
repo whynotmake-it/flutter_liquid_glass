@@ -265,6 +265,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    final transform = getTransformTo(null);
+    final globalRect =
+        MatrixUtils.transformRect(transform, Offset.zero & size);
+    final offset = globalRect.topLeft;
+    final scaleX = transform.storage[0]; // m00
+    final scaleY = transform.storage[5]; // m11
+
     final shapes = collectShapes();
 
     if (_settings.thickness <= 0) {
@@ -305,7 +312,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         ..setFloat(baseIndex + 5, shape.cornerRadius * _devicePixelRatio);
     }
 
-    _paintShapeBlurs(context, offset, shapes);
+    _paintShapeBlurs(context, offset, shapes, scaleX: scaleX, scaleY: scaleY);
 
     _paintShapeContents(context, offset, shapes, glassContainsChild: true);
 
@@ -359,11 +366,15 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   void _paintShapeBlurs(
     PaintingContext context,
     Offset offset,
-    List<(RenderLiquidGlass, RawShape)> shapes,
-  ) {
+    List<(RenderLiquidGlass, RawShape)> shapes, {
+    required double scaleX,
+    required double scaleY,
+  }) {
+    final scaleXY = Matrix4.diagonal3Values(scaleX, scaleY, 1);
+
     for (final (render, _) in shapes) {
       // Get the transform from the shape to this layer
-      final transform = render.getTransformTo(this);
+      final transform = render.getTransformTo(this).multiplied(scaleXY);
 
       // Apply the full transform to the painting context for blur
       context.pushTransform(
@@ -371,7 +382,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         offset,
         transform,
         (context, offset) {
-          render.paintBlur(context, offset, _settings.blur);
+          render.paintBlur(
+            context,
+            offset,
+            blur: _settings.blur,
+            scaleX: scaleX,
+            scaleY: scaleY,
+          );
         },
       );
     }

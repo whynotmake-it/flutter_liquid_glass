@@ -31,6 +31,11 @@ sealed class LiquidShape extends OutlinedBorder with EquatableMixin {
   }
 
   @override
+  ShapeBorder scale(double t);
+
+  ShapeBorder scaleXY(double scaleX, double scaleY);
+
+  @override
   List<Object?> get props => [side];
 }
 
@@ -75,6 +80,14 @@ class LiquidRoundedSuperellipse extends LiquidShape {
   }
 
   @override
+  ShapeBorder scaleXY(double scaleX, double scaleY) {
+    return LiquidRoundedSuperellipse(
+      borderRadius: borderRadius.scaleXY(scaleX, scaleY),
+      side: side.scaleXY(scaleX, scaleY),
+    );
+  }
+
+  @override
   List<Object?> get props => [...super.props, borderRadius];
 }
 
@@ -99,6 +112,13 @@ class LiquidOval extends LiquidShape {
   ShapeBorder scale(double t) {
     return LiquidOval(
       side: side.scale(t),
+    );
+  }
+
+  @override
+  ShapeBorder scaleXY(double scaleX, double scaleY) {
+    return LiquidOval(
+      side: side.scaleXY(scaleX, scaleY),
     );
   }
 }
@@ -145,5 +165,23 @@ class LiquidRoundedRectangle extends LiquidShape {
   }
 
   @override
+  ShapeBorder scaleXY(double scaleX, double scaleY) {
+    return LiquidRoundedRectangle(
+      borderRadius: borderRadius.scaleXY(scaleX, scaleY),
+      side: side.scaleXY(scaleX, scaleY),
+    );
+  }
+
+  @override
   List<Object?> get props => [...super.props, borderRadius];
+}
+
+extension on Radius {
+  Radius scaleXY(double scaleX, double scaleY) =>
+      Radius.elliptical(x / scaleX, y / scaleY);
+}
+
+extension on BorderSide {
+  BorderSide scaleXY(double scaleX, double scaleY) =>
+      scale((scaleX + scaleY) / 2);
 }

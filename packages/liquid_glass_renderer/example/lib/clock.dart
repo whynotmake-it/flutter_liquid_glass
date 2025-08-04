@@ -42,21 +42,19 @@ class ClockExample extends HookWidget {
         ).show(context);
       },
       child: ImagePageView(
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: LiquidGlass(
-              settings: settings.copyWith(glassColor: Colors.transparent),
-              shape: LiquidRoundedRectangle(borderRadius: Radius.circular(64)),
-              child: Padding(
-                padding: const EdgeInsets.all(64.0),
-                child: Glassify(
-                  settings: settings,
-                  child: Text(
-                    format.format(time),
-                    style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
-                        .copyWith(fontSize: 200),
-                  ),
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: LiquidGlass(
+            settings: settings.copyWith(glassColor: Colors.transparent),
+            shape: LiquidRoundedRectangle(borderRadius: Radius.circular(64)),
+            child: Padding(
+              padding: const EdgeInsets.all(64.0),
+              child: Glassify(
+                settings: settings,
+                child: Text(
+                  format.format(time),
+                  style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
+                      .copyWith(fontSize: 200),
                 ),
               ),
             ),
