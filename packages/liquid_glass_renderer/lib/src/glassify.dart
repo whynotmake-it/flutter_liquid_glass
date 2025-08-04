@@ -339,10 +339,14 @@ class _GlassifyShaderLayer extends OffsetLayer {
   }
 
   ui.Image _buildMaskImage([double? blur]) {
+    final bounds = offset & layerSize;
+    if (bounds.isEmpty) {
+      return _buildEmptyImage();
+    }
+
     final builder = ui.SceneBuilder();
     final transform =
         Matrix4.diagonal3Values(devicePixelRatio, devicePixelRatio, 1);
-    final bounds = offset & layerSize;
 
     builder.pushTransform(transform.storage);
     _addMaskToScene(builder, blur);
@@ -353,6 +357,8 @@ class _GlassifyShaderLayer extends OffsetLayer {
           (devicePixelRatio * bounds.height).floor(),
         );
   }
+
+  ui.Image _buildEmptyImage() => ui.SceneBuilder().build().toImageSync(1, 1);
 
   void _addMaskToScene(ui.SceneBuilder builder, [double? blur]) {
     final mask = firstChild;

@@ -29,13 +29,16 @@ class ShapesExample extends HookWidget {
         ).show(context);
       },
       child: ImagePageView(
-        child: Center(
+        child: FittedBox(
           child: Padding(
             padding: const EdgeInsets.all(32.0),
             child: LiquidGlassLayer(
               settings: settings,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Flex(
+                direction: switch (MediaQuery.orientationOf(context)) {
+                  Orientation.portrait => Axis.vertical,
+                  Orientation.landscape => Axis.horizontal,
+                },
                 spacing: 64,
                 children: [
                   LiquidGlass.inLayer(

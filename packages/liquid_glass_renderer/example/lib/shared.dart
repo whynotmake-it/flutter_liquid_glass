@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:smooth_sheets/smooth_sheets.dart';
 
 Animation<double> useRotatingAnimationController() {
   return useAnimationController(
@@ -65,6 +64,7 @@ class ImagePageView extends HookWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
         PageView.builder(
           itemBuilder: (context, index) {
@@ -101,11 +101,18 @@ class SettingsSheet extends HookWidget {
   Future<void> show(BuildContext context) {
     return Navigator.push(
       context,
-      ModalSheetRoute(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, __, ___) {
+          return GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: this,
+          );
+        },
         barrierColor: Colors.black26,
-        swipeDismissible: true,
-        viewportPadding: const EdgeInsets.all(100),
-        builder: (context) => this,
       ),
     );
   }
@@ -115,33 +122,28 @@ class SettingsSheet extends HookWidget {
     final settings = useValueListenable(settingsNotifier);
     final lightAngle = useValueListenable(lightAngleAnimation);
 
-    return Sheet(
-      dragConfiguration: SheetDragConfiguration(),
-      scrollConfiguration: const SheetScrollConfiguration(),
-      initialOffset: SheetOffset(1),
-      shrinkChildToAvoidDynamicOverlap: true,
-      shrinkChildToAvoidStaticOverlap: true,
-      snapGrid: SheetSnapGrid(snaps: [SheetOffset(0.5), SheetOffset(1)]),
-      child: SafeArea(
-        child: LiquidGlass(
-          glassContainsChild: false,
-          settings: LiquidGlassSettings(
-            thickness: 30,
-            blur: 20,
-            lightIntensity: .5,
-            lightAngle: lightAngle,
-            ambientStrength: .5,
-            chromaticAberration: 2,
-            glassColor: Theme.of(
-              context,
-            ).colorScheme.surface.withValues(alpha: 0.4),
-          ),
-          shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
-          child: DefaultTextStyle(
-            style: Theme.of(context).textTheme.bodyLarge!,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: SingleChildScrollView(
+    return SingleChildScrollView(
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(16) + EdgeInsets.symmetric(vertical: 320),
+          child: SizedBox(
+            width: (MediaQuery.sizeOf(context).width / 2).clamp(320, 640),
+            child: LiquidGlass(
+              glassContainsChild: false,
+              settings: LiquidGlassSettings(
+                thickness: 30,
+                blur: 20,
+                lightIntensity: .5,
+                lightAngle: lightAngle,
+                ambientStrength: .5,
+                chromaticAberration: 2,
+                glassColor: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.4),
+              ),
+              shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
+              child: DefaultTextStyle(
+                style: Theme.of(context).textTheme.bodyLarge!,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -155,7 +157,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Thickness:'),
+                          Expanded(child: Text('Thickness:')),
                           Text(settings.thickness.toStringAsFixed(2)),
                         ],
                       ),
@@ -172,7 +174,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Light Intensity:'),
+                          Expanded(child: Text('Light Intensity:')),
                           Text(settings.lightIntensity.toStringAsFixed(2)),
                         ],
                       ),
@@ -189,7 +191,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Ambient Strength:'),
+                          Expanded(child: Text('Ambient Strength:')),
                           Text(settings.ambientStrength.toStringAsFixed(2)),
                         ],
                       ),
@@ -206,7 +208,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Blur:'),
+                          Expanded(child: Text('Blur:')),
                           Text(settings.blur.toStringAsFixed(2)),
                         ],
                       ),
@@ -223,7 +225,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Liquid Factor™:'),
+                          Expanded(child: Text('Liquid Factor™:')),
                           Text(settings.blend.toStringAsFixed(2)),
                         ],
                       ),
@@ -240,7 +242,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Chromatic Aberration:'),
+                          Expanded(child: Text('Chromatic Aberration:')),
                           Text(settings.chromaticAberration.toStringAsFixed(2)),
                         ],
                       ),
@@ -257,7 +259,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Saturation:'),
+                          Expanded(child: Text('Saturation:')),
                           Text(settings.saturation.toStringAsFixed(2)),
                         ],
                       ),
@@ -274,7 +276,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Lightness:'),
+                          Expanded(child: Text('Lightness:')),
                           Text(settings.lightness.toStringAsFixed(2)),
                         ],
                       ),
@@ -291,7 +293,7 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Refractive Index:'),
+                          Expanded(child: Text('Refractive Index:')),
                           Text(settings.refractiveIndex.toStringAsFixed(2)),
                         ],
                       ),
