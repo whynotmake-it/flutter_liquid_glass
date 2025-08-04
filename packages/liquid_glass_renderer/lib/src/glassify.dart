@@ -180,6 +180,9 @@ class RenderGlassify extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     // Calculate global position for the shader
     var globalOffset = offset;
+    var layerSize = size;
+    double scaleX = 1;
+    double scaleY = 1;
     try {
       final transform = getTransformTo(null);
       final globalRect = MatrixUtils.transformRect(
@@ -187,6 +190,9 @@ class RenderGlassify extends RenderProxyBox {
         Offset.zero & size,
       );
       globalOffset = globalRect.topLeft;
+      layerSize = globalRect.size;
+      scaleX = transform.storage[0]; // m00
+      scaleY = transform.storage[5]; // m11
     } catch (e) {
       // Fallback to the provided offset if transform calculation fails
       debugPrint('Failed to calculate global transform for Glassify: $e');
@@ -198,7 +204,9 @@ class RenderGlassify extends RenderProxyBox {
       shader: _shader,
       settings: _settings,
       devicePixelRatio: _devicePixelRatio,
-      layerSize: size,
+      layerSize: layerSize,
+      scaleX: scaleX,
+      scaleY: scaleY,
     );
     layer!
       ..offset = offset
@@ -206,7 +214,9 @@ class RenderGlassify extends RenderProxyBox {
       ..shader = _shader
       ..settings = _settings
       ..devicePixelRatio = _devicePixelRatio
-      ..layerSize = size;
+      ..layerSize = layerSize
+      ..scaleX = scaleX
+      ..scaleY = scaleY;
     context.pushLayer(
       layer!,
       (context, offset) {
@@ -244,12 +254,16 @@ class _GlassifyShaderLayer extends OffsetLayer {
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
     required Size layerSize,
+    required double scaleX,
+    required double scaleY,
     required super.offset,
     required Offset globalOffset,
   })  : _shader = shader,
         _settings = settings,
         _devicePixelRatio = devicePixelRatio,
         _layerSize = layerSize,
+        _scaleX = scaleX,
+        _scaleY = scaleY,
         _globalOffset = globalOffset;
 
   FragmentShader _shader;
@@ -289,6 +303,22 @@ class _GlassifyShaderLayer extends OffsetLayer {
   set globalOffset(Offset value) {
     if (_globalOffset == value) return;
     _globalOffset = value;
+    markNeedsAddToScene();
+  }
+
+  double _scaleX;
+  double get scaleX => _scaleX;
+  set scaleX(double v) {
+    if (_scaleX == v) return;
+    _scaleX = v;
+    markNeedsAddToScene();
+  }
+
+  double _scaleY;
+  double get scaleY => _scaleY;
+  set scaleY(double v) {
+    if (_scaleY == v) return;
+    _scaleY = v;
     markNeedsAddToScene();
   }
 
@@ -345,8 +375,11 @@ class _GlassifyShaderLayer extends OffsetLayer {
     }
 
     final builder = ui.SceneBuilder();
-    final transform =
-        Matrix4.diagonal3Values(devicePixelRatio, devicePixelRatio, 1);
+    final transform = Matrix4.diagonal3Values(
+      devicePixelRatio * scaleX,
+      devicePixelRatio * scaleY,
+      1,
+    );
 
     builder.pushTransform(transform.storage);
     _addMaskToScene(builder, blur);
