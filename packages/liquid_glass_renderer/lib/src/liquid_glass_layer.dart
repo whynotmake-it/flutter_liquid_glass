@@ -158,9 +158,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         _settings = settings,
         _tickerProvider = ticker,
         _debugRenderRefractionMap = debugRenderRefractionMap {
-    _ticker = _tickerProvider.createTicker((_) {
-      markNeedsPaint();
-    });
+    _ticker = _tickerProvider.createTicker(_onTick);
   }
 
   // Registry to allow shapes to find their parent layer
@@ -168,10 +166,15 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
   final Set<RenderLiquidGlass> registeredShapes = {};
 
+  String? _lastShapeStateHash;
+  LiquidGlassSettings? _lastSettings;
+  DateTime _lastUpdateTime = DateTime.now();
+
   double _devicePixelRatio;
   set devicePixelRatio(double value) {
     if (_devicePixelRatio == value) return;
     _devicePixelRatio = value;
+    _invalidateCache();
     markNeedsPaint();
   }
 
@@ -181,6 +184,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     _settings = value;
+    _invalidateCache();
     markNeedsPaint();
   }
 
@@ -204,6 +208,61 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   // come up with a better solution right now.
   Ticker? _ticker;
 
+  void _invalidateCache() {
+    _lastShapeStateHash = null;
+    _lastSettings = null;
+    _lastUpdateTime = DateTime.now();
+  }
+
+  void _onTick(Duration elapsed) {
+    if (_hasSignificantChanges()) {
+      markNeedsPaint();
+    }
+  }
+
+  bool _hasSignificantChanges() {
+    if (_lastSettings != _settings) {
+      _lastSettings = _settings;
+      return true;
+    }
+
+    final currentHash = _generateShapeStateHash();
+    if (_lastShapeStateHash != currentHash) {
+      _lastShapeStateHash = currentHash;
+      return true;
+    }
+
+    final now = DateTime.now();
+    if (now.difference(_lastUpdateTime).inMilliseconds > 1000) {
+      _lastUpdateTime = now;
+      return true;
+    }
+
+    return false;
+  }
+
+  String _generateShapeStateHash() {
+    if (registeredShapes.isEmpty) return 'empty';
+
+    final buffer = StringBuffer()..write(registeredShapes.length);
+
+    for (final shape in registeredShapes) {
+      if (shape.attached && shape.hasSize) {
+        try {
+          buffer.write(
+            '${shape.size.width.toInt()},${shape.size.height.toInt()};',
+          );
+        } catch (_) {
+          buffer.write('error;');
+        }
+      } else {
+        buffer.write('detached;');
+      }
+    }
+
+    return buffer.toString();
+  }
+
   void registerShape(RenderLiquidGlass shape) {
     if (registeredShapes.length >= _maxShapesPerLayer) {
       throw UnsupportedError(
@@ -212,6 +271,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     }
     registeredShapes.add(shape);
     layerRegistry[shape] = this;
+    _invalidateCache();
     markNeedsPaint();
 
     if (registeredShapes.length == 1) {
@@ -222,6 +282,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   void unregisterShape(RenderLiquidGlass shape) {
     registeredShapes.remove(shape);
     layerRegistry[shape] = null;
+    _invalidateCache();
     markNeedsPaint();
     if (registeredShapes.isEmpty) {
       _ticker?.stop();
