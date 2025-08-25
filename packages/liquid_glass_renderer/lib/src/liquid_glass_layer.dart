@@ -215,12 +215,12 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   }
 
   void _onTick(Duration elapsed) {
-    if (_hasSignificantChanges()) {
+    if (_hasChanges()) {
       markNeedsPaint();
     }
   }
 
-  bool _hasSignificantChanges() {
+  bool _hasChanges() {
     if (_lastSettings != _settings) {
       _lastSettings = _settings;
       return true;
