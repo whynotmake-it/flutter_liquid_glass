@@ -1,0 +1,76 @@
+name: Performance Benchmarks
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'packages/liquid_glass_renderer/**'
+
+jobs:
+  benchmark:
+    name: Run Performance Benchmarks
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: flutter config --enable-macos-desktop
+
+      - name: 🔧 Get dependencies
+        working-directory: packages/liquid_glass_renderer/example
+        run: flutter pub get
+
+      - name: 🏃‍♂️ Run benchmark tests
+        working-directory: packages/liquid_glass_renderer/example
+        run: |
+          chmod +x tool/benchmark.sh
+          ./tool/benchmark.sh
+
+      - name: 📊 Parse benchmark results
+        id: parse-results
+        working-directory: packages/liquid_glass_renderer/example
+        run: |
+          dart tool/parse_benchmark_results.dart >> $GITHUB_OUTPUT
+
+      - name: 📝 Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Performance Benchmark Results'
+
+      - name: 💬 Create or update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: packages/liquid_glass_renderer/example/benchmark_summary.md
+          edit-mode: replace
+
+      - name: 📤 Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.event.pull_request.number }}
+          path: packages/liquid_glass_renderer/example/build/*.timeline*.json
+          retention-days: 30
