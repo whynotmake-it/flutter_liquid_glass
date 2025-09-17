@@ -19,6 +19,7 @@ layout(location = 2) uniform vec4 uGlassColor;             // r, g, b, a
 layout(location = 3) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, gaussianBlur
 layout(location = 4) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
 layout(location = 5) uniform vec3 uTransformData;          // offsetX, offsetY, lightness
+layout(location = 6) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
 
 // Extract individual values for backward compatibility
 float uChromaticAberration = uOpticalProps.y;
@@ -200,7 +201,7 @@ void main() {
         uRefractiveIndex, 
         uChromaticAberration, 
         uGlassColor, 
-        uLightAngle, 
+        uLightDirection, 
         uLightIntensity, 
         uAmbientStrength, 
         uBackgroundTexture, 

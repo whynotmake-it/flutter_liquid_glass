@@ -87,7 +87,7 @@ vec3 calculateLighting(
     vec3 normal, 
     float sd, 
     float thickness, 
-    float lightAngle, 
+    vec2 lightDirection, 
     float lightIntensity, 
     float ambientStrength, 
     vec3 backgroundColor
@@ -114,7 +114,8 @@ vec3 calculateLighting(
     float rimWidth = 1.5; // Controls the sigma of the gaussian for the rim light width.
     float rimFactor = exp(-sd * sd / (2.0 * rimWidth * rimWidth)); // Gaussian falloff from the edge
 
-    vec2 lightDir2D = vec2(cos(lightAngle), sin(lightAngle));
+    // Use pre-computed light direction (eliminates expensive cos/sin per pixel)
+    vec2 lightDir2D = lightDirection;
     // We use normal.xy which represents the direction on the screen plane.
     float mainLightInfluence = max(0.0, dot(normalize(normal.xy), lightDir2D));
 
@@ -267,7 +268,7 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 }
 
 // Complete liquid glass rendering pipeline
-vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, float lightAngle, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation, float lightness) {
+vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation, float lightness) {
     // If we're completely outside the glass area (with smooth transition)
     if (foregroundAlpha < 0.001) {
         return texture(backgroundTexture, screenUV);
@@ -291,7 +292,7 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     vec4 backgroundColor = texture(backgroundTexture, screenUV);
     
     // Calculate lighting effects using background color
-    vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, lightAngle, lightIntensity, ambientStrength, backgroundColor.rgb);
+    vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, lightDirection, lightIntensity, ambientStrength, backgroundColor.rgb);
     
     // Apply realistic glass color influence
     vec4 finalColor = applyGlassColor(liquidColor, glassColor);

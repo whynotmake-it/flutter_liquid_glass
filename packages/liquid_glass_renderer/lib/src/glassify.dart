@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'dart:ui';
 
@@ -403,7 +404,10 @@ class _GlassifyShaderLayer extends OffsetLayer {
       // uTransformData (vec3) - location 5: starts at float index 16
       ..setFloat(16, globalOffset.dx * devicePixelRatio)
       ..setFloat(17, globalOffset.dy * devicePixelRatio)
-      ..setFloat(18, settings.lightness);
+      ..setFloat(18, settings.lightness)
+      // uLightDirection (vec2) - location 6: starts at float index 19
+      ..setFloat(19, cos(settings.lightAngle))
+      ..setFloat(20, sin(settings.lightAngle));
   }
 
   @override

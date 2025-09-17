@@ -329,11 +329,14 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       ..setFloat(13, _settings.saturation)
       // uColorAdjust (vec2) - location 4: starts at float index 14
       ..setFloat(14, _settings.lightness)
-      ..setFloat(15, shapeCount.toDouble());
+      ..setFloat(15, shapeCount.toDouble())
+      // uLightDirection (vec2) - location 5: starts at float index 16
+      ..setFloat(16, cos(_settings.lightAngle))
+      ..setFloat(17, sin(_settings.lightAngle));
 
     for (var i = 0; i < shapeCount; i++) {
       final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex = 16 + (i * 6); // Shape array at location 5
+      final baseIndex = 18 + (i * 6); // Shape array at location 6
 
       _shader
         ..setFloat(baseIndex, shape.type.index.toDouble())

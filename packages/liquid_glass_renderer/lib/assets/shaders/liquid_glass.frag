@@ -21,7 +21,8 @@ layout(location = 0) uniform vec2 uSize;                    // width, height
 layout(location = 1) uniform vec4 uGlassColor;             // r, g, b, a
 layout(location = 2) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, blend
 layout(location = 3) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
-layout(location = 4) uniform vec2 uColorAdjust;            // lightness, numShapes
+layout(location = 4) uniform vec2 uColorAdjust;            // lightness, numShapes  
+layout(location = 5) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
 
 // Extract individual values for backward compatibility
 float uChromaticAberration = uOpticalProps.y;
@@ -38,7 +39,7 @@ float uLightness = uColorAdjust.x;
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 // Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
 #define MAX_SHAPES 16
-layout(location = 5) uniform float uShapeData[MAX_SHAPES * 6];
+layout(location = 6) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
@@ -164,7 +165,7 @@ void main() {
         uRefractiveIndex, 
         uChromaticAberration, 
         uGlassColor, 
-        uLightAngle, 
+        uLightDirection, 
         uLightIntensity, 
         uAmbientStrength, 
         uBackgroundTexture, 
