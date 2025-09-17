@@ -16,33 +16,28 @@ precision mediump float;
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
 
-layout(location = 0) uniform float uSizeW;
-layout(location = 1) uniform float uSizeH;
+// Optimized uniform layout - grouped into vectors for better performance
+layout(location = 0) uniform vec2 uSize;                    // width, height
+layout(location = 1) uniform vec4 uGlassColor;             // r, g, b, a
+layout(location = 2) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, blend
+layout(location = 3) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
+layout(location = 4) uniform vec2 uColorAdjust;            // lightness, numShapes
 
-vec2 uSize = vec2(uSizeW, uSizeH);
-
-layout(location = 2) uniform float uChromaticAberration = 0.0;
-
-layout(location = 3) uniform float uGlassColorR;
-layout(location = 4) uniform float uGlassColorG;
-layout(location = 5) uniform float uGlassColorB;
-layout(location = 6) uniform float uGlassColorA;
-
-vec4 uGlassColor = vec4(uGlassColorR, uGlassColorG, uGlassColorB, uGlassColorA);
-
-layout(location = 7) uniform float uLightAngle = 0.785398;
-layout(location = 8) uniform float uLightIntensity = 1.0;
-layout(location = 9) uniform float uAmbientStrength = 0.1;
-layout(location = 10) uniform float uThickness;
-layout(location = 11) uniform float uRefractiveIndex = 1.2;
-layout(location = 12) uniform float uBlend;
-layout(location = 13) uniform float uNumShapes;
-layout(location = 14) uniform float uSaturation;
-layout(location = 15) uniform float uLightness;
+// Extract individual values for backward compatibility
+float uChromaticAberration = uOpticalProps.y;
+float uLightAngle = uLightConfig.x;
+float uLightIntensity = uLightConfig.y;
+float uAmbientStrength = uLightConfig.z;
+float uThickness = uOpticalProps.z;
+float uRefractiveIndex = uOpticalProps.x;
+float uBlend = uOpticalProps.w;
+float uNumShapes = uColorAdjust.y;
+float uSaturation = uLightConfig.w;
+float uLightness = uColorAdjust.x;
 
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 #define MAX_SHAPES 64
-layout(location = 16) uniform float uShapeData[MAX_SHAPES * 6];
+layout(location = 5) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
