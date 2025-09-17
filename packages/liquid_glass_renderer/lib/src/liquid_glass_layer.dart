@@ -23,7 +23,7 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of 64 shapes are supported per layer at the moment.
+/// > A maximum of 16 shapes are supported per layer due to Impeller's uniform buffer limits.
 ///
 /// ## Example
 ///
@@ -155,8 +155,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   }
 }
 
-/// Maximum number of shapes supported per layer due to Flutter's uniform limit
-const int _maxShapesPerLayer = 64;
+/// Maximum number of shapes supported per layer due to Impeller's uniform buffer limit
+const int _maxShapesPerLayer = 16;
 
 @internal
 class RenderLiquidGlassLayer extends RenderProxyBox {

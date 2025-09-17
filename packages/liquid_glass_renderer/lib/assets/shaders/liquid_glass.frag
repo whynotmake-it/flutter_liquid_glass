@@ -36,7 +36,8 @@ float uSaturation = uLightConfig.w;
 float uLightness = uColorAdjust.x;
 
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
-#define MAX_SHAPES 64
+// Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
+#define MAX_SHAPES 16
 layout(location = 5) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
