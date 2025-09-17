@@ -70,7 +70,7 @@ vec2 blueOffset = baseRefract.xy * (1.0 - dispersionStrength);
 **Performance Gain**: 65% reduction in refraction calculations  
 **✅ IMPLEMENTED**: Optimization complete - uses pre-computed base refraction with dispersion offsets
 
-### 3. Dynamic Shape Loop Optimization 🔧 **MEDIUM**
+### 3. Dynamic Shape Loop Optimization ✅ **COMPLETED**
 **Location**: `liquid_glass.frag:127-130` - `sceneSDF()`  
 **Impact**: O(n) SDF evaluations per pixel  
 **Performance Cost**: Scales linearly with shape count  
@@ -99,9 +99,31 @@ if (numShapes <= 4) {
     }
 }
 ```
+**✅ IMPLEMENTED Solution**:
+```glsl
+// Optimized: unroll for common cases (1-4 shapes), use loop for 5+ shapes
+if (numShapes <= 4) {
+    // Fully unrolled for 1-4 shapes (covers 90%+ of use cases)
+    if (numShapes >= 2) result = smoothUnion(result, getShapeSDFFromArray(1, p), uBlend);
+    if (numShapes >= 3) result = smoothUnion(result, getShapeSDFFromArray(2, p), uBlend);
+    if (numShapes >= 4) result = smoothUnion(result, getShapeSDFFromArray(3, p), uBlend);
+} else {
+    // Dynamic loop for 5+ shapes (uncommon cases)
+    for (int i = 1; i < min(numShapes, MAX_SHAPES); i++) {
+        float shapeSDF = getShapeSDFFromArray(i, p);
+        result = smoothUnion(result, shapeSDF, uBlend);
+    }
+}
+```
+
+**Performance Impact**:
+- **Loop Elimination**: No dynamic loops for 90%+ of use cases
+- **Branch Optimization**: GPU can better optimize static branches
+- **Instruction Cache**: Better cache utilization with unrolled code
+
 **Visual Impact**: None  
 **Performance Gain**: 40% improvement for 1-4 shapes (common case)  
-**🔧 NOT IMPLEMENTED**: This optimization was not completed (would benefit from loop unrolling)
+**✅ IMPLEMENTED**: Main shader optimized with hybrid unrolled/loop approach
 
 ### 4. Uniform Binding Inefficiency ✅ **COMPLETED**
 **Location**: `liquid_glass.frag:19-41` + `liquid_glass_layer.dart:311-324`  
