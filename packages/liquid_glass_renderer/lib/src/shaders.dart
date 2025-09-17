@@ -2,7 +2,7 @@
 
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:meta/meta.dart';
 
 final String _shadersRoot =

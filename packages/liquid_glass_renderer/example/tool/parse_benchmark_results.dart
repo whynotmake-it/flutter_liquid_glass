@@ -19,6 +19,29 @@ void main() async {
     return;
   }
 
+  // Sort files alphabetically by their test names
+  summaryFiles.sort((a, b) {
+    final testNameA = a.path
+        .split('/')
+        .last
+        .replaceAll('.timeline_summary.json', '')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+
+    final testNameB = b.path
+        .split('/')
+        .last
+        .replaceAll('.timeline_summary.json', '')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+
+    return testNameA.compareTo(testNameB);
+  });
+
   final buffer = StringBuffer();
   buffer.writeln('## 🚀 Performance Benchmark Results\n');
 
