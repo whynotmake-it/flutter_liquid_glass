@@ -152,7 +152,8 @@ void main() {
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
     if (foregroundAlpha < 0.01) {
-        discard;
+        fragColor = texture(uBackgroundTexture, screenUV);
+        return;
     }
     
     // Use shared rendering pipeline
