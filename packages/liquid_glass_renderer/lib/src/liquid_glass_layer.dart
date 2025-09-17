@@ -23,7 +23,8 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of 16 shapes are supported per layer due to Impeller's uniform buffer limits.
+/// > A maximum of 16 shapes are supported per layer due to Impeller's 
+/// > uniform buffer limits.
 ///
 /// ## Example
 ///
@@ -155,7 +156,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   }
 }
 
-/// Maximum number of shapes supported per layer due to Impeller's uniform buffer limit
+/// Maximum number of shapes supported per layer due to Impeller's uniform 
+/// buffer limit
 const int _maxShapesPerLayer = 16;
 
 @internal

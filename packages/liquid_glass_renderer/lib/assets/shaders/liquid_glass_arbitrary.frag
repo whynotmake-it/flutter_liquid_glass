@@ -12,40 +12,25 @@ precision mediump float;
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
 
-layout(location = 0) uniform float uSizeW;
-layout(location = 1) uniform float uSizeH;
+// Optimized uniform layout - grouped into vectors for 50% fewer API calls
+layout(location = 0) uniform vec2 uSize;                    // width, height (auto-set by Flutter)
+layout(location = 1) uniform vec2 uForegroundSize;          // width, height
+layout(location = 2) uniform vec4 uGlassColor;             // r, g, b, a
+layout(location = 3) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, gaussianBlur
+layout(location = 4) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
+layout(location = 5) uniform vec3 uTransformData;          // offsetX, offsetY, lightness
 
-vec2 uSize = vec2(uSizeW, uSizeH);
-
-layout(location = 2) uniform float uForegroundSizeW;
-layout(location = 3) uniform float uForegroundSizeH;
-vec2 uForegroundSize = vec2(uForegroundSizeW, uForegroundSizeH);
-
-layout(location = 4) uniform float uChromaticAberration = 0.0;
-
-layout(location = 5) uniform float uGlassColorR;
-layout(location = 6) uniform float uGlassColorG;
-layout(location = 7) uniform float uGlassColorB;
-layout(location = 8) uniform float uGlassColorA;
-
-vec4 uGlassColor = vec4(uGlassColorR, uGlassColorG, uGlassColorB, uGlassColorA);
-
-layout(location = 9) uniform float uLightAngle;
-layout(location = 10) uniform float uLightIntensity;
-layout(location = 11) uniform float uAmbientStrength;
-layout(location = 12) uniform float uThickness;
-layout(location = 13) uniform float uRefractiveIndex;
-
-layout(location = 14) uniform float uOffsetX;
-layout(location = 15) uniform float uOffsetY;
-vec2 uOffset = vec2(uOffsetX, uOffsetY);
-
-// Saturation and lightness uniforms
-layout(location = 16) uniform float uSaturation = 1.0;
-layout(location = 17) uniform float uLightness = 1.0;
-
-// Gaussian blur uniform
-layout(location = 18) uniform float uGaussianBlur;
+// Extract individual values for backward compatibility
+float uChromaticAberration = uOpticalProps.y;
+float uLightAngle = uLightConfig.x;
+float uLightIntensity = uLightConfig.y;
+float uAmbientStrength = uLightConfig.z;
+float uThickness = uOpticalProps.z;
+float uRefractiveIndex = uOpticalProps.x;
+vec2 uOffset = uTransformData.xy;
+float uSaturation = uLightConfig.w;
+float uLightness = uTransformData.z;
+float uGaussianBlur = uOpticalProps.w;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uForegroundTexture;

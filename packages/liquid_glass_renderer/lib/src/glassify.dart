@@ -379,28 +379,31 @@ class _GlassifyShaderLayer extends OffsetLayer {
   }
 
   void _setupShaderUniforms() {
-    // Since BackdropFilter operates in global coordinate space,
-    // we need to pass the global offset to the shader
     shader
       ..setImageSampler(1, childImage!) // uForegroundTexture
       ..setImageSampler(2, childBlurredImage!) // uForegroundBlurredTexture
+      // uForegroundSize (vec2) - location 1: starts at float index 2
       ..setFloat(2, layerSize.width * devicePixelRatio)
       ..setFloat(3, layerSize.height * devicePixelRatio)
-      ..setFloat(4, settings.chromaticAberration)
-      ..setFloat(5, settings.glassColor.r)
-      ..setFloat(6, settings.glassColor.g)
-      ..setFloat(7, settings.glassColor.b)
-      ..setFloat(8, settings.glassColor.a)
-      ..setFloat(9, settings.lightAngle)
-      ..setFloat(10, settings.lightIntensity)
-      ..setFloat(11, settings.ambientStrength)
-      ..setFloat(12, settings.thickness)
-      ..setFloat(13, settings.refractiveIndex)
-      ..setFloat(14, globalOffset.dx * devicePixelRatio)
-      ..setFloat(15, globalOffset.dy * devicePixelRatio)
-      ..setFloat(16, settings.saturation)
-      ..setFloat(17, settings.lightness)
-      ..setFloat(18, settings.blur);
+      // uGlassColor (vec4) - location 2: starts at float index 4
+      ..setFloat(4, settings.glassColor.r)
+      ..setFloat(5, settings.glassColor.g)
+      ..setFloat(6, settings.glassColor.b)
+      ..setFloat(7, settings.glassColor.a)
+      // uOpticalProps (vec4) - location 3: starts at float index 8
+      ..setFloat(8, settings.refractiveIndex)
+      ..setFloat(9, settings.chromaticAberration)
+      ..setFloat(10, settings.thickness)
+      ..setFloat(11, settings.blur)
+      // uLightConfig (vec4) - location 4: starts at float index 12
+      ..setFloat(12, settings.lightAngle)
+      ..setFloat(13, settings.lightIntensity)
+      ..setFloat(14, settings.ambientStrength)
+      ..setFloat(15, settings.saturation)
+      // uTransformData (vec3) - location 5: starts at float index 16
+      ..setFloat(16, globalOffset.dx * devicePixelRatio)
+      ..setFloat(17, globalOffset.dy * devicePixelRatio)
+      ..setFloat(18, settings.lightness);
   }
 
   @override
