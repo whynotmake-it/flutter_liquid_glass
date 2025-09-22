@@ -87,14 +87,12 @@ vec3 calculateLighting(
     vec3 normal, 
     float sd, 
     float thickness, 
+    float height,
     vec2 lightDirection, 
     float lightIntensity, 
     float ambientStrength, 
     vec3 backgroundColor
 ) {
-    // Calculate height from sd to get proper shape mask
-    float height = getHeight(sd, thickness);
-    
     // Basic shape mask (restored from old version)
     float normalizedHeight = thickness > 0.0 ? height / thickness : 0.0;
     float shape = smoothstep(0.0, 0.9, 1.0 - normalizedHeight);
@@ -116,11 +114,11 @@ vec3 calculateLighting(
 
     // Use pre-computed light direction (eliminates expensive cos/sin per pixel)
     vec2 lightDir2D = lightDirection;
-    // We use normal.xy which represents the direction on the screen plane.
-    float mainLightInfluence = max(0.0, dot(normalize(normal.xy), lightDir2D));
+    vec2 normalizedNormal = normalize(normal.xy);
+    float mainLightInfluence = max(0.0, dot(normalizedNormal, lightDir2D));
 
     // Add a secondary, weaker light from the opposite direction.
-    float oppositeLightInfluence = max(0.0, dot(normalize(normal.xy), -lightDir2D));
+    float oppositeLightInfluence = max(0.0, dot(normalizedNormal, -lightDir2D));
 
     // Increase strength of opposite light
     float totalInfluence = mainLightInfluence + oppositeLightInfluence * 0.8;
@@ -169,57 +167,49 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
     float baseHeight = thickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
     
-    vec4 refractColor;
+    // Pre-compute base refraction vector once
+    vec3 baseRefract = refract(incident, normal, 1.0 / refractiveIndex);
+    float baseRefractLength = (height + baseHeight) / max(0.001, abs(baseRefract.z));
+    vec2 baseDisplacement = baseRefract.xy * baseRefractLength;
+    refractionDisplacement = baseDisplacement;
+    
     vec2 texelSize = 1.0 / uSize;
-
+    
     // Optimized chromatic aberration with pre-computed base refraction
     if (chromaticAberration > 0.001) {
-        // Pre-compute base refraction vector once
-        vec3 baseRefract = refract(incident, normal, 1.0 / refractiveIndex);
-        float baseRefractLength = (height + baseHeight) / max(0.001, abs(baseRefract.z));
-        vec2 baseDisplacement = baseRefract.xy * baseRefractLength;
-        
-        // Calculate dispersion strength for analytical approximation
+        // Calculate chromatic dispersion offsets
         float dispersionStrength = chromaticAberration * 0.5;
-        
-        // Apply dispersion as offsets from base refraction (65% faster than 3 separate refract calls)
         vec2 redOffset = baseDisplacement * (1.0 + dispersionStrength);
-        vec2 greenOffset = baseDisplacement; // Reference channel
         vec2 blueOffset = baseDisplacement * (1.0 - dispersionStrength);
         
-        // Sample displaced colors
         vec2 redUV = screenUV + redOffset / uSize;
-        vec2 greenUV = screenUV + greenOffset / uSize;
+        vec2 greenUV = screenUV + baseDisplacement / uSize;
         vec2 blueUV = screenUV + blueOffset / uSize;
         
-        float red = (blurRadius > 0.001) ? 
-            applyKawaseBlur(backgroundTexture, redUV, texelSize, blurRadius).r :
-            texture(backgroundTexture, redUV).r;
-            
-        vec4 greenSample = (blurRadius > 0.001) ? 
-            applyKawaseBlur(backgroundTexture, greenUV, texelSize, blurRadius) :
-            texture(backgroundTexture, greenUV);
-        float green = greenSample.g;
-        float bgAlpha = greenSample.a;
+        // Sample displaced colors
+        float red, green, blue, alpha;
+        if (blurRadius > 0.001) {
+            red = applyKawaseBlur(backgroundTexture, redUV, texelSize, blurRadius).r;
+            vec4 greenSample = applyKawaseBlur(backgroundTexture, greenUV, texelSize, blurRadius);
+            green = greenSample.g;
+            alpha = greenSample.a;
+            blue = applyKawaseBlur(backgroundTexture, blueUV, texelSize, blurRadius).b;
+        } else {
+            red = texture(backgroundTexture, redUV).r;
+            vec4 greenSample = texture(backgroundTexture, greenUV);
+            green = greenSample.g;
+            alpha = greenSample.a;
+            blue = texture(backgroundTexture, blueUV).b;
+        }
         
-        float blue = (blurRadius > 0.001) ? 
-            applyKawaseBlur(backgroundTexture, blueUV, texelSize, blurRadius).b :
-            texture(backgroundTexture, blueUV).b;
-        
-        refractionDisplacement = greenOffset;
-        refractColor = vec4(red, green, blue, bgAlpha);
+        return vec4(red, green, blue, alpha);
     } else {
         // Default path for no chromatic aberration
-        vec3 refractVec = refract(incident, normal, 1.0 / refractiveIndex);
-        float refractLength = (height + baseHeight) / max(0.001, abs(refractVec.z));
-        refractionDisplacement = refractVec.xy * refractLength;
-        vec2 refractedUV = screenUV + refractionDisplacement / uSize;
-        refractColor = (blurRadius > 0.001) ? 
+        vec2 refractedUV = screenUV + baseDisplacement / uSize;
+        return (blurRadius > 0.001) ? 
             applyKawaseBlur(backgroundTexture, refractedUV, texelSize, blurRadius) :
             texture(backgroundTexture, refractedUV);
     }
-    
-    return refractColor;
 }
 
 // Apply saturation and lightness adjustments to a color
@@ -269,16 +259,20 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 
 // Complete liquid glass rendering pipeline
 vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation, float lightness) {
+    // Get background color for lighting calculations
+    vec4 backgroundColor = texture(backgroundTexture, screenUV);
+    
     // If we're completely outside the glass area (with smooth transition)
     if (foregroundAlpha < 0.001) {
-        return texture(backgroundTexture, screenUV);
+        return backgroundColor;
     }
     
     // If thickness is effectively zero, behave like a simple blur
     if (thickness < 0.01) {
-        return texture(backgroundTexture, screenUV);
+        return backgroundColor;
     }
     
+
     float height = getHeight(sd, thickness);
     
     // Calculate refraction & chromatic aberration with blur applied to the sampling
@@ -288,11 +282,8 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     // Mix refraction and reflection based on normal.z
     vec4 liquidColor = refractColor;
     
-    // Get background color for lighting calculations
-    vec4 backgroundColor = texture(backgroundTexture, screenUV);
-    
     // Calculate lighting effects using background color
-    vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, lightDirection, lightIntensity, ambientStrength, backgroundColor.rgb);
+    vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, height, lightDirection, lightIntensity, ambientStrength, backgroundColor.rgb);
     
     // Apply realistic glass color influence
     vec4 finalColor = applyGlassColor(liquidColor, glassColor);
