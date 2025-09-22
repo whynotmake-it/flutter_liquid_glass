@@ -174,6 +174,7 @@ void main() {
     vec3 normal = getNormal(sd, uThickness);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
+    // Early discard for pixels outside glass shapes to reduce overdraw
     if (foregroundAlpha < 0.01) {
         fragColor = texture(uBackgroundTexture, screenUV);
         return;
