@@ -5,8 +5,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
+import 'package:liquid_glass_renderer/src/glass_link.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/raw_shapes.dart';
@@ -23,7 +23,7 @@ import 'package:meta/meta.dart';
 /// them.
 ///
 /// > [!WARNING]
-/// > A maximum of 16 shapes are supported per layer due to Impeller's 
+/// > A maximum of 16 shapes are supported per layer due to Impeller's
 /// > uniform buffer limits.
 ///
 /// ## Example
@@ -105,7 +105,6 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         shader: shader,
         settings: widget.settings,
         debugRenderRefractionMap: false,
-        vsync: this,
         restrictThickness: widget.restrictThickness,
         child: child!,
       ),
@@ -119,7 +118,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.shader,
     required this.settings,
     required this.debugRenderRefractionMap,
-    required this.vsync,
     required this.restrictThickness,
     required Widget super.child,
   });
@@ -128,7 +126,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final LiquidGlassSettings settings;
   final bool debugRenderRefractionMap;
   final bool restrictThickness;
-  final TickerProvider vsync;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -137,7 +134,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       shader: shader,
       settings: settings,
       debugRenderRefractionMap: debugRenderRefractionMap,
-      ticker: vsync,
       restrictThickness: restrictThickness,
     );
   }
@@ -150,13 +146,12 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     renderObject
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
-      ..ticker = vsync
       ..debugRenderRefractionMap = debugRenderRefractionMap
       ..restrictThickness = restrictThickness;
   }
 }
 
-/// Maximum number of shapes supported per layer due to Impeller's uniform 
+/// Maximum number of shapes supported per layer due to Impeller's uniform
 /// buffer limit
 const int _maxShapesPerLayer = 16;
 
@@ -166,18 +161,16 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     required double devicePixelRatio,
     required FragmentShader shader,
     required LiquidGlassSettings settings,
-    required TickerProvider ticker,
     required bool restrictThickness,
     bool debugRenderRefractionMap = false,
   })  : _devicePixelRatio = devicePixelRatio,
         _shader = shader,
         _settings = settings,
-        _tickerProvider = ticker,
         _debugRenderRefractionMap = debugRenderRefractionMap,
-        _restrictThickness = restrictThickness {
-    _ticker = _tickerProvider.createTicker((_) {
-      markNeedsPaint();
-    });
+        _restrictThickness = restrictThickness,
+        _glassLink = GlassLink() {
+    // Listen to glass link changes instead of using a ticker
+    _glassLink.addListener(_onGlassLinkChanged);
   }
 
   bool _restrictThickness;
@@ -187,10 +180,10 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  // Registry to allow shapes to find their parent layer
-  static final Expando<RenderLiquidGlassLayer> layerRegistry = Expando();
+  final GlassLink _glassLink;
 
-  final Set<RenderLiquidGlass> registeredShapes = {};
+  /// The GlassLink that shapes can use to report their state.
+  GlassLink get glassLink => _glassLink;
 
   double _devicePixelRatio;
   set devicePixelRatio(double value) {
@@ -215,72 +208,34 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  TickerProvider _tickerProvider;
-  set ticker(TickerProvider value) {
-    if (_tickerProvider == value) return;
-    _tickerProvider = value;
+  void _onGlassLinkChanged() {
     markNeedsPaint();
-  }
-
-  /// Ticker to animate the liquid glass effect.
-  ///
-  // TODO(timcreatedit): this is maybe not the best for performance, but I can't
-  // come up with a better solution right now.
-  Ticker? _ticker;
-
-  void registerShape(RenderLiquidGlass shape) {
-    if (registeredShapes.length >= _maxShapesPerLayer) {
-      throw UnsupportedError(
-        'Only $_maxShapesPerLayer shapes are supported at the moment!',
-      );
-    }
-    registeredShapes.add(shape);
-    layerRegistry[shape] = this;
-    markNeedsPaint();
-
-    if (registeredShapes.length == 1) {
-      _ticker?.start();
-    }
-  }
-
-  void unregisterShape(RenderLiquidGlass shape) {
-    registeredShapes.remove(shape);
-    layerRegistry[shape] = null;
-    markNeedsPaint();
-    if (registeredShapes.isEmpty) {
-      _ticker?.stop();
-    }
   }
 
   List<(RenderLiquidGlass, RawShape)> collectShapes() {
     final result = <(RenderLiquidGlass, RawShape)>[];
+    final computedShapes = _glassLink.computedShapes;
 
-    for (final shapeRender in registeredShapes) {
-      if (shapeRender.attached && shapeRender.hasSize) {
-        try {
-          // Get transform relative to global coordinates, since the shader
-          // always covers the whole screen (BackdropFilter)
-          final transform = shapeRender.getTransformTo(null);
+    // Check shape count limit
+    if (computedShapes.length > _maxShapesPerLayer) {
+      throw UnsupportedError(
+        'Only $_maxShapesPerLayer shapes are supported at the moment!',
+      );
+    }
 
-          final rect = MatrixUtils.transformRect(
-            transform,
-            Offset.zero & shapeRender.size,
-          );
-
-          result.add(
-            (
-              shapeRender,
-              RawShape.fromLiquidGlassShape(
-                shapeRender.shape,
-                center: rect.center,
-                size: rect.size,
-              ),
+    for (final shapeInfo in computedShapes) {
+      final renderObject = shapeInfo.renderObject;
+      if (renderObject is RenderLiquidGlass) {
+        result.add(
+          (
+            renderObject,
+            RawShape.fromLiquidGlassShape(
+              shapeInfo.shape,
+              center: shapeInfo.globalBounds.center,
+              size: shapeInfo.globalBounds.size,
             ),
-          );
-        } catch (e) {
-          // Skip shapes that can't be transformed
-          debugPrint('Failed to collect shape: $e');
-        }
+          ),
+        );
       }
     }
 
@@ -370,9 +325,9 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
   @override
   void dispose() {
-    _ticker?.stop();
-    _ticker?.dispose();
-    _ticker = null;
+    _glassLink
+      ..removeListener(_onGlassLinkChanged)
+      ..dispose();
     super.dispose();
   }
 

@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:liquid_glass_renderer/src/glass_link.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/liquid_shape.dart';
@@ -166,7 +167,7 @@ class RenderLiquidGlass extends RenderProxyBox {
     if (_shape == value) return;
     _shape = value;
     markNeedsPaint();
-    _notifyLayerIfNeeded();
+    _updateGlassLink();
   }
 
   bool _glassContainsChild = true;
@@ -175,13 +176,14 @@ class RenderLiquidGlass extends RenderProxyBox {
     if (_glassContainsChild == value) return;
     _glassContainsChild = value;
     markNeedsPaint();
-    _notifyLayerIfNeeded();
+    _updateGlassLink();
   }
+
+  GlassLink? _glassLink;
 
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    // Register with parent layer after attaching
     _registerWithParentLayer();
   }
 
@@ -196,7 +198,12 @@ class RenderLiquidGlass extends RenderProxyBox {
     var ancestor = parent;
     while (ancestor != null) {
       if (ancestor is RenderLiquidGlassLayer) {
-        ancestor.registerShape(this);
+        _glassLink = ancestor.glassLink;
+        _glassLink?.registerShape(
+          this,
+          _shape,
+          glassContainsChild: _glassContainsChild,
+        );
         break;
       }
       ancestor = ancestor.parent;
@@ -204,20 +211,23 @@ class RenderLiquidGlass extends RenderProxyBox {
   }
 
   void _unregisterFromParentLayer() {
-    final layer = RenderLiquidGlassLayer.layerRegistry[this];
-    layer?.unregisterShape(this);
+    _glassLink?.unregisterShape(this);
+    _glassLink = null;
   }
 
-  void _notifyLayerIfNeeded() {
-    final layer = RenderLiquidGlassLayer.layerRegistry[this];
-    layer?.markNeedsPaint();
+  void _updateGlassLink() {
+    _glassLink?.updateShape(
+      this,
+      _shape,
+      glassContainsChild: _glassContainsChild,
+    );
   }
 
   @override
   void performLayout() {
     super.performLayout();
     // Notify parent layer when our layout changes
-    _notifyLayerIfNeeded();
+    _glassLink?.notifyShapeLayoutChanged(this);
   }
 
   @override
@@ -245,12 +255,5 @@ class RenderLiquidGlass extends RenderProxyBox {
         );
       },
     );
-  }
-
-  @override
-  void markNeedsPaint() {
-    super.markNeedsPaint();
-    // Also notify the parent layer
-    _notifyLayerIfNeeded();
   }
 }
