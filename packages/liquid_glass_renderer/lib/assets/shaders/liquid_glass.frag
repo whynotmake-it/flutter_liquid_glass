@@ -165,10 +165,14 @@ vec3 getNormal(float sd, float thickness) {
 }
 
 void main() {
-    vec2 screenUV = FlutterFragCoord().xy / uSize;
+    vec2 fragCoord = FlutterFragCoord().xy;
+    
+    // Compute screen UV
+    float yUsed = normalizeY(fragCoord.y, uSize);
+    vec2 screenUV = vec2(fragCoord.x / uSize.x, yUsed);
     
     // Apply transform to fragment coordinates
-    vec4 transformedCoord = uTransform * vec4(FlutterFragCoord().xy, 0.0, 1.0);
+    vec4 transformedCoord = uTransform * vec4(fragCoord, 0.0, 1.0);
     vec2 p = transformedCoord.xy;
     
     // Generate shape and calculate normal using shader-specific method
