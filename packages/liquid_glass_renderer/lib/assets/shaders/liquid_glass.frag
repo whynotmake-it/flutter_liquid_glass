@@ -166,11 +166,14 @@ vec3 getNormal(float sd, float thickness) {
 }
 
 void main() {
-    vec2 screenUV = FlutterFragCoord().xy / uSize;
-    vec2 p = FlutterFragCoord().xy;
+    vec2 fragCoord = FlutterFragCoord().xy;
+
+    // Compute screen UV
+    float yUsed = normalizeY(fragCoord.y, uSize);
+    vec2 screenUV = vec2(fragCoord.x / uSize.x, yUsed);
     
     // Generate shape and calculate normal using shader-specific method
-    float sd = sceneSDF(p);
+    float sd = sceneSDF(fragCoord);
     vec3 normal = getNormal(sd, uThickness);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
@@ -183,7 +186,7 @@ void main() {
     // Use shared rendering pipeline
     fragColor = renderLiquidGlass(
         screenUV, 
-        p, 
+        fragCoord, 
         uSize, 
         sd, 
         uThickness, 

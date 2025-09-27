@@ -7,6 +7,19 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
+#ifndef EMULATOR_Y_FLIP
+  #define EMULATOR_Y_FLIP 0
+#endif
+
+// Compute normalized Y coordinate depending on compile-time flip macro (used to support emulator rendering)
+float normalizeY(float coordY, vec2 size) {
+    #if EMULATOR_Y_FLIP == 1
+        return 1.0 - (coordY / size.y);
+    #else
+        return coordY / size.y;
+    #endif
+}
+
 // Optimized Kawase blur function - 5 samples instead of 13 (60-70% performance improvement)
 vec4 applyKawaseBlur(sampler2D tex, vec2 uv, vec2 texelSize, float blurRadius) {
     // Early return for no blur - only 1 texture sample

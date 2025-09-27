@@ -9,6 +9,8 @@ import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:rivership/rivership.dart';
 
 void main() {
+  // Uncomment to test emulator-compatible shaders or comment if you are on a real device
+  forceLiquidGlassEmulatorRendering();
   runApp(const MainApp());
 }
 
