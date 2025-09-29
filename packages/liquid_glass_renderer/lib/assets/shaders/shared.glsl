@@ -7,13 +7,9 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
-#ifndef EMULATOR_Y_FLIP
-  #define EMULATOR_Y_FLIP 0
-#endif
-
-// Compute normalized Y coordinate depending on compile-time flip macro (used to support emulator rendering)
-float normalizeY(float coordY, vec2 size) {
-    #if EMULATOR_Y_FLIP == 1
+// Compute Y coordinate reversing it for OpenGL backend
+float computeY(float coordY, vec2 size) {
+    #ifdef IMPELLER_TARGET_OPENGLES
         return 1.0 - (coordY / size.y);
     #else
         return coordY / size.y;
