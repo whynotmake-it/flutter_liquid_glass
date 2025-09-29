@@ -168,7 +168,7 @@ void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
     
     // Compute screen UV
-    float yUsed = normalizeY(fragCoord.y, uSize);
+    float yUsed = computeY(fragCoord.y, uSize);
     vec2 screenUV = vec2(fragCoord.x / uSize.x, yUsed);
     
     // Apply transform to fragment coordinates

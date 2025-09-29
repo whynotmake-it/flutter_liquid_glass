@@ -167,7 +167,7 @@ void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
 
     // Compute screen UV
-    float screenY = normalizeY(fragCoord.y, uSize);
+    float screenY = computeY(fragCoord.y, uSize);
     vec2 screenUV = vec2(fragCoord.x / uSize.x, screenY);
 
     // Convert screen coordinates to layer-local coordinates
@@ -176,7 +176,7 @@ void main() {
 
     // Then apply inverse transform to account for scaling (e.g. from FittedBox)
     vec4 transformedCoord = uTransform * vec4(layerLocalCoord, 0.0, 1.0);
-    float layerY = normalizeY(transformedCoord.y, uForegroundSize);
+    float layerY = computeY(transformedCoord.y, uForegroundSize);
     vec2 layerUV = vec2(transformedCoord.x / uForegroundSize.x, layerY);
 
     // If we are sampling outside of the foreground matte we should just treat the
@@ -198,7 +198,7 @@ void main() {
     vec4 blurred = texture(uForegroundBlurredTexture, layerUV);
     float sd = approximateSDF(blurred.a, uThickness);
     
-#if EMULATOR_Y_FLIP == 1
+#ifdef IMPELLER_TARGET_OPENGLES
     // Convert flipped layerUV back to layer-local coordinates for normal calculation
     transformedCoord.xy = layerUV * uForegroundSize;
 #endif
