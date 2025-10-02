@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:smooth_sheets/smooth_sheets.dart';
 import 'package:stupid_simple_sheet/stupid_simple_sheet.dart';
 
 Animation<double> useRotatingAnimationController() {
@@ -114,18 +113,17 @@ class SettingsSheet extends HookWidget {
     return SafeArea(
       child: LiquidGlass(
         glassContainsChild: false,
-        settings: LiquidGlassSettings(
-          thickness: 30,
-          blur: 20,
-          lightIntensity: .5,
+        settings: LiquidGlassSettings.figma(
+          depth: 100,
+          refraction: 100,
           lightAngle: lightAngle,
-          ambientStrength: .5,
-          chromaticAberration: 2,
+          dispersion: 4,
+          frost: 4,
           glassColor: Theme.of(
             context,
           ).colorScheme.surface.withValues(alpha: 0.4),
         ),
-        shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(24)),
+        shape: LiquidRoundedSuperellipse(borderRadius: Radius.circular(32)),
         child: DefaultTextStyle(
           style: Theme.of(context).textTheme.bodyLarge!,
           child: Align(
