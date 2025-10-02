@@ -6,6 +6,54 @@ import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
+/// Creates a jelly transform matrix based on velocity for organic squash and stretch effect
+Matrix4 buildJellyTransform({
+  required Offset velocity,
+  double maxDistortion = 0.7,
+  double velocityScale = 1000.0,
+}) {
+  // Calculate the magnitude of velocity to determine distortion intensity
+  final speed = velocity.distance;
+
+  // Normalize velocity direction
+  final direction = speed > 0 ? velocity / speed : Offset.zero;
+
+  // Apply a scaling factor to make the effect more pronounced
+  final distortionFactor =
+      (speed / velocityScale).clamp(0.0, 1.0) * maxDistortion;
+
+  if (distortionFactor == 0) {
+    return Matrix4.identity();
+  }
+
+  // Create squash and stretch effect
+  // Squash in the direction of movement, stretch perpendicular to it
+  final squashX = 1.0 - (direction.dx.abs() * distortionFactor * 0.5);
+  final squashY = 1.0 - (direction.dy.abs() * distortionFactor * 0.5);
+  final stretchX = 1.0 + (direction.dy.abs() * distortionFactor * 0.3);
+  final stretchY = 1.0 + (direction.dx.abs() * distortionFactor * 0.3);
+
+  // Combine squash and stretch effects
+  final scaleX = squashX * stretchX;
+  final scaleY = squashY * stretchY;
+
+  // Create skew effect for more organic jelly feel
+  final skewX = direction.dx * distortionFactor * 0.2;
+  final skewY = direction.dy * distortionFactor * 0.2;
+
+  // Build the transformation matrix
+  final matrix = Matrix4.identity();
+
+  // Apply skew transformation
+  matrix.setEntry(0, 1, skewX); // Skew X by Y
+  matrix.setEntry(1, 0, skewY); // Skew Y by X
+
+  // Apply scale transformation
+  matrix.scale(scaleX, scaleY);
+
+  return matrix;
+}
+
 class LiquidGlassBottomBar extends StatefulWidget {
   const LiquidGlassBottomBar({
     super.key,
@@ -486,12 +534,13 @@ class _TabIndicatorState extends State<_TabIndicator>
         _isDragging = false;
         _isDown = false;
       }),
-      child: SingleMotionBuilder(
+      child: VelocityMotionBuilder(
+        converter: SingleMotionConverter(),
         value: xAlign,
         motion: _isDragging
             ? const Motion.interactiveSpring()
             : const Motion.bouncySpring(),
-        builder: (context, value, child) {
+        builder: (context, value, velocity, child) {
           final alignment = Alignment(value, 0);
           return SingleMotionBuilder(
             motion: const Motion.snappySpring(),
@@ -501,78 +550,47 @@ class _TabIndicatorState extends State<_TabIndicator>
                 ? 1.0
                 : 0.0,
             builder: (context, thickness, child) {
-              final rect = RelativeRect.lerp(
-                RelativeRect.fill,
-                const RelativeRect.fromLTRB(-12, -12, -12, -12),
-                thickness,
-              );
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
                   if (thickness < 1)
-                    Positioned.fill(
-                      left: 4,
-                      right: 4,
-                      top: 4,
-                      bottom: 4,
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / widget.tabCount,
-                        alignment: alignment,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned.fromRelativeRect(
-                              rect: rect!,
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 120),
-                                opacity: widget.visible && thickness <= .2
-                                    ? 1
-                                    : 0,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: indicatorColor,
-                                    borderRadius: BorderRadius.circular(64),
-                                  ),
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                          ],
+                    _IndicatorTransform(
+                      velocity: velocity,
+                      tabCount: widget.tabCount,
+                      alignment: alignment,
+                      thickness: thickness,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 120),
+                        opacity: widget.visible && thickness <= .2 ? 1 : 0,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: indicatorColor,
+                            borderRadius: BorderRadius.circular(64),
+                          ),
+                          child: const SizedBox.expand(),
                         ),
                       ),
                     ),
                   child!,
                   if (thickness > 0)
-                    Positioned.fill(
-                      left: 4,
-                      right: 4,
-                      top: 4,
-                      bottom: 4,
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / widget.tabCount,
-                        alignment: alignment,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned.fromRelativeRect(
-                              rect: rect!,
-                              child: LiquidGlass(
-                                settings: LiquidGlassSettings(
-                                  saturation: 1 + .5 * thickness,
-                                  lightness: 1 + .1 * thickness,
-                                  refractiveIndex: 1.15,
-                                  thickness: thickness * 20,
-                                  lightIntensity: 2,
-                                  chromaticAberration: .5,
-                                ),
-                                shape: const LiquidRoundedSuperellipse(
-                                  borderRadius: Radius.circular(64),
-                                ),
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                          ],
+                    _IndicatorTransform(
+                      velocity: velocity,
+                      tabCount: widget.tabCount,
+                      alignment: alignment,
+                      thickness: thickness,
+                      child: LiquidGlass(
+                        settings: LiquidGlassSettings(
+                          saturation: 1 + .5 * thickness,
+                          lightness: 1 + .1 * thickness,
+                          refractiveIndex: 1.15,
+                          thickness: thickness * 20,
+                          lightIntensity: 2,
+                          chromaticAberration: .5,
                         ),
+                        shape: const LiquidRoundedSuperellipse(
+                          borderRadius: Radius.circular(64),
+                        ),
+                        child: const SizedBox.expand(),
                       ),
                     ),
                 ],
@@ -582,6 +600,66 @@ class _TabIndicatorState extends State<_TabIndicator>
           );
         },
         child: widget.child,
+      ),
+    );
+  }
+}
+
+class _IndicatorTransform extends StatelessWidget {
+  const _IndicatorTransform({
+    required this.velocity,
+    required this.tabCount,
+    required this.alignment,
+    required this.thickness,
+    required this.child,
+  });
+
+  final double velocity;
+  final int tabCount;
+  final Alignment alignment;
+  final double thickness;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final rect = RelativeRect.lerp(
+      RelativeRect.fill,
+      const RelativeRect.fromLTRB(-12, -12, -12, -12),
+      thickness,
+    );
+    return Positioned.fill(
+      left: 4,
+      right: 4,
+      top: 4,
+      bottom: 4,
+      child: FractionallySizedBox(
+        widthFactor: 1 / tabCount,
+        alignment: alignment,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fromRelativeRect(
+              rect: rect!,
+              child: SingleMotionBuilder(
+                motion: Motion.bouncySpring(),
+                value: velocity,
+                builder: (context, velocity, child) {
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: buildJellyTransform(
+                      velocity: Offset(velocity, 0),
+                      maxDistortion: .6,
+                      velocityScale: 20
+                    ),
+                    child: child,
+                  );
+                  
+                },child: child,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
