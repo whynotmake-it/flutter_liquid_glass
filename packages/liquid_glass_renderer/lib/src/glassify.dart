@@ -407,7 +407,12 @@ class _GlassifyShaderLayer extends OffsetLayer {
       ..setFloat(18, settings.lightness)
       // uLightDirection (vec2) - location 6: starts at float index 19
       ..setFloat(19, cos(settings.lightAngle))
-      ..setFloat(20, sin(settings.lightAngle));
+      ..setFloat(20, sin(settings.lightAngle))
+      // uTransform (mat4) - location 7: starts at float index 21
+      ..setFloat(21, 1) ..setFloat(22, 0) ..setFloat(23, 0) ..setFloat(24, 0)
+      ..setFloat(25, 0) ..setFloat(26, 1) ..setFloat(27, 0) ..setFloat(28, 0)
+      ..setFloat(29, 0) ..setFloat(30, 0) ..setFloat(31, 1) ..setFloat(32, 0)
+      ..setFloat(33, 0) ..setFloat(34, 0) ..setFloat(35, 0) ..setFloat(36, 1);
   }
 
   @override

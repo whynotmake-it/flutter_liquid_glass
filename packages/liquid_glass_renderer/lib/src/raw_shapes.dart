@@ -26,6 +26,7 @@ class RawShape with EquatableMixin {
     LiquidShape shape, {
     required Offset center,
     required Size size,
+    double scale = 1.0,
   }) {
     switch (shape) {
       case LiquidRoundedSuperellipse():
@@ -34,7 +35,7 @@ class RawShape with EquatableMixin {
           type: RawShapeType.squircle,
           center: center,
           size: size,
-          cornerRadius: shape.borderRadius.x,
+          cornerRadius: shape.borderRadius.x * scale,
         );
       case LiquidOval():
         return RawShape(
@@ -49,7 +50,7 @@ class RawShape with EquatableMixin {
           type: RawShapeType.roundedRectangle,
           center: center,
           size: size,
-          cornerRadius: shape.borderRadius.x,
+          cornerRadius: shape.borderRadius.x * scale,
         );
     }
   }

@@ -23,6 +23,7 @@ layout(location = 2) uniform vec4 uOpticalProps;           // refractiveIndex, c
 layout(location = 3) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
 layout(location = 4) uniform vec2 uColorAdjust;            // lightness, numShapes  
 layout(location = 5) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
+layout(location = 6) uniform mat4 uTransform;              // transform matrix for all shapes
 
 // Extract individual values for backward compatibility
 float uChromaticAberration = uOpticalProps.y;
@@ -39,7 +40,7 @@ float uLightness = uColorAdjust.x;
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 // Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
 #define MAX_SHAPES 16
-layout(location = 6) uniform float uShapeData[MAX_SHAPES * 6];
+layout(location = 10) uniform float uShapeData[MAX_SHAPES * 6];
 
 uniform sampler2D uBackgroundTexture;
 layout(location = 0) out vec4 fragColor;
@@ -167,7 +168,10 @@ vec3 getNormal(float sd, float thickness) {
 
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
-    vec2 p = FlutterFragCoord().xy;
+    
+    // Apply transform to fragment coordinates
+    vec4 transformedCoord = uTransform * vec4(FlutterFragCoord().xy, 0.0, 1.0);
+    vec2 p = transformedCoord.xy;
     
     // Generate shape and calculate normal using shader-specific method
     float sd = sceneSDF(p);

@@ -226,8 +226,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     for (final shapeInfo in computedShapes) {
       final renderObject = shapeInfo.renderObject;
 
-
       if (renderObject is RenderLiquidGlass) {
+        final scale = _getScaleFromTransform(shapeInfo.transform);
         result.add(
           (
             renderObject,
@@ -235,6 +235,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
               shapeInfo.shape,
               center: shapeInfo.globalBounds.center,
               size: shapeInfo.globalBounds.size,
+              scale: scale,
             ),
           ),
         );
@@ -242,6 +243,42 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     }
 
     return result;
+  }
+
+  /// Extracts the geometric mean of X and Y scale factors from a transform.
+  ///
+  /// This is used to scale corner radii when shapes are transformed by Flutter
+  /// widgets like [FittedBox] or [Transform]. The position and size are already
+  /// correctly transformed via [MatrixUtils.transformRect], but corner radii
+  /// need explicit scaling.
+  ///
+  /// **Design Tradeoff**: Instead of passing full Matrix3 transforms to the
+  /// shader, we extract scale on the CPU once per frame
+  /// per shape and only send 6 floats per shape to the shader.
+  ///
+  /// **Performance**: Optimized with fast path for axis-aligned transforms
+  /// (FittedBox, Transform.scale) using direct matrix access. Handles rotated
+  /// and skewed transforms with minimal overhead.
+  ///
+  /// **Limitation**: For non-uniform scaling with rotation, the geometric mean
+  /// may not perfectly match visual appearance in all cases, but provides good
+  /// results for common UI transforms while keeping shader cost at zero.
+  double _getScaleFromTransform(Matrix4 transform) {
+    final m = transform.storage;
+    final scaleX = m[0];
+    final scaleY = m[5];
+    
+    if (m[1] == 0 && m[4] == 0) {
+      return sqrt(scaleX.abs() * scaleY.abs());
+    }
+    
+    final a = m[0];
+    final b = m[1];
+    final c = m[4];
+    final d = m[5];
+    final scaleXSq = a * a + b * b;
+    final scaleYSq = c * c + d * d;
+    return sqrt(sqrt(scaleXSq * scaleYSq));
   }
 
   @override
@@ -266,43 +303,40 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       thickness = min(thickness, smallestShape.$2.size.shortestSide);
     }
 
-    // Optimized uniform binding - grouped into vectors (50% fewer API calls)
-    _shader
-      // uSize (vec2) - location 0: automatically set by Flutter
-      // uGlassColor (vec4) - location 1: starts at float index 2
-      ..setFloat(2, _settings.glassColor.r)
-      ..setFloat(3, _settings.glassColor.g)
-      ..setFloat(4, _settings.glassColor.b)
-      ..setFloat(5, _settings.glassColor.a)
-      // uOpticalProps (vec4) - location 2: starts at float index 6
-      ..setFloat(6, _settings.refractiveIndex)
-      ..setFloat(7, _settings.chromaticAberration)
-      ..setFloat(8, thickness)
-      ..setFloat(9, _settings.blend * _devicePixelRatio)
-      // uLightConfig (vec4) - location 3: starts at float index 10
-      ..setFloat(10, _settings.lightAngle)
-      ..setFloat(11, _settings.lightIntensity)
-      ..setFloat(12, _settings.ambientStrength)
-      ..setFloat(13, _settings.saturation)
-      // uColorAdjust (vec2) - location 4: starts at float index 14
-      ..setFloat(14, _settings.lightness)
-      ..setFloat(15, shapeCount.toDouble())
-      // uLightDirection (vec2) - location 5: starts at float index 16
-      ..setFloat(16, cos(_settings.lightAngle))
-      ..setFloat(17, sin(_settings.lightAngle));
+    _shader.setFloatUniforms(initialIndex: 2, (value) {
+      value
+        ..setColor(_settings.glassColor)
+        ..setFloats([
+          _settings.refractiveIndex,
+          _settings.chromaticAberration,
+          thickness,
+          _settings.blend * _devicePixelRatio,
+          _settings.lightAngle,
+          _settings.lightIntensity,
+          _settings.ambientStrength,
+          _settings.saturation,
+          _settings.lightness,
+          shapeCount.toDouble(),
+        ])
+        ..setOffset(
+          Offset(
+            cos(_settings.lightAngle),
+            sin(_settings.lightAngle),
+          ),
+        )
+        ..setFloats(Matrix4.identity().storage); // Identity matrix
 
-    for (var i = 0; i < shapeCount; i++) {
-      final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
-      final baseIndex = 18 + (i * 6); // Shape array at location 6
-
-      _shader
-        ..setFloat(baseIndex, shape.type.index.toDouble())
-        ..setFloat(baseIndex + 1, shape.center.dx * _devicePixelRatio)
-        ..setFloat(baseIndex + 2, shape.center.dy * _devicePixelRatio)
-        ..setFloat(baseIndex + 3, shape.size.width * _devicePixelRatio)
-        ..setFloat(baseIndex + 4, shape.size.height * _devicePixelRatio)
-        ..setFloat(baseIndex + 5, shape.cornerRadius * _devicePixelRatio);
-    }
+      for (var i = 0; i < shapeCount; i++) {
+        final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
+        value
+          ..setFloat(shape.type.index.toDouble())
+          ..setFloat(shape.center.dx * _devicePixelRatio)
+          ..setFloat(shape.center.dy * _devicePixelRatio)
+          ..setFloat(shape.size.width * _devicePixelRatio)
+          ..setFloat(shape.size.height * _devicePixelRatio)
+          ..setFloat(shape.cornerRadius * _devicePixelRatio);
+      }
+    });
 
     _paintShapeBlurs(context, offset, shapes);
 

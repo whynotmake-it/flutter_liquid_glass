@@ -20,6 +20,7 @@ layout(location = 3) uniform vec4 uOpticalProps;           // refractiveIndex, c
 layout(location = 4) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
 layout(location = 5) uniform vec3 uTransformData;          // offsetX, offsetY, lightness
 layout(location = 6) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
+layout(location = 7) uniform mat4 uTransform;              // transform matrix
 
 // Extract individual values for backward compatibility
 float uChromaticAberration = uOpticalProps.y;
@@ -166,9 +167,12 @@ vec3 getNormal(vec2 p, float thickness) {
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
 
+    // Apply transform to fragment coordinates
+    vec4 transformedCoord = uTransform * vec4(FlutterFragCoord().xy, 0.0, 1.0);
+    
     // Convert screen coordinates to layer-local coordinates
     // Subtract the layer's position on screen to get coordinates relative to the layer
-    vec2 layerLocalCoord = FlutterFragCoord().xy - uOffset;
+    vec2 layerLocalCoord = transformedCoord.xy - uOffset;
     vec2 layerUV = layerLocalCoord / uForegroundSize;
 
     // If we are sampling outside of the foreground matte we should just treat the

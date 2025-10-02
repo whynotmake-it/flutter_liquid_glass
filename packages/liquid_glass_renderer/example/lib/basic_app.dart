@@ -52,10 +52,12 @@ class BasicApp extends HookWidget {
               shape: LiquidRoundedRectangle(borderRadius: Radius.circular(64)),
               child: Padding(
                 padding: const EdgeInsets.all(64.0),
-                child: Text(
-                  format.format(time),
-                  style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
-                      .copyWith(fontSize: 200),
+                child: Glassify(
+                  child: Text(
+                    format.format(time),
+                    style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
+                        .copyWith(fontSize: 200),
+                  ),
                 ),
               ),
             ),
