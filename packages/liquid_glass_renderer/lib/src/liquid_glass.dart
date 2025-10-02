@@ -223,10 +223,13 @@ class RenderLiquidGlass extends RenderProxyBox {
     );
   }
 
+  late Path _lastPath;
+
   @override
   void performLayout() {
     super.performLayout();
     // Notify parent layer when our layout changes
+    _lastPath = shape.getOuterPath(Offset.zero & size);
     _glassLink?.notifyShapeLayoutChanged(this);
   }
 
@@ -241,7 +244,7 @@ class RenderLiquidGlass extends RenderProxyBox {
     super.paint(context, offset);
   }
 
-  Path getPath(Offset offset) {
-    return shape.getOuterPath(offset & size);
+  Path getPath() {
+    return _lastPath;
   }
 }

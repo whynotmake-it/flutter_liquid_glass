@@ -41,24 +41,8 @@ class BasicApp extends HookWidget {
               slivers: [
                 SliverGrid(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => Stack(
-                      children: [
-                        Image.network(
-                          'https://picsum.photos/500/500?random=$index',
-                        ),
-                        Positioned(
-                          right: 0,
-                          child: LiquidGlass(
-                            child: SizedBox.square(dimension: 40),
-                            shape: LiquidOval(),
-                            settings: LiquidGlassSettings(
-                              blur: 10,
-                              glassColor: CupertinoTheme.of(context).barBackgroundColor.withValues(alpha: 0.1),
-                            ),
-
-                          ),
-                        ),
-                      ],
+                    (context, index) => Image.network(
+                      'https://picsum.photos/500/500?random=$index',
                     ),
                   ),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
