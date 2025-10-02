@@ -1,8 +1,8 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
@@ -544,7 +544,7 @@ class _TabIndicatorState extends State<_TabIndicator>
           final alignment = Alignment(value, 0);
           return SingleMotionBuilder(
             motion: const Motion.snappySpring(
-              duration: Duration(milliseconds: 300)
+              duration: Duration(milliseconds: 300),
             ),
             value:
                 widget.visible &&
@@ -644,7 +644,9 @@ class _IndicatorTransform extends StatelessWidget {
             Positioned.fromRelativeRect(
               rect: rect!,
               child: SingleMotionBuilder(
-                motion: Motion.bouncySpring(duration: const Duration(milliseconds: 600)),
+                motion: Motion.bouncySpring(
+                  duration: const Duration(milliseconds: 600),
+                ),
                 value: velocity,
                 builder: (context, velocity, child) {
                   return Transform(
@@ -652,12 +654,12 @@ class _IndicatorTransform extends StatelessWidget {
                     transform: buildJellyTransform(
                       velocity: Offset(velocity, 0),
                       maxDistortion: .5,
-                      velocityScale: 15
+                      velocityScale: 15,
                     ),
                     child: child,
                   );
-                  
-                },child: child,
+                },
+                child: child,
               ),
             ),
           ],

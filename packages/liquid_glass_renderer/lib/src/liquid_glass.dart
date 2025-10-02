@@ -1,7 +1,5 @@
 // ignore_for_file: avoid_setters_without_getters
 
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/src/glass_link.dart';
