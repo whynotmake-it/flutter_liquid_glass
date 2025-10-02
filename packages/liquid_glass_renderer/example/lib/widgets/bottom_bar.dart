@@ -57,7 +57,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           lightAngle: math.pi / 4,
           glassColor: CupertinoTheme.of(
             context,
-          ).barBackgroundColor.withValues(alpha: 0.4),
+          ).barBackgroundColor.withValues(alpha: 0.6),
         );
 
     return LiquidGlassLayer(
@@ -284,7 +284,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
                 child: Icon(
                   widget.config.icon,
                   size: 24,
-                  color: theme.barBackgroundColor,
+                  color: theme.textTheme.textStyle.color,
                 ),
               ),
             ),
@@ -318,41 +318,35 @@ class _TabIndicator extends StatefulWidget {
 
 class _TabIndicatorState extends State<_TabIndicator>
     with SingleTickerProviderStateMixin {
+  bool _isDown = false;
   bool _isDragging = false;
 
-  late final xAlignmentController = SingleMotionController(
-    vsync: this,
-    motion: const Motion.bouncySpring(),
-  );
+  late double xAlign = computeXAlignmentForTab(widget.tabIndex);
 
   @override
   void initState() {
     super.initState();
   }
 
+  double computeXAlignmentForTab(int tabIndex) {
+    final relativeTabIndex = (tabIndex / (widget.tabCount - 1)).clamp(0.0, 1.0);
+    return (relativeTabIndex * 2) - 1; // -1 to 1
+  }
+
   @override
   void didUpdateWidget(covariant _TabIndicator oldWidget) {
     if (oldWidget.tabIndex != widget.tabIndex ||
         oldWidget.tabCount != widget.tabCount) {
-      final relativeTabIndex = (widget.tabIndex / (widget.tabCount - 1)).clamp(
-        0.0,
-        1.0,
-      );
-      final targetXAlignment = (relativeTabIndex * 2) - 1; // -1 to 1
-      xAlignmentController.animateTo(targetXAlignment);
+      setState(() {
+        xAlign = computeXAlignmentForTab(widget.tabIndex);
+      });
     }
     super.didUpdateWidget(oldWidget);
   }
 
-  @override
-  void dispose() {
-    xAlignmentController.dispose();
-    super.dispose();
-  }
-
-  void _onDragUpdate(DragUpdateDetails details) {
+  double _getAlignmentFromGlobalPostition(Offset globalPosition) {
     final box = context.findRenderObject() as RenderBox;
-    final localPosition = box.globalToLocal(details.globalPosition);
+    final localPosition = box.globalToLocal(globalPosition);
 
     // Calculate the effective draggable range
     // The indicator moves within the tab bar, but has its own width (1/tabCount of total)
@@ -367,9 +361,21 @@ class _TabIndicatorState extends State<_TabIndicator>
 
     // Apply rubber band resistance for overdrag
     final adjustedRelativeX = _applyRubberBandResistance(normalizedX);
-    final alignmentX = (adjustedRelativeX * 2) - 1; // Convert to -1:1 range
+    return (adjustedRelativeX * 2) - 1; // Convert to -1:1 range
+  }
 
-    xAlignmentController.value = alignmentX;
+  void _onDragDown(DragDownDetails details) {
+    setState(() {
+      _isDown = true;
+      xAlign = _getAlignmentFromGlobalPostition(details.globalPosition);
+    });
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _isDragging = true;
+      xAlign = _getAlignmentFromGlobalPostition(details.globalPosition);
+    });
   }
 
   // Apply rubber band resistance similar to iOS scroll views
@@ -395,11 +401,13 @@ class _TabIndicatorState extends State<_TabIndicator>
   }
 
   void _onDragEnd(DragEndDetails details) {
-    setState(() => _isDragging = false);
+    setState(() {
+      _isDragging = false;
+      _isDown = false;
+    });
 
     final box = context.findRenderObject() as RenderBox;
-    final currentRelativeX =
-        (xAlignmentController.value + 1) / 2; // Convert from -1:1 to 0:1
+    final currentRelativeX = (xAlign + 1) / 2; // Convert from -1:1 to 0:1
     final tabWidth = 1.0 / widget.tabCount;
 
     // Calculate velocity in relative units, adjusted for the draggable range
@@ -454,16 +462,7 @@ class _TabIndicatorState extends State<_TabIndicator>
         );
       }
     }
-
-    // Calculate target alignment for the tab
-    final targetRelativeX = (targetTabIndex / (widget.tabCount - 1)).clamp(
-      0.0,
-      1.0,
-    );
-    final targetAlignment = (targetRelativeX * 2) - 1; // Convert to -1:1
-
-    // Animate to target
-    xAlignmentController.animateTo(targetAlignment, withVelocity: velocityX);
+    xAlign = computeXAlignmentForTab(targetTabIndex);
 
     // Notify parent of tab change if different from current
     if (targetTabIndex != widget.tabIndex) {
@@ -477,29 +476,28 @@ class _TabIndicatorState extends State<_TabIndicator>
     final indicatorColor =
         widget.indicatorColor ??
         theme.textTheme.textStyle.color?.withValues(alpha: .1);
-
-    final relativeTabIndex = (widget.tabIndex / (widget.tabCount - 1)).clamp(
-      0.0,
-      1.0,
-    );
-
-    final targetXAlignment = (relativeTabIndex * 2) - 1; // -1 to 1
+    final targetAlignment = computeXAlignmentForTab(widget.tabIndex);
 
     return GestureDetector(
-      onHorizontalDragDown: (details) => setState(() => _isDragging = true),
+      onHorizontalDragDown: _onDragDown,
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
-      onHorizontalDragCancel: () => setState(() => _isDragging = false),
-      child: AnimatedBuilder(
-        animation: xAlignmentController,
-        builder: (context, child) {
-          final alignment = Alignment(xAlignmentController.value, 0);
+      onHorizontalDragCancel: () => setState(() {
+        _isDragging = false;
+        _isDown = false;
+      }),
+      child: SingleMotionBuilder(
+        value: xAlign,
+        motion: _isDragging
+            ? const Motion.interactiveSpring()
+            : const Motion.bouncySpring(),
+        builder: (context, value, child) {
+          final alignment = Alignment(value, 0);
           return SingleMotionBuilder(
             motion: const Motion.snappySpring(),
             value:
                 widget.visible &&
-                    (_isDragging ||
-                        (alignment.x - targetXAlignment).abs() > 0.20)
+                    (_isDown || (alignment.x - targetAlignment).abs() > 0.20)
                 ? 1.0
                 : 0.0,
             builder: (context, thickness, child) {
@@ -560,7 +558,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                               rect: rect!,
                               child: LiquidGlass(
                                 settings: LiquidGlassSettings(
-                                  saturation: 1 + 1 * thickness,
+                                  saturation: 1 + .5 * thickness,
                                   lightness: 1 + .1 * thickness,
                                   refractiveIndex: 1.15,
                                   thickness: thickness * 20,

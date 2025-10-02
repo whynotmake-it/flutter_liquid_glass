@@ -7,6 +7,7 @@ environment:
   sdk: ^3.8.1
 
 dependencies:
+  cupertino_icons: ^1.0.8
   flex_color_picker: ^3.7.1
   flutter:
     sdk: flutter

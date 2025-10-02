@@ -230,8 +230,12 @@ class RenderLiquidGlass extends RenderProxyBox {
     _glassLink?.notifyShapeLayoutChanged(this);
   }
 
+  Matrix4? lastTransform;
+
   @override
-  void paint(PaintingContext context, Offset offset) {}
+  void paint(PaintingContext context, Offset offset) {
+    _glassLink?.notifyShapeLayoutChanged(this);
+  }
 
   void paintFromLayer(PaintingContext context, Offset offset) {
     super.paint(context, offset);

@@ -48,8 +48,10 @@ class BasicApp extends HookWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         CupertinoPageRoute(
-                          builder: (context) =>
-                              CupertinoPageScaffold(child: SizedBox()),
+                          builder: (context) => CupertinoPageScaffold(
+                            child: SizedBox(),
+                            navigationBar: CupertinoNavigationBar.large(),
+                          ),
                         ),
                       );
                     },
