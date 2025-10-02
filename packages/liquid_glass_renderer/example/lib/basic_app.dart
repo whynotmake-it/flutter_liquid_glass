@@ -1,10 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
+import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
 
 void main() {
   runApp(CupertinoApp(home: BasicApp()));
@@ -26,15 +25,8 @@ class BasicApp extends HookWidget {
   Widget build(BuildContext context) {
     useStream(Stream.periodic(const Duration(seconds: 1)));
     final lightAngleController = useRotatingAnimationController();
-    final lightAngle = useAnimation(lightAngleController);
 
-    final settings = useValueListenable(
-      settingsNotifier,
-    ).copyWith(lightAngle: lightAngle);
-
-    final time = DateTime.now();
-
-    final format = DateFormat('HH:mm');
+    final tab = useState(0);
 
     return GestureDetector(
       onTap: () {
@@ -43,25 +35,44 @@ class BasicApp extends HookWidget {
           lightAngleAnimation: lightAngleController,
         ).show(context);
       },
-      child: ImagePageView(
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: LiquidGlass(
-              settings: settings.copyWith(glassColor: Colors.transparent),
-              shape: LiquidRoundedRectangle(borderRadius: Radius.circular(64)),
-              child: Padding(
-                padding: const EdgeInsets.all(64.0),
-                child: Glassify(
-                  child: Text(
-                    format.format(time),
-                    style: GoogleFonts.lexendGigaTextTheme().headlineLarge!
-                        .copyWith(fontSize: 200),
+      child: CupertinoPageScaffold(
+        child: Stack(
+          children: [
+            ImagePageView(child: SizedBox.expand()),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: LiquidGlassBottomBar(
+                  extraButton: LiquidGlassBottomBarExtraButton(
+                    icon: CupertinoIcons.add_circled,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (context) =>
+                              CupertinoPageScaffold(child: SizedBox()),
+                        ),
+                      );
+                    },
+                    label: '',
                   ),
+                  tabs: [
+                    LiquidGlassBottomBarTab(
+                      label: 'Hi',
+                      icon: CupertinoIcons.home,
+                    ),
+                    LiquidGlassBottomBarTab(
+                      label: 'Hi',
+                      icon: CupertinoIcons.home,
+                    ),
+                  ],
+                  selectedIndex: tab.value,
+                  onTabSelected: (index) {
+                    tab.value = index;
+                  },
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
