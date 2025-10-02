@@ -202,24 +202,24 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
     } else {
         // Full chromatic aberration path
         // Calculate chromatic dispersion offsets
-        float dispersionStrength = chromaticAberration * 0.5;
-        vec2 redOffset = baseDisplacement * (1.0 + dispersionStrength);
-        vec2 blueOffset = baseDisplacement * (1.0 - dispersionStrength);
-        
-        vec2 redUV = screenUV + redOffset * invUSize;
-        vec2 greenUV = screenUV + baseDisplacement * invUSize;
-        vec2 blueUV = screenUV + blueOffset * invUSize;
-        
-        // Sample displaced colors - reuse green sample for alpha and optimize sampling
-        vec4 greenSample = applyKawaseBlur(backgroundTexture, greenUV, texelSize, blurRadius);
-        float green = greenSample.g;
-        float alpha = greenSample.a;
-        
-        // For R and B channels, only sample the specific channel to reduce bandwidth
-        float red = applyKawaseBlur(backgroundTexture, redUV, texelSize, blurRadius).r;
-        float blue = applyKawaseBlur(backgroundTexture, blueUV, texelSize, blurRadius).b;
-        
-        return vec4(red, green, blue, alpha);
+    float dispersionStrength = chromaticAberration * 0.5;
+    vec2 redOffset = baseDisplacement * (1.0 + dispersionStrength);
+    vec2 blueOffset = baseDisplacement * (1.0 - dispersionStrength);
+
+    vec2 redUV = screenUV + redOffset * invUSize;
+    vec2 greenUV = screenUV + baseDisplacement * invUSize;
+    vec2 blueUV = screenUV + blueOffset * invUSize;
+
+    // Sample displaced colors - reuse green sample for alpha and optimize sampling
+    vec4 greenSample = applyKawaseBlur(backgroundTexture, greenUV, texelSize, blurRadius);
+    float green = greenSample.g;
+    float alpha = greenSample.a;
+
+    // For R and B channels, only sample the specific channel to reduce bandwidth
+    float red = applyKawaseBlur(backgroundTexture, redUV, texelSize, blurRadius).r;
+    float blue = applyKawaseBlur(backgroundTexture, blueUV, texelSize, blurRadius).b;
+
+    return vec4(red, green, blue, alpha);
     }
 }
 

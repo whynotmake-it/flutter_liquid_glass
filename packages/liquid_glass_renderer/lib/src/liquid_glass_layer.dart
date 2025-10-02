@@ -173,6 +173,9 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     _glassLink.addListener(_onGlassLinkChanged);
   }
 
+  @override
+  bool get alwaysNeedsCompositing => true;
+
   bool _restrictThickness;
   set restrictThickness(bool value) {
     if (_restrictThickness == value) return;
@@ -281,6 +284,10 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     return sqrt(sqrt(scaleXSq * scaleYSq));
   }
 
+  final _shaderHandle = LayerHandle<BackdropFilterLayer>();
+  final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
+  final _clipLayerHandle = LayerHandle<ClipPathLayer>();
+
   @override
   void paint(PaintingContext context, Offset offset) {
     final shapes = collectShapes();
@@ -338,24 +345,51 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       }
     });
 
-    _paintShapeBlurs(context, offset, shapes);
-
     _paintShapeContents(context, offset, shapes, glassContainsChild: true);
 
-    context.pushLayer(
-      BackdropFilterLayer(
-        filter: ImageFilter.shader(_shader),
-      ),
-      (context, offset) {
-        _paintShapeContents(
+    final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
+      ..filter = ImageFilter.shader(_shader);
+
+    final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
+      ..filter = ImageFilter.blur(
+        sigmaX: _settings.blur * _devicePixelRatio,
+        sigmaY: _settings.blur * _devicePixelRatio,
+      );
+
+    final clipPath = Path();
+    for (final shape in shapes) {
+      clipPath.addPath(shape.$1.getPath(Offset.zero), Offset.zero);
+    }
+
+    final clipLayer = (_clipLayerHandle.layer ??= ClipPathLayer())
+      ..clipPath = clipPath
+      ..clipBehavior = Clip.hardEdge;
+
+    context
+      // First we push the clipped blur layer
+      ..pushLayer(
+        clipLayer,
+        (context, offset) {
+          context.pushLayer(
+            blurLayer,
+            (context, offset) {},
+            offset,
+          );
+        },
+        offset,
+      )
+      // Then we push the shader layer on top
+      ..pushLayer(
+        shaderLayer,
+        (context, offset) => _paintShapeContents(
           context,
           offset,
           shapes,
           glassContainsChild: false,
-        );
-      },
-      offset,
-    );
+        ),
+        offset,
+      );
+
     super.paint(context, offset);
   }
 
@@ -364,6 +398,9 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     _glassLink
       ..removeListener(_onGlassLinkChanged)
       ..dispose();
+    _blurLayerHandle.layer = null;
+    _shaderHandle.layer = null;
+    _clipLayerHandle.layer = null;
     super.dispose();
   }
 
@@ -377,7 +414,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       if (ro.glassContainsChild == glassContainsChild) {
         final globalTransform = ro.getTransformTo(null);
         final layerGlobalOffset = localToGlobal(Offset.zero);
-        
+
         final relativeTransform = Matrix4.identity()
           ..translateByDouble(
             -layerGlobalOffset.dx,
@@ -394,35 +431,6 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
           ro.paintFromLayer,
         );
       }
-    }
-  }
-
-  void _paintShapeBlurs(
-    PaintingContext context,
-    Offset offset,
-    List<(RenderLiquidGlass, RawShape)> shapes,
-  ) {
-    for (final (render, _) in shapes) {
-      final globalTransform = render.getTransformTo(null);
-      final layerGlobalOffset = localToGlobal(Offset.zero);
-      
-      final relativeTransform = Matrix4.identity()
-        ..translateByDouble(
-          -layerGlobalOffset.dx,
-          -layerGlobalOffset.dy,
-          0,
-          1,
-        )
-        ..multiply(globalTransform);
-
-      context.pushTransform(
-        true,
-        offset,
-        relativeTransform,
-        (context, offset) {
-          render.paintBlur(context, offset, _settings.blur);
-        },
-      );
     }
   }
 }

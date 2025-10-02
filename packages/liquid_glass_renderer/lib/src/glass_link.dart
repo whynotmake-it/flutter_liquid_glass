@@ -99,14 +99,20 @@ class GlassLink with ChangeNotifier {
   /// Get the number of registered shapes.
   int get shapeCount => _shapes.length;
 
+  bool _postFrameCallbackScheduled = false;
+
   void _notifyChange() {
     if (WidgetsBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       // We're in the middle of a layout and paint phase. Notify listeners
       // at the end of the frame.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (hasListeners) notifyListeners();
-      });
+      if (!_postFrameCallbackScheduled) {
+        _postFrameCallbackScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _postFrameCallbackScheduled = false;
+          if (hasListeners) notifyListeners();
+        });
+      }
       return;
     }
 
