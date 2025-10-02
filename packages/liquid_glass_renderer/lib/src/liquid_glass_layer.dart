@@ -225,6 +225,8 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     for (final shapeInfo in computedShapes) {
       final renderObject = shapeInfo.renderObject;
+
+
       if (renderObject is RenderLiquidGlass) {
         result.add(
           (
@@ -340,12 +342,12 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     for (final (ro, _) in shapes) {
       if (ro.glassContainsChild == glassContainsChild) {
         // Get the transform from the shape to this layer
-        final transform = ro.getTransformTo(this);
+        final transform = ro.getTransformTo(null);
 
         // Apply the full transform to the painting context
         context.pushTransform(
           true,
-          offset,
+          Offset.zero,
           transform,
           ro.paintFromLayer,
         );
@@ -360,12 +362,12 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   ) {
     for (final (render, _) in shapes) {
       // Get the transform from the shape to this layer
-      final transform = render.getTransformTo(this);
+      final transform = render.getTransformTo(null);
 
       // Apply the full transform to the painting context for blur
       context.pushTransform(
         true,
-        offset,
+        Offset.zero,
         transform,
         (context, offset) {
           render.paintBlur(context, offset, _settings.blur);
