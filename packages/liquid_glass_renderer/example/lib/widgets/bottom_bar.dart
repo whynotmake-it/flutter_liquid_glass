@@ -543,10 +543,12 @@ class _TabIndicatorState extends State<_TabIndicator>
         builder: (context, value, velocity, child) {
           final alignment = Alignment(value, 0);
           return SingleMotionBuilder(
-            motion: const Motion.snappySpring(),
+            motion: const Motion.snappySpring(
+              duration: Duration(milliseconds: 300)
+            ),
             value:
                 widget.visible &&
-                    (_isDown || (alignment.x - targetAlignment).abs() > 0.20)
+                    (_isDown || (alignment.x - targetAlignment).abs() > 0.30)
                 ? 1.0
                 : 0.0,
             builder: (context, thickness, child) {
@@ -625,7 +627,7 @@ class _IndicatorTransform extends StatelessWidget {
   Widget build(BuildContext context) {
     final rect = RelativeRect.lerp(
       RelativeRect.fill,
-      const RelativeRect.fromLTRB(-12, -12, -12, -12),
+      const RelativeRect.fromLTRB(-11, -11, -11, -11),
       thickness,
     );
     return Positioned.fill(
@@ -642,15 +644,15 @@ class _IndicatorTransform extends StatelessWidget {
             Positioned.fromRelativeRect(
               rect: rect!,
               child: SingleMotionBuilder(
-                motion: Motion.bouncySpring(),
+                motion: Motion.bouncySpring(duration: const Duration(milliseconds: 600)),
                 value: velocity,
                 builder: (context, velocity, child) {
                   return Transform(
                     alignment: Alignment.center,
                     transform: buildJellyTransform(
                       velocity: Offset(velocity, 0),
-                      maxDistortion: .6,
-                      velocityScale: 20
+                      maxDistortion: .5,
+                      velocityScale: 15
                     ),
                     child: child,
                   );

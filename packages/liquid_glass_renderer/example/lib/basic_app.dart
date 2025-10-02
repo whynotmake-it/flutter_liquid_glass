@@ -27,7 +27,6 @@ class BasicApp extends HookWidget {
     final lightAngleController = useRotatingAnimationController();
 
     final tab = useState(0);
-
     return GestureDetector(
       onTap: () {
         SettingsSheet(
@@ -38,8 +37,37 @@ class BasicApp extends HookWidget {
       child: CupertinoPageScaffold(
         child: Stack(
           children: [
-            ImagePageView(child: SizedBox.expand()),
+            CustomScrollView(
+              slivers: [
+                SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => Stack(
+                      children: [
+                        Image.network(
+                          'https://picsum.photos/500/500?random=$index',
+                        ),
+                        Positioned(
+                          child: LiquidGlass(
+                            child: SizedBox.square(dimension: 40),
+                            shape: LiquidOval(),
+                            settings: LiquidGlassSettings(
+                              blur: 10,
+                              glassColor: CupertinoTheme.of(context).barBackgroundColor.withValues(alpha: 0.1),
+                            ),
+
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                  ),
+                ),
+              ],
+            ),
             SafeArea(
+              bottom: false,
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: LiquidGlassBottomBar(
@@ -59,12 +87,16 @@ class BasicApp extends HookWidget {
                   ),
                   tabs: [
                     LiquidGlassBottomBarTab(
-                      label: 'Hi',
+                      label: 'Home',
                       icon: CupertinoIcons.home,
                     ),
                     LiquidGlassBottomBarTab(
-                      label: 'Hi',
-                      icon: CupertinoIcons.home,
+                      label: 'Profile',
+                      icon: CupertinoIcons.person,
+                    ),
+                    LiquidGlassBottomBarTab(
+                      label: 'Settings',
+                      icon: CupertinoIcons.settings,
                     ),
                   ],
                   selectedIndex: tab.value,
