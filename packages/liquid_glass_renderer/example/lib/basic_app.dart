@@ -47,6 +47,7 @@ class BasicApp extends HookWidget {
                           'https://picsum.photos/500/500?random=$index',
                         ),
                         Positioned(
+                          right: 0,
                           child: LiquidGlass(
                             child: SizedBox.square(dimension: 40),
                             shape: LiquidOval(),

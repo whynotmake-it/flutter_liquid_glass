@@ -358,7 +358,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     final clipPath = Path();
     for (final shape in shapes) {
-      clipPath.addPath(shape.$1.getPath(Offset.zero), Offset.zero);
+      final globalTransform = shape.$1.getTransformTo(this);
+
+      clipPath.addPath(
+        shape.$1.getPath(offset),
+        Offset.zero,
+        matrix4: globalTransform.storage,
+      );
     }
 
     final clipLayer = (_clipLayerHandle.layer ??= ClipPathLayer())
