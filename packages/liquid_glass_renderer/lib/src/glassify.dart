@@ -396,41 +396,39 @@ class _GlassifyShaderLayer extends OffsetLayer {
     final scaleY = transformedSize.height / layerSize.height;
     
     shader
-      ..setImageSampler(1, childImage!) // uForegroundTexture
-      ..setImageSampler(2, childBlurredImage!) // uForegroundBlurredTexture
-      // uForegroundSize (vec2) - location 1: starts at float index 2
-      ..setFloat(2, layerSize.width * devicePixelRatio)
-      ..setFloat(3, layerSize.height * devicePixelRatio)
-      // uGlassColor (vec4) - location 2: starts at float index 4
-      ..setFloat(4, settings.glassColor.r)
-      ..setFloat(5, settings.glassColor.g)
-      ..setFloat(6, settings.glassColor.b)
-      ..setFloat(7, settings.glassColor.a)
-      // uOpticalProps (vec4) - location 3: starts at float index 8
-      ..setFloat(8, settings.refractiveIndex)
-      ..setFloat(9, settings.chromaticAberration)
-      ..setFloat(10, settings.thickness)
-      ..setFloat(11, settings.blur)
-      // uLightConfig (vec4) - location 4: starts at float index 12
-      ..setFloat(12, settings.lightAngle)
-      ..setFloat(13, settings.lightIntensity)
-      ..setFloat(14, settings.ambientStrength)
-      ..setFloat(15, settings.saturation)
-      // uTransformData (vec3) - location 5: starts at float index 16
-      ..setFloat(16, globalOffset.dx * devicePixelRatio)
-      ..setFloat(17, globalOffset.dy * devicePixelRatio)
-      ..setFloat(18, settings.lightness)
-      // uLightDirection (vec2) - location 6: starts at float index 19
-      ..setFloat(19, cos(settings.lightAngle))
-      ..setFloat(20, sin(settings.lightAngle))
-      // uTransform (mat4) - location 7: starts at float index 21
-      // Inverse scale to map transformed screen coords -> untransformed texture
-      ..setFloat(21, 1 / scaleX) ..setFloat(22, 0) ..setFloat(23, 0)
-      ..setFloat(24, 0)
-      ..setFloat(25, 0) ..setFloat(26, 1 / scaleY) ..setFloat(27, 0)
-      ..setFloat(28, 0)
-      ..setFloat(29, 0) ..setFloat(30, 0) ..setFloat(31, 1) ..setFloat(32, 0)
-      ..setFloat(33, 0) ..setFloat(34, 0) ..setFloat(35, 0) ..setFloat(36, 1);
+      ..setImageSampler(1, childImage!)
+      ..setImageSampler(2, childBlurredImage!)
+      ..setFloatUniforms(initialIndex: 2, (value) {
+        value
+          ..setOffset(
+            Offset(
+              layerSize.width * devicePixelRatio,
+              layerSize.height * devicePixelRatio,
+            ),
+          )
+          ..setColor(settings.glassColor)
+          ..setFloats([
+            settings.refractiveIndex,
+            settings.chromaticAberration,
+            settings.thickness,
+            settings.blur,
+            settings.lightAngle,
+            settings.lightIntensity,
+            settings.ambientStrength,
+            settings.saturation,
+          ])
+          ..setOffset(globalOffset * devicePixelRatio)
+          ..setFloat(settings.lightness)
+          ..setOffset(
+            Offset(
+              cos(settings.lightAngle),
+              sin(settings.lightAngle),
+            ),
+          )
+          ..setFloats(
+            Matrix4.diagonal3Values(1 / scaleX, 1 / scaleY, 1).storage,
+          );
+      });
   }
 
   @override

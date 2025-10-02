@@ -267,11 +267,11 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     final m = transform.storage;
     final scaleX = m[0];
     final scaleY = m[5];
-    
+
     if (m[1] == 0 && m[4] == 0) {
       return sqrt(scaleX.abs() * scaleY.abs());
     }
-    
+
     final a = m[0];
     final b = m[1];
     final c = m[4];
@@ -375,14 +375,22 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   }) {
     for (final (ro, _) in shapes) {
       if (ro.glassContainsChild == glassContainsChild) {
-        // Get the transform from the shape to this layer
-        final transform = ro.getTransformTo(null);
+        final globalTransform = ro.getTransformTo(null);
+        final layerGlobalOffset = localToGlobal(Offset.zero);
+        
+        final relativeTransform = Matrix4.identity()
+          ..translateByDouble(
+            -layerGlobalOffset.dx,
+            -layerGlobalOffset.dy,
+            0,
+            1,
+          )
+          ..multiply(globalTransform);
 
-        // Apply the full transform to the painting context
         context.pushTransform(
           true,
-          Offset.zero,
-          transform,
+          offset,
+          relativeTransform,
           ro.paintFromLayer,
         );
       }
@@ -395,14 +403,22 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
     List<(RenderLiquidGlass, RawShape)> shapes,
   ) {
     for (final (render, _) in shapes) {
-      // Get the transform from the shape to this layer
-      final transform = render.getTransformTo(null);
+      final globalTransform = render.getTransformTo(null);
+      final layerGlobalOffset = localToGlobal(Offset.zero);
+      
+      final relativeTransform = Matrix4.identity()
+        ..translateByDouble(
+          -layerGlobalOffset.dx,
+          -layerGlobalOffset.dy,
+          0,
+          1,
+        )
+        ..multiply(globalTransform);
 
-      // Apply the full transform to the painting context for blur
       context.pushTransform(
         true,
-        Offset.zero,
-        transform,
+        offset,
+        relativeTransform,
         (context, offset) {
           render.paintBlur(context, offset, _settings.blur);
         },
