@@ -179,8 +179,8 @@ class RenderGlassify extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    // Calculate global position for the shader
     var globalOffset = offset;
+    var transformedSize = size;
     try {
       final transform = getTransformTo(null);
       final globalRect = MatrixUtils.transformRect(
@@ -188,8 +188,8 @@ class RenderGlassify extends RenderProxyBox {
         Offset.zero & size,
       );
       globalOffset = globalRect.topLeft;
+      transformedSize = globalRect.size;
     } catch (e) {
-      // Fallback to the provided offset if transform calculation fails
       debugPrint('Failed to calculate global transform for Glassify: $e');
     }
 
@@ -200,6 +200,7 @@ class RenderGlassify extends RenderProxyBox {
       settings: _settings,
       devicePixelRatio: _devicePixelRatio,
       layerSize: size,
+      transformedSize: transformedSize,
     );
     layer!
       ..offset = offset
@@ -207,7 +208,8 @@ class RenderGlassify extends RenderProxyBox {
       ..shader = _shader
       ..settings = _settings
       ..devicePixelRatio = _devicePixelRatio
-      ..layerSize = size;
+      ..layerSize = size
+      ..transformedSize = transformedSize;
     context.pushLayer(
       layer!,
       (context, offset) {
@@ -245,12 +247,14 @@ class _GlassifyShaderLayer extends OffsetLayer {
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
     required Size layerSize,
+    required Size transformedSize,
     required super.offset,
     required Offset globalOffset,
   })  : _shader = shader,
         _settings = settings,
         _devicePixelRatio = devicePixelRatio,
         _layerSize = layerSize,
+        _transformedSize = transformedSize,
         _globalOffset = globalOffset;
 
   FragmentShader _shader;
@@ -282,6 +286,14 @@ class _GlassifyShaderLayer extends OffsetLayer {
   set layerSize(Size value) {
     if (_layerSize == value) return;
     _layerSize = value;
+    markNeedsAddToScene();
+  }
+
+  Size _transformedSize;
+  Size get transformedSize => _transformedSize;
+  set transformedSize(Size value) {
+    if (_transformedSize == value) return;
+    _transformedSize = value;
     markNeedsAddToScene();
   }
 
@@ -380,6 +392,9 @@ class _GlassifyShaderLayer extends OffsetLayer {
   }
 
   void _setupShaderUniforms() {
+    final scaleX = transformedSize.width / layerSize.width;
+    final scaleY = transformedSize.height / layerSize.height;
+    
     shader
       ..setImageSampler(1, childImage!) // uForegroundTexture
       ..setImageSampler(2, childBlurredImage!) // uForegroundBlurredTexture
@@ -409,8 +424,11 @@ class _GlassifyShaderLayer extends OffsetLayer {
       ..setFloat(19, cos(settings.lightAngle))
       ..setFloat(20, sin(settings.lightAngle))
       // uTransform (mat4) - location 7: starts at float index 21
-      ..setFloat(21, 1) ..setFloat(22, 0) ..setFloat(23, 0) ..setFloat(24, 0)
-      ..setFloat(25, 0) ..setFloat(26, 1) ..setFloat(27, 0) ..setFloat(28, 0)
+      // Inverse scale to map transformed screen coords -> untransformed texture
+      ..setFloat(21, 1 / scaleX) ..setFloat(22, 0) ..setFloat(23, 0)
+      ..setFloat(24, 0)
+      ..setFloat(25, 0) ..setFloat(26, 1 / scaleY) ..setFloat(27, 0)
+      ..setFloat(28, 0)
       ..setFloat(29, 0) ..setFloat(30, 0) ..setFloat(31, 1) ..setFloat(32, 0)
       ..setFloat(33, 0) ..setFloat(34, 0) ..setFloat(35, 0) ..setFloat(36, 1);
   }

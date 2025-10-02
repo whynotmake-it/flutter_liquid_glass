@@ -167,13 +167,13 @@ vec3 getNormal(vec2 p, float thickness) {
 void main() {
     vec2 screenUV = FlutterFragCoord().xy / uSize;
 
-    // Apply transform to fragment coordinates
-    vec4 transformedCoord = uTransform * vec4(FlutterFragCoord().xy, 0.0, 1.0);
-    
     // Convert screen coordinates to layer-local coordinates
-    // Subtract the layer's position on screen to get coordinates relative to the layer
-    vec2 layerLocalCoord = transformedCoord.xy - uOffset;
-    vec2 layerUV = layerLocalCoord / uForegroundSize;
+    // First subtract the layer's position to get coordinates relative to the layer
+    vec2 layerLocalCoord = FlutterFragCoord().xy - uOffset;
+    
+    // Then apply inverse transform to account for scaling (e.g. from FittedBox)
+    vec4 transformedCoord = uTransform * vec4(layerLocalCoord, 0.0, 1.0);
+    vec2 layerUV = transformedCoord.xy / uForegroundSize;
 
     // If we are sampling outside of the foreground matte we should just treat the
     // pixel as skipped
@@ -193,7 +193,7 @@ void main() {
     // Use the same SDF calculation as the normal function for consistency
     vec4 blurred = texture(uForegroundBlurredTexture, layerUV);
     float sd = approximateSDF(blurred.a, uThickness);
-    vec3 normal = getNormal(layerLocalCoord, uThickness);
+    vec3 normal = getNormal(transformedCoord.xy, uThickness);
     
     // Use shared rendering pipeline to get the glass color
     fragColor = renderLiquidGlass(
