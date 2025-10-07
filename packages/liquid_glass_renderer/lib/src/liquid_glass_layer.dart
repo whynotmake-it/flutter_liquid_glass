@@ -345,15 +345,13 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
       }
     });
 
-    _paintShapeContents(context, offset, shapes, glassContainsChild: true);
-
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.shader(_shader);
 
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.blur(
-        sigmaX: _settings.blur * _devicePixelRatio,
-        sigmaY: _settings.blur * _devicePixelRatio,
+        sigmaX: _settings.blur,
+        sigmaY: _settings.blur,
       );
 
     final clipPath = Path();
@@ -378,7 +376,15 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
         (context, offset) {
           context.pushLayer(
             blurLayer,
-            (context, offset) {},
+            (context, offset) {
+              // If glass contains child we paint it above blur but below shader
+              _paintShapeContents(
+                context,
+                offset,
+                shapes,
+                glassContainsChild: true,
+              );
+            },
             offset,
           );
         },

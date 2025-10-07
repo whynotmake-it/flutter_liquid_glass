@@ -96,8 +96,8 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
         widget.glassSettings ??
         LiquidGlassSettings(
           refractiveIndex: 1.21,
-          thickness: 40,
-          blur: 4,
+          thickness: 30,
+          blur: 8,
           saturation: 1.5,
           blend: 10,
           lightIntensity: isDark ? .7 : 1,
@@ -117,7 +117,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           bottom: widget.bottomPadding,
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           spacing: widget.spacing,
           children: [
             Expanded(
@@ -135,7 +134,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                   onTabChanged: widget.onTabSelected,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    constraints: const BoxConstraints(maxWidth: 600),
                     height: widget.barHeight,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -653,8 +651,8 @@ class _IndicatorTransform extends StatelessWidget {
                     alignment: Alignment.center,
                     transform: buildJellyTransform(
                       velocity: Offset(velocity, 0),
-                      maxDistortion: .5,
-                      velocityScale: 15,
+                      maxDistortion: .8,
+                      velocityScale: 10,
                     ),
                     child: child,
                   );

@@ -14,7 +14,7 @@ final settingsNotifier = ValueNotifier(
     thickness: 20,
     blur: 10,
     refractiveIndex: 1.2,
-    glassColor: Colors.white.withValues(alpha: 0.1),
+    glassColor: Colors.white.withValues(alpha: 0.2),
   ),
 );
 
@@ -27,6 +27,7 @@ class BasicApp extends HookWidget {
     final lightAngleController = useRotatingAnimationController();
 
     final tab = useState(0);
+
     return GestureDetector(
       onTap: () {
         SettingsSheet(
@@ -50,6 +51,49 @@ class BasicApp extends HookWidget {
                   ),
                 ),
               ],
+            ),
+            Center(
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  settingsNotifier,
+                  lightAngleController,
+                ]),
+                builder: (context, child) {
+                  final settings = settingsNotifier.value.copyWith(
+                    lightAngle: lightAngleController.value,
+                    glassColor: CupertinoTheme.of(
+                      context,
+                    ).barBackgroundColor.withValues(alpha: 0.4),
+                  );
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 16,
+                    children: [
+                      LiquidGlass(
+                        settings: settings,
+                        shape: LiquidRoundedSuperellipse(
+                          borderRadius: Radius.circular(20),
+                        ),
+                        glassContainsChild: false,
+                        child: SizedBox.square(
+                          dimension: 100,
+                          child: Center(child: Text('REAL')),
+                        ),
+                      ),
+                      FakeGlass(
+                        settings: settings,
+                        shape: LiquidRoundedSuperellipse(
+                          borderRadius: Radius.circular(20),
+                        ),
+                        child: SizedBox.square(
+                          dimension: 100,
+                          child: Center(child: Text('FAKE')),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
             SafeArea(
               bottom: false,
