@@ -99,16 +99,18 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
       return widget.child;
     }
 
-    return ShaderBuilder(
-      assetKey: liquidGlassShader,
-      (context, shader, child) => _RawShapes(
-        shader: shader,
-        settings: widget.settings,
-        debugRenderRefractionMap: false,
-        restrictThickness: widget.restrictThickness,
-        child: child!,
+    return RepaintBoundary(
+      child: ShaderBuilder(
+        assetKey: liquidGlassShader,
+        (context, shader, child) => _RawShapes(
+          shader: shader,
+          settings: widget.settings,
+          debugRenderRefractionMap: false,
+          restrictThickness: widget.restrictThickness,
+          child: child!,
+        ),
+        child: widget.child,
       ),
-      child: widget.child,
     );
   }
 }

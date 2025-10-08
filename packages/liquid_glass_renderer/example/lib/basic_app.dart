@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/glass_distortion.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
 
@@ -69,25 +70,32 @@ class BasicApp extends HookWidget {
                     mainAxisSize: MainAxisSize.min,
                     spacing: 16,
                     children: [
-                      LiquidGlass(
-                        settings: settings,
-                        shape: LiquidRoundedSuperellipse(
-                          borderRadius: Radius.circular(20),
-                        ),
-                        glassContainsChild: false,
-                        child: SizedBox.square(
-                          dimension: 100,
-                          child: Center(child: Text('REAL')),
+                      GlassStretch(
+                        child: LiquidGlass(
+                          settings: settings,
+                          shape: LiquidRoundedSuperellipse(
+                            borderRadius: Radius.circular(20),
+                          ),
+                          glassContainsChild: false,
+                          child: SizedBox.square(
+                            dimension: 100,
+                            child: Center(child: Text('REAL')),
+                          ),
                         ),
                       ),
-                      FakeGlass(
-                        settings: settings,
-                        shape: LiquidRoundedSuperellipse(
-                          borderRadius: Radius.circular(20),
-                        ),
-                        child: SizedBox.square(
-                          dimension: 100,
-                          child: Center(child: Text('FAKE')),
+                      GlassStretch(
+                        child: FakeGlass(
+                          settings: settings,
+                          shape: LiquidRoundedSuperellipse(
+                            borderRadius: Radius.circular(20),
+                          ),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            child: SizedBox.square(
+                              dimension: 100,
+                              child: Center(child: Text('FAKE')),
+                            ),
+                          ),
                         ),
                       ),
                     ],

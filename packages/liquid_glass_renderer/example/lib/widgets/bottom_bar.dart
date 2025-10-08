@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/glass_distortion.dart';
 import 'package:motor/motor.dart';
 
 /// Creates a jelly transform matrix based on velocity for organic squash and stretch effect
@@ -120,33 +121,36 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           spacing: widget.spacing,
           children: [
             Expanded(
-              child: LiquidGlass.inLayer(
-                clipBehavior: Clip.none,
-                shape: const LiquidRoundedSuperellipse(
-                  borderRadius: Radius.circular(32),
-                ),
-                glassContainsChild: false,
-                child: _TabIndicator(
-                  visible: widget.showIndicator,
-                  tabIndex: widget.selectedIndex,
-                  tabCount: widget.tabs.length,
-                  indicatorColor: widget.indicatorColor,
-                  onTabChanged: widget.onTabSelected,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    height: widget.barHeight,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        for (var i = 0; i < widget.tabs.length; i++)
-                          Expanded(
-                            child: _BottomBarTab(
-                              tab: widget.tabs[i],
-                              selected: widget.selectedIndex == i,
-                              onTap: () => widget.onTabSelected(i),
+              child: GlassStretch(
+                stretch: .2,
+                child: LiquidGlass.inLayer(
+                  clipBehavior: Clip.none,
+                  shape: const LiquidRoundedSuperellipse(
+                    borderRadius: Radius.circular(32),
+                  ),
+                  glassContainsChild: false,
+                  child: _TabIndicator(
+                    visible: widget.showIndicator,
+                    tabIndex: widget.selectedIndex,
+                    tabCount: widget.tabs.length,
+                    indicatorColor: widget.indicatorColor,
+                    onTabChanged: widget.onTabSelected,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      height: widget.barHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < widget.tabs.length; i++)
+                            Expanded(
+                              child: _BottomBarTab(
+                                tab: widget.tabs[i],
+                                selected: widget.selectedIndex == i,
+                                onTap: () => widget.onTabSelected(i),
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -306,12 +310,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.config.onTap,
+    return GlassStretch(
       child: Semantics(
         button: true,
         label: widget.config.label,

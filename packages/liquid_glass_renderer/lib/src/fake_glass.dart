@@ -5,8 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
-class FakeGlass extends SingleChildRenderObjectWidget {
+class FakeGlass extends StatelessWidget {
   const FakeGlass({
+    required this.shape,
+    this.settings = const LiquidGlassSettings(),
+    required this.child,
+    super.key,
+  });
+
+  final LiquidShape shape;
+
+  final Widget child;
+
+  final LiquidGlassSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipPath(
+      clipper: ShapeBorderClipper(shape: shape),
+      child: RawFakeGlass(
+        shape: shape,
+        settings: settings,
+        child: child,
+      ),
+    );
+  }
+}
+
+class RawFakeGlass extends SingleChildRenderObjectWidget {
+  const RawFakeGlass({
     required this.shape,
     required this.child,
     this.settings = const LiquidGlassSettings(),
@@ -38,8 +65,7 @@ class FakeGlass extends SingleChildRenderObjectWidget {
   }
 }
 
-class _RenderFakeGlass extends RenderBox
-    with RenderObjectWithChildMixin<RenderBox> {
+class _RenderFakeGlass extends RenderProxyBox {
   _RenderFakeGlass({
     required LiquidShape shape,
     required LiquidGlassSettings settings,
@@ -63,31 +89,12 @@ class _RenderFakeGlass extends RenderBox
   }
 
   @override
-  void performLayout() {
-    if (child != null) {
-      child!.layout(constraints, parentUsesSize: true);
-      size = child!.size;
-    } else {
-      size = constraints.smallest;
-    }
-  }
+  bool get alwaysNeedsCompositing => child != null;
 
-  final LayerHandle<BackdropFilterLayer> _blurHandle =
-      LayerHandle<BackdropFilterLayer>();
-
-  final LayerHandle<ClipPathLayer> _clipHandle = LayerHandle<ClipPathLayer>();
-
-  @override
-  void detach() {
-    _blurHandle.layer = null;
-    _clipHandle.layer = null;
-    super.detach();
-  }
+  BackdropFilterLayer? get layer => super.layer as BackdropFilterLayer?;
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    final clipPath = shape.getOuterPath(offset & size);
-
     // Create saturation filter if needed
     final ImageFilter? saturationFilter = settings.saturation != 1.0
         ? ColorFilter.matrix(_createSaturationMatrix(settings.saturation))
@@ -106,31 +113,19 @@ class _RenderFakeGlass extends RenderBox
           )
         : blurFilter;
 
-    final blurLayer = (_blurHandle.layer ??= BackdropFilterLayer())
+    final blurLayer = (layer ??= BackdropFilterLayer())
       ..filter = combinedFilter;
 
-    final clipLayer = (_clipHandle.layer ??= ClipPathLayer())
-      ..clipPath = clipPath;
-
     context.pushLayer(
-      clipLayer,
+      blurLayer,
       (context, offset) {
-        context.pushLayer(
-          blurLayer,
-          (context, offset) {
-            if (child != null) {
-              _paintColor(context.canvas, clipPath);
-              context.paintChild(child!, offset);
-              _paintSpecular(context.canvas, clipPath);
-            }
-          },
-          offset,
-        );
+        final path = shape.getOuterPath(offset & size);
+        _paintColor(context.canvas, path);
+        _paintSpecular(context.canvas, path);
+        super.paint(context, offset);
       },
       offset,
     );
-
-    super.paint(context, offset);
   }
 
   /// Creates a saturation adjustment matrix
