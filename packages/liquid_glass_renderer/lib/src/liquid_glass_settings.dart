@@ -17,7 +17,6 @@ class LiquidGlassSettings with EquatableMixin {
     this.ambientStrength = .01,
     this.refractiveIndex = 1.51,
     this.saturation = 1.0,
-    this.lightness = 1.0,
   });
 
   /// Creates a new [LiquidGlassSettings] with the given settings where each
@@ -38,7 +37,6 @@ class LiquidGlassSettings with EquatableMixin {
           chromaticAberration: 4 * (dispersion / 100),
           lightIntensity: lightIntensity / 100,
           blur: frost,
-          lightness: 1.08,
           lightAngle: lightAngle,
           ambientStrength: 0.1,
           saturation: 1.05,
@@ -101,13 +99,6 @@ class LiquidGlassSettings with EquatableMixin {
   /// Defaults to 1.0
   final double saturation;
 
-  /// The lightness adjustment for pixels that shine through the glass.
-  ///
-  /// 1.0 means no change, values < 1.0 darken the background,
-  /// values > 1.0 brighten the background.
-  /// Defaults to 1.0
-  final double lightness;
-
   /// Creates a new [LiquidGlassSettings] with the given settings.
   LiquidGlassSettings copyWith({
     Color? glassColor,
@@ -120,7 +111,6 @@ class LiquidGlassSettings with EquatableMixin {
     double? ambientStrength,
     double? refractiveIndex,
     double? saturation,
-    double? lightness,
   }) =>
       LiquidGlassSettings(
         glassColor: glassColor ?? this.glassColor,
@@ -133,7 +123,6 @@ class LiquidGlassSettings with EquatableMixin {
         ambientStrength: ambientStrength ?? this.ambientStrength,
         refractiveIndex: refractiveIndex ?? this.refractiveIndex,
         saturation: saturation ?? this.saturation,
-        lightness: lightness ?? this.lightness,
       );
 
   @override
@@ -148,6 +137,5 @@ class LiquidGlassSettings with EquatableMixin {
         ambientStrength,
         refractiveIndex,
         saturation,
-        lightness,
       ];
 }

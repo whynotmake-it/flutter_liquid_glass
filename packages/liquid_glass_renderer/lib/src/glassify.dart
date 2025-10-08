@@ -394,7 +394,7 @@ class _GlassifyShaderLayer extends OffsetLayer {
   void _setupShaderUniforms() {
     final scaleX = transformedSize.width / layerSize.width;
     final scaleY = transformedSize.height / layerSize.height;
-    
+
     shader
       ..setImageSampler(1, childImage!)
       ..setImageSampler(2, childBlurredImage!)
@@ -418,7 +418,6 @@ class _GlassifyShaderLayer extends OffsetLayer {
             settings.saturation,
           ])
           ..setOffset(globalOffset * devicePixelRatio)
-          ..setFloat(settings.lightness)
           ..setOffset(
             Offset(
               cos(settings.lightAngle),

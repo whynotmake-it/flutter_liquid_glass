@@ -581,8 +581,13 @@ class _TabIndicatorState extends State<_TabIndicator>
                       thickness: thickness,
                       child: LiquidGlass(
                         settings: LiquidGlassSettings(
+                          glassColor: Color.from(
+                            alpha: .1 * thickness,
+                            red: 1,
+                            green: 1,
+                            blue: 1,
+                          ),
                           saturation: 1 + .5 * thickness,
-                          lightness: 1 + .1 * thickness,
                           refractiveIndex: 1.15,
                           thickness: thickness * 20,
                           lightIntensity: 2,

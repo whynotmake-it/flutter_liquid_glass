@@ -21,7 +21,7 @@ layout(location = 0) uniform vec2 uSize;                    // width, height
 layout(location = 1) uniform vec4 uGlassColor;             // r, g, b, a
 layout(location = 2) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, blend
 layout(location = 3) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
-layout(location = 4) uniform vec2 uColorAdjust;            // lightness, numShapes  
+layout(location = 4) uniform float uNumShapes;             // numShapes  
 layout(location = 5) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
 layout(location = 6) uniform mat4 uTransform;              // transform matrix for all shapes
 
@@ -33,9 +33,7 @@ float uAmbientStrength = uLightConfig.z;
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
 float uBlend = uOpticalProps.w;
-float uNumShapes = uColorAdjust.y;
 float uSaturation = uLightConfig.w;
-float uLightness = uColorAdjust.x;
 
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 // Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
@@ -201,8 +199,7 @@ void main() {
         normal,
         foregroundAlpha,
         0.0,
-        uSaturation,
-        uLightness
+        uSaturation
     );
     
     // Apply debug normals visualization using shared function

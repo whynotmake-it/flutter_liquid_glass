@@ -223,26 +223,15 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
     }
 }
 
-// Apply saturation and lightness adjustments to a color
-vec3 applySaturationLightness(vec3 color, float saturation, float lightness) {
+// Apply saturation adjustment to a color
+vec3 applySaturation(vec3 color, float saturation) {
     // Convert to HSL-like adjustments
     float luminance = dot(color, vec3(0.299, 0.587, 0.114));
     
     // Apply saturation adjustment (1.0 = no change)
     vec3 saturatedColor = mix(vec3(luminance), color, saturation);
     
-    // Apply lightness adjustment (1.0 = no change)
-    // This properly lightens/darkens all colors including black
-    vec3 adjustedColor;
-    if (lightness > 1.0) {
-        // Lighten: blend towards white
-        adjustedColor = mix(saturatedColor, vec3(1.0), lightness - 1.0);
-    } else {
-        // Darken: multiply towards black
-        adjustedColor = saturatedColor * lightness;
-    }
-    
-    return clamp(adjustedColor, 0.0, 1.0);
+    return clamp(saturatedColor, 0.0, 1.0);
 }
 
 // Apply glass color tinting to the liquid color
@@ -269,7 +258,7 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 }
 
 // Complete liquid glass rendering pipeline
-vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation, float lightness) {
+vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation) {
     // Get background color for lighting calculations
     vec4 backgroundColor = texture(backgroundTexture, screenUV);
     
@@ -302,8 +291,8 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     // Add lighting effects to final color
     finalColor.rgb += lighting;
     
-    // Apply saturation and lightness adjustments to the final color after tinting
-    finalColor.rgb = applySaturationLightness(finalColor.rgb, saturation, lightness);
+    // Apply saturation adjustment to the final color after tinting
+    finalColor.rgb = applySaturation(finalColor.rgb, saturation);
     
     // Use alpha for smooth transition at boundaries
     return mix(backgroundColor, finalColor, foregroundAlpha);

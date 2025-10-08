@@ -18,7 +18,7 @@ layout(location = 1) uniform vec2 uForegroundSize;          // width, height
 layout(location = 2) uniform vec4 uGlassColor;             // r, g, b, a
 layout(location = 3) uniform vec4 uOpticalProps;           // refractiveIndex, chromaticAberration, thickness, gaussianBlur
 layout(location = 4) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
-layout(location = 5) uniform vec3 uTransformData;          // offsetX, offsetY, lightness
+layout(location = 5) uniform vec2 uTransformData;          // offsetX, offsetY
 layout(location = 6) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
 layout(location = 7) uniform mat4 uTransform;              // transform matrix
 
@@ -31,7 +31,6 @@ float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
 vec2 uOffset = uTransformData.xy;
 float uSaturation = uLightConfig.w;
-float uLightness = uTransformData.z;
 float uGaussianBlur = uOpticalProps.w;
 
 uniform sampler2D uBackgroundTexture;
@@ -212,8 +211,7 @@ void main() {
         normal,
         foregroundColor.a,
         uGaussianBlur,
-        uSaturation,
-        uLightness
+        uSaturation
     );
     
     // Apply debug normals visualization using shared function

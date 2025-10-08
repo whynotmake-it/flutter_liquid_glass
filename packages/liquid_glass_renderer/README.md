@@ -250,10 +250,8 @@ Here's a breakdown of the key settings:
 -   `ambientStrength`: The intensity of ambient light.
 -   `outlineIntensity`: The visibility of the glass outline.
 -   `saturation`: Adjusts the color saturation of background pixels visible through the glass (1.0 = no change, <1.0 = desaturated, >1.0 = more saturated).
--   `lightness`: Adjusts the brightness of background pixels visible through the glass (1.0 = no change, <1.0 = darker, >1.0 = brighter).
 
-
-Saturation and lightness can be combined with blur to achieve an Apple-like look.
+Saturation should be increased if a color is applied to achieve an Apple-like look.
 
 ### Adding Blur
 

@@ -324,7 +324,6 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
           _settings.lightIntensity,
           _settings.ambientStrength,
           _settings.saturation,
-          _settings.lightness,
           shapeCount.toDouble(),
         ])
         ..setOffset(

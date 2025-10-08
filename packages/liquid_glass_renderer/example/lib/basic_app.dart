@@ -14,6 +14,8 @@ final settingsNotifier = ValueNotifier(
     thickness: 20,
     blur: 10,
     refractiveIndex: 1.2,
+    lightIntensity: .8,
+    saturation: 1.2,
     glassColor: Colors.white.withValues(alpha: 0.2),
   ),
 );

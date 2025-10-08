@@ -262,23 +262,6 @@ class SettingsSheet extends HookWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Lightness:'),
-                          Text(settings.lightness.toStringAsFixed(2)),
-                        ],
-                      ),
-                      CupertinoSlider(
-                        value: settings.lightness,
-                        onChanged: (value) {
-                          settingsNotifier.value = settings.copyWith(
-                            lightness: value,
-                          );
-                        },
-                        min: 0,
-                        max: 2,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
                           Text('Refractive Index:'),
                           Text(settings.refractiveIndex.toStringAsFixed(2)),
                         ],
