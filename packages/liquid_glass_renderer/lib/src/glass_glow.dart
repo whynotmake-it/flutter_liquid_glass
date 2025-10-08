@@ -257,8 +257,6 @@ class _RenderGlassGlowLayer extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    super.paint(context, offset);
-
     final canvas = context.canvas;
     final bounds = offset & size;
 
@@ -290,5 +288,6 @@ class _RenderGlassGlowLayer extends RenderProxyBox {
         paint,
       )
       ..restore();
+    super.paint(context, offset);
   }
 }

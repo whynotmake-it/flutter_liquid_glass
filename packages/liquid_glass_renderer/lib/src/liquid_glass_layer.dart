@@ -425,22 +425,12 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
   }) {
     for (final (ro, _) in shapes) {
       if (ro.glassContainsChild == glassContainsChild) {
-        final globalTransform = ro.getTransformTo(null);
-        final layerGlobalOffset = localToGlobal(Offset.zero);
-
-        final relativeTransform = Matrix4.identity()
-          ..translateByDouble(
-            -layerGlobalOffset.dx,
-            -layerGlobalOffset.dy,
-            0,
-            1,
-          )
-          ..multiply(globalTransform);
+        final transform = ro.getTransformTo(this);
 
         context.pushTransform(
           true,
           offset,
-          relativeTransform,
+          transform,
           ro.paintFromLayer,
         );
       }

@@ -36,10 +36,10 @@ class FakeGlass extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipPath(
       clipper: ShapeBorderClipper(shape: shape),
-      child: GlassGlowLayer(
-        child: RawFakeGlass(
-          shape: shape,
-          settings: settings,
+      child: RawFakeGlass(
+        shape: shape,
+        settings: settings,
+        child: GlassGlowLayer(
           child: child,
         ),
       ),
