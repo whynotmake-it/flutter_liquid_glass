@@ -134,12 +134,9 @@ void main() async {
 
   buffer.writeln('</details>');
 
-  // Write to output file for GitHub Actions
   final output = buffer.toString();
-  // await File('benchmark_summary.md').writeAsString(output);
 
-  // Set output for GitHub Actions (escape newlines for shell)
-  print('BENCHMARK_SUMMARY<<EOF');
+  print('summary<<EOF');
   print(output);
   print('EOF');
 }

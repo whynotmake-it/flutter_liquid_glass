@@ -64,7 +64,7 @@ jobs:
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
-          body-path: packages/liquid_glass_renderer/example/benchmark_summary.md
+          body: ${{ steps.parse-results.outputs.summary }}
           edit-mode: replace
 
       - name: 📤 Upload benchmark artifacts
