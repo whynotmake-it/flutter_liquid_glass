@@ -121,7 +121,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           spacing: widget.spacing,
           children: [
             Expanded(
-              child: GlassStretch(
+              child: StretchGlass(
                 stretch: .2,
                 child: LiquidGlass.inLayer(
                   clipBehavior: Clip.none,
@@ -310,26 +310,31 @@ class _ExtraButtonState extends State<_ExtraButton> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
-    return GlassStretch(
-      child: Semantics(
-        button: true,
-        label: widget.config.label,
-        child: SingleMotionBuilder(
-          motion: Motion.interactiveSpring(),
-          value: _pressed ? 1.2 : 1,
-          builder: (context, value, child) =>
-              Transform.scale(scale: value, child: child),
-          child: LiquidGlass.inLayer(
-            shape: const LiquidOval(),
-            glassContainsChild: false,
-            child: Container(
-              height: widget.config.size,
-              width: widget.config.size,
-              child: Center(
-                child: Icon(
-                  widget.config.icon,
-                  size: 24,
-                  color: theme.textTheme.textStyle.color,
+    return GestureDetector(
+      onTap: widget.config.onTap,
+      child: StretchGlass(
+        child: Semantics(
+          button: true,
+          label: widget.config.label,
+          child: SingleMotionBuilder(
+            motion: Motion.interactiveSpring(),
+            value: _pressed ? 1.2 : 1,
+            builder: (context, value, child) =>
+                Transform.scale(scale: value, child: child),
+            child: LiquidGlass.inLayer(
+              shape: const LiquidOval(),
+              glassContainsChild: false,
+              child: GlassGlow(
+                child: Container(
+                  height: widget.config.size,
+                  width: widget.config.size,
+                  child: Center(
+                    child: Icon(
+                      widget.config.icon,
+                      size: 24,
+                      color: theme.textTheme.textStyle.color,
+                    ),
+                  ),
                 ),
               ),
             ),

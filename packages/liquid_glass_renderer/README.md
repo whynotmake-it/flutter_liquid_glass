@@ -20,6 +20,9 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 -   🔀 **Blending Layers**: Create layers where multiple glass shapes can blend together like liquid.
 -   🎨 **Highly Customizable**: Adjust thickness, color tint, lighting, and more.
 -   🔍 **Background Effects**: Apply background blur and refraction.
+-   ✨ **Interactive Glow**: Add touch-responsive glow effects to glass surfaces.
+-   🎭 **Fake Glass**: Lightweight glass appearance without expensive shaders for better performance.
+-   🤸 **Stretch Effects**: Apply organic squash and stretch animations to glass widgets.
 -   🚀 **Performant**: Built on top of Flutter's shader support for great performance.
 
 ## ⚠️ Limitations
@@ -74,12 +77,15 @@ Stack(
 
 ### Choosing the Right Widget
 
-This package provides three main widgets to create the glass effect:
+This package provides several widgets to create the glass effect:
 
 | Widget               | Use Case                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------- |
 | `LiquidGlass`        | For a single, high-quality glass shape. Best performance and quality.                 |
 | `LiquidGlassLayer`   | To blend multiple `LiquidGlass` shapes together seamlessly.                           |
+| `FakeGlass`          | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
+| `GlassGlow`          | Add touch-responsive glow effects to glass surfaces.                                  |
+| `StretchGlass`       | Add interactive squash and stretch effects to glass widgets.                          |
 | `Glassify` (Experimental) | To apply a glass effect to any arbitrary widget (e.g., text, icons). Less performant. |
 
 ---
@@ -267,6 +273,78 @@ The `child` of a `LiquidGlass` widget can be rendered either "inside" the glass 
 
 -   `glassContainsChild: true` (default): The child is part of the glass, affected by color tint and refraction.
 -   `glassContainsChild: false`: The child is rendered normally on top of the glass effect.
+
+### `FakeGlass`: Lightweight Glass Alternative
+
+For scenarios where performance is critical or you need a glass-like appearance without the computational cost of refraction, use `FakeGlass`. It provides a similar visual effect using backdrop filters instead of shaders.
+
+```dart
+FakeGlass(
+  shape: LiquidRoundedSuperellipse(
+    borderRadius: Radius.circular(20),
+  ),
+  settings: LiquidGlassSettings(
+    blur: 10,
+    glassColor: Colors.white.withOpacity(0.2),
+  ),
+  child: SizedBox(
+    height: 100,
+    width: 100,
+    child: Center(child: Text('Fast Glass')),
+  ),
+)
+```
+
+**Note:** `FakeGlass` does not support `thickness` or `refractiveIndex` properties since it doesn't perform actual refraction.
+
+### `GlassGlow`: Interactive Touch Effects
+
+Add responsive glow effects that follow user touches. Wrap your glass widget with `GlassGlow` inside a `GlassGlowLayer`:
+
+```dart
+GlassGlowLayer(
+  child: LiquidGlass(
+    shape: LiquidRoundedSuperellipse(
+      borderRadius: Radius.circular(20),
+    ),
+    glassContainsChild: false,
+    child: GlassGlow(
+      glowColor: Colors.white24,
+      glowRadius: 1.0,
+      child: SizedBox(
+        height: 100,
+        width: 100,
+        child: Center(child: Text('Touch Me')),
+      ),
+    ),
+  ),
+)
+```
+
+The glow effect automatically appears at touch locations and fades out smoothly when interaction ends.
+
+### `StretchGlass`: Organic Squash and Stretch
+
+Add interactive squash and stretch effects that respond to user gestures, creating an organic, jelly-like feel:
+
+```dart
+StretchGlass(
+  stretch: 0.5,
+  interactionScale: 1.05,
+  child: LiquidGlass(
+    shape: LiquidRoundedSuperellipse(
+      borderRadius: Radius.circular(20),
+    ),
+    child: SizedBox(
+      height: 100,
+      width: 100,
+      child: Center(child: Text('Stretchy')),
+    ),
+  ),
+)
+```
+
+The widget listens to drag gestures and applies smooth squash and stretch transformations without interfering with other gestures.
 
 ---
 

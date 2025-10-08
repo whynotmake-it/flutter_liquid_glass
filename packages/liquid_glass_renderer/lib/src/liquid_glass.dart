@@ -2,10 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/glass_link.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
-import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
 /// A liquid glass shape.
@@ -69,9 +67,11 @@ class LiquidGlass extends StatelessWidget {
   /// on top using [glassContainsChild].
   final Widget child;
 
+  /// {@template liquid_glass_renderer.LiquidGlass.shape}
   /// The shape of this glass.
   ///
   /// This is the shape of the glass that will be rendered.
+  /// {@endtemplate}
   final LiquidShape shape;
 
   /// Whether this glass should be rendered "inside" of the glass, or on top.
@@ -100,7 +100,7 @@ class LiquidGlass extends StatelessWidget {
           child: ClipPath(
             clipper: ShapeBorderClipper(shape: shape),
             clipBehavior: clipBehavior,
-            child: child,
+            child: GlassGlowLayer(child: child),
           ),
         );
       case final settings:
@@ -113,7 +113,7 @@ class LiquidGlass extends StatelessWidget {
             child: ClipPath(
               clipper: ShapeBorderClipper(shape: shape),
               clipBehavior: clipBehavior,
-              child: child,
+              child: GlassGlowLayer(child: child),
             ),
           ),
         );

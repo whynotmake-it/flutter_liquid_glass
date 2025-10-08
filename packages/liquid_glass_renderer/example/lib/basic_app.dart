@@ -24,16 +24,13 @@ class BasicApp extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    useStream(Stream.periodic(const Duration(seconds: 1)));
-    final lightAngleController = useRotatingAnimationController();
-
     final tab = useState(0);
 
     return GestureDetector(
       onTap: () {
         SettingsSheet(
           settingsNotifier: settingsNotifier,
-          lightAngleAnimation: lightAngleController,
+          lightAngleAnimation: AlwaysStoppedAnimation(0),
         ).show(context);
       },
       child: CupertinoPageScaffold(
@@ -55,13 +52,9 @@ class BasicApp extends HookWidget {
             ),
             Center(
               child: ListenableBuilder(
-                listenable: Listenable.merge([
-                  settingsNotifier,
-                  lightAngleController,
-                ]),
+                listenable: Listenable.merge([settingsNotifier]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
-                    lightAngle: lightAngleController.value,
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.4),
@@ -70,30 +63,34 @@ class BasicApp extends HookWidget {
                     mainAxisSize: MainAxisSize.min,
                     spacing: 16,
                     children: [
-                      GlassStretch(
+                      StretchGlass(
                         child: LiquidGlass(
                           settings: settings,
                           shape: LiquidRoundedSuperellipse(
                             borderRadius: Radius.circular(20),
                           ),
                           glassContainsChild: false,
-                          child: SizedBox.square(
-                            dimension: 100,
-                            child: Center(child: Text('REAL')),
+                          child: GlassGlow(
+                            child: SizedBox.square(
+                              dimension: 100,
+                              child: Center(child: Text('REAL')),
+                            ),
                           ),
                         ),
                       ),
-                      GlassStretch(
+                      StretchGlass(
                         child: FakeGlass(
                           settings: settings,
                           shape: LiquidRoundedSuperellipse(
                             borderRadius: Radius.circular(20),
                           ),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            child: SizedBox.square(
-                              dimension: 100,
-                              child: Center(child: Text('FAKE')),
+                          child: GlassGlow(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              child: SizedBox.square(
+                                dimension: 100,
+                                child: Center(child: Text('FAKE')),
+                              ),
                             ),
                           ),
                         ),

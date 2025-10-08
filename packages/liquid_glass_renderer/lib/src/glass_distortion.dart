@@ -1,57 +1,43 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_renderer/src/internal/glass_drag_builder.dart';
 import 'package:motor/motor.dart';
 
-class GlassDragBuilder extends StatefulWidget {
-  const GlassDragBuilder({
-    required this.builder,
-    this.child,
-    super.key,
-  });
-
-  final ValueWidgetBuilder<Offset?> builder;
-  final Widget? child;
-
-  @override
-  State<GlassDragBuilder> createState() => _GlassDragBuilderState();
-}
-
-class _GlassDragBuilderState extends State<GlassDragBuilder> {
-  Offset? currentDragOffset;
-
-  bool get isDragging => currentDragOffset != null;
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (event) => setState(() {
-        setState(() {
-          currentDragOffset = Offset.zero;
-        });
-      }),
-      onPointerMove: (event) => setState(() {
-        currentDragOffset = (currentDragOffset ?? Offset.zero) + event.delta;
-      }),
-      onPointerUp: (event) => setState(() {
-        currentDragOffset = null;
-      }),
-      child: widget.builder(context, currentDragOffset, widget.child),
-    );
-  }
-}
-
-class GlassStretch extends StatelessWidget {
-  const GlassStretch({
+/// A widget that provides a squash and stretch effect to its child based on
+/// user interaction.
+///
+/// Will listen to drag gestures from the user without interfering with other
+/// gestures.
+class StretchGlass extends StatelessWidget {
+  /// Creates a new [StretchGlass] widget with the given [child],
+  /// [interactionScale], and [stretch].
+  const StretchGlass({
+    required this.child,
     this.interactionScale = 1.05,
     this.stretch = .5,
-    required this.child,
     super.key,
   });
 
+  /// The scale factor to apply when the user is interacting with the widget.
+  ///
+  /// A value of 1.0 means no scaling.
+  /// A value greater than 1.0 means the widget will scale up.
+  /// A value less than 1.0 means the widget will scale down.
+  ///
+  /// Defaults to 1.05.
   final double interactionScale;
+
+  /// The factor to multiply the drag offset by to determine the stretch
+  /// amount.
+  ///
+  /// A value of 0.0 means no stretch.
+  ///
+  /// Defaults to 0.5.
   final double stretch;
+
+  /// The child widget to apply the stretch effect to.
   final Widget child;
 
   @override
@@ -73,7 +59,7 @@ class GlassStretch extends StatelessWidget {
                 ? const Motion.bouncySpring()
                 : const Motion.interactiveSpring(),
             converter: const OffsetMotionConverter(),
-            builder: (context, value, child) => RawGlassStretch(
+            builder: (context, value, child) => _RawGlassStretch(
               stretch: value * stretch,
               child: child!,
             ),
@@ -86,11 +72,10 @@ class GlassStretch extends StatelessWidget {
   }
 }
 
-class RawGlassStretch extends StatelessWidget {
-  const RawGlassStretch({
+class _RawGlassStretch extends StatelessWidget {
+  const _RawGlassStretch({
     required this.stretch,
     required this.child,
-    super.key,
   });
 
   final Offset stretch;
@@ -100,8 +85,8 @@ class RawGlassStretch extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = getScale(stretch: stretch);
     final matrix = Matrix4.identity()
-      ..scale(scale.dx, scale.dy)
-      ..translate(stretch.dx, stretch.dy);
+      ..scaleByDouble(scale.dx, scale.dy, 1, 1)
+      ..translateByDouble(stretch.dx, stretch.dy, 0, 1);
     return Transform(
       transform: matrix,
       child: child,
@@ -121,6 +106,7 @@ class RawGlassStretch extends StatelessWidget {
 /// to the right, and positive y means stretching downwards.
 ///
 /// A value of 0 means no resistance
+@internal
 Offset getScale({
   required Offset stretch,
 }) {

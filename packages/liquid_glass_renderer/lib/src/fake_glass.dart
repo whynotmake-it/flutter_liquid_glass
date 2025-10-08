@@ -1,48 +1,62 @@
+// ignore_for_file: require_trailing_commas
+
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:meta/meta.dart';
 
+/// A widget that aims to provide a similar look to [LiquidGlass], but without
+/// the expensive shader.
 class FakeGlass extends StatelessWidget {
+  /// Creates a new [FakeGlass] widget with the given [child], [shape], and
+  /// [settings].
   const FakeGlass({
     required this.shape,
-    this.settings = const LiquidGlassSettings(),
     required this.child,
+    this.settings = const LiquidGlassSettings(),
     super.key,
   });
 
+  /// {@macro liquid_glass_renderer.LiquidGlass.shape}
   final LiquidShape shape;
 
-  final Widget child;
-
+  /// The settings for the glass effect.
+  ///
+  /// Some properties will not have any effect, such as `thickness` and
+  /// `refractiveIndex`, since there is no actual refraction happening.
   final LiquidGlassSettings settings;
+
+  /// The child widget that will be displayed inside the glass.
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return ClipPath(
       clipper: ShapeBorderClipper(shape: shape),
-      child: RawFakeGlass(
-        shape: shape,
-        settings: settings,
-        child: child,
+      child: GlassGlowLayer(
+        child: RawFakeGlass(
+          shape: shape,
+          settings: settings,
+          child: child,
+        ),
       ),
     );
   }
 }
 
+@internal
 class RawFakeGlass extends SingleChildRenderObjectWidget {
   const RawFakeGlass({
     required this.shape,
-    required this.child,
+    required super.child,
     this.settings = const LiquidGlassSettings(),
     super.key,
   });
 
   final LiquidShape shape;
-
-  final Widget child;
 
   final LiquidGlassSettings settings;
 
@@ -91,6 +105,7 @@ class _RenderFakeGlass extends RenderProxyBox {
   @override
   bool get alwaysNeedsCompositing => child != null;
 
+  @override
   BackdropFilterLayer? get layer => super.layer as BackdropFilterLayer?;
 
   @override
