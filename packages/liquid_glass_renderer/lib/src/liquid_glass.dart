@@ -39,7 +39,7 @@ class LiquidGlass extends StatelessWidget {
   const LiquidGlass({
     required this.child,
     required this.shape,
-    this.glassContainsChild = true,
+    this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.restrictThickness = true,
     super.key,
@@ -56,7 +56,7 @@ class LiquidGlass extends StatelessWidget {
     required this.child,
     required this.shape,
     super.key,
-    this.glassContainsChild = true,
+    this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
   })  : _settings = null,
         restrictThickness = false;
@@ -78,6 +78,8 @@ class LiquidGlass extends StatelessWidget {
   ///
   /// If it is rendered inside, the color tint
   /// of the glass will affect the child, and it will also be refracted.
+  ///
+  /// Defaults to `false`.
   final bool glassContainsChild;
 
   /// The clip behavior of this glass.

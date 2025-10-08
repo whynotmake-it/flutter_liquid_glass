@@ -113,7 +113,6 @@ class SettingsSheet extends HookWidget {
     return SafeArea(
       minimum: const EdgeInsets.all(16.0),
       child: LiquidGlass(
-        glassContainsChild: false,
         settings: LiquidGlassSettings.figma(
           depth: 50,
           refraction: 100,

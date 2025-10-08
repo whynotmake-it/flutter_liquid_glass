@@ -61,6 +61,7 @@ void main() {
                         thickness: 2,
                         glassColor: Colors.blue.withValues(alpha: 0.5),
                       ),
+                      glassContainsChild: true,
                       shape: LiquidRoundedSuperellipse(
                         borderRadius: Radius.circular(radius),
                       ),
@@ -83,6 +84,7 @@ void main() {
                   name: 'wide shape radius ${radius.toStringAsFixed(0)}px',
                   child: buildWithGridPaper(
                     LiquidGlass(
+                      glassContainsChild: true,
                       settings: settingsWithoutLighting.copyWith(
                         thickness: 2,
                         glassColor: Colors.blue.withValues(alpha: 0.5),

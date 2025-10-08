@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_distortion.dart';
 import 'package:motor/motor.dart';
 
 /// Creates a jelly transform matrix based on velocity for organic squash and stretch effect
@@ -128,7 +127,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                   shape: const LiquidRoundedSuperellipse(
                     borderRadius: Radius.circular(32),
                   ),
-                  glassContainsChild: false,
                   child: _TabIndicator(
                     visible: widget.showIndicator,
                     tabIndex: widget.selectedIndex,
@@ -323,7 +321,6 @@ class _ExtraButtonState extends State<_ExtraButton> {
                 Transform.scale(scale: value, child: child),
             child: LiquidGlass.inLayer(
               shape: const LiquidOval(),
-              glassContainsChild: false,
               child: GlassGlow(
                 child: Container(
                   height: widget.config.size,

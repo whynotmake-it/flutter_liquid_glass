@@ -82,7 +82,6 @@ class GridItem extends HookWidget {
       child: Transform.scale(
         scale: scale,
         child: LiquidGlass.inLayer(
-          glassContainsChild: false,
           child: SizedBox.expand(
             child: Container(
               color: Colors.transparent,

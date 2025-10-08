@@ -79,14 +79,14 @@ Stack(
 
 This package provides several widgets to create the glass effect:
 
-| Widget               | Use Case                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| `LiquidGlass`        | For a single, high-quality glass shape. Best performance and quality.                 |
-| `LiquidGlassLayer`   | To blend multiple `LiquidGlass` shapes together seamlessly.                           |
-| `FakeGlass`          | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
-| `GlassGlow`          | Add touch-responsive glow effects to glass surfaces.                                  |
-| `StretchGlass`       | Add interactive squash and stretch effects to glass widgets.                          |
-| `Glassify` (Experimental) | To apply a glass effect to any arbitrary widget (e.g., text, icons). Less performant. |
+| Widget                    | Use Case                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `LiquidGlass`             | For a single, high-quality glass shape. Best performance and quality.                      |
+| `LiquidGlassLayer`        | To blend multiple `LiquidGlass` shapes together seamlessly.                                |
+| `FakeGlass`               | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
+| `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
+| `StretchGlass`            | Add interactive squash and stretch effects to glass widgets.                               |
+| `Glassify` (Experimental) | To apply a glass effect to any arbitrary widget (e.g., text, icons). Less performant.      |
 
 ---
 
@@ -271,8 +271,8 @@ LiquidGlass(
 
 The `child` of a `LiquidGlass` widget can be rendered either "inside" the glass or on top of it using the `glassContainsChild` property.
 
--   `glassContainsChild: true` (default): The child is part of the glass, affected by color tint and refraction.
--   `glassContainsChild: false`: The child is rendered normally on top of the glass effect.
+-   `glassContainsChild: false` (default): The child is rendered normally on top of the glass effect.
+-   `glassContainsChild: true`: The child is part of the glass, affected by color tint and refraction.
 
 ### `FakeGlass`: Lightweight Glass Alternative
 
@@ -307,7 +307,6 @@ GlassGlowLayer(
     shape: LiquidRoundedSuperellipse(
       borderRadius: Radius.circular(20),
     ),
-    glassContainsChild: false,
     child: GlassGlow(
       glowColor: Colors.white24,
       glowRadius: 1.0,
