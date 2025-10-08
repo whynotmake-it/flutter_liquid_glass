@@ -3,10 +3,10 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:meta/meta.dart';
 
 /// A widget that aims to provide a similar look to [LiquidGlass], but without
 /// the expensive shader.
@@ -206,12 +206,20 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..shader = shader
       ..blendMode = BlendMode.lighten
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, .7);
+      ..strokeWidth = 1;
+
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, .7);
+    } else {
+      paint.strokeWidth = 2;
+    }
+
     canvas.drawPath(path, paint);
 
     // Paint a second, slightly blurred outline
-    paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawPath(path, paint);
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      canvas.drawPath(path, paint);
+    }
   }
 }

@@ -6,13 +6,23 @@
 [![lints by lintervention][lintervention_badge]][lintervention_link]
 
 
-> **Note:** This package is currently in a pre-release stage. The API may change, and there are some limitations. Feedback and contributions are highly welcome!
+## ⚠️ **EXPERIMENTAL - USE WITH CAUTION**
+
+**This package is still highly experimental and should not be blindly added to production apps for all devices.** While performance has improved significantly, liquid glass effects in Flutter are computationally intensive due to the limited access to the GPUand may not perform well on all hardware configurations.
+
+**Before deploying to production:**
+- **Test thoroughly on your target devices**, especially lower-end and mid-range devices
+- **Monitor performance metrics** (frame rates, power consumption, jank) in real-world usage scenarios
+- **Consider device capabilities** and conditionally enable effects based on device performance
+- **Use `FakeGlass` strategically**: Swap out `LiquidGlass` widgets with `FakeGlass` when they're not highly visible, off-screen, or have low visual impact
+- **Limit the number of glass widgets** visible simultaneously
+
+**We need your feedback!** Please test on your devices and report performance characteristics, issues, and suggestions.
 
 A Flutter package for creating a stunning "liquid glass" or "frosted glass" effect. This package allows you to transform your widgets into beautiful, customizable glass-like surfaces that can blend and interact with each other.
 
 
-![Example GIF](doc/example.gif)
-> The actual performance of this effect is much better, the GIFs in this README just have a low framerate.
+![Showcase GIF](doc/showcase.gif)
 
 ## Features
 
@@ -23,7 +33,6 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 -   ✨ **Interactive Glow**: Add touch-responsive glow effects to glass surfaces.
 -   🎭 **Fake Glass**: Lightweight glass appearance without expensive shaders for better performance.
 -   🤸 **Stretch Effects**: Apply organic squash and stretch animations to glass widgets.
--   🚀 **Performant**: Built on top of Flutter's shader support for great performance.
 
 ## ⚠️ Limitations
 
@@ -58,8 +67,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 ## How To Use
 
-![Showcase](doc/showcase.gif)
-> Demo by [Souvik Biswas](https://github.com/sbis04/liquid_glass_demo)
+![Example GIF](doc/example.gif)
 
 The liquid glass effect is achieved by taking the pixels of the content *behind* the glass widget and distorting them. For the effect to be visible, you **must** place your glass widget on top of other content. The easiest way to do this is with a `Stack`.
 
@@ -81,7 +89,7 @@ This package provides several widgets to create the glass effect:
 
 | Widget                    | Use Case                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------ |
-| `LiquidGlass`             | For a single, high-quality glass shape. Best performance and quality.                      |
+| `LiquidGlass`             | For a single, high-quality glass shape. Best visual quality but most expensive.            |
 | `LiquidGlassLayer`        | To blend multiple `LiquidGlass` shapes together seamlessly.                                |
 | `FakeGlass`               | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
 | `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
@@ -213,7 +221,7 @@ Center(
       style: TextStyle(
         fontSize: 120,
         fontWeight: FontWeight.bold,
-        color: Colors.black, // The color here is only for the shape
+        color: Colors.black,
       ),
     ),
   ),
@@ -232,7 +240,7 @@ You can customize the appearance of the glass by providing `LiquidGlassSettings`
 LiquidGlassLayer(
   settings: const LiquidGlassSettings(
     thickness: 10,
-    glassColor: Color(0x1AFFFFFF), // A subtle white tint
+    glassColor: Color(0x1AFFFFFF),
     lightIntensity: 1.5,
     blend: 40,
     outlineIntensity: 0.5,

@@ -39,14 +39,14 @@ class BasicApp extends HookWidget {
           children: [
             CustomScrollView(
               slivers: [
-                SliverGrid(
+                SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => Image.network(
-                      'https://picsum.photos/500/500?random=$index',
+                    (context, index) => AspectRatio(
+                      aspectRatio: 2,
+                      child: Image.network(
+                        'https://picsum.photos/1000/500?random=$index',
+                      ),
                     ),
-                  ),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
                   ),
                 ),
               ],
@@ -60,7 +60,7 @@ class BasicApp extends HookWidget {
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.4),
                   );
-                  return Column(
+                  return Row(
                     mainAxisSize: MainAxisSize.min,
                     spacing: 16,
                     children: [
