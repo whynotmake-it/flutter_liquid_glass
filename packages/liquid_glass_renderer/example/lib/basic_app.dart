@@ -30,11 +30,13 @@ class BasicApp extends HookWidget {
   Widget build(BuildContext context) {
     final tab = useState(0);
 
+    final light = useRotatingAnimationController();
+
     return GestureDetector(
       onTap: () {
         SettingsSheet(
           settingsNotifier: settingsNotifier,
-          lightAngleAnimation: AlwaysStoppedAnimation(0),
+          lightAngleAnimation: light,
         ).show(context);
       },
       child: CupertinoPageScaffold(
@@ -56,9 +58,10 @@ class BasicApp extends HookWidget {
             ),
             Center(
               child: ListenableBuilder(
-                listenable: Listenable.merge([settingsNotifier]),
+                listenable: Listenable.merge([settingsNotifier, light]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
+                    lightAngle: light.value,
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.4),

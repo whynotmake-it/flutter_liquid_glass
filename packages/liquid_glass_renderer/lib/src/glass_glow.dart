@@ -171,10 +171,6 @@ class GlassGlowLayerState extends State<GlassGlowLayer>
         _radiusController,
       ]),
       builder: (context, child) {
-        print(_alphaController.value);
-        print(_radiusController.value);
-        print(_offsetController.value);
-
         return _RenderGlassGlowLayerWidget(
           glowRadius: _baseRadius * _radiusController.value,
           glowColor: _baseColor.withValues(

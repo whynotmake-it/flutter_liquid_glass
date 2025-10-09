@@ -1,7 +1,7 @@
 // ignore_for_file: require_trailing_commas
 
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -111,18 +111,18 @@ class _RenderFakeGlass extends RenderProxyBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     // Create saturation filter if needed
-    final ImageFilter? saturationFilter = settings.saturation != 1.0
-        ? ColorFilter.matrix(_createSaturationMatrix(settings.saturation))
+    final ui.ImageFilter? saturationFilter = settings.saturation != 1.0
+        ? ui.ColorFilter.matrix(_createSaturationMatrix(settings.saturation))
         : null;
 
-    final blurFilter = ImageFilter.blur(
+    final blurFilter = ui.ImageFilter.blur(
       sigmaX: settings.blur,
       sigmaY: settings.blur,
     );
 
     // Combine blur and saturation filters
     final combinedFilter = saturationFilter != null
-        ? ImageFilter.compose(
+        ? ui.ImageFilter.compose(
             inner: saturationFilter,
             outer: blurFilter,
           )
@@ -136,7 +136,7 @@ class _RenderFakeGlass extends RenderProxyBox {
       (context, offset) {
         final path = shape.getOuterPath(offset & size);
         _paintColor(context.canvas, path);
-        _paintSpecular(context.canvas, path);
+        _paintSpecular(context.canvas, path, offset & size);
         super.paint(context, offset);
       },
       offset,
@@ -179,20 +179,36 @@ class _RenderFakeGlass extends RenderProxyBox {
     canvas.drawPath(path, paint);
   }
 
-  void _paintSpecular(Canvas canvas, Path path) {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    // Compute alignments from light angle
+  void _paintSpecular(Canvas canvas, Path path, Rect bounds) {
+    final squareBounds = Rect.fromCenter(
+      center: bounds.center,
+      width: bounds.longestSide,
+      height: bounds.longestSide,
+    );
     final radians = settings.lightAngle;
 
-    final x = -1 * math.cos(radians);
-    final y = -1 * math.sin(radians);
+    final x = math.cos(radians);
+    final y = math.sin(radians);
+
+    final alignmentWithShortestSide = size.aspectRatio < 1 ? x : y;
 
     final color = Colors.white.withValues(
-      alpha: switch (defaultTargetPlatform) {
-        TargetPlatform.iOS => settings.lightIntensity.clamp(0, 1) * 2,
-        _ => settings.lightIntensity.clamp(0, 1),
-      },
+      alpha: (settings.lightIntensity * 2).clamp(0, 1),
     );
+
+    final adjustment = 1 - 1 / size.aspectRatio;
+    final inset = ui.lerpDouble(
+      0,
+      .4,
+      adjustment * alignmentWithShortestSide.abs(),
+    )!;
+
+    final secondInset = ui.lerpDouble(
+      .15,
+      .5,
+      adjustment * alignmentWithShortestSide.abs(),
+    )!;
+
     final shader = LinearGradient(
       colors: [
         color,
@@ -200,30 +216,27 @@ class _RenderFakeGlass extends RenderProxyBox {
         color.withValues(alpha: settings.ambientStrength.clamp(0, 1)),
         color,
       ],
+      stops: [
+        inset,
+        secondInset,
+        1 - secondInset,
+        1 - inset,
+      ],
       begin: Alignment(x, y),
       end: Alignment(-x, -y),
-    ).createShader(path.getBounds());
-
-    // Paint sharp outline
+    ).createShader(squareBounds);
 
     final paint = Paint()
       ..shader = shader
       ..blendMode = BlendMode.softLight
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
-      paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, .7);
-    } else {
-      paint.strokeWidth = 3;
-    }
-
+      ..strokeWidth = 3;
     canvas.drawPath(path, paint);
 
-    // Paint a second, slightly blurred outline
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
-      paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-      canvas.drawPath(path, paint);
-    }
+    paint
+      ..strokeWidth = 1
+      ..color = color.withValues(alpha: color.a * 0.5)
+      ..blendMode = BlendMode.hardLight;
+    canvas.drawPath(path, paint);
   }
 }
