@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_drag_builder.dart';
+import 'package:meta/meta.dart';
 import 'package:motor/motor.dart';
 
 /// A widget that provides a squash and stretch effect to its child based on

@@ -1,3 +1,7 @@
+## 0.1.1-dev.16
+
+ - **FIX**: import annotations from `package:meta` again.
+
 ## 0.1.1-dev.15
 
 > Note: This release has breaking changes.

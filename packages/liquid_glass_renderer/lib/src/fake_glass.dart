@@ -3,10 +3,10 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:meta/meta.dart';
 
 /// A widget that aims to provide a similar look to [LiquidGlass], but without
 /// the expensive shader.
