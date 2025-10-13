@@ -8,7 +8,7 @@
 // Feel free to use this shader in your own projects, it'd be lovely if you could
 // give some credit like I did here.
 
-#version 320 es
+#version 460 core
 precision mediump float;
 
 #define DEBUG_NORMALS 0
@@ -23,7 +23,6 @@ layout(location = 2) uniform vec4 uOpticalProps;           // refractiveIndex, c
 layout(location = 3) uniform vec4 uLightConfig;            // angle, intensity, ambient, saturation
 layout(location = 4) uniform float uNumShapes;             // numShapes  
 layout(location = 5) uniform vec2 uLightDirection;         // pre-computed cos(angle), sin(angle)
-layout(location = 6) uniform mat4 uTransform;              // transform matrix for all shapes
 
 // Extract individual values for backward compatibility
 float uChromaticAberration = uOpticalProps.y;
@@ -68,15 +67,12 @@ float sdfSquircle(vec2 p, vec2 b, float r) {
     return min(max(q.x, q.y), 0.0) + sqrt(maxQ.x * maxQ.x + maxQ.y * maxQ.y) - r;
 }
 
-// Optimized ellipse SDF (reduced divisions and length calculations)
 float sdfEllipse(vec2 p, vec2 r) {
     r = max(r, 1e-4);
     
-    // Cache reciprocals to avoid repeated division
     vec2 invR = 1.0 / r;
     vec2 invR2 = invR * invR;
     
-    // Use squared lengths to avoid some sqrt operations where possible
     vec2 pInvR = p * invR;
     float k1 = length(pInvR);
     
@@ -166,17 +162,17 @@ vec3 getNormal(float sd, float thickness) {
 
 void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
-    
-    // Compute screen UV
-    float yUsed = computeY(fragCoord.y, uSize);
-    vec2 screenUV = vec2(fragCoord.x / uSize.x, yUsed);
-    
-    // Apply transform to fragment coordinates
-    vec4 transformedCoord = uTransform * vec4(fragCoord, 0.0, 1.0);
-    vec2 p = transformedCoord.xy;
+     
+    // We invert screenUV Y on OpenGL to sample the textures correctly
+    // fragCoord stays the same so shape positions are correct.
+    #ifdef IMPELLER_TARGET_OPENGLES
+        vec2 screenUV = vec2(fragCoord.x / uSize.x, 1.0 - (fragCoord.y / uSize.y));
+    #else
+        vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
+    #endif
     
     // Generate shape and calculate normal using shader-specific method
-    float sd = sceneSDF(p);
+    float sd = sceneSDF(fragCoord);
     vec3 normal = getNormal(sd, uThickness);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
@@ -189,7 +185,7 @@ void main() {
     // Use shared rendering pipeline
     fragColor = renderLiquidGlass(
         screenUV, 
-        p, 
+        fragCoord, 
         uSize, 
         sd, 
         uThickness, 

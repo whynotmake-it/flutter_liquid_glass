@@ -336,8 +336,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
             cos(_settings.lightAngle),
             sin(_settings.lightAngle),
           ),
-        )
-        ..setFloats(Matrix4.identity().storage); // Identity matrix
+        );
 
       for (var i = 0; i < shapeCount; i++) {
         final shape = i < shapes.length ? shapes[i].$2 : RawShape.none;
@@ -356,6 +355,7 @@ class RenderLiquidGlassLayer extends RenderProxyBox {
 
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.blur(
+        tileMode: TileMode.mirror,
         sigmaX: _settings.blur,
         sigmaY: _settings.blur,
       );
