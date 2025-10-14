@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
+import 'package:rivership/rivership.dart';
 
 void main() {
   runApp(CupertinoApp(home: BasicApp()));
@@ -173,6 +174,27 @@ class BasicApp extends HookWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class Blink extends StatelessWidget {
+  const Blink({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SequenceMotionBuilder(
+      converter: SingleMotionConverter(),
+      sequence: StepSequence.withMotions([
+        (0.0, Motion.linear(Duration(seconds: 1))),
+        (1.0, Motion.linear(Duration(seconds: 1))),
+        (1.0, Motion.linear(Duration(seconds: 1))),
+      ], loop: LoopMode.loop),
+      builder: (context, value, phase, child) =>
+          Opacity(opacity: value, child: child),
+      child: child,
     );
   }
 }

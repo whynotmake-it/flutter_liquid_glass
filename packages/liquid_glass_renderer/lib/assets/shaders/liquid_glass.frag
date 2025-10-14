@@ -156,7 +156,8 @@ vec3 getNormal(float sd, float thickness) {
     float n_cos = max(thickness + sd, 0.0) / thickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
     
-    // Return the normal directly without encoding
+    // Pre-scale xy components, then normalize once
+    vec2 xy = vec2(dx, dy) * n_cos;
     return normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
 }
 
@@ -173,7 +174,6 @@ void main() {
     
     // Generate shape and calculate normal using shader-specific method
     float sd = sceneSDF(fragCoord);
-    vec3 normal = getNormal(sd, uThickness);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
     // Early discard for pixels outside glass shapes to reduce overdraw
@@ -181,6 +181,8 @@ void main() {
         fragColor = texture(uBackgroundTexture, screenUV);
         return;
     }
+
+    vec3 normal = getNormal(sd, uThickness);
     
     // Use shared rendering pipeline
     fragColor = renderLiquidGlass(

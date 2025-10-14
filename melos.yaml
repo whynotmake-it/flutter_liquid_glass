@@ -64,6 +64,19 @@ scripts:
   test-without-goldens:
     run: melos run test-without-goldens:select --no-select
     description: Run all tests in this project without golden tests.
+
+  update-goldens:select:
+    run: flutter test --enable-impeller --tags=golden --update-goldens
+    exec:
+      failFast: true
+      concurrency: 6
+    packageFilters:
+      dirExists: test
+    description: Run `flutter test` for selected packages without golden tests.
+
+    
+  update-goldens:
+    run: melos run update-goldens:select --no-select
   
   generate:select:
     description: Run code generation for selected packages.

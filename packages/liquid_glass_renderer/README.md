@@ -40,7 +40,7 @@ As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
 - **Maximum of 64 shapes** can be blended in a `LiquidGlassLayer`, and performance will degrade significantly with the more shapes you add in the same layer.
-- **Blur** introduces artifacts when blending shapes, and looks suboptimal for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
+- **Blur** introduces artifacts when blending shapes, and is entirely unsupported for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
 
 ## Acknowledgements
 
@@ -206,7 +206,7 @@ Apple themselves barely use this effect, one of their uses is the time on the lo
 To make it look best, consider a few key tips:
 
 - Try to limit the use of these widgets on each screen, to keep the performance good
-- Always apply at least a subtle blur (5-10px)to hide potential artifacts
+- **Note: Blur is not supported in `Glassify`** due to performance constraints. The shader has been optimized to remove blur to improve mobile GPU performance.
 - The algorithm often falls apart for high thicknesses, try to keep it below 20px for best results
 - Depending on the shape, you might need to adjust `lightIntensity` and `ambientStrength` to make it look best
 - Colors help maintain readability
