@@ -156,8 +156,6 @@ vec3 getNormal(float sd, float thickness) {
     float n_cos = max(thickness + sd, 0.0) / thickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
     
-    // Pre-scale xy components, then normalize once
-    vec2 xy = vec2(dx, dy) * n_cos;
     return normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
 }
 

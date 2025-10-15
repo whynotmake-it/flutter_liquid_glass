@@ -2,6 +2,9 @@
 //
 // Shared rendering functions for liquid glass shaders
 
+// Constants
+const vec3 LUMA_WEIGHTS = vec3(0.299, 0.587, 0.114);
+
 // Utility functions
 mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
@@ -19,7 +22,7 @@ float computeY(float coordY, vec2 size) {
 
 // Determine highlight color with gradual transition from colored to white based on darkness
 vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
-    float luminance = dot(backgroundColor, vec3(0.299, 0.587, 0.114));
+    float luminance = dot(backgroundColor, LUMA_WEIGHTS);
     
     // Calculate saturation (difference between max and min RGB components)
     float maxComponent = max(max(backgroundColor.r, backgroundColor.g), backgroundColor.b);
@@ -38,7 +41,7 @@ vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
         
         // Boost saturation for more vivid highlights
         float saturationBoost = 1.3;
-        vec3 gray = vec3(dot(coloredHighlight, vec3(0.299, 0.587, 0.114)));
+        vec3 gray = vec3(dot(coloredHighlight, LUMA_WEIGHTS));
         coloredHighlight = mix(gray, coloredHighlight, saturationBoost);
         coloredHighlight = min(coloredHighlight, vec3(1.0));
     }
@@ -120,13 +123,14 @@ vec3 calculateLighting(
     // Increase strength of opposite light
     float totalInfluence = mainLightInfluence + oppositeLightInfluence * 0.8;
 
-    vec3 highlightColor = getHighlightColor(backgroundColor, 0.7);
+    // Compute highlight color once at max brightness, then scale for different uses
+    vec3 highlightColor = getHighlightColor(backgroundColor, 1.0);
 
-    // Directional component. Increased brightness.
-    vec3 directionalRim = highlightColor * (totalInfluence * totalInfluence) * lightIntensity * 2.0;
+    // Directional component with 0.7 brightness factor
+    vec3 directionalRim = (highlightColor * 0.7) * (totalInfluence * totalInfluence) * lightIntensity * 2.0;
 
-    // Ambient component for the rim (from all sides)
-    vec3 ambientRim = getHighlightColor(backgroundColor, 0.4) * ambientStrength;
+    // Ambient component with 0.4 brightness factor
+    vec3 ambientRim = (highlightColor * 0.4) * ambientStrength;
 
     // Combine directional and ambient rim light, and apply rim falloff
     vec3 totalRimLight = (directionalRim + ambientRim) * rimFactor;
@@ -200,7 +204,7 @@ vec4 calculateRefraction(vec2 screenUV, vec3 normal, float height, float thickne
 // Apply saturation adjustment to a color
 vec3 applySaturation(vec3 color, float saturation) {
     // Convert to HSL-like adjustments
-    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+    float luminance = dot(color, LUMA_WEIGHTS);
     
     // Apply saturation adjustment (1.0 = no change)
     vec3 saturatedColor = mix(vec3(luminance), color, saturation);
@@ -213,7 +217,7 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
     vec4 finalColor = liquidColor;
     
     if (glassColor.a > 0.0) {
-        float glassLuminance = dot(glassColor.rgb, vec3(0.299, 0.587, 0.114));
+        float glassLuminance = dot(glassColor.rgb, LUMA_WEIGHTS);
         
         if (glassLuminance < 0.5) {
             vec3 darkened = liquidColor.rgb * (glassColor.rgb * 2.0);
@@ -233,12 +237,9 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 
 // Complete liquid glass rendering pipeline
 vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation) {
-    // Sample background once for early exit and final blend
-    vec4 bgSample = texture(backgroundTexture, screenUV);
-    
     // Early exit for fully transparent pixels - avoid all expensive calculations
     if (foregroundAlpha < 0.001 || thickness < 0.01) {
-        return bgSample;
+        return texture(backgroundTexture, screenUV);
     }
     
     float height = getHeight(sd, thickness);
@@ -247,8 +248,8 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     vec2 refractionDisplacement;
     vec4 refractColor = calculateRefraction(screenUV, normal, height, thickness, refractiveIndex, chromaticAberration, uSize, backgroundTexture, gaussianBlur, refractionDisplacement);
     
-    // Get background color for lighting calculations (reuse refractColor when no CA, else use bgSample)
-    vec3 backgroundColor = chromaticAberration < 0.001 ? refractColor.rgb : bgSample.rgb;
+    // Get background color for lighting calculations
+    vec3 backgroundColor = refractColor.rgb;
     
     // Calculate lighting effects using background color
     vec3 lighting = calculateLighting(screenUV, normal, sd, thickness, height, lightDirection, lightIntensity, ambientStrength, backgroundColor);
@@ -263,6 +264,8 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     finalColor.rgb = applySaturation(finalColor.rgb, saturation);
     
     // Use alpha for smooth transition at boundaries
+    // Only sample background texture when we need to blend
+    vec4 bgSample = texture(backgroundTexture, screenUV);
     return mix(bgSample, finalColor, foregroundAlpha);
 }
 
