@@ -57,76 +57,76 @@ class BasicApp extends HookWidget {
                 ),
               ],
             ),
+
             Center(
               child: ListenableBuilder(
                 listenable: Listenable.merge([settingsNotifier, light]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
-                    lightAngle: light.value,
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.4),
                   );
-                  return Column(
-                    spacing: 16,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        spacing: 16,
-                        children: [
-                          LiquidStretch(
-                            child: LiquidGlass(
-                              settings: settings,
-                              shape: LiquidRoundedSuperellipse(
-                                borderRadius: Radius.circular(20),
-                              ),
-                              child: GlassGlow(
-                                child: SizedBox.square(
-                                  dimension: 100,
-                                  child: Center(child: Text('REAL')),
+                  return LiquidGlassLayer(
+                    settings: settings.copyWith(lightAngle: light.value),
+                    child: Column(
+                      spacing: 16,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 16,
+                          children: [
+                            LiquidStretch(
+                              child: LiquidGlass.inLayer(
+                                shape: LiquidRoundedSuperellipse(
+                                  borderRadius: Radius.circular(20),
                                 ),
-                              ),
-                            ),
-                          ),
-                          LiquidStretch(
-                            child: FakeGlass(
-                              settings: settings,
-                              shape: LiquidRoundedSuperellipse(
-                                borderRadius: Radius.circular(20),
-                              ),
-                              child: GlassGlow(
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
+                                child: GlassGlow(
                                   child: SizedBox.square(
                                     dimension: 100,
-                                    child: Center(child: Text('FAKE')),
+                                    child: Center(child: Text('REAL')),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      LiquidStretch(
-                        child: FakeGlass(
-                          settings: settings,
-                          shape: LiquidRoundedSuperellipse(
-                            borderRadius: Radius.circular(20),
-                          ),
-                          child: GlassGlow(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              child: SizedBox(
-                                width: 400,
-                                height: 64,
-                                child: Center(child: Text('FAKE')),
+                            LiquidStretch(
+                              child: LiquidGlass.inLayer(
+                                shape: LiquidRoundedSuperellipse(
+                                  borderRadius: Radius.circular(20),
+                                ),
+                                child: GlassGlow(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    child: SizedBox.square(
+                                      dimension: 100,
+                                      child: Center(child: Text('FAKE')),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        LiquidStretch(
+                          child: LiquidGlass.inLayer(
+                            shape: LiquidRoundedSuperellipse(
+                              borderRadius: Radius.circular(20),
+                            ),
+                            child: GlassGlow(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                child: SizedBox(
+                                  width: 400,
+                                  height: 64,
+                                  child: Center(child: Text('FAKE')),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),

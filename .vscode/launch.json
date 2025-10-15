@@ -7,6 +7,7 @@
         {
             "name": "example",
             "cwd": "packages/liquid_glass_renderer/example",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -16,6 +17,7 @@
         {
             "name": "example (no impeller)",
             "cwd": "packages/liquid_glass_renderer/example",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -25,6 +27,7 @@
         {
             "name": "example (profile mode)",
             "cwd": "packages/liquid_glass_renderer/example",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile",
@@ -35,6 +38,7 @@
         {
             "name": "example (release mode)",
             "cwd": "packages/liquid_glass_renderer/example",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release",

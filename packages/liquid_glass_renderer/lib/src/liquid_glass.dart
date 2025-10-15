@@ -3,7 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/glass_link.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
 import 'package:meta/meta.dart';
 
 /// A liquid glass shape.
@@ -61,6 +62,9 @@ class LiquidGlass extends StatelessWidget {
   })  : _settings = null,
         restrictThickness = false;
 
+  /// Maximum number of shapes supported per layer.
+  static const int maxShapesPerLayer = 16;
+
   /// The child of this widget.
   ///
   /// You can choose whether this should be rendered "inside" of the glass, or
@@ -97,6 +101,7 @@ class LiquidGlass extends StatelessWidget {
     switch (_settings) {
       case null:
         return _RawLiquidGlass(
+          glassLink: LiquidGlassScope.of(context).link,
           shape: shape,
           glassContainsChild: glassContainsChild,
           child: ClipPath(
@@ -109,14 +114,19 @@ class LiquidGlass extends StatelessWidget {
         return LiquidGlassLayer(
           settings: settings,
           restrictThickness: restrictThickness,
-          child: _RawLiquidGlass(
-            shape: shape,
-            glassContainsChild: glassContainsChild,
-            child: ClipPath(
-              clipper: ShapeBorderClipper(shape: shape),
-              clipBehavior: clipBehavior,
-              child: GlassGlowLayer(child: child),
-            ),
+          child: Builder(
+            builder: (context) {
+              return _RawLiquidGlass(
+                glassLink: LiquidGlassScope.of(context).link,
+                shape: shape,
+                glassContainsChild: glassContainsChild,
+                child: ClipPath(
+                  clipper: ShapeBorderClipper(shape: shape),
+                  clipBehavior: clipBehavior,
+                  child: GlassGlowLayer(child: child),
+                ),
+              );
+            },
           ),
         );
     }
@@ -128,17 +138,21 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required super.child,
     required this.shape,
     required this.glassContainsChild,
+    required this.glassLink,
   });
 
   final LiquidShape shape;
 
   final bool glassContainsChild;
 
+  final GlassLink glassLink;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return RenderLiquidGlass(
       shape: shape,
       glassContainsChild: glassContainsChild,
+      glassLink: glassLink,
     );
   }
 
@@ -149,7 +163,8 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   ) {
     renderObject
       ..shape = shape
-      ..glassContainsChild = glassContainsChild;
+      ..glassContainsChild = glassContainsChild
+      ..glassLink = glassLink;
   }
 }
 
@@ -158,8 +173,10 @@ class RenderLiquidGlass extends RenderProxyBox {
   RenderLiquidGlass({
     required LiquidShape shape,
     required bool glassContainsChild,
+    required GlassLink glassLink,
   })  : _shape = shape,
-        _glassContainsChild = glassContainsChild;
+        _glassContainsChild = glassContainsChild,
+        _glassLink = glassLink;
 
   late LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -175,16 +192,21 @@ class RenderLiquidGlass extends RenderProxyBox {
   set glassContainsChild(bool value) {
     if (_glassContainsChild == value) return;
     _glassContainsChild = value;
-    markNeedsPaint();
     _updateGlassLink();
   }
 
   GlassLink? _glassLink;
+  set glassLink(GlassLink? value) {
+    if (_glassLink == value) return;
+    _unregisterFromParentLayer();
+    _glassLink = value;
+    _registerWithLink();
+  }
 
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    _registerWithParentLayer();
+    _registerWithLink();
   }
 
   @override
@@ -193,20 +215,13 @@ class RenderLiquidGlass extends RenderProxyBox {
     super.detach();
   }
 
-  void _registerWithParentLayer() {
-    // Walk up the render tree to find the nearest RenderLiquidGlassLayer
-    var ancestor = parent;
-    while (ancestor != null) {
-      if (ancestor is RenderLiquidGlassLayer) {
-        _glassLink = ancestor.glassLink;
-        _glassLink?.registerShape(
-          this,
-          _shape,
-          glassContainsChild: _glassContainsChild,
-        );
-        break;
-      }
-      ancestor = ancestor.parent;
+  void _registerWithLink() {
+    if (_glassLink != null) {
+      _glassLink!.registerShape(
+        this,
+        _shape,
+        glassContainsChild: _glassContainsChild,
+      );
     }
   }
 
@@ -237,7 +252,11 @@ class RenderLiquidGlass extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    _glassLink?.notifyShapeLayoutChanged(this);
+    final transform = getTransformTo(null);
+    if (lastTransform != transform) {
+      lastTransform = transform;
+      _glassLink?.notifyShapeLayoutChanged(this);
+    }
   }
 
   void paintFromLayer(PaintingContext context, Offset offset) {

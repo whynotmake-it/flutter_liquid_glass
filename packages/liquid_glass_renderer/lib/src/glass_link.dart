@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
 import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 
 /// A link that connects liquid glass shapes to their parent layer for
@@ -7,16 +11,21 @@ import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 ///
 /// This replaces the ticker-based approach with an event-driven system
 /// similar to follow_the_leader's LeaderLink pattern.
+@internal
 class GlassLink with ChangeNotifier {
   /// Creates a new [GlassLink].
   GlassLink();
 
+  static GlassLink of(BuildContext context) {
+    return LiquidGlassScope.of(context).link;
+  }
+
   /// Information about a shape registered with this link.
-  final Map<RenderObject, GlassShapeInfo> _shapes = {};
+  final Map<RenderLiquidGlass, GlassShapeInfo> _shapes = {};
 
   /// Register a shape with this link.
   void registerShape(
-    RenderObject renderObject,
+    RenderLiquidGlass renderObject,
     LiquidShape shape, {
     required bool glassContainsChild,
   }) {
@@ -55,49 +64,11 @@ class GlassLink with ChangeNotifier {
     }
   }
 
-  /// Get all currently registered shapes with their computed information.
-  List<ComputedShapeInfo> get computedShapes {
-    final result = <ComputedShapeInfo>[];
-
-    for (final entry in _shapes.entries) {
-      final renderObject = entry.key;
-      final shapeInfo = entry.value;
-
-      if (renderObject is RenderBox &&
-          renderObject.attached &&
-          renderObject.hasSize) {
-        try {
-          // Get transform relative to global coordinates
-          final transform = renderObject.getTransformTo(null);
-          final rect = MatrixUtils.transformRect(
-            transform,
-            Offset.zero & renderObject.size,
-          );
-
-          result.add(
-            ComputedShapeInfo(
-              renderObject: renderObject,
-              shape: shapeInfo.shape,
-              glassContainsChild: shapeInfo.glassContainsChild,
-              globalBounds: rect,
-              transform: transform,
-            ),
-          );
-        } catch (e) {
-          // Skip shapes that can't be transformed
-          debugPrint('Failed to compute shape info: $e');
-        }
-      }
-    }
-
-    return result;
-  }
-
   /// Check if any shapes are registered.
   bool get hasShapes => _shapes.isNotEmpty;
 
-  /// Get the number of registered shapes.
-  int get shapeCount => _shapes.length;
+  Iterable<MapEntry<RenderLiquidGlass, GlassShapeInfo>> get shapeEntries =>
+      _shapes.entries;
 
   bool _postFrameCallbackScheduled = false;
 
@@ -140,31 +111,4 @@ class GlassShapeInfo {
 
   /// Whether the glass contains the child.
   bool glassContainsChild;
-}
-
-/// Computed information about a shape including its global positioning.
-class ComputedShapeInfo {
-  /// Creates a new [ComputedShapeInfo].
-  ComputedShapeInfo({
-    required this.renderObject,
-    required this.shape,
-    required this.glassContainsChild,
-    required this.globalBounds,
-    required this.transform,
-  });
-
-  /// The render object for this shape.
-  final RenderObject renderObject;
-
-  /// The liquid shape.
-  final LiquidShape shape;
-
-  /// Whether the glass contains the child.
-  final bool glassContainsChild;
-
-  /// The global bounds of the shape.
-  final Rect globalBounds;
-
-  /// The transform matrix for the shape.
-  final Matrix4 transform;
 }

@@ -15,5 +15,21 @@ final String liquidGlassShader =
     '${_shadersRoot}lib/assets/shaders/liquid_glass.frag';
 
 @internal
+final String liquidGlassGeometryShader =
+    '${_shadersRoot}lib/assets/shaders/liquid_glass_geometry_blended.frag';
+
+@internal
+final String liquidGlassRenderShader =
+    '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
+
+@internal
+final String liquidGlassLightingShader =
+    '${_shadersRoot}lib/assets/shaders/liquid_glass_lighting.frag';
+
+@internal
+final String liquidGlassFilterShader =
+    '${_shadersRoot}lib/assets/shaders/liquid_glass_filter.frag';
+
+@internal
 final String arbitraryShader =
     '${_shadersRoot}lib/assets/shaders/liquid_glass_arbitrary.frag';

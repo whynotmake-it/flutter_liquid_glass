@@ -115,40 +115,38 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           right: widget.horizontalPadding,
           left: widget.horizontalPadding,
           bottom: widget.bottomPadding,
+          top: widget.bottomPadding,
         ),
         child: Row(
           spacing: widget.spacing,
           children: [
             Expanded(
-              child: LiquidStretch(
-                stretch: .2,
+              child: _TabIndicator(
+                visible: widget.showIndicator,
+                tabIndex: widget.selectedIndex,
+                tabCount: widget.tabs.length,
+                indicatorColor: widget.indicatorColor,
+                onTabChanged: widget.onTabSelected,
                 child: LiquidGlass.inLayer(
                   clipBehavior: Clip.none,
                   shape: const LiquidRoundedSuperellipse(
                     borderRadius: Radius.circular(32),
                   ),
-                  child: _TabIndicator(
-                    visible: widget.showIndicator,
-                    tabIndex: widget.selectedIndex,
-                    tabCount: widget.tabs.length,
-                    indicatorColor: widget.indicatorColor,
-                    onTabChanged: widget.onTabSelected,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      height: widget.barHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < widget.tabs.length; i++)
-                            Expanded(
-                              child: _BottomBarTab(
-                                tab: widget.tabs[i],
-                                selected: widget.selectedIndex == i,
-                                onTap: () => widget.onTabSelected(i),
-                              ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    height: widget.barHeight,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        for (var i = 0; i < widget.tabs.length; i++)
+                          Expanded(
+                            child: _BottomBarTab(
+                              tab: widget.tabs[i],
+                              selected: widget.selectedIndex == i,
+                              onTap: () => widget.onTabSelected(i),
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -589,7 +587,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                           ),
                           saturation: 1 + .5 * thickness,
                           refractiveIndex: 1.15,
-                          thickness: thickness * 20,
+                          thickness: thickness * 15,
                           lightIntensity: 2,
                           chromaticAberration: .5,
                         ),
@@ -631,7 +629,7 @@ class _IndicatorTransform extends StatelessWidget {
   Widget build(BuildContext context) {
     final rect = RelativeRect.lerp(
       RelativeRect.fill,
-      const RelativeRect.fromLTRB(-11, -11, -11, -11),
+      const RelativeRect.fromLTRB(-14, -14, -14, -14),
       thickness,
     );
     return Positioned.fill(
