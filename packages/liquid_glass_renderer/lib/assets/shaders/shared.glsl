@@ -237,11 +237,6 @@ vec4 applyGlassColor(vec4 liquidColor, vec4 glassColor) {
 
 // Complete liquid glass rendering pipeline
 vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickness, float refractiveIndex, float chromaticAberration, vec4 glassColor, vec2 lightDirection, float lightIntensity, float ambientStrength, sampler2D backgroundTexture, vec3 normal, float foregroundAlpha, float gaussianBlur, float saturation) {
-    // Early exit for fully transparent pixels - avoid all expensive calculations
-    if (foregroundAlpha < 0.001 || thickness < 0.01) {
-        return texture(backgroundTexture, screenUV);
-    }
-    
     float height = getHeight(sd, thickness);
     
     // Calculate refraction & chromatic aberration
