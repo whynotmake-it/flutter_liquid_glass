@@ -176,7 +176,7 @@ void main() {
 
     // Early discard for pixels outside glass shapes to reduce overdraw
     if (foregroundAlpha < 0.01) {
-        fragColor = texture(uBackgroundTexture, screenUV);
+        fragColor = vec4(0, 0, 0, 0);
         return;
     }
 

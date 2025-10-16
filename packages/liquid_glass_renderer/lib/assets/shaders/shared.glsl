@@ -258,10 +258,7 @@ vec4 renderLiquidGlass(vec2 screenUV, vec2 p, vec2 uSize, float sd, float thickn
     // Apply saturation adjustment to the final color after tinting
     finalColor.rgb = applySaturation(finalColor.rgb, saturation);
     
-    // Use alpha for smooth transition at boundaries
-    // Only sample background texture when we need to blend
-    vec4 bgSample = texture(backgroundTexture, screenUV);
-    return mix(bgSample, finalColor, foregroundAlpha);
+    return mix(vec4(0.0), finalColor, foregroundAlpha);
 }
 
 // Debug function to visualize normals as colors
