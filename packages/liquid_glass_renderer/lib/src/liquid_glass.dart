@@ -42,7 +42,6 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-    this.restrictThickness = true,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
   }) : _settings = settings;
@@ -59,8 +58,7 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-  })  : _settings = null,
-        restrictThickness = false;
+  }) : _settings = null;
 
   /// Maximum number of shapes supported per layer.
   static const int maxShapesPerLayer = 16;
@@ -91,9 +89,6 @@ class LiquidGlass extends StatelessWidget {
   /// Defaults to [Clip.none], so [child] will not be clipped.
   final Clip clipBehavior;
 
-  /// {@macro liquid_glass_renderer.restrict_thickness}
-  final bool restrictThickness;
-
   final LiquidGlassSettings? _settings;
 
   @override
@@ -113,7 +108,6 @@ class LiquidGlass extends StatelessWidget {
       case final settings:
         return LiquidGlassLayer(
           settings: settings,
-          restrictThickness: restrictThickness,
           child: Builder(
             builder: (context) {
               return _RawLiquidGlass(

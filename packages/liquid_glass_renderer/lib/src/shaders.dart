@@ -11,25 +11,25 @@ final String _shadersRoot =
         : 'packages/liquid_glass_renderer/';
 
 @internal
-final String liquidGlassShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass.frag';
+abstract class ShaderKeys {
+  const ShaderKeys._();
 
-@internal
-final String liquidGlassGeometryShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass_geometry_blended.frag';
+  static final blendedGeometry =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_geometry_blended.frag';
 
-@internal
-final String liquidGlassRenderShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
+  static final liquidGlassRender =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
 
-@internal
-final String liquidGlassLightingShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass_lighting.frag';
+  static final lighting =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_lighting.frag';
 
-@internal
-final String liquidGlassFilterShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass_filter.frag';
+  static final String liquidGlassFilterShader =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_filter.frag';
 
-@internal
-final String arbitraryShader =
-    '${_shadersRoot}lib/assets/shaders/liquid_glass_arbitrary.frag';
+  static final String glassify =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_arbitrary.frag';
+
+  @Deprecated('This shader is only for legacy reasons and reference.')
+  static final legacyLiquidGlass =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass.frag';
+}

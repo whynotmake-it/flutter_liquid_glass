@@ -67,7 +67,7 @@ class _GlassifyState extends State<Glassify>
     }
 
     return ShaderBuilder(
-      assetKey: arbitraryShader,
+      assetKey: ShaderKeys.glassify,
       (context, shader, child) => _RawGlassify(
         shader: shader,
         settings: widget.settings,

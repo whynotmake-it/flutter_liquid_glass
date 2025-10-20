@@ -74,12 +74,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  @protected
-  void onLinkNotification() {
-    _invalidateGeometry();
-  }
-
-  // === Cached Geometry State ===
+  @override
+  bool get alwaysNeedsCompositing => _geometryImage != null;
 
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
@@ -89,16 +85,20 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
 
   /// Computed shape information
   List<ShapeInLayerInfo> _cachedShapes = [];
-  List<ShapeInLayerInfo> get cachedShapes => _cachedShapes;
 
   /// Layer-space bounding box (for painting)
   Rect _cachedLayerBoundingBox = Rect.zero;
 
-  bool _needsRecreateGeometryImage = true;
+  @protected
+  void onLinkNotification() {
+    _invalidateGeometry();
+  }
 
   void _invalidateGeometry() {
-    _needsRecreateGeometryImage = true;
+    _geometryImage?.dispose();
+    _geometryImage = null;
     _cachedScreenShapesBounds = null;
+    markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -140,7 +140,7 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
 
   /// Uploads shape data to geometry shader in screen space coordinates
   void _updateGeometryShaderShapes(Offset screenOrigin) {
-    final shapes = cachedShapes;
+    final shapes = _cachedShapes;
     final shapeCount = shapes.length;
 
     if (shapeCount > LiquidGlass.maxShapesPerLayer) {
@@ -171,10 +171,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
     debugPaintLiquidGlassGeometry = false;
-
-    if (_needsRecreateGeometryImage) {
+    if (_geometryImage == null) {
       _rebuildGeometry();
-      _needsRecreateGeometryImage = false;
     }
 
     final shapes = _cachedShapes;
@@ -299,6 +297,7 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
       ..setFloat(1, height.toDouble());
 
     _geometryImage = _renderGeometryToImage(geometryBounds, width, height);
+    markNeedsCompositingBitsUpdate();
   }
 
   /// Snaps bounds to pixel boundaries to prevent sub-pixel flickering
@@ -316,8 +315,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
   }
 
   (int, int) _getGeometryImageSize(Rect bounds) {
-    final width = (bounds.width * devicePixelRatio).round();
-    final height = (bounds.height * devicePixelRatio).round();
+    final width = (bounds.width * devicePixelRatio).ceil();
+    final height = (bounds.height * devicePixelRatio).ceil();
     return (width, height);
   }
 
@@ -411,6 +410,7 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
   @override
   @mustCallSuper
   void dispose() {
+    _geometryImage?.dispose();
     glassLink.removeListener(onLinkNotification);
     super.dispose();
   }

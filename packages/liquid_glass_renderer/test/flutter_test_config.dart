@@ -1,13 +1,17 @@
 import 'dart:async';
 
 import 'package:alchemist/alchemist.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
+import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
-  await ShaderBuilder.precacheShader(liquidGlassShader);
-  await ShaderBuilder.precacheShader(liquidGlassFilterShader);
-  await ShaderBuilder.precacheShader(arbitraryShader);
+  await MultiShaderBuilder.precacheShaders([
+    ShaderKeys.blendedGeometry,
+    ShaderKeys.liquidGlassRender,
+    ShaderKeys.lighting,
+    ShaderKeys.liquidGlassFilterShader,
+    ShaderKeys.glassify,
+  ]);
 
   return AlchemistConfig.runWithConfig(
     config: AlchemistConfig(

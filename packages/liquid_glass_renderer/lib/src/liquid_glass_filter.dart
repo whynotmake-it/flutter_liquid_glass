@@ -58,9 +58,9 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
       link: _glassLink,
       child: MultiShaderBuilder(
         assetKeys: [
-          liquidGlassGeometryShader,
-          liquidGlassRenderShader,
-          liquidGlassLightingShader,
+          ShaderKeys.blendedGeometry,
+          ShaderKeys.liquidGlassRender,
+          ShaderKeys.lighting,
         ],
         (context, shaders, child) {
           return _RawLiquidGlassFilter(

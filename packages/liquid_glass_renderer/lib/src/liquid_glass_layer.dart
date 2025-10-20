@@ -59,7 +59,6 @@ class LiquidGlassLayer extends StatefulWidget {
   const LiquidGlassLayer({
     required this.child,
     this.settings = const LiquidGlassSettings(),
-    this.restrictThickness = true,
     super.key,
   });
 
@@ -71,14 +70,6 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
-
-  /// {@template liquid_glass_renderer.restrict_thickness}
-  /// If set to true, the thickness of all shapes in this layer will be
-  /// restricted to the dimensions of the smallest shape.
-  ///
-  /// This will prevent artifacts on shapes that are thicker than wide/tall
-  /// {@endtemplate}
-  final bool restrictThickness;
 
   @override
   State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
@@ -112,16 +103,15 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
       link: _glassLink,
       child: MultiShaderBuilder(
         assetKeys: [
-          liquidGlassRenderShader,
-          liquidGlassGeometryShader,
-          liquidGlassLightingShader,
+          ShaderKeys.blendedGeometry,
+          ShaderKeys.liquidGlassRender,
+          ShaderKeys.lighting,
         ],
         (context, shaders, child) => _RawShapes(
-          renderShader: shaders[0],
-          geometryShader: shaders[1],
+          geometryShader: shaders[0],
+          renderShader: shaders[1],
           lightingShader: shaders[2],
           settings: widget.settings,
-          restrictThickness: widget.restrictThickness,
           glassLink: _glassLink,
           child: child!,
         ),
@@ -137,7 +127,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.geometryShader,
     required this.lightingShader,
     required this.settings,
-    required this.restrictThickness,
     required Widget super.child,
     required this.glassLink,
   });
@@ -146,7 +135,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final FragmentShader renderShader;
   final FragmentShader lightingShader;
   final LiquidGlassSettings settings;
-  final bool restrictThickness;
   final GlassLink glassLink;
 
   @override
@@ -184,9 +172,6 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
     required super.glassLink,
   });
 
-  @override
-  bool get alwaysNeedsCompositing => true;
-
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
   final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
   final _clipLayerHandle = LayerHandle<ClipPathLayer>();
@@ -198,15 +183,15 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
     List<ShapeInLayerInfo> shapes,
     Rect boundingBox,
   ) {
-    final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
-      ..filter = ImageFilter.shader(renderShader);
-
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.blur(
         tileMode: TileMode.mirror,
         sigmaX: settings.blur,
         sigmaY: settings.blur,
       );
+
+    final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
+      ..filter = ImageFilter.shader(renderShader);
 
     final clipPath = Path();
     for (final shape in shapes) {
@@ -246,12 +231,14 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
       )
       ..pushLayer(
         shaderLayer,
-        (context, offset) => paintShapeContents(
-          context,
-          offset,
-          shapes,
-          glassContainsChild: false,
-        ),
+        (context, offset) {
+          paintShapeContents(
+            context,
+            offset,
+            shapes,
+            glassContainsChild: false,
+          );
+        },
         offset,
       );
   }
