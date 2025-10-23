@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print, lines_longer_than_80_chars
 
-import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
+import 'package:meta/meta.dart';
 
 export 'package:logging/logging.dart' show Level, Logger;
 
