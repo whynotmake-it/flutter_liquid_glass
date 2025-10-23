@@ -30,6 +30,7 @@ class BasicApp extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final tab = useState(0);
+    final fake = useState(false);
 
     final light = useRotatingAnimationController();
 
@@ -64,6 +65,15 @@ class BasicApp extends HookWidget {
                 ),
               ],
             ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: CupertinoSwitch(
+                  value: fake.value,
+                  onChanged: (v) => fake.value = v,
+                ),
+              ),
+            ),
             Center(
               child: ListenableBuilder(
                 listenable: Listenable.merge([settingsNotifier, light]),
@@ -85,19 +95,25 @@ class BasicApp extends HookWidget {
                           children: [
                             LiquidStretch(
                               child: LiquidGlass.inLayer(
+                                fake: fake.value,
                                 shape: LiquidRoundedSuperellipse(
                                   borderRadius: Radius.circular(20),
                                 ),
                                 child: GlassGlow(
                                   child: SizedBox.square(
                                     dimension: 100,
-                                    child: Center(child: Text('REAL')),
+                                    child: Center(
+                                      child: fake.value
+                                          ? Text('FAKE')
+                                          : Text('REAL'),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                             LiquidStretch(
                               child: LiquidGlass.inLayer(
+                                fake: fake.value,
                                 shape: LiquidRoundedSuperellipse(
                                   borderRadius: Radius.circular(20),
                                 ),
@@ -106,7 +122,11 @@ class BasicApp extends HookWidget {
                                     behavior: HitTestBehavior.opaque,
                                     child: SizedBox.square(
                                       dimension: 100,
-                                      child: Center(child: Text('REAL')),
+                                      child: Center(
+                                        child: fake.value
+                                            ? Text('FAKE')
+                                            : Text('REAL'),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -115,7 +135,8 @@ class BasicApp extends HookWidget {
                           ],
                         ),
                         LiquidStretch(
-                          child: FakeGlass.inLayer(
+                          child: LiquidGlass.inLayer(
+                            fake: fake.value,
                             shape: LiquidRoundedSuperellipse(
                               borderRadius: Radius.circular(20),
                             ),
@@ -125,7 +146,11 @@ class BasicApp extends HookWidget {
                                 child: SizedBox(
                                   width: 400,
                                   height: 64,
-                                  child: Center(child: Text('FAKE')),
+                                  child: Center(
+                                    child: fake.value
+                                        ? Text('FAKE')
+                                        : Text('REAL'),
+                                  ),
                                 ),
                               ),
                             ),
@@ -142,6 +167,7 @@ class BasicApp extends HookWidget {
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: LiquidGlassBottomBar(
+                  fake: fake.value,
                   extraButton: LiquidGlassBottomBarExtraButton(
                     icon: CupertinoIcons.add_circled,
                     onTap: () {

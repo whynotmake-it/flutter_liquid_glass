@@ -184,6 +184,7 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
     List<ShapeInLayerInfo> shapes,
     Rect boundingBox,
   ) {
+    if (!attached) return;
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.blur(
         tileMode: TileMode.mirror,
@@ -196,6 +197,7 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
 
     final clipPath = Path();
     for (final shape in shapes) {
+      if (!shape.renderObject.attached) continue;
       final globalTransform = shape.renderObject.getTransformTo(this);
 
       clipPath.addPath(

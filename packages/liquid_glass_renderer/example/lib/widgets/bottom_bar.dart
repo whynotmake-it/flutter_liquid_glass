@@ -37,16 +37,8 @@ Matrix4 buildJellyTransform({
   final scaleX = squashX * stretchX;
   final scaleY = squashY * stretchY;
 
-  // Create skew effect for more organic jelly feel
-  final skewX = direction.dx * distortionFactor * 0.2;
-  final skewY = direction.dy * distortionFactor * 0.2;
-
   // Build the transformation matrix
   final matrix = Matrix4.identity();
-
-  // Apply skew transformation
-  matrix.setEntry(0, 1, skewX); // Skew X by Y
-  matrix.setEntry(1, 0, skewY); // Skew Y by X
 
   // Apply scale transformation
   matrix.scale(scaleX, scaleY);
@@ -68,6 +60,7 @@ class LiquidGlassBottomBar extends StatefulWidget {
     this.glassSettings,
     this.showIndicator = true,
     this.indicatorColor,
+    this.fake = false,
   });
 
   final List<LiquidGlassBottomBarTab> tabs;
@@ -81,6 +74,7 @@ class LiquidGlassBottomBar extends StatefulWidget {
   final LiquidGlassSettings? glassSettings;
   final bool showIndicator;
   final Color? indicatorColor;
+  final bool fake;
 
   @override
   State<LiquidGlassBottomBar> createState() => _LiquidGlassBottomBarState();
@@ -122,12 +116,14 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           children: [
             Expanded(
               child: _TabIndicator(
+                fake: widget.fake,
                 visible: widget.showIndicator,
                 tabIndex: widget.selectedIndex,
                 tabCount: widget.tabs.length,
                 indicatorColor: widget.indicatorColor,
                 onTabChanged: widget.onTabSelected,
                 child: LiquidGlass.inLayer(
+                  fake: widget.fake,
                   clipBehavior: Clip.none,
                   shape: const LiquidRoundedSuperellipse(
                     borderRadius: Radius.circular(32),
@@ -153,7 +149,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
               ),
             ),
             if (widget.extraButton != null)
-              _ExtraButton(config: widget.extraButton!),
+              _ExtraButton(config: widget.extraButton!, fake: widget.fake),
           ],
         ),
       ),
@@ -292,9 +288,10 @@ class _BottomBarTab extends StatelessWidget {
 }
 
 class _ExtraButton extends StatefulWidget {
-  const _ExtraButton({required this.config});
+  const _ExtraButton({required this.config, this.fake = false});
 
   final LiquidGlassBottomBarExtraButton config;
+  final bool fake;
 
   @override
   State<_ExtraButton> createState() => _ExtraButtonState();
@@ -318,6 +315,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
             builder: (context, value, child) =>
                 Transform.scale(scale: value, child: child),
             child: LiquidGlass.inLayer(
+              fake: widget.fake,
               shape: const LiquidOval(),
               child: GlassGlow(
                 child: Container(
@@ -348,6 +346,7 @@ class _TabIndicator extends StatefulWidget {
     required this.onTabChanged,
     this.visible = true,
     this.indicatorColor,
+    this.fake = false,
   });
 
   final int tabIndex;
@@ -356,6 +355,7 @@ class _TabIndicator extends StatefulWidget {
   final Widget child;
   final Color? indicatorColor;
   final ValueChanged<int> onTabChanged;
+  final bool fake;
 
   @override
   State<_TabIndicator> createState() => _TabIndicatorState();
@@ -578,6 +578,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass(
+                        fake: widget.fake,
                         settings: LiquidGlassSettings(
                           glassColor: Color.from(
                             alpha: .1 * thickness,

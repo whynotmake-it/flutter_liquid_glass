@@ -42,6 +42,7 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
+    this.fake = false,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
   }) : _settings = settings;
@@ -58,6 +59,7 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
+    this.fake = false,
   }) : _settings = null;
 
   /// Maximum number of shapes supported per layer.
@@ -89,10 +91,18 @@ class LiquidGlass extends StatelessWidget {
   /// Defaults to [Clip.none], so [child] will not be clipped.
   final Clip clipBehavior;
 
+  /// When this is set to `true`, the glass effect will be faked entirely using
+  /// [FakeGlass], or [FakeGlass.inLayer] respectively.
+  final bool fake;
+
   final LiquidGlassSettings? _settings;
 
   @override
   Widget build(BuildContext context) {
+    if (fake) {
+      return _buildFakeGlass(context);
+    }
+
     switch (_settings) {
       case null:
         return _RawLiquidGlass(
@@ -122,6 +132,22 @@ class LiquidGlass extends StatelessWidget {
               );
             },
           ),
+        );
+    }
+  }
+
+  Widget _buildFakeGlass(BuildContext context) {
+    switch (_settings) {
+      case null:
+        return FakeGlass.inLayer(
+          shape: shape,
+          child: child,
+        );
+      case final settings:
+        return FakeGlass(
+          shape: shape,
+          settings: settings,
+          child: child,
         );
     }
   }
@@ -254,7 +280,7 @@ class RenderLiquidGlass extends RenderProxyBox {
   }
 
   void paintFromLayer(PaintingContext context, Offset offset) {
-    super.paint(context, offset);
+    if (attached) super.paint(context, offset);
   }
 
   Path getPath() {

@@ -384,7 +384,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     final shapes = <ShapeInLayerInfo>[];
     final cachedShapes = _cachedShapes;
 
-    var anyShapeChangedInLayer = false;
+    var anyShapeChangedInLayer =
+        cachedShapes.length != glassLink.shapeEntries.length;
 
     Rect? layerBounds;
     Rect? screenBounds;
@@ -402,6 +403,9 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
         layerBounds = layerBounds?.expandToInclude(shapeData.layerBounds) ??
             shapeData.layerBounds;
 
+        screenBounds = screenBounds?.expandToInclude(shapeData.screenBounds) ??
+            shapeData.screenBounds;
+
         final existingShape =
             cachedShapes.length > index ? cachedShapes[index] : null;
 
@@ -410,9 +414,6 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
         } else if (existingShape.layerBounds != shapeData.layerBounds) {
           anyShapeChangedInLayer = true;
         }
-
-        screenBounds = screenBounds?.expandToInclude(shapeData.screenBounds) ??
-            shapeData.screenBounds;
       } catch (e) {
         debugPrint('Failed to compute shape info: $e');
       }

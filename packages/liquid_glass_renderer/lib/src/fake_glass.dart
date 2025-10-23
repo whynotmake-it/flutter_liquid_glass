@@ -181,9 +181,20 @@ class _RenderFakeGlass extends RenderProxyBox {
     final blendMode = luminance < 0.5 ? BlendMode.multiply : BlendMode.screen;
 
     final paint = Paint()
-      ..color = settings.glassColor
+      ..color =
+          settings.glassColor.withValues(alpha: settings.glassColor.a * .5)
       ..blendMode = blendMode
       ..style = PaintingStyle.fill;
+
+    canvas.drawPath(path, paint);
+
+    // Paint a blurred stroke to simulate the glass edge
+    paint
+      ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal, (settings.thickness * 2).clamp(2, 100))
+      ..style = PaintingStyle.stroke
+      ..color = settings.glassColor
+      ..strokeWidth = settings.thickness;
 
     canvas.drawPath(path, paint);
   }
@@ -199,8 +210,10 @@ class _RenderFakeGlass extends RenderProxyBox {
       radius: bounds.size.longestSide / 2,
     );
 
+    final thicknessFactor = (settings.thickness / 5).clamp(0.0, 1.0);
+
     final color = Colors.white.withValues(
-      alpha: (settings.lightIntensity * 2).clamp(0, 1),
+      alpha: settings.lightIntensity.clamp(0, 1) * thicknessFactor,
     );
     final rad = settings.lightAngle;
 
@@ -209,8 +222,8 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     // How far the light covers the glass, used to adjust the gradient stops
     final lightCoverage = ui.lerpDouble(
-      .2,
-      .35,
+      .3,
+      .5,
       settings.lightIntensity.clamp(0, 1),
     )!;
 
@@ -254,13 +267,17 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..shader = shader
       ..blendMode = BlendMode.softLight
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal, (settings.thickness / 20).clamp(1, 50))
+      ..strokeWidth = 2 * (settings.thickness / 20) * thicknessFactor;
+
     canvas.drawPath(path, paint);
 
     paint
       ..strokeWidth =
           ui.lerpDouble(.5, 1.5, settings.lightIntensity.clamp(0, 1))!
       ..color = color.withValues(alpha: color.a * 0.3)
+      ..maskFilter = null
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
   }
