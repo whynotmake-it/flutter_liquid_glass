@@ -188,8 +188,8 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
       ..filter = ImageFilter.blur(
         tileMode: TileMode.mirror,
-        sigmaX: settings.blur,
-        sigmaY: settings.blur,
+        sigmaX: settings.effectiveBlur,
+        sigmaY: settings.effectiveBlur,
       );
 
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())

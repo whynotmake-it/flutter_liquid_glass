@@ -580,22 +580,23 @@ class _TabIndicatorState extends State<_TabIndicator>
                       child: LiquidGlass(
                         fake: widget.fake,
                         settings: LiquidGlassSettings(
+                          visibility: thickness,
                           glassColor: Color.from(
-                            alpha: .1 * thickness,
+                            alpha: .1,
                             red: 1,
                             green: 1,
                             blue: 1,
                           ),
-                          saturation: 1 + .5 * thickness,
+                          saturation: 1.5,
                           refractiveIndex: 1.15,
-                          thickness: thickness * 15,
+                          thickness: 20,
                           lightIntensity: 2,
                           chromaticAberration: .5,
                         ),
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: Radius.circular(64),
                         ),
-                        child: const SizedBox.expand(),
+                        child: GlassGlow(child: const SizedBox.expand()),
                       ),
                     ),
                 ],

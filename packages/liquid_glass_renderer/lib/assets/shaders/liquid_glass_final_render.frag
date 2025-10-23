@@ -13,15 +13,15 @@ precision mediump float;
 #include "displacement_encoding.glsl"
 #include "render.glsl"
 
-layout(location = 0) uniform vec2 uSize;
-layout(location = 1) uniform vec4 uGeometryTextureRect;
-layout(location = 2) uniform mat4 uGeometryTransform;
-layout(location = 3) uniform float uDevicePixelRatio;
+uniform vec2 uSize;
+uniform vec4 uGeometryTextureRect;
+uniform mat4 uGeometryTransform;
+uniform float uDevicePixelRatio;
 
-layout(location = 4) uniform vec4 uGlassColor;
-layout(location = 5) uniform vec3 uOpticalProps;
-layout(location = 6) uniform vec3 uLightConfig;
-layout(location = 7) uniform vec2 uLightDirection;
+uniform vec4 uGlassColor;
+uniform vec3 uOpticalProps;
+uniform vec3 uLightConfig;
+uniform vec2 uLightDirection;
 
 
 float uRefractiveIndex = uOpticalProps.x;

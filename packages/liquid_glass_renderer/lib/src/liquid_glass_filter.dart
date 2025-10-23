@@ -153,7 +153,7 @@ class _RenderLiquidGlassFilter extends LiquidGlassShaderRenderObject {
       ..bounds = offset & size
       ..offset = offset
       ..shapeBounds = boundingBox
-      ..blur = settings.blur;
+      ..blur = settings.effectiveBlur;
 
     paintShapeContents(
       context,

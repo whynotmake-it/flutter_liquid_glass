@@ -347,7 +347,7 @@ class _GlassifyShaderLayer extends OffsetLayer {
   void _captureChildBlurredLayer() {
     childBlurredImage?.dispose();
 
-    final matteBlur = settings.thickness / 6;
+    final matteBlur = settings.effectiveThickness / 6;
     childBlurredImage = _buildMaskImage(matteBlur);
   }
 
@@ -406,16 +406,16 @@ class _GlassifyShaderLayer extends OffsetLayer {
               layerSize.height * devicePixelRatio,
             ),
           )
-          ..setColor(settings.glassColor)
+          ..setColor(settings.effectiveGlassColor)
           ..setFloats([
             settings.refractiveIndex,
-            settings.chromaticAberration,
-            settings.thickness,
-            settings.blur,
+            settings.effectiveChromaticAberration,
+            settings.effectiveThickness,
+            settings.effectiveBlur,
             settings.lightAngle,
-            settings.lightIntensity,
-            settings.ambientStrength,
-            settings.saturation,
+            settings.effectiveLightIntensity,
+            settings.effectiveAmbientStrength,
+            settings.effectiveSaturation,
           ])
           ..setOffset(globalOffset * devicePixelRatio)
           ..setOffset(

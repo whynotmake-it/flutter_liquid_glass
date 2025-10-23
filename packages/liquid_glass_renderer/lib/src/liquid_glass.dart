@@ -112,7 +112,12 @@ class LiquidGlass extends StatelessWidget {
           child: ClipPath(
             clipper: ShapeBorderClipper(shape: shape),
             clipBehavior: clipBehavior,
-            child: GlassGlowLayer(child: child),
+            child: Opacity(
+              opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
+              child: GlassGlowLayer(
+                child: child,
+              ),
+            ),
           ),
         );
       case final settings:
@@ -127,7 +132,12 @@ class LiquidGlass extends StatelessWidget {
                 child: ClipPath(
                   clipper: ShapeBorderClipper(shape: shape),
                   clipBehavior: clipBehavior,
-                  child: GlassGlowLayer(child: child),
+                  child: Opacity(
+                    opacity: settings.visibility.clamp(0, 1),
+                    child: GlassGlowLayer(
+                      child: child,
+                    ),
+                  ),
                 ),
               );
             },

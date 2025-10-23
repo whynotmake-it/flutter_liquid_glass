@@ -9,6 +9,7 @@ import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
 class LiquidGlassSettings with EquatableMixin {
   /// Creates a new [LiquidGlassSettings] with the given settings.
   const LiquidGlassSettings({
+    this.visibility = 1.0,
     this.glassColor = const Color.fromARGB(0, 255, 255, 255),
     this.thickness = 20,
     this.blur = 0,
@@ -29,11 +30,13 @@ class LiquidGlassSettings with EquatableMixin {
     required double depth,
     required double dispersion,
     required double frost,
+    double visibility = 1.0,
     double lightIntensity = 50,
     double lightAngle = 0.5 * pi,
     double blend = 20,
     Color glassColor = const Color.fromARGB(0, 255, 255, 255),
   }) : this(
+          visibility: visibility,
           refractiveIndex: 1 + (refraction / 100) * 0.2,
           thickness: depth,
           chromaticAberration: 4 * (dispersion / 100),
@@ -54,15 +57,27 @@ class LiquidGlassSettings with EquatableMixin {
     return LiquidGlassScope.of(context).settings;
   }
 
+  /// A factor that can be used to scale all thickness-related properties.
+  ///
+  /// Defaults to 1.0.
+  final double visibility;
+
   /// The color tint of the glass effect.
   ///
   /// Opacity defines the intensity of the tint.
   final Color glassColor;
 
+  /// The effective glass color taking visibility into account.
+  Color get effectiveGlassColor =>
+      glassColor.withValues(alpha: glassColor.a * visibility);
+
   /// The thickness of the glass surface.
   ///
   /// Thicker surfaces refract the light more intensely.
   final double thickness;
+
+  /// The effective thickness taking visibility into account.
+  double get effectiveThickness => thickness * visibility;
 
   /// The blur of the glass effect.
   ///
@@ -71,12 +86,18 @@ class LiquidGlassSettings with EquatableMixin {
   /// Defaults to 0.
   final double blur;
 
+  /// The effective blur taking visibility into account.
+  double get effectiveBlur => blur * visibility;
+
   /// The chromatic aberration of the glass effect (WIP).
   ///
   /// This is a little ugly still.
   ///
   /// Higher values create more pronounced color fringes.
   final double chromaticAberration;
+
+  /// The effective chromatic aberration taking visibility into account.
+  double get effectiveChromaticAberration => chromaticAberration * visibility;
 
   /// How strongly the shapes in this layer will blend together.
   final double blend;
@@ -91,10 +112,16 @@ class LiquidGlassSettings with EquatableMixin {
   /// Higher values create more pronounced highlights.
   final double lightIntensity;
 
+  /// The effective light intensity taking visibility into account.
+  double get effectiveLightIntensity => lightIntensity * visibility;
+
   /// The strength of the ambient light.
   ///
   /// Higher values create more pronounced ambient light.
   final double ambientStrength;
+
+  /// The effective ambient strength taking visibility into account.
+  double get effectiveAmbientStrength => ambientStrength * visibility;
 
   /// The strength of the refraction.
   ///
@@ -109,8 +136,12 @@ class LiquidGlassSettings with EquatableMixin {
   /// Defaults to 1.0
   final double saturation;
 
+  /// The effective saturation taking visibility into account.
+  double get effectiveSaturation => 1 + (saturation - 1) * visibility;
+
   /// Creates a new [LiquidGlassSettings] with the given settings.
   LiquidGlassSettings copyWith({
+    double? visibility,
     Color? glassColor,
     double? thickness,
     double? blur,
@@ -123,6 +154,7 @@ class LiquidGlassSettings with EquatableMixin {
     double? saturation,
   }) =>
       LiquidGlassSettings(
+        visibility: visibility ?? this.visibility,
         glassColor: glassColor ?? this.glassColor,
         thickness: thickness ?? this.thickness,
         blur: blur ?? this.blur,
@@ -137,6 +169,7 @@ class LiquidGlassSettings with EquatableMixin {
 
   @override
   List<Object?> get props => [
+        visibility,
         glassColor,
         thickness,
         blur,

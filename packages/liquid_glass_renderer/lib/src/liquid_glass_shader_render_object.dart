@@ -125,14 +125,14 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
   void _updateShaderSettings() {
     renderShader.setFloatUniforms(initialIndex: 23, (value) {
       value
-        ..setColor(settings.glassColor)
+        ..setColor(settings.effectiveGlassColor)
         ..setFloats([
           settings.refractiveIndex,
-          settings.chromaticAberration,
-          settings.thickness,
-          settings.lightIntensity,
-          settings.ambientStrength,
-          settings.saturation,
+          settings.effectiveChromaticAberration,
+          settings.effectiveThickness,
+          settings.effectiveLightIntensity,
+          settings.effectiveAmbientStrength,
+          settings.effectiveSaturation,
         ])
         ..setOffset(
           Offset(
@@ -145,8 +145,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     geometryShader.setFloatUniforms(initialIndex: 2, (value) {
       value.setFloats([
         settings.refractiveIndex,
-        settings.chromaticAberration,
-        settings.thickness,
+        settings.effectiveChromaticAberration,
+        settings.effectiveThickness,
         settings.blend * devicePixelRatio,
       ]);
     });
@@ -196,7 +196,7 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
       return;
     }
 
-    if (settings.thickness <= 0) {
+    if (settings.effectiveThickness <= 0) {
       _paintShapesWithoutGlass(context, offset, shapes);
       super.paint(context, offset);
       return;
@@ -474,7 +474,7 @@ extension on LiquidGlassSettings {
   bool requiresGeometryRebuild(LiquidGlassSettings? other) {
     if (other == null) return false;
 
-    return thickness != other.thickness ||
+    return effectiveThickness != other.effectiveThickness ||
         refractiveIndex != other.refractiveIndex ||
         blend != other.blend;
   }

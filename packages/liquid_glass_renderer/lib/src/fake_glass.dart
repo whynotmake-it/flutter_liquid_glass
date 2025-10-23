@@ -42,11 +42,12 @@ class FakeGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = this.settings ?? LiquidGlassSettings.of(context);
     return ClipPath(
       clipper: ShapeBorderClipper(shape: shape),
       child: RawFakeGlass(
         shape: shape,
-        settings: settings ?? LiquidGlassSettings.of(context),
+        settings: settings,
         child: GlassGlowLayer(
           child: child,
         ),
@@ -119,13 +120,15 @@ class _RenderFakeGlass extends RenderProxyBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     // Create saturation filter if needed
-    final ui.ImageFilter? saturationFilter = settings.saturation != 1.0
-        ? ui.ColorFilter.matrix(_createSaturationMatrix(settings.saturation))
+    final ui.ImageFilter? saturationFilter = settings.effectiveSaturation != 1.0
+        ? ui.ColorFilter.matrix(
+            _createSaturationMatrix(settings.effectiveSaturation),
+          )
         : null;
 
     final blurFilter = ui.ImageFilter.blur(
-      sigmaX: settings.blur,
-      sigmaY: settings.blur,
+      sigmaX: settings.effectiveBlur,
+      sigmaY: settings.effectiveBlur,
       tileMode: TileMode.mirror,
     );
 
@@ -176,13 +179,13 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   void _paintColor(Canvas canvas, Path path) {
-    final luminance = settings.glassColor.computeLuminance();
+    final color = settings.effectiveGlassColor;
+    final luminance = settings.effectiveGlassColor.computeLuminance();
 
     final blendMode = luminance < 0.5 ? BlendMode.multiply : BlendMode.screen;
 
     final paint = Paint()
-      ..color =
-          settings.glassColor.withValues(alpha: settings.glassColor.a * .5)
+      ..color = color.withValues(alpha: color.a * .8)
       ..blendMode = blendMode
       ..style = PaintingStyle.fill;
 
@@ -191,10 +194,10 @@ class _RenderFakeGlass extends RenderProxyBox {
     // Paint a blurred stroke to simulate the glass edge
     paint
       ..maskFilter = MaskFilter.blur(
-          BlurStyle.normal, (settings.thickness * 2).clamp(2, 100))
+          BlurStyle.normal, (settings.effectiveThickness).clamp(5, 100))
       ..style = PaintingStyle.stroke
-      ..color = settings.glassColor
-      ..strokeWidth = settings.thickness;
+      ..color = color.withValues(alpha: color.a * .5)
+      ..strokeWidth = settings.effectiveThickness;
 
     canvas.drawPath(path, paint);
   }
@@ -210,10 +213,13 @@ class _RenderFakeGlass extends RenderProxyBox {
       radius: bounds.size.longestSide / 2,
     );
 
-    final thicknessFactor = (settings.thickness / 5).clamp(0.0, 1.0);
+    final lightIntensity = settings.effectiveLightIntensity.clamp(0.0, 1.0);
+    final ambientStrength = settings.effectiveAmbientStrength.clamp(0.0, 1.0);
 
+    final thicknessFactor = (settings.effectiveThickness / 5).clamp(0.0, 1.0);
+    final alpha = Curves.easeOut.transform(lightIntensity);
     final color = Colors.white.withValues(
-      alpha: settings.lightIntensity.clamp(0, 1) * thicknessFactor,
+      alpha: alpha * thicknessFactor,
     );
     final rad = settings.lightAngle;
 
@@ -221,11 +227,7 @@ class _RenderFakeGlass extends RenderProxyBox {
     final y = math.sin(rad);
 
     // How far the light covers the glass, used to adjust the gradient stops
-    final lightCoverage = ui.lerpDouble(
-      .3,
-      .5,
-      settings.lightIntensity.clamp(0, 1),
-    )!;
+    final lightCoverage = ui.lerpDouble(.3, .5, lightIntensity)!;
 
     // How perpendicular we are to the shortest side of the box, 1 means the
     // light is hitting the shortest side directly, 0 means it's hitting the
@@ -249,8 +251,8 @@ class _RenderFakeGlass extends RenderProxyBox {
     final shader = LinearGradient(
       colors: [
         color,
-        color.withValues(alpha: settings.ambientStrength.clamp(0, 1)),
-        color.withValues(alpha: settings.ambientStrength.clamp(0, 1)),
+        color.withValues(alpha: ambientStrength),
+        color.withValues(alpha: ambientStrength),
         color,
       ],
       stops: [
@@ -265,19 +267,19 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final paint = Paint()
       ..shader = shader
+      ..color = color
       ..blendMode = BlendMode.softLight
       ..style = PaintingStyle.stroke
       ..maskFilter = MaskFilter.blur(
-          BlurStyle.normal, (settings.thickness / 20).clamp(1, 50))
-      ..strokeWidth = 2 * (settings.thickness / 20) * thicknessFactor;
+          BlurStyle.normal, (settings.effectiveThickness / 30).clamp(1, 50))
+      ..strokeWidth = 2 * (settings.effectiveThickness / 20);
 
     canvas.drawPath(path, paint);
 
     paint
-      ..strokeWidth =
-          ui.lerpDouble(.5, 1.5, settings.lightIntensity.clamp(0, 1))!
-      ..color = color.withValues(alpha: color.a * 0.3)
-      ..maskFilter = null
+      ..strokeWidth = ui.lerpDouble(.5, 1.5, lightIntensity)!
+      ..color = color.withValues(alpha: color.a * 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, .5)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
   }
