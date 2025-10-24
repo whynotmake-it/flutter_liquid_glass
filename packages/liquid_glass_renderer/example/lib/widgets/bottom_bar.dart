@@ -298,8 +298,6 @@ class _ExtraButton extends StatefulWidget {
 }
 
 class _ExtraButtonState extends State<_ExtraButton> {
-  bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
@@ -309,23 +307,17 @@ class _ExtraButtonState extends State<_ExtraButton> {
         child: Semantics(
           button: true,
           label: widget.config.label,
-          child: SingleMotionBuilder(
-            motion: Motion.interactiveSpring(),
-            value: _pressed ? 1.2 : 1,
-            builder: (context, value, child) =>
-                Transform.scale(scale: value, child: child),
-            child: LiquidGlass.inLayer(
-              shape: const LiquidOval(),
-              child: GlassGlow(
-                child: Container(
-                  height: widget.config.size,
-                  width: widget.config.size,
-                  child: Center(
-                    child: Icon(
-                      widget.config.icon,
-                      size: 24,
-                      color: theme.textTheme.textStyle.color,
-                    ),
+          child: LiquidGlass.inLayer(
+            shape: const LiquidOval(),
+            child: GlassGlow(
+              child: Container(
+                height: widget.config.size,
+                width: widget.config.size,
+                child: Center(
+                  child: Icon(
+                    widget.config.icon,
+                    size: 24,
+                    color: theme.textTheme.textStyle.color,
                   ),
                 ),
               ),
@@ -534,12 +526,13 @@ class _TabIndicatorState extends State<_TabIndicator>
         converter: SingleMotionConverter(),
         value: xAlign,
         motion: _isDragging
-            ? const Motion.interactiveSpring()
-            : const Motion.bouncySpring(),
+            ? const Motion.interactiveSpring(snapToEnd: true)
+            : const Motion.bouncySpring(snapToEnd: true),
         builder: (context, value, velocity, child) {
           final alignment = Alignment(value, 0);
           return SingleMotionBuilder(
             motion: const Motion.snappySpring(
+              snapToEnd: true,
               duration: Duration(milliseconds: 300),
             ),
             value:

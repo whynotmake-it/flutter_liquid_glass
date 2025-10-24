@@ -61,6 +61,7 @@ class LiquidGlassLayer extends StatefulWidget {
     required this.child,
     this.settings = const LiquidGlassSettings(),
     this.fake = false,
+    this.useBackdropGroup = false,
     super.key,
   });
 
@@ -76,6 +77,19 @@ class LiquidGlassLayer extends StatefulWidget {
   /// Whether to replace all liquid glass effects in this layer with
   /// [FakeGlass] effects.
   final bool fake;
+
+  /// Whether to look up the tree for a [BackdropGroup] to use for this layer's
+  /// blur.
+  ///
+  /// If you have multiple [LiquidGlassLayer]s in a subtree that use the same
+  /// background blur, setting this to true can improve performance by sharing
+  /// the same backdrop.
+  ///
+  /// If [fake] is true, this will be ignored, as this widget will already use
+  /// a shared backdrop for the fake glass effect.
+  ///
+  /// Defaults to false.
+  final bool useBackdropGroup;
 
   @override
   State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
@@ -109,28 +123,31 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         link: _glassLink,
         useFake: true,
-        child: widget.child,
+        child: BackdropGroup(child: widget.child),
       );
     }
 
-    return LiquidGlassScope(
-      settings: widget.settings,
-      link: _glassLink,
-      child: MultiShaderBuilder(
-        assetKeys: [
-          ShaderKeys.blendedGeometry,
-          ShaderKeys.liquidGlassRender,
-          ShaderKeys.lighting,
-        ],
-        (context, shaders, child) => _RawShapes(
-          geometryShader: shaders[0],
-          renderShader: shaders[1],
-          lightingShader: shaders[2],
-          settings: widget.settings,
-          glassLink: _glassLink,
-          child: child!,
+    return RepaintBoundary(
+      child: LiquidGlassScope(
+        settings: widget.settings,
+        link: _glassLink,
+        child: MultiShaderBuilder(
+          assetKeys: [
+            ShaderKeys.blendedGeometry,
+            ShaderKeys.liquidGlassRender,
+          ],
+          (context, shaders, child) => _RawShapes(
+            geometryShader: shaders[0],
+            renderShader: shaders[1],
+            backdropKey: widget.useBackdropGroup
+                ? BackdropGroup.of(context)?.backdropKey
+                : null,
+            settings: widget.settings,
+            glassLink: _glassLink,
+            child: child!,
+          ),
+          child: widget.child,
         ),
-        child: widget.child,
       ),
     );
   }
@@ -140,7 +157,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   const _RawShapes({
     required this.renderShader,
     required this.geometryShader,
-    required this.lightingShader,
+    required this.backdropKey,
     required this.settings,
     required Widget super.child,
     required this.glassLink,
@@ -148,7 +165,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
 
   final FragmentShader geometryShader;
   final FragmentShader renderShader;
-  final FragmentShader lightingShader;
+  final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GlassLink glassLink;
 
@@ -158,7 +175,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       renderShader: renderShader,
       geometryShader: geometryShader,
-      lightingShader: lightingShader,
+      backdropKey: backdropKey,
       settings: settings,
       glassLink: glassLink,
     );
@@ -172,7 +189,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     renderObject
       ..glassLink = glassLink
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
-      ..settings = settings;
+      ..settings = settings
+      ..backdropKey = backdropKey;
   }
 }
 
@@ -181,7 +199,7 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
   RenderLiquidGlassLayer({
     required super.geometryShader,
     required super.renderShader,
-    required super.lightingShader,
+    required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
     required super.glassLink,
@@ -189,7 +207,8 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
   final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
-  final _clipLayerHandle = LayerHandle<ClipPathLayer>();
+  final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
+  final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
   @override
   void paintLiquidGlass(
@@ -200,6 +219,7 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
   ) {
     if (!attached) return;
     final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
+      ..backdropKey = backdropKey
       ..filter = ImageFilter.blur(
         tileMode: TileMode.mirror,
         sigmaX: settings.effectiveBlur,
@@ -221,9 +241,12 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
       );
     }
 
-    final clipLayer = (_clipLayerHandle.layer ??= ClipPathLayer())
+    final clipLayer = (_clipPathLayerHandle.layer ??= ClipPathLayer())
       ..clipPath = clipPath
       ..clipBehavior = Clip.hardEdge;
+
+    final clipRectLayer = (_clipRectLayerHandle.layer ??= ClipRectLayer())
+      ..clipRect = boundingBox;
 
     context
       // First we push the clipped blur layer
@@ -246,17 +269,23 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
         },
         offset,
       )
-      ..pushLayer(
-        shaderLayer,
-        (context, offset) {
-          paintShapeContents(
-            context,
-            offset,
-            shapes,
-            glassContainsChild: false,
-          );
-        },
+      ..pushClipRect(
+        true,
         offset,
+        boundingBox,
+        (context, offset) => context.pushLayer(
+          shaderLayer,
+          (context, offset) {
+            paintShapeContents(
+              context,
+              offset,
+              shapes,
+              glassContainsChild: false,
+            );
+          },
+          offset,
+        ),
+        oldLayer: clipRectLayer,
       );
   }
 
@@ -264,7 +293,8 @@ class RenderLiquidGlassLayer extends LiquidGlassShaderRenderObject {
   void dispose() {
     _blurLayerHandle.layer = null;
     _shaderHandle.layer = null;
-    _clipLayerHandle.layer = null;
+    _clipPathLayerHandle.layer = null;
+    _clipRectLayerHandle.layer = null;
     super.dispose();
   }
 }

@@ -61,13 +61,12 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
         assetKeys: [
           ShaderKeys.blendedGeometry,
           ShaderKeys.liquidGlassRender,
-          ShaderKeys.lighting,
         ],
         (context, shaders, child) {
           return _RawLiquidGlassFilter(
             geometryShader: shaders[0],
             renderShader: shaders[1],
-            lightingShader: shaders[2],
+            backdropKey: BackdropGroup.of(context)?.backdropKey,
             settings: widget.settings,
             glassLink: _glassLink,
             child: child,
@@ -83,7 +82,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
   const _RawLiquidGlassFilter({
     required this.geometryShader,
     required this.renderShader,
-    required this.lightingShader,
+    required this.backdropKey,
     required this.settings,
     required this.glassLink,
     required super.child,
@@ -93,7 +92,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
 
   final FragmentShader renderShader;
 
-  final FragmentShader lightingShader;
+  final BackdropKey? backdropKey;
 
   final LiquidGlassSettings settings;
 
@@ -104,7 +103,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
     return _RenderLiquidGlassFilter(
       geometryShader: geometryShader,
       renderShader: renderShader,
-      lightingShader: lightingShader,
+      backdropKey: backdropKey,
       settings: settings,
       glassLink: glassLink,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
@@ -119,6 +118,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
     renderObject
       ..settings = settings
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
+      ..backdropKey = backdropKey
       ..glassLink = glassLink;
   }
 }
@@ -127,7 +127,7 @@ class _RenderLiquidGlassFilter extends LiquidGlassShaderRenderObject {
   _RenderLiquidGlassFilter({
     required super.geometryShader,
     required super.renderShader,
-    required super.lightingShader,
+    required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
     required super.glassLink,

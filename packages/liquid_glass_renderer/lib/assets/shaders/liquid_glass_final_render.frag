@@ -52,11 +52,6 @@ void main() {
         geometryUv.y = 1.0 - geometryUv.y;
     #endif
 
-
-    if (geometryUv.x < 0.0 || geometryUv.x > 1.0 || geometryUv.y < 0.0 || geometryUv.y > 1.0) {
-        fragColor = vec4(0.0);
-        return;
-    }
     vec4 geometryData = texture(uGeometryTexture, geometryUv);
     
     #if DEBUG_GEOMETRY

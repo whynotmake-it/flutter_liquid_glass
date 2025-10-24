@@ -36,13 +36,14 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
   LiquidGlassShaderRenderObject({
     required this.renderShader,
     required this.geometryShader,
-    required this.lightingShader,
     required GlassLink glassLink,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
+    required BackdropKey? backdropKey,
   })  : _settings = settings,
         _glassLink = glassLink,
-        _devicePixelRatio = devicePixelRatio {
+        _devicePixelRatio = devicePixelRatio,
+        _backdropKey = backdropKey {
     _glassLink.addListener(onLinkNotification);
     onLinkNotification();
     _updateShaderSettings();
@@ -52,7 +53,6 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
 
   final FragmentShader renderShader;
   final FragmentShader geometryShader;
-  final FragmentShader lightingShader;
 
   // === Settings and Configuration ===
 
@@ -69,6 +69,13 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     _settings = value;
     _updateShaderSettings();
     markNeedsPaint();
+  }
+
+  BackdropKey? _backdropKey;
+  BackdropKey? get backdropKey => _backdropKey;
+  set backdropKey(BackdropKey? value) {
+    if (_backdropKey == value) return;
+    _backdropKey = value;
   }
 
   double _devicePixelRatio;
@@ -197,7 +204,8 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     }
 
     if (settings.effectiveThickness <= 0) {
-      _paintShapesWithoutGlass(context, offset, shapes);
+      paintShapeContents(context, offset, shapes, glassContainsChild: true);
+      paintShapeContents(context, offset, shapes, glassContainsChild: false);
       super.paint(context, offset);
       return;
     }
@@ -215,15 +223,6 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (attached) markNeedsPaint();
     });
-  }
-
-  void _paintShapesWithoutGlass(
-    PaintingContext context,
-    Offset offset,
-    List<ShapeInLayerInfo> shapes,
-  ) {
-    paintShapeContents(context, offset, shapes, glassContainsChild: true);
-    paintShapeContents(context, offset, shapes, glassContainsChild: false);
   }
 
   void _debugPaintGeometry(PaintingContext context, Offset offset) {
@@ -308,7 +307,7 @@ abstract class LiquidGlassShaderRenderObject extends RenderProxyBox {
     _geometryImage = null;
 
     _cachedShapes = shapes;
-    _cachedLayerBoundingBox = layerBounds;
+    _cachedLayerBoundingBox = layerBounds.inflate(settings.blend);
     final geometryBounds = _cachedScreenShapesBounds =
         screenBounds.inflate(settings.blend).snapToPixels(devicePixelRatio);
 

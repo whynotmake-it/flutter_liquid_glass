@@ -43,11 +43,16 @@ class FakeGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = this.settings ?? LiquidGlassSettings.of(context);
+
+    // If we are in a layer, we accept that layer's backdrop key.
+    final backdropKey =
+        this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
     return ClipPath(
       clipper: ShapeBorderClipper(shape: shape),
       child: RawFakeGlass(
         shape: shape,
         settings: settings,
+        backdropKey: backdropKey,
         child: Opacity(
           opacity: settings.visibility.clamp(0, 1),
           child: GlassGlowLayer(
@@ -64,6 +69,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
   const RawFakeGlass({
     required this.shape,
     required super.child,
+    this.backdropKey,
     this.settings = const LiquidGlassSettings(),
     super.key,
   });
@@ -72,11 +78,14 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
   final LiquidGlassSettings settings;
 
+  final BackdropKey? backdropKey;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return _RenderFakeGlass(
       shape: shape,
       settings: settings,
+      backdropKey: backdropKey,
     );
   }
 
@@ -86,7 +95,8 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
     if (renderObject is _RenderFakeGlass) {
       renderObject
         ..shape = shape
-        ..settings = settings;
+        ..settings = settings
+        .._backdropKey = backdropKey;
     }
   }
 }
@@ -95,8 +105,10 @@ class _RenderFakeGlass extends RenderProxyBox {
   _RenderFakeGlass({
     required LiquidShape shape,
     required LiquidGlassSettings settings,
+    required BackdropKey? backdropKey,
   })  : _shape = shape,
-        _settings = settings;
+        _settings = settings,
+        _backdropKey = backdropKey;
 
   LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -111,6 +123,14 @@ class _RenderFakeGlass extends RenderProxyBox {
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     _settings = value;
+    markNeedsPaint();
+  }
+
+  BackdropKey? _backdropKey;
+  BackdropKey? get backdropKey => _backdropKey;
+  set backdropKey(BackdropKey? value) {
+    if (_backdropKey == value) return;
+    _backdropKey = value;
     markNeedsPaint();
   }
 
@@ -143,12 +163,13 @@ class _RenderFakeGlass extends RenderProxyBox {
           )
         : blurFilter;
 
-    final blurLayer = (layer ??= BackdropFilterLayer())
+    final layer = (this.layer ??= BackdropFilterLayer())
       ..filter = combinedFilter
-      ..blendMode = BlendMode.src;
+      ..blendMode = BlendMode.srcATop
+      ..backdropKey = backdropKey;
 
     context.pushLayer(
-      blurLayer,
+      layer,
       (context, offset) {
         final path = shape.getOuterPath(offset & size);
         _paintColor(context.canvas, path);
@@ -274,8 +295,6 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..color = color
       ..blendMode = BlendMode.softLight
       ..style = PaintingStyle.stroke
-      ..maskFilter = MaskFilter.blur(
-          BlurStyle.normal, (settings.effectiveThickness / 30).clamp(1, 50))
       ..strokeWidth = 2 * (settings.effectiveThickness / 20);
 
     canvas.drawPath(path, paint);
@@ -283,7 +302,6 @@ class _RenderFakeGlass extends RenderProxyBox {
     paint
       ..strokeWidth = ui.lerpDouble(.5, 1.5, lightIntensity)!
       ..color = color.withValues(alpha: color.a * 0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, .5)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
   }
