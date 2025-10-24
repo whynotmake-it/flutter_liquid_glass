@@ -10,12 +10,15 @@ class LiquidGlassScope extends InheritedWidget {
     required this.settings,
     required super.child,
     required this.link,
+    this.useFake = false,
     super.key,
   });
 
   final LiquidGlassSettings settings;
 
   final GlassLink link;
+
+  final bool useFake;
 
   static LiquidGlassScope of(BuildContext context) {
     final scope =
@@ -28,6 +31,7 @@ class LiquidGlassScope extends InheritedWidget {
   bool updateShouldNotify(covariant InheritedWidget oldWidget) {
     return oldWidget is! LiquidGlassScope ||
         oldWidget.settings != settings ||
-        oldWidget.link != link;
+        oldWidget.link != link ||
+        oldWidget.useFake != useFake;
   }
 }

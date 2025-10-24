@@ -42,10 +42,11 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-    this.fake = false,
+    bool fake = false,
     super.key,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
-  }) : _settings = settings;
+  })  : _settings = settings,
+        _fake = fake;
 
   /// Creates a new [LiquidGlass] on a shared layer with the given [child] and
   /// [shape].
@@ -59,8 +60,8 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-    this.fake = false,
-  }) : _settings = null;
+  })  : _settings = null,
+        _fake = null;
 
   /// Maximum number of shapes supported per layer.
   static const int maxShapesPerLayer = 16;
@@ -93,12 +94,14 @@ class LiquidGlass extends StatelessWidget {
 
   /// When this is set to `true`, the glass effect will be faked entirely using
   /// [FakeGlass], or [FakeGlass.inLayer] respectively.
-  final bool fake;
+  final bool? _fake;
 
   final LiquidGlassSettings? _settings;
 
   @override
   Widget build(BuildContext context) {
+    final fake = _fake ?? LiquidGlassScope.of(context).useFake;
+
     if (fake) {
       return _buildFakeGlass(context);
     }

@@ -84,6 +84,7 @@ class BasicApp extends HookWidget {
                     ).barBackgroundColor.withValues(alpha: 0.4),
                   );
                   return LiquidGlassLayer(
+                    fake: fake.value,
                     settings: settings.copyWith(lightAngle: light.value),
                     child: Column(
                       spacing: 16,
@@ -95,7 +96,6 @@ class BasicApp extends HookWidget {
                           children: [
                             LiquidStretch(
                               child: LiquidGlass.inLayer(
-                                fake: fake.value,
                                 shape: LiquidRoundedSuperellipse(
                                   borderRadius: Radius.circular(20),
                                 ),
@@ -113,7 +113,6 @@ class BasicApp extends HookWidget {
                             ),
                             LiquidStretch(
                               child: LiquidGlass.inLayer(
-                                fake: fake.value,
                                 shape: LiquidRoundedSuperellipse(
                                   borderRadius: Radius.circular(20),
                                 ),
@@ -136,7 +135,6 @@ class BasicApp extends HookWidget {
                         ),
                         LiquidStretch(
                           child: LiquidGlass.inLayer(
-                            fake: fake.value,
                             shape: LiquidRoundedSuperellipse(
                               borderRadius: Radius.circular(20),
                             ),

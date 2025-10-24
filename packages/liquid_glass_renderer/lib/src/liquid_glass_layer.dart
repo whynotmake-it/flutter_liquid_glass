@@ -4,12 +4,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_link.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_shader_render_object.dart';
+import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:liquid_glass_renderer/src/shape_in_layer.dart';
 import 'package:meta/meta.dart';
@@ -60,6 +60,7 @@ class LiquidGlassLayer extends StatefulWidget {
   const LiquidGlassLayer({
     required this.child,
     this.settings = const LiquidGlassSettings(),
+    this.fake = false,
     super.key,
   });
 
@@ -72,6 +73,10 @@ class LiquidGlassLayer extends StatefulWidget {
   /// The settings for the liquid glass effect for all shapes in this layer.
   final LiquidGlassSettings settings;
 
+  /// Whether to replace all liquid glass effects in this layer with
+  /// [FakeGlass] effects.
+  final bool fake;
+
   @override
   State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
 }
@@ -79,6 +84,8 @@ class LiquidGlassLayer extends StatefulWidget {
 class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     with SingleTickerProviderStateMixin {
   late final _glassLink = GlassLink();
+
+  late final logger = Logger(LgrLogNames.layer);
 
   @override
   void dispose() {
@@ -88,15 +95,22 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   @override
   Widget build(BuildContext context) {
-    if (!ImageFilter.isShaderFilterSupported) {
-      assert(
-        ImageFilter.isShaderFilterSupported,
-        'liquid_glass_renderer is only supported when using Impeller at the '
-        'moment. Please enable Impeller, or check '
-        'ImageFilter.isShaderFilterSupported before you use liquid glass '
-        'widgets.',
+    if (widget.fake || !ImageFilter.isShaderFilterSupported) {
+      if (!ImageFilter.isShaderFilterSupported) {
+        logger.warning(
+            'LiquidGlassLayer is only supported when using Impeller at the '
+            'moment. Falling back to FakeGlass for LiquidGlassLayer. '
+            'To prevent this warning, enable Impeller, or set '
+            'LiquidGlassLayer.fake to true before you use liquid glass widgets '
+            'on Skia.');
+      }
+
+      return LiquidGlassScope(
+        settings: widget.settings,
+        link: _glassLink,
+        useFake: true,
+        child: widget.child,
       );
-      return widget.child;
     }
 
     return LiquidGlassScope(

@@ -104,6 +104,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
 
     return LiquidGlassLayer(
       settings: glassSettings,
+      fake: widget.fake,
       child: Padding(
         padding: EdgeInsets.only(
           right: widget.horizontalPadding,
@@ -123,7 +124,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                 indicatorColor: widget.indicatorColor,
                 onTabChanged: widget.onTabSelected,
                 child: LiquidGlass.inLayer(
-                  fake: widget.fake,
                   clipBehavior: Clip.none,
                   shape: const LiquidRoundedSuperellipse(
                     borderRadius: Radius.circular(32),
@@ -315,7 +315,6 @@ class _ExtraButtonState extends State<_ExtraButton> {
             builder: (context, value, child) =>
                 Transform.scale(scale: value, child: child),
             child: LiquidGlass.inLayer(
-              fake: widget.fake,
               shape: const LiquidOval(),
               child: GlassGlow(
                 child: Container(
@@ -592,6 +591,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                           thickness: 20,
                           lightIntensity: 2,
                           chromaticAberration: .5,
+                          blur: 0,
                         ),
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: Radius.circular(64),
