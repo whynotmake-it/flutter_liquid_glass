@@ -48,8 +48,11 @@ class FakeGlass extends StatelessWidget {
       child: RawFakeGlass(
         shape: shape,
         settings: settings,
-        child: GlassGlowLayer(
-          child: child,
+        child: Opacity(
+          opacity: settings.visibility.clamp(0, 1),
+          child: GlassGlowLayer(
+            child: child,
+          ),
         ),
       ),
     );
@@ -112,7 +115,7 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   @override
-  bool get alwaysNeedsCompositing => child != null;
+  bool get alwaysNeedsCompositing => true;
 
   @override
   BackdropFilterLayer? get layer => super.layer as BackdropFilterLayer?;
@@ -141,7 +144,8 @@ class _RenderFakeGlass extends RenderProxyBox {
         : blurFilter;
 
     final blurLayer = (layer ??= BackdropFilterLayer())
-      ..filter = combinedFilter;
+      ..filter = combinedFilter
+      ..blendMode = BlendMode.src;
 
     context.pushLayer(
       blurLayer,
