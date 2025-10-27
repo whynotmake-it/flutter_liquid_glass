@@ -43,9 +43,7 @@ dev_dependencies:
 
 flutter:
   shaders:
-    - lib/assets/shaders/liquid_glass.frag
     - lib/assets/shaders/liquid_glass_geometry_blended.frag
     - lib/assets/shaders/liquid_glass_filter.frag
     - lib/assets/shaders/liquid_glass_arbitrary.frag
     - lib/assets/shaders/liquid_glass_final_render.frag
-    - lib/assets/shaders/liquid_glass_lighting.frag

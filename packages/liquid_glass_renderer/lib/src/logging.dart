@@ -73,7 +73,7 @@ abstract class LgrLogs {
   /// Logs a record using a print statement.
   static void _printLog(LogRecord record) {
     print(
-      '(${record.time.second}.${record.time.millisecond.toString().padLeft(3, '0')}) ${record.loggerName} > ${record.level.name}: ${record.message}',
+      '${record.loggerName} > ${record.level.name}: ${record.message}',
     );
   }
 }

@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_link.dart';
+import 'package:liquid_glass_renderer/src/internal/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
+import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_shader_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
-import 'package:liquid_glass_renderer/src/shape_in_layer.dart';
 import 'package:meta/meta.dart';
 
 /// An experimental way to use the liquid glass effect as a filter over [child],
@@ -28,6 +27,7 @@ class LiquidGlassFilter extends StatefulWidget {
   const LiquidGlassFilter({
     required this.child,
     this.settings = const LiquidGlassSettings(),
+    this.fake = false,
     super.key,
   });
 
@@ -35,6 +35,8 @@ class LiquidGlassFilter extends StatefulWidget {
   ///
   /// Defaults to a default instance of [LiquidGlassSettings].
   final LiquidGlassSettings settings;
+
+  final bool fake;
 
   /// The child that will be filtered with the liquid glass effect.
   final Widget child;
@@ -44,11 +46,11 @@ class LiquidGlassFilter extends StatefulWidget {
 }
 
 class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
-  late final _glassLink = GlassLink();
+  late final _link = GeometryRenderLink();
 
   @override
   void dispose() {
-    _glassLink.dispose();
+    _link.dispose();
     super.dispose();
   }
 
@@ -56,23 +58,24 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
   Widget build(BuildContext context) {
     return LiquidGlassScope(
       settings: widget.settings,
-      link: _glassLink,
-      child: MultiShaderBuilder(
-        assetKeys: [
-          ShaderKeys.blendedGeometry,
-          ShaderKeys.liquidGlassRender,
-        ],
-        (context, shaders, child) {
-          return _RawLiquidGlassFilter(
-            geometryShader: shaders[0],
-            renderShader: shaders[1],
-            backdropKey: BackdropGroup.of(context)?.backdropKey,
-            settings: widget.settings,
-            glassLink: _glassLink,
-            child: child,
-          );
-        },
-        child: widget.child,
+      useFake: widget.fake,
+      child: InheritedGeometryRenderLink(
+        link: _link,
+        child: MultiShaderBuilder(
+          assetKeys: [
+            ShaderKeys.liquidGlassRender,
+          ],
+          (context, shaders, child) {
+            return _RawLiquidGlassFilter(
+              renderShader: shaders[0],
+              backdropKey: BackdropGroup.of(context)?.backdropKey,
+              settings: widget.settings,
+              link: _link,
+              child: child,
+            );
+          },
+          child: widget.child,
+        ),
       ),
     );
   }
@@ -80,15 +83,12 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
 
 class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
   const _RawLiquidGlassFilter({
-    required this.geometryShader,
     required this.renderShader,
     required this.backdropKey,
     required this.settings,
-    required this.glassLink,
+    required this.link,
     required super.child,
   });
-
-  final FragmentShader geometryShader;
 
   final FragmentShader renderShader;
 
@@ -96,16 +96,15 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
 
   final LiquidGlassSettings settings;
 
-  final GlassLink glassLink;
+  final GeometryRenderLink link;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
     return _RenderLiquidGlassFilter(
-      geometryShader: geometryShader,
       renderShader: renderShader,
       backdropKey: backdropKey,
       settings: settings,
-      glassLink: glassLink,
+      link: link,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
     );
   }
@@ -119,18 +118,17 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
       ..settings = settings
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..backdropKey = backdropKey
-      ..glassLink = glassLink;
+      ..link = link;
   }
 }
 
-class _RenderLiquidGlassFilter extends LiquidGlassShaderRenderObject {
+class _RenderLiquidGlassFilter extends LiquidGlassRenderObject {
   _RenderLiquidGlassFilter({
-    required super.geometryShader,
     required super.renderShader,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
-    required super.glassLink,
+    required super.link,
   });
 
   @override
@@ -140,14 +138,19 @@ class _RenderLiquidGlassFilter extends LiquidGlassShaderRenderObject {
   _ShaderLayer? get layer => super.layer as _ShaderLayer?;
 
   @override
+  ui.Size get desiredMatteSize => size;
+
+  @override
+  Matrix4 get matteTransform => Matrix4.identity();
+
+  @override
   void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
-    List<ShapeInLayerInfo> shapes,
+    List<(RenderLiquidGlassGeometry, Geometry, Matrix4)> shapes,
     Rect boundingBox,
   ) {
     final layer = (this.layer ??= _ShaderLayer())
-      ..shapes = shapes
       ..shader = renderShader
       ..devicePixelRatio = devicePixelRatio
       ..bounds = offset & size
@@ -159,22 +162,14 @@ class _RenderLiquidGlassFilter extends LiquidGlassShaderRenderObject {
       context,
       offset,
       shapes,
-      glassContainsChild: true,
-    );
-    context.pushLayer(
-      layer,
-      (context, offset) {
-        // The child is the whole app in this case
-        context.paintChild(child!, offset);
-      },
-      offset,
+      insideGlass: true,
     );
 
     paintShapeContents(
       context,
       offset,
       shapes,
-      glassContainsChild: false,
+      insideGlass: false,
     );
   }
 }
@@ -189,14 +184,6 @@ class _ShaderLayer extends OffsetLayer {
   set blur(double value) {
     if (_blur == value) return;
     _blur = value;
-    markNeedsAddToScene();
-  }
-
-  List<ShapeInLayerInfo> _shapes = [];
-  List<ShapeInLayerInfo> get shapes => _shapes;
-  set shapes(List<ShapeInLayerInfo> value) {
-    if (_shapes == value) return;
-    _shapes = value;
     markNeedsAddToScene();
   }
 
@@ -267,6 +254,7 @@ class _ShaderLayer extends OffsetLayer {
 
       final picture = recorder.endRecording();
       builder.addPicture(offset, picture);
+      picture.dispose();
     }
     builder.pop();
   }
@@ -286,7 +274,6 @@ class _ShaderLayer extends OffsetLayer {
     );
     builder.pushTransform(transform.storage);
     if (blur > 0) {
-      // We only need to capture the area that will be blurred
       builder.pushImageFilter(
         ui.ImageFilter.blur(
           sigmaX: blur,
@@ -304,10 +291,13 @@ class _ShaderLayer extends OffsetLayer {
 
     builder.pop();
 
-    return builder.build().toImageSync(
-          (devicePixelRatio * bounds.width).ceil(),
-          (devicePixelRatio * bounds.height).ceil(),
-        );
+    final scene = builder.build();
+    final image = scene.toImageSync(
+      (devicePixelRatio * bounds.width).ceil(),
+      (devicePixelRatio * bounds.height).ceil(),
+    );
+    scene.dispose();
+    return image;
   }
 
   @override

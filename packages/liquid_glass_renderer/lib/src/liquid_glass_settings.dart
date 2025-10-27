@@ -44,7 +44,7 @@ class LiquidGlassSettings with EquatableMixin {
           blur: frost,
           lightAngle: lightAngle,
           ambientStrength: 0.1,
-          saturation: 1.05,
+          saturation: 1.5,
           blend: blend,
           glassColor: glassColor,
         );

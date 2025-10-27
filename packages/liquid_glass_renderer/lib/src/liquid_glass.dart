@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_link.dart';
+import 'package:liquid_glass_renderer/src/internal/links.dart';
+import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
 import 'package:meta/meta.dart';
 
@@ -32,39 +34,22 @@ import 'package:meta/meta.dart';
 ///
 /// See the [LiquidGlassLayer] documentation for more information.
 class LiquidGlass extends StatelessWidget {
-  /// Creates a new [LiquidGlass] on its own layer with the given [child],
-  /// [shape], and [settings].
-  ///
-  /// This shape will not blend together with other shapes, so
-  /// [LiquidGlassSettings.blend] will be ignored.
   const LiquidGlass({
     required this.child,
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-    bool fake = false,
     super.key,
-    LiquidGlassSettings settings = const LiquidGlassSettings(),
-  })  : _settings = settings,
-        _fake = fake;
+  }) : blendGroupLink = null;
 
-  /// Creates a new [LiquidGlass] on a shared layer with the given [child] and
-  /// [shape].
-  ///
-  /// This widget will assume that it is a child of a [LiquidGlassLayer], from
-  /// where it will take the [LiquidGlassSettings].
-  /// It will also blend together with other shapes in that layer.
-  const LiquidGlass.inLayer({
+  const LiquidGlass.blended({
     required this.child,
     required this.shape,
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
-  })  : _settings = null,
-        _fake = null;
-
-  /// Maximum number of shapes supported per layer.
-  static const int maxShapesPerLayer = 16;
+    this.blendGroupLink,
+  });
 
   /// The child of this widget.
   ///
@@ -92,77 +77,57 @@ class LiquidGlass extends StatelessWidget {
   /// Defaults to [Clip.none], so [child] will not be clipped.
   final Clip clipBehavior;
 
-  /// When this is set to `true`, the glass effect will be faked entirely using
-  /// [FakeGlass], or [FakeGlass.inLayer] respectively.
-  final bool? _fake;
-
-  final LiquidGlassSettings? _settings;
+  /// The link to this glass's blend group if it is part of one.
+  final BlendGroupLink? blendGroupLink;
 
   @override
   Widget build(BuildContext context) {
-    final fake = _fake ?? LiquidGlassScope.of(context).useFake;
+    final fake = LiquidGlassScope.of(context).useFake;
 
     if (fake) {
-      return _buildFakeGlass(context);
+      return FakeGlass.inLayer(
+        shape: shape,
+        child: child,
+      );
     }
 
-    switch (_settings) {
-      case null:
-        return _RawLiquidGlass(
-          glassLink: LiquidGlassScope.of(context).link,
-          shape: shape,
-          glassContainsChild: glassContainsChild,
-          child: ClipPath(
-            clipper: ShapeBorderClipper(shape: shape),
-            clipBehavior: clipBehavior,
-            child: Opacity(
-              opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
-              child: GlassGlowLayer(
-                child: child,
-              ),
-            ),
-          ),
-        );
-      case final settings:
-        return LiquidGlassLayer(
-          settings: settings,
-          child: Builder(
-            builder: (context) {
-              return _RawLiquidGlass(
-                glassLink: LiquidGlassScope.of(context).link,
-                shape: shape,
-                glassContainsChild: glassContainsChild,
-                child: ClipPath(
-                  clipper: ShapeBorderClipper(shape: shape),
-                  clipBehavior: clipBehavior,
-                  child: Opacity(
-                    opacity: settings.visibility.clamp(0, 1),
-                    child: GlassGlowLayer(
-                      child: child,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-    }
-  }
+    // if (blendGroupLink == null) {
+    //   return LiquidGlassBlendGroup(
+    //     child: Builder(
+    //       builder: (context) => _RawLiquidGlass(
+    //         blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
+    //         shape: shape,
+    //         glassContainsChild: glassContainsChild,
+    //         child: ClipPath(
+    //           clipper: ShapeBorderClipper(shape: shape),
+    //           clipBehavior: clipBehavior,
+    //           child: Opacity(
+    //             opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
+    //             child: GlassGlowLayer(
+    //               child: child,
+    //             ),
+    //           ),
+    //         ),
+    //       ),
+    //     ),
+    //   );
+    // }
 
-  Widget _buildFakeGlass(BuildContext context) {
-    switch (_settings) {
-      case null:
-        return FakeGlass.inLayer(
-          shape: shape,
-          child: child,
-        );
-      case final settings:
-        return FakeGlass(
-          shape: shape,
-          settings: settings,
-          child: child,
-        );
-    }
+    return _RawLiquidGlass(
+      blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
+      shape: shape,
+      glassContainsChild: glassContainsChild,
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: shape),
+        clipBehavior: clipBehavior,
+        child: Opacity(
+          opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
+          child: GlassGlowLayer(
+            child: child,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -171,21 +136,21 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required super.child,
     required this.shape,
     required this.glassContainsChild,
-    required this.glassLink,
+    required this.blendGroupLink,
   });
 
   final LiquidShape shape;
 
   final bool glassContainsChild;
 
-  final GlassLink glassLink;
+  final BlendGroupLink? blendGroupLink;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
     return RenderLiquidGlass(
       shape: shape,
       glassContainsChild: glassContainsChild,
-      glassLink: glassLink,
+      blendGroupLink: blendGroupLink,
     );
   }
 
@@ -197,19 +162,20 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     renderObject
       ..shape = shape
       ..glassContainsChild = glassContainsChild
-      ..glassLink = glassLink;
+      ..blendGroupLink = blendGroupLink;
   }
 }
 
 @internal
-class RenderLiquidGlass extends RenderProxyBox {
+class RenderLiquidGlass extends RenderProxyBox
+    with TransformTrackingRenderObjectMixin {
   RenderLiquidGlass({
     required LiquidShape shape,
     required bool glassContainsChild,
-    required GlassLink glassLink,
+    required BlendGroupLink? blendGroupLink,
   })  : _shape = shape,
         _glassContainsChild = glassContainsChild,
-        _glassLink = glassLink;
+        _blendGroupLink = blendGroupLink;
 
   late LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -217,7 +183,7 @@ class RenderLiquidGlass extends RenderProxyBox {
     if (_shape == value) return;
     _shape = value;
     markNeedsPaint();
-    _updateGlassLink();
+    _updateBlendGroupLink();
   }
 
   bool _glassContainsChild = true;
@@ -225,16 +191,18 @@ class RenderLiquidGlass extends RenderProxyBox {
   set glassContainsChild(bool value) {
     if (_glassContainsChild == value) return;
     _glassContainsChild = value;
-    _updateGlassLink();
+    _updateBlendGroupLink();
   }
 
-  GlassLink? _glassLink;
-  set glassLink(GlassLink? value) {
-    if (_glassLink == value) return;
+  BlendGroupLink? _blendGroupLink;
+  set blendGroupLink(BlendGroupLink? value) {
+    if (_blendGroupLink == value) return;
     _unregisterFromParentLayer();
-    _glassLink = value;
+    _blendGroupLink = value;
     _registerWithLink();
   }
+
+  final transformLayerHandle = LayerHandle<TransformLayer>();
 
   @override
   void attach(PipelineOwner owner) {
@@ -245,29 +213,29 @@ class RenderLiquidGlass extends RenderProxyBox {
   @override
   void detach() {
     _unregisterFromParentLayer();
+    transformLayerHandle.layer = null;
     super.detach();
   }
 
   void _registerWithLink() {
-    if (_glassLink != null) {
-      _glassLink!.registerShape(
+    if (_blendGroupLink != null) {
+      _blendGroupLink!.registerShape(
         this,
         _shape,
-        glassContainsChild: _glassContainsChild,
+        _glassContainsChild,
       );
     }
   }
 
   void _unregisterFromParentLayer() {
-    _glassLink?.unregisterShape(this);
-    _glassLink = null;
+    _blendGroupLink?.unregisterShape(this);
   }
 
-  void _updateGlassLink() {
-    _glassLink?.updateShape(
+  void _updateBlendGroupLink() {
+    _blendGroupLink?.updateShape(
       this,
       _shape,
-      glassContainsChild: _glassContainsChild,
+      _glassContainsChild,
     );
   }
 
@@ -278,22 +246,34 @@ class RenderLiquidGlass extends RenderProxyBox {
     super.performLayout();
     // Notify parent layer when our layout changes
     _lastPath = shape.getOuterPath(Offset.zero & size);
-    _glassLink?.notifyShapeLayoutChanged(this);
+    _blendGroupLink?.notifyShapeLayoutChanged(this);
   }
-
-  Matrix4? lastTransform;
 
   @override
-  void paint(PaintingContext context, Offset offset) {
-    final transform = getTransformTo(null);
-    if (lastTransform != transform) {
-      lastTransform = transform;
-      _glassLink?.notifyShapeLayoutChanged(this);
-    }
+  void onTransformChanged() {
+    _blendGroupLink?.notifyShapeLayoutChanged(this);
   }
 
-  void paintFromLayer(PaintingContext context, Offset offset) {
-    if (attached) super.paint(context, offset);
+  @override
+  // ignore: must_call_super
+  void paint(PaintingContext context, Offset offset) {
+    setUpLayer(offset);
+  }
+
+  void paintFromLayer(
+    PaintingContext context,
+    Matrix4 transform,
+    Offset offset,
+  ) {
+    if (attached) {
+      transformLayerHandle.layer = context.pushTransform(
+        needsCompositing,
+        offset,
+        transform,
+        super.paint,
+        oldLayer: transformLayerHandle.layer,
+      );
+    }
   }
 
   Path getPath() {

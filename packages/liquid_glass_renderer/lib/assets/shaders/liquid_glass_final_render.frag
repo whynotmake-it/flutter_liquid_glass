@@ -14,15 +14,13 @@ precision mediump float;
 #include "render.glsl"
 
 uniform vec2 uSize;
-uniform vec4 uGeometryTextureRect;
-uniform mat4 uGeometryTransform;
-uniform float uDevicePixelRatio;
+uniform vec2 uGeometryOffset;
+uniform vec2 uGeometrySize;
 
 uniform vec4 uGlassColor;
 uniform vec3 uOpticalProps;
 uniform vec3 uLightConfig;
 uniform vec2 uLightDirection;
-
 
 float uRefractiveIndex = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -40,19 +38,19 @@ void main() {
     // FlutterFragCoord() returns logical pixels, but our geometry texture is in physical pixels
     // So we need to scale by devicePixelRatio to work in physical pixel space
     vec2 fragCoord = FlutterFragCoord().xy;
-
-    vec2 geometryFragCoord = (uGeometryTransform * vec4(fragCoord, 0.0, 1.0)).xy ;
     
-    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
-    vec2 geometryUv = (geometryFragCoord - uGeometryTextureRect.xy) / uGeometryTextureRect.zw;
-        
+    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);        
         
     #ifdef IMPELLER_TARGET_OPENGLES
         screenUV.y = 1.0 - screenUV.y;
-        geometryUv.y = 1.0 - geometryUv.y;
     #endif
 
-    vec4 geometryData = texture(uGeometryTexture, geometryUv);
+    vec2 geometryUV = (fragCoord - uGeometryOffset) / uGeometrySize;
+    #ifdef IMPELLER_TARGET_OPENGLES
+        geometryUV.y = 1.0 - geometryUV.y;
+    #endif
+
+    vec4 geometryData = texture(uGeometryTexture, geometryUV);
     
     #if DEBUG_GEOMETRY
         fragColor = geometryData;
@@ -94,7 +92,10 @@ void main() {
 
     // Compute edge lighting
     float normalizedHeight = geometryData.b;
-    float edgeFactor = 1.0 - smoothstep(0.0, 0.6, normalizedHeight);
+    
+    float thicknessScale = clamp(40.0 / max(uThickness, 1.0), 1.0, 4.0);
+    float edgeThreshold = mix(0.8, 0.5, 1.0 / thicknessScale);
+    float edgeFactor = 1.0 - smoothstep(0.0, edgeThreshold, normalizedHeight);
     
     if (edgeFactor > 0.01) {
         vec2 normalXY = normalize(displacement);
@@ -104,13 +105,23 @@ void main() {
         
         float totalInfluence = mainLight + oppositeLight * 0.8;
         
-        float directional = (totalInfluence * totalInfluence) * uLightIntensity * 2.0 * 0.7;
-        float ambient = uAmbientStrength * 0.4;
+        float directional = pow(totalInfluence, 1.5) * uLightIntensity * 3.0;
+        float ambient = uAmbientStrength * 0.5;
         
-        float brightness = (directional + ambient) * edgeFactor;
+        float brightness = (directional + ambient) * edgeFactor * thicknessScale * 0.8;
         
-        // Mix lighting with the background pixel
-        finalColor.rgb = mix(finalColor.rgb, vec3(1.0), brightness);
+        vec3 bgColor = refractColor.rgb;
+        float bgLuminance = dot(bgColor, LUMA_WEIGHTS);
+        vec3 highlightColor;
+        
+        vec3 saturatedBg = bgColor / max(bgLuminance, 0.001);
+        saturatedBg = mix(bgColor, saturatedBg, 0.8);
+        float colorfulness = length(bgColor - vec3(bgLuminance));
+        float colorMix = clamp(colorfulness * 1.0 + 0.5, 0.5, 1.0);
+        highlightColor = mix(vec3(1.0), saturatedBg, colorMix);
+       
+        
+        finalColor.rgb = mix(finalColor.rgb, highlightColor, brightness);
     }
 
     float alpha = geometryData.a;

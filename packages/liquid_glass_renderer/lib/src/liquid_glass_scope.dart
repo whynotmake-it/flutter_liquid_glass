@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_link.dart';
 import 'package:meta/meta.dart';
 
 @internal
@@ -9,14 +8,11 @@ class LiquidGlassScope extends InheritedWidget {
   const LiquidGlassScope({
     required this.settings,
     required super.child,
-    required this.link,
     this.useFake = false,
     super.key,
   });
 
   final LiquidGlassSettings settings;
-
-  final GlassLink link;
 
   final bool useFake;
 
@@ -31,7 +27,6 @@ class LiquidGlassScope extends InheritedWidget {
   bool updateShouldNotify(covariant InheritedWidget oldWidget) {
     return oldWidget is! LiquidGlassScope ||
         oldWidget.settings != settings ||
-        oldWidget.link != link ||
         oldWidget.useFake != useFake;
   }
 }

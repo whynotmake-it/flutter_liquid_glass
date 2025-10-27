@@ -3,6 +3,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
+import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
@@ -27,6 +28,58 @@ enum RawShapeType {
         return RawShapeType.roundedRectangle;
     }
   }
+}
+
+/// The geometry of a single shape.
+///
+/// Can be part of multiple blended shapes in [RenderLiquidGlassGeometry], or on its
+/// own.
+@internal
+class ShapeGeometry extends Equatable {
+  ShapeGeometry({
+    required this.renderObject,
+    required this.shape,
+    required this.glassContainsChild,
+    required this.shapeBounds,
+    this.shapeToGeometry,
+  })  : rawCornerRadius = _getRadiusFromGlassShape(shape),
+        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+
+  static double _getRadiusFromGlassShape(LiquidShape shape) {
+    switch (shape) {
+      case LiquidRoundedSuperellipse():
+        _assertSameRadius(shape.borderRadius);
+        return shape.borderRadius.x;
+      case LiquidRoundedRectangle():
+        _assertSameRadius(shape.borderRadius);
+        return shape.borderRadius.x;
+      case LiquidOval():
+        return 0;
+    }
+  }
+
+  final RenderLiquidGlass renderObject;
+
+  final LiquidShape shape;
+
+  final RawShapeType rawShapeType;
+
+  final double rawCornerRadius;
+
+  final bool glassContainsChild;
+
+  /// Bounds in geometry-local coordinates (for painting)
+  final Rect shapeBounds;
+
+  final Matrix4? shapeToGeometry;
+
+  @override
+  List<Object?> get props => [
+        renderObject,
+        shape,
+        glassContainsChild,
+        shapeBounds,
+      ];
 }
 
 /// Shape data in both layer and screen coordinate spaces
@@ -67,6 +120,8 @@ class ShapeInLayerInfo extends Equatable {
   final bool glassContainsChild;
 
   /// Bounds in layer-local coordinates (for painting)
+  ///
+  // TODO rename
   final Rect layerBounds;
 
   /// Bounds in layer-relative coordinates
