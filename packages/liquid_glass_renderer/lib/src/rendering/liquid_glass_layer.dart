@@ -6,26 +6,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
-/// Represents a layer of multiple [LiquidGlass] shapes that can flow together
-/// and have shared [LiquidGlassSettings].
+/// Represents a layer of multiple [LiquidGlass] shapes or
+/// [LiquidGlassBlendGroup]s that have shared [LiquidGlassSettings] and will be
+/// rendered together.
 ///
-/// If you create a [LiquidGlassLayer] with one or more [LiquidGlass.inLayer]
-/// widgets, the liquid glass effect will be rendered where this layer is.
+/// If you create a [LiquidGlassLayer] with one or more [LiquidGlass] or
+/// [LiquidGlassBlendGroup] widgets, the liquid glass effect will be rendered
+/// where this layer is.
+///
 /// Make sure not to stack any other widgets between the [LiquidGlassLayer] and
 /// the [LiquidGlass] widgets, otherwise the liquid glass effect will be behind
 /// them.
-///
-/// > [!WARNING]
-/// > A maximum of 16 shapes are supported per layer due to Impeller's
-/// > uniform buffer limits.
 ///
 /// ## Example
 ///
@@ -34,8 +33,8 @@ import 'package:meta/meta.dart';
 ///   return LiquidGlassLayer(
 ///     child: Column(
 ///       children: [
-///         LiquidGlass.inLayer(
-///           shape: LiquidGlassSquircle(
+///         LiquidGlass(
+///           shape: LiquidRoundedSuperellipse(
 ///             borderRadius: Radius.circular(10),
 ///           ),
 ///           child: SizedBox.square(
@@ -43,12 +42,25 @@ import 'package:meta/meta.dart';
 ///           ),
 ///         ),
 ///         const SizedBox(height: 100),
-///         LiquidGlass.inLayer(
-///           shape: LiquidGlassSquircle(
-///             borderRadius: Radius.circular(50),
-///           ),
-///           child: SizedBox.square(
-///             dimension: 100,
+///         LiquidGlassBlendGroup(
+///          blend: 20,
+///          child: Row(
+///             children: [
+///               LiquidGlass(
+///                 shape: LiquidOval(),
+///                 child: SizedBox.square(
+///                   dimension: 100,
+///                 ),
+///               ),
+///               LiquidGlass(
+///                 shape: LiquidRoundedSuperellipse(
+///                   borderRadius: Radius.circular(20),
+///                 ),
+///                 child: SizedBox.square(
+///                   dimension: 100,
+///                 ),
+///               ),
+///             ],
 ///           ),
 ///         ),
 ///       ],

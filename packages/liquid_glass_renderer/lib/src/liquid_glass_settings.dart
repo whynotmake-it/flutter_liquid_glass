@@ -14,7 +14,6 @@ class LiquidGlassSettings with EquatableMixin {
     this.thickness = 20,
     this.blur = 0,
     this.chromaticAberration = .01,
-    this.blend = 0,
     this.lightAngle = 0.5 * pi,
     this.lightIntensity = .2,
     this.ambientStrength = .01,
@@ -33,7 +32,6 @@ class LiquidGlassSettings with EquatableMixin {
     double visibility = 1.0,
     double lightIntensity = 50,
     double lightAngle = 0.5 * pi,
-    double blend = 0,
     Color glassColor = const Color.fromARGB(0, 255, 255, 255),
   }) : this(
           visibility: visibility,
@@ -45,7 +43,6 @@ class LiquidGlassSettings with EquatableMixin {
           lightAngle: lightAngle,
           ambientStrength: 0.1,
           saturation: 1.5,
-          blend: blend,
           glassColor: glassColor,
         );
 
@@ -98,9 +95,6 @@ class LiquidGlassSettings with EquatableMixin {
 
   /// The effective chromatic aberration taking visibility into account.
   double get effectiveChromaticAberration => chromaticAberration * visibility;
-
-  /// How strongly the shapes in this layer will blend together.
-  final double blend;
 
   /// The angle of the light source in radians.
   ///
@@ -159,7 +153,6 @@ class LiquidGlassSettings with EquatableMixin {
         thickness: thickness ?? this.thickness,
         blur: blur ?? this.blur,
         chromaticAberration: chromaticAberration ?? this.chromaticAberration,
-        blend: blend ?? this.blend,
         lightAngle: lightAngle ?? this.lightAngle,
         lightIntensity: lightIntensity ?? this.lightIntensity,
         ambientStrength: ambientStrength ?? this.ambientStrength,
@@ -174,7 +167,6 @@ class LiquidGlassSettings with EquatableMixin {
         thickness,
         blur,
         chromaticAberration,
-        blend,
         lightAngle,
         lightIntensity,
         ambientStrength,

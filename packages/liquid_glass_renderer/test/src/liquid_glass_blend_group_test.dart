@@ -3,30 +3,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
 void main() {
   group('LiquidGlassBlendGroup', () {
     const blendGroupKey = Key('blend-group');
+    late GeometryRenderLink link;
+    setUp(() {
+      link = GeometryRenderLink();
+    });
 
-    Widget build(LiquidGlassSettings settings) {
+    tearDown(() {
+      link.dispose();
+    });
+
+    Widget build(LiquidGlassSettings settings, double blend) {
       return CupertinoApp(
-        home: LiquidGlassScope(
-          settings: settings,
-          child: const LiquidGlassBlendGroup(
-            key: blendGroupKey,
-            child: Row(
-              children: [
-                LiquidGlass.blended(
-                  shape: LiquidOval(),
-                  child: SizedBox.square(dimension: 100),
-                ),
-                LiquidGlass.blended(
-                  shape: LiquidRoundedSuperellipse(
-                    borderRadius: Radius.circular(20),
+        home: InheritedGeometryRenderLink(
+          link: link,
+          child: LiquidGlassScope(
+            settings: settings,
+            child: LiquidGlassBlendGroup(
+              blend: blend,
+              key: blendGroupKey,
+              child: const Row(
+                children: [
+                  LiquidGlass.blended(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 100),
                   ),
-                  child: SizedBox.square(dimension: 100),
-                ),
-              ],
+                  LiquidGlass.blended(
+                    shape: LiquidRoundedSuperellipse(
+                      borderRadius: Radius.circular(20),
+                    ),
+                    child: SizedBox.square(dimension: 100),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -38,8 +51,11 @@ void main() {
       final refractiveIndices = [1.0, 1.1, 1.2, 1.3];
       final blendValues = [0.0, 10, 20, 30, 300];
 
-      Future<void> verifySettings(LiquidGlassSettings settings) async {
-        await tester.pumpWidget(build(settings));
+      Future<void> verifySettings(
+        LiquidGlassSettings settings,
+        double blend,
+      ) async {
+        await tester.pumpWidget(build(settings, blend));
         await tester.pumpAndSettle();
 
         final blendGroupFinder = find.byKey(blendGroupKey);
@@ -64,7 +80,7 @@ void main() {
             'goldens/geometry/liquid_glass_blend_group_geometry_'
             'thickness${settings.thickness}_'
             'refractiveIndex${settings.refractiveIndex}_'
-            'blend${settings.blend}'
+            'blend$blend'
             '.png',
           ),
         );
@@ -74,8 +90,8 @@ void main() {
         const LiquidGlassSettings(
           thickness: 0,
           refractiveIndex: 1.5,
-          blend: 100,
         ),
+        0,
       );
 
       for (final thickness in thicknesses) {
@@ -84,9 +100,8 @@ void main() {
             final settings = LiquidGlassSettings(
               thickness: thickness.toDouble(),
               refractiveIndex: refractiveIndex,
-              blend: blend.toDouble(),
             );
-            await verifySettings(settings);
+            await verifySettings(settings, blend.toDouble());
           }
         }
       }

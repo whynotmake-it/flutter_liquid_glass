@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/links.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
@@ -28,12 +27,9 @@ import 'package:meta/meta.dart';
 /// }
 /// ```
 ///
-/// If you want multiple shapes to blend together, you need to construct your
-/// own [LiquidGlassLayer], and place this widget inside of there using the
-/// [LiquidGlass.inLayer] constructor.
-///
 /// See the [LiquidGlassLayer] documentation for more information.
 class LiquidGlass extends StatelessWidget {
+  /// Creates a new [LiquidGlass] with the given [child] and [shape].
   const LiquidGlass({
     required this.child,
     required this.shape,
@@ -42,6 +38,7 @@ class LiquidGlass extends StatelessWidget {
     super.key,
   }) : blendGroupLink = null;
 
+  /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
   const LiquidGlass.blended({
     required this.child,
     required this.shape,
@@ -91,30 +88,33 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    // if (blendGroupLink == null) {
-    //   return LiquidGlassBlendGroup(
-    //     child: Builder(
-    //       builder: (context) => _RawLiquidGlass(
-    //         blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
-    //         shape: shape,
-    //         glassContainsChild: glassContainsChild,
-    //         child: ClipPath(
-    //           clipper: ShapeBorderClipper(shape: shape),
-    //           clipBehavior: clipBehavior,
-    //           child: Opacity(
-    //             opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
-    //             child: GlassGlowLayer(
-    //               child: child,
-    //             ),
-    //           ),
-    //         ),
-    //       ),
-    //     ),
-    //   );
-    // }
+    final blendGroupLink =
+        this.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context);
+
+    if (blendGroupLink == null) {
+      return LiquidGlassBlendGroup(
+        child: Builder(
+          builder: (context) => _RawLiquidGlass(
+            blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
+            shape: shape,
+            glassContainsChild: glassContainsChild,
+            child: ClipPath(
+              clipper: ShapeBorderClipper(shape: shape),
+              clipBehavior: clipBehavior,
+              child: Opacity(
+                opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
+                child: GlassGlowLayer(
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return _RawLiquidGlass(
-      blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
+      blendGroupLink: blendGroupLink,
       shape: shape,
       glassContainsChild: glassContainsChild,
       child: ClipPath(
@@ -222,7 +222,7 @@ class RenderLiquidGlass extends RenderProxyBox
       _blendGroupLink!.registerShape(
         this,
         _shape,
-        _glassContainsChild,
+        glassContainsChild: _glassContainsChild,
       );
     }
   }
@@ -235,7 +235,7 @@ class RenderLiquidGlass extends RenderProxyBox
     _blendGroupLink?.updateShape(
       this,
       _shape,
-      _glassContainsChild,
+      glassContainsChild: _glassContainsChild,
     );
   }
 

@@ -1,12 +1,13 @@
 import 'dart:ui';
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/links.dart';
-import 'package:liquid_glass_renderer/src/internal/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
-import 'package:liquid_glass_renderer/src/shape_in_layer.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 
@@ -329,7 +330,88 @@ extension on LiquidGlassSettings {
     if (other == null) return false;
 
     return effectiveThickness != other.effectiveThickness ||
-        refractiveIndex != other.refractiveIndex ||
-        blend != other.blend;
+        refractiveIndex != other.refractiveIndex;
   }
+}
+
+@internal
+enum RawShapeType {
+  // none(0), unused in CPU code
+  squircle(1),
+  ellipse(2),
+  roundedRectangle(3);
+
+  const RawShapeType(this.shaderIndex);
+
+  final double shaderIndex;
+
+  static RawShapeType fromLiquidGlassShape(LiquidShape shape) {
+    switch (shape) {
+      case LiquidRoundedSuperellipse():
+        return RawShapeType.squircle;
+      case LiquidOval():
+        return RawShapeType.ellipse;
+      case LiquidRoundedRectangle():
+        return RawShapeType.roundedRectangle;
+    }
+  }
+}
+
+/// The geometry of a single shape.
+///
+/// Can be part of multiple blended shapes in [RenderLiquidGlassGeometry], or on
+/// its own.
+@internal
+class ShapeGeometry extends Equatable {
+  ShapeGeometry({
+    required this.renderObject,
+    required this.shape,
+    required this.glassContainsChild,
+    required this.shapeBounds,
+    this.shapeToGeometry,
+  })  : rawCornerRadius = _getRadiusFromGlassShape(shape),
+        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+
+  static double _getRadiusFromGlassShape(LiquidShape shape) {
+    switch (shape) {
+      case LiquidRoundedSuperellipse():
+        _assertSameRadius(shape.borderRadius);
+        return shape.borderRadius.x;
+      case LiquidRoundedRectangle():
+        _assertSameRadius(shape.borderRadius);
+        return shape.borderRadius.x;
+      case LiquidOval():
+        return 0;
+    }
+  }
+
+  final RenderLiquidGlass renderObject;
+
+  final LiquidShape shape;
+
+  final RawShapeType rawShapeType;
+
+  final double rawCornerRadius;
+
+  final bool glassContainsChild;
+
+  /// Bounds in geometry-local coordinates (for painting)
+  final Rect shapeBounds;
+
+  final Matrix4? shapeToGeometry;
+
+  @override
+  List<Object?> get props => [
+        renderObject,
+        shape,
+        glassContainsChild,
+        shapeBounds,
+      ];
+}
+
+void _assertSameRadius(Radius borderRadius) {
+  assert(
+    borderRadius.x == borderRadius.y,
+    'The radius must have equal x and y values for a liquid glass shape.',
+  );
 }

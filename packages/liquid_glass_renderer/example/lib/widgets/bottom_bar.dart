@@ -93,7 +93,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           thickness: 30,
           blur: 8,
           saturation: 1.5,
-          blend: 10,
           lightIntensity: isDark ? .7 : 1,
           ambientStrength: isDark ? .2 : .5,
           lightAngle: math.pi / 4,
@@ -106,6 +105,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
       settings: glassSettings,
       fake: widget.fake,
       child: LiquidGlassBlendGroup(
+        blend: 10,
         child: Padding(
           padding: EdgeInsets.only(
             right: widget.horizontalPadding,

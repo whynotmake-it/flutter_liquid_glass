@@ -24,6 +24,8 @@ final settingsNotifier = ValueNotifier(
   ),
 );
 
+final blendNotifier = ValueNotifier(10.0);
+
 class BasicApp extends HookWidget {
   const BasicApp({super.key});
 
@@ -37,6 +39,7 @@ class BasicApp extends HookWidget {
     return GestureDetector(
       onTap: () {
         SettingsSheet(
+          blendNotifier: blendNotifier,
           settingsNotifier: settingsNotifier,
           lightAngleAnimation: light,
         ).show(context);
@@ -76,7 +79,11 @@ class BasicApp extends HookWidget {
             ),
             Center(
               child: ListenableBuilder(
-                listenable: Listenable.merge([settingsNotifier, light]),
+                listenable: Listenable.merge([
+                  settingsNotifier,
+                  light,
+                  blendNotifier,
+                ]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
                     glassColor: CupertinoTheme.of(
@@ -87,6 +94,7 @@ class BasicApp extends HookWidget {
                     fake: fake.value,
                     settings: settings.copyWith(lightAngle: light.value),
                     child: LiquidGlassBlendGroup(
+                      blend: blendNotifier.value,
                       child: Column(
                         spacing: 16,
                         mainAxisAlignment: MainAxisAlignment.center,

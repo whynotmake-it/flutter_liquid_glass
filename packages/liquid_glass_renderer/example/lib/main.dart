@@ -13,7 +13,6 @@ final settingsNotifier = ValueNotifier<LiquidGlassSettings>(
   LiquidGlassSettings(
     thickness: 20,
     lightAngle: 0.5 * pi,
-    blend: 50,
     chromaticAberration: 1,
   ),
 );
