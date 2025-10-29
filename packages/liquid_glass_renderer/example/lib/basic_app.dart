@@ -13,15 +13,7 @@ void main() {
 }
 
 final settingsNotifier = ValueNotifier(
-  LiquidGlassSettings(
-    thickness: 20,
-    blur: 10,
-    refractiveIndex: 1.2,
-    lightIntensity: .8,
-    saturation: 1.2,
-    lightAngle: pi / 4,
-    glassColor: Colors.white.withValues(alpha: 0.2),
-  ),
+  LiquidGlassSettings(glassColor: Colors.white.withValues(alpha: 0.2)),
 );
 
 final blendNotifier = ValueNotifier(10.0);

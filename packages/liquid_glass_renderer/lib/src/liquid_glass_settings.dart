@@ -12,13 +12,13 @@ class LiquidGlassSettings with EquatableMixin {
     this.visibility = 1.0,
     this.glassColor = const Color.fromARGB(0, 255, 255, 255),
     this.thickness = 20,
-    this.blur = 0,
+    this.blur = 5,
     this.chromaticAberration = .01,
     this.lightAngle = 0.5 * pi,
-    this.lightIntensity = .2,
-    this.ambientStrength = .01,
-    this.refractiveIndex = 1.51,
-    this.saturation = 1.0,
+    this.lightIntensity = .5,
+    this.ambientStrength = 0,
+    this.refractiveIndex = 1.2,
+    this.saturation = 1.5,
   });
 
   /// Creates a new [LiquidGlassSettings] with the given settings where each
