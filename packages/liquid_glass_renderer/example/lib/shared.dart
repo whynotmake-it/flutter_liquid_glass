@@ -131,9 +131,7 @@ class SettingsSheet extends HookWidget {
           minimum: const EdgeInsets.all(16.0),
           child: LiquidGlassBlendGroup(
             child: LiquidGlass.blended(
-              shape: LiquidRoundedSuperellipse(
-                borderRadius: Radius.circular(32),
-              ),
+              shape: LiquidRoundedSuperellipse(borderRadius: 32),
               child: GlassGlow(
                 child: DefaultTextStyle(
                   style: Theme.of(context).textTheme.bodyLarge!,

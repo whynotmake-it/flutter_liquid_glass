@@ -33,7 +33,7 @@ void main() {
                     child: const LiquidGlassBlendGroup(
                       child: LiquidGlass.blended(
                         shape: LiquidRoundedSuperellipse(
-                          borderRadius: Radius.circular(100),
+                          borderRadius: 100,
                         ),
                         child: SizedBox.square(
                           dimension: 400,
@@ -69,7 +69,7 @@ void main() {
                         child: LiquidGlass.blended(
                           glassContainsChild: true,
                           shape: LiquidRoundedSuperellipse(
-                            borderRadius: Radius.circular(radius),
+                            borderRadius: radius,
                           ),
                           child: SizedBox.square(
                             dimension: 400,
@@ -100,7 +100,7 @@ void main() {
                         child: LiquidGlass.blended(
                           glassContainsChild: true,
                           shape: LiquidRoundedSuperellipse(
-                            borderRadius: Radius.circular(radius),
+                            borderRadius: radius,
                           ),
                           child: SizedBox.fromSize(
                             size: const Size(400, 200),
@@ -151,13 +151,13 @@ void main() {
                           ),
                           LiquidGlass.blended(
                             shape: LiquidRoundedRectangle(
-                              borderRadius: Radius.circular(20),
+                              borderRadius: 20,
                             ),
                             child: SizedBox.square(dimension: 100),
                           ),
                           LiquidGlass.blended(
                             shape: LiquidRoundedSuperellipse(
-                              borderRadius: Radius.circular(20),
+                              borderRadius: 20,
                             ),
                             child: SizedBox.square(dimension: 100),
                           ),

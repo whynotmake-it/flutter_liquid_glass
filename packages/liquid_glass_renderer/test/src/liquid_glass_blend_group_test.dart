@@ -34,7 +34,7 @@ void main() {
                   ),
                   LiquidGlass.blended(
                     shape: LiquidRoundedSuperellipse(
-                      borderRadius: Radius.circular(20),
+                      borderRadius: 20,
                     ),
                     child: SizedBox.square(dimension: 100),
                   ),

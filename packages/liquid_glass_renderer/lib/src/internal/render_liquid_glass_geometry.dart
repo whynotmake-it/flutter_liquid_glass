@@ -375,11 +375,9 @@ class ShapeGeometry extends Equatable {
   static double _getRadiusFromGlassShape(LiquidShape shape) {
     switch (shape) {
       case LiquidRoundedSuperellipse():
-        _assertSameRadius(shape.borderRadius);
-        return shape.borderRadius.x;
+        return shape.borderRadius;
       case LiquidRoundedRectangle():
-        _assertSameRadius(shape.borderRadius);
-        return shape.borderRadius.x;
+        return shape.borderRadius;
       case LiquidOval():
         return 0;
     }
@@ -407,11 +405,4 @@ class ShapeGeometry extends Equatable {
         glassContainsChild,
         shapeBounds,
       ];
-}
-
-void _assertSameRadius(Radius borderRadius) {
-  assert(
-    borderRadius.x == borderRadius.y,
-    'The radius must have equal x and y values for a liquid glass shape.',
-  );
 }

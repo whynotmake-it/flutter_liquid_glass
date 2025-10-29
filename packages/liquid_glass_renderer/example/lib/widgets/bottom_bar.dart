@@ -126,9 +126,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                   onTabChanged: widget.onTabSelected,
                   child: LiquidGlass.blended(
                     clipBehavior: Clip.none,
-                    shape: const LiquidRoundedSuperellipse(
-                      borderRadius: Radius.circular(32),
-                    ),
+                    shape: const LiquidRoundedSuperellipse(borderRadius: 32),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       height: widget.barHeight,
@@ -592,7 +590,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                         child: LiquidGlassBlendGroup(
                           child: LiquidGlass.blended(
                             shape: const LiquidRoundedSuperellipse(
-                              borderRadius: Radius.circular(64),
+                              borderRadius: 64,
                             ),
                             child: GlassGlow(child: const SizedBox.expand()),
                           ),

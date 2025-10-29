@@ -47,18 +47,18 @@ class LiquidRoundedSuperellipse extends LiquidShape {
   /// The radius of the squircle.
   ///
   /// This is the radius of the corners of the squircle.
-  final Radius borderRadius;
+  final double borderRadius;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.all(borderRadius),
+        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
         side: side,
       );
 
   @override
   LiquidRoundedSuperellipse copyWith({
     BorderSide? side,
-    Radius? borderRadius,
+    double? borderRadius,
   }) {
     return LiquidRoundedSuperellipse(
       side: side ?? this.side,
@@ -117,18 +117,18 @@ class LiquidRoundedRectangle extends LiquidShape {
   /// The radius of the rounded rectangle.
   ///
   /// This is the radius of the corners of the rounded rectangle.
-  final Radius borderRadius;
+  final double borderRadius;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(borderRadius),
+        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
         side: side,
       );
 
   @override
   LiquidRoundedRectangle copyWith({
     BorderSide? side,
-    Radius? borderRadius,
+    double? borderRadius,
   }) {
     return LiquidRoundedRectangle(
       side: side ?? this.side,

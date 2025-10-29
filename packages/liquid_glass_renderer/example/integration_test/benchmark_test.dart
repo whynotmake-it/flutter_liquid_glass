@@ -116,15 +116,11 @@ class _SingleTestApp extends StatelessWidget {
           ? LiquidGlassLayer(
               settings: settings,
               child: LiquidGlass(
-                shape: LiquidRoundedSuperellipse(
-                  borderRadius: Radius.circular(20),
-                ),
+                shape: LiquidRoundedSuperellipse(borderRadius: 20),
                 child: Container(
                   key: const Key('liquid_glass_widget'),
                   decoration: ShapeDecoration(
-                    shape: LiquidRoundedSuperellipse(
-                      borderRadius: Radius.circular(20),
-                    ),
+                    shape: LiquidRoundedSuperellipse(borderRadius: 20),
                   ),
                   child: content,
                 ),
@@ -182,18 +178,14 @@ class _MultiTestApp extends StatelessWidget {
           child: switch ((withGlass, shareLayer)) {
             (true, true) => LiquidGlass(
               key: Key('liquid_glass_$index'),
-              shape: LiquidRoundedSuperellipse(
-                borderRadius: Radius.circular(15),
-              ),
+              shape: LiquidRoundedSuperellipse(borderRadius: 15),
               child: listItem,
             ),
             (true, false) => LiquidGlassLayer(
               settings: settings,
               child: LiquidGlass(
                 key: Key('liquid_glass_$index'),
-                shape: LiquidRoundedSuperellipse(
-                  borderRadius: Radius.circular(15),
-                ),
+                shape: LiquidRoundedSuperellipse(borderRadius: 15),
                 child: listItem,
               ),
             ),
