@@ -4,12 +4,17 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// A widget that groups multiple liquid glass shapes for blending.
+///
+/// Any [LiquidGlass.blended] widgets inside this group will blend together.
+///
+/// This widget will expect a parent [LiquidGlassLayer] to render the liquid
+/// glass effect on.
 class LiquidGlassBlendGroup extends StatefulWidget {
   /// Creates a new [LiquidGlassBlendGroup].
   const LiquidGlassBlendGroup({
@@ -62,7 +67,7 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final useFake = LiquidGlassScope.of(context).useFake;
+    final useFake = LiquidGlassRenderScope.of(context).useFake;
 
     if (useFake) {
       return _InheritedLiquidGlassBlendGroup(
@@ -79,7 +84,7 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
           shader: shader,
           link: _geometryLink,
           renderLink: InheritedGeometryRenderLink.of(context)!,
-          settings: LiquidGlassScope.of(context).settings,
+          settings: LiquidGlassRenderScope.of(context).settings,
           child: child,
         ),
         assetKey: ShaderKeys.blendedGeometry,

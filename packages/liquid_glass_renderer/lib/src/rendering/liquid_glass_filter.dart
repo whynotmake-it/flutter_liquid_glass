@@ -6,7 +6,7 @@ import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
@@ -54,7 +54,7 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassScope(
+    return LiquidGlassRenderScope(
       settings: widget.settings,
       useFake: widget.fake,
       child: InheritedGeometryRenderLink(

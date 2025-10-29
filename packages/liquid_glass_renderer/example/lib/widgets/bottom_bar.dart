@@ -569,7 +569,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                       tabCount: widget.tabCount,
                       alignment: alignment,
                       thickness: thickness,
-                      child: LiquidGlassLayer(
+                      child: LiquidGlass.withOwnLayer(
                         fake: widget.fake,
                         settings: LiquidGlassSettings(
                           visibility: thickness,
@@ -587,14 +587,10 @@ class _TabIndicatorState extends State<_TabIndicator>
                           blur: 0,
                         ),
 
-                        child: LiquidGlassBlendGroup(
-                          child: LiquidGlass.blended(
-                            shape: const LiquidRoundedSuperellipse(
-                              borderRadius: 64,
-                            ),
-                            child: GlassGlow(child: const SizedBox.expand()),
-                          ),
+                        shape: const LiquidRoundedSuperellipse(
+                          borderRadius: 64,
                         ),
+                        child: GlassGlow(child: const SizedBox.expand()),
                       ),
                     ),
                 ],

@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
 void main() {
@@ -19,9 +19,10 @@ void main() {
 
     Widget build(LiquidGlassSettings settings, double blend) {
       return CupertinoApp(
+        // Inject the stuff that LiquidGlassBlendGroup needs.
         home: InheritedGeometryRenderLink(
           link: link,
-          child: LiquidGlassScope(
+          child: LiquidGlassRenderScope(
             settings: settings,
             child: LiquidGlassBlendGroup(
               blend: blend,

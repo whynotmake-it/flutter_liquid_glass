@@ -5,40 +5,43 @@ import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:meta/meta.dart';
 
 /// A liquid glass shape.
 ///
-/// This can either be used on its own, or be part of a shared
-/// [LiquidGlassLayer], where all shapes will blend together.
+/// To render liquid glass, you probably want to wrap this in a
+/// [LiquidGlassLayer], where the glass effect will be rendered.
 ///
-/// The simplest use of this widget is to create a [LiquidGlass] on its own
-/// layer:
+/// This can either create a single shape, or be blended together with other
+/// shapes in a parent [LiquidGlassBlendGroup] by using the
+/// [LiquidGlass.blended] constructor.
 ///
-/// ```dart
-/// Widget build(BuildContext context) {
-///   return LiquidGlass(
-///     shape: LiquidGlassSquircle(
-///       borderRadius: Radius.circular(10),
-///     ),
-///     child: FlutterLogo(),
-///   );
-/// }
-/// ```
+/// If you only need a single shape with its own settings, you can also use the
+/// [LiquidGlass.withOwnLayer] constructor, which will create its own
+/// [LiquidGlassLayer] internally.
+/// Be mindful that creating many individual layers can be expensive.
 ///
 /// See the [LiquidGlassLayer] documentation for more information.
 class LiquidGlass extends StatelessWidget {
   /// Creates a new [LiquidGlass] with the given [child] and [shape].
+  ///
+  /// This will expect a parent [LiquidGlassLayer] to be present in the widget
+  /// tree, where the liquid glass effect will be rendered.
   const LiquidGlass({
     required this.child,
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     super.key,
-  }) : blendGroupLink = null;
+  })  : blendGroupLink = null,
+        ownLayerConfig = null;
 
   /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
+  ///
+  /// This will expect a parent [LiquidGlassBlendGroup] to be present in the
+  /// widget tree, as well as a parent [LiquidGlassLayer] above that, where the
+  /// result will be rendered.
   const LiquidGlass.blended({
     required this.child,
     required this.shape,
@@ -46,7 +49,25 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
-  });
+  }) : ownLayerConfig = null;
+
+  /// Creates a new [LiquidGlass] that creates its own [LiquidGlassLayer].
+  ///
+  /// While this might seem convenient, creating many individual layers can be
+  /// expensive.
+  ///
+  /// You should prefer rendering multiple [LiquidGlass] shapes that share the
+  /// same settings inside a single [LiquidGlassLayer] for better performance.
+  const LiquidGlass.withOwnLayer({
+    required this.child,
+    required this.shape,
+    LiquidGlassSettings settings = const LiquidGlassSettings(),
+    bool fake = false,
+    super.key,
+    this.glassContainsChild = false,
+    this.clipBehavior = Clip.hardEdge,
+    this.blendGroupLink,
+  }) : ownLayerConfig = (settings, fake);
 
   /// The child of this widget.
   ///
@@ -77,9 +98,33 @@ class LiquidGlass extends StatelessWidget {
   /// The link to this glass's blend group if it is part of one.
   final BlendGroupLink? blendGroupLink;
 
+  /// The settings for this glass if it is supposed to create its own layer.
+  final (LiquidGlassSettings settings, bool fake)? ownLayerConfig;
+
   @override
   Widget build(BuildContext context) {
-    final fake = LiquidGlassScope.of(context).useFake;
+    // If we have our own layer config, we create our own layer.
+    if (ownLayerConfig case (final settings, final fake)) {
+      if (fake) {
+        return FakeGlass(
+          shape: shape,
+          settings: settings,
+          child: child,
+        );
+      }
+
+      return LiquidGlassLayer(
+        settings: settings,
+        child: LiquidGlassBlendGroup(
+          blend: 0,
+          child: Builder(
+            builder: _buildContent,
+          ),
+        ),
+      );
+    }
+
+    final fake = LiquidGlassRenderScope.of(context).useFake;
 
     if (fake) {
       return FakeGlass.inLayer(
@@ -92,36 +137,37 @@ class LiquidGlass extends StatelessWidget {
         this.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context);
 
     if (blendGroupLink == null) {
+      // For now we create our own blend group until we support non-blended
+      // geometry generation
       return LiquidGlassBlendGroup(
+        blend: 0,
         child: Builder(
-          builder: (context) => _RawLiquidGlass(
-            blendGroupLink: LiquidGlassBlendGroup.maybeOf(context),
-            shape: shape,
-            glassContainsChild: glassContainsChild,
-            child: ClipPath(
-              clipper: ShapeBorderClipper(shape: shape),
-              clipBehavior: clipBehavior,
-              child: Opacity(
-                opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
-                child: GlassGlowLayer(
-                  child: child,
-                ),
-              ),
-            ),
+          builder: (context) => _buildContent(
+            context,
+            LiquidGlassBlendGroup.of(context),
           ),
         ),
       );
     }
 
+    return _buildContent(
+      context,
+      blendGroupLink,
+    );
+  }
+
+  Widget _buildContent(BuildContext context, [BlendGroupLink? blendGroupLink]) {
+    final settings = LiquidGlassSettings.of(context);
+
     return _RawLiquidGlass(
-      blendGroupLink: blendGroupLink,
+      blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
       shape: shape,
       glassContainsChild: glassContainsChild,
       child: ClipPath(
         clipper: ShapeBorderClipper(shape: shape),
         clipBehavior: clipBehavior,
         child: Opacity(
-          opacity: LiquidGlassSettings.of(context).visibility.clamp(0, 1),
+          opacity: settings.visibility.clamp(0, 1),
           child: GlassGlowLayer(
             child: child,
           ),

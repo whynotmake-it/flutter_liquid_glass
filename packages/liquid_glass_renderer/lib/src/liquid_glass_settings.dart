@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 /// Represents the settings for a liquid glass effect.
 class LiquidGlassSettings with EquatableMixin {
@@ -49,9 +49,9 @@ class LiquidGlassSettings with EquatableMixin {
   /// Retrieves the nearest [LiquidGlassSettings] from the widget tree.
   ///
   /// This will look for the nearest ancestor [LiquidGlassLayer] or
-  /// [LiquidGlassScope] widget in the widget tree.
+  /// [LiquidGlassRenderScope] widget in the widget tree.
   static LiquidGlassSettings of(BuildContext context) {
-    return LiquidGlassScope.of(context).settings;
+    return LiquidGlassRenderScope.of(context).settings;
   }
 
   /// A factor that can be used to scale all thickness-related properties.

@@ -26,19 +26,15 @@ void main() {
               GoldenTestScenario(
                 name: 'thickness ${thickness.toStringAsFixed(0)}px',
                 child: buildWithGridPaper(
-                  LiquidGlassLayer(
+                  LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
                       thickness: thickness.toDouble(),
                     ),
-                    child: const LiquidGlassBlendGroup(
-                      child: LiquidGlass.blended(
-                        shape: LiquidRoundedSuperellipse(
-                          borderRadius: 100,
-                        ),
-                        child: SizedBox.square(
-                          dimension: 400,
-                        ),
-                      ),
+                    shape: const LiquidRoundedSuperellipse(
+                      borderRadius: 100,
+                    ),
+                    child: const SizedBox.square(
+                      dimension: 400,
                     ),
                   ),
                 ),
@@ -60,26 +56,22 @@ void main() {
                 GoldenTestScenario(
                   name: 'square shape radius ${radius.toStringAsFixed(0)}px',
                   child: buildWithGridPaper(
-                    LiquidGlassLayer(
+                    LiquidGlass.withOwnLayer(
                       settings: settingsWithoutLighting.copyWith(
                         thickness: 2,
                         glassColor: Colors.blue.withValues(alpha: 0.5),
                       ),
-                      child: LiquidGlassBlendGroup(
-                        child: LiquidGlass.blended(
-                          glassContainsChild: true,
-                          shape: LiquidRoundedSuperellipse(
-                            borderRadius: radius,
-                          ),
-                          child: SizedBox.square(
-                            dimension: 400,
-                            child: Container(
-                              decoration: ShapeDecoration(
-                                color: Colors.red.withValues(alpha: 0.5),
-                                shape: RoundedSuperellipseBorder(
-                                  borderRadius: BorderRadius.circular(radius),
-                                ),
-                              ),
+                      glassContainsChild: true,
+                      shape: LiquidRoundedSuperellipse(
+                        borderRadius: radius,
+                      ),
+                      child: SizedBox.square(
+                        dimension: 400,
+                        child: Container(
+                          decoration: ShapeDecoration(
+                            color: Colors.red.withValues(alpha: 0.5),
+                            shape: RoundedSuperellipseBorder(
+                              borderRadius: BorderRadius.circular(radius),
                             ),
                           ),
                         ),

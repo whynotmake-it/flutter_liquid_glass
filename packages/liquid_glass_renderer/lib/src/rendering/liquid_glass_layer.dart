@@ -8,7 +8,7 @@ import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
@@ -131,7 +131,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             'on Skia.');
       }
 
-      return LiquidGlassScope(
+      return LiquidGlassRenderScope(
         settings: widget.settings,
         useFake: true,
         child: InheritedGeometryRenderLink(
@@ -142,7 +142,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     }
 
     return RepaintBoundary(
-      child: LiquidGlassScope(
+      child: LiquidGlassRenderScope(
         settings: widget.settings,
         child: InheritedGeometryRenderLink(
           link: _link,
