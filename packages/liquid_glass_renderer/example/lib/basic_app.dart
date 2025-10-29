@@ -145,7 +145,7 @@ class BasicApp extends HookWidget {
                           LiquidStretch(
                             child: LiquidGlass.blended(
                               shape: LiquidRoundedSuperellipse(
-                                borderRadius: 20,
+                                borderRadius: 9000,
                               ),
                               child: GlassGlow(
                                 child: GestureDetector(

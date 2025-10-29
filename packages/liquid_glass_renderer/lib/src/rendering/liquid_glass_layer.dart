@@ -35,9 +35,9 @@ import 'package:meta/meta.dart';
 ///       children: [
 ///         LiquidGlass(
 ///           shape: LiquidRoundedSuperellipse(
-///             borderRadius: Radius.circular(10),
+///             borderRadius: 10,
 ///           ),
-///           child: SizedBox.square(
+///           child: const SizedBox.square(
 ///             dimension: 100,
 ///           ),
 ///         ),
@@ -46,17 +46,17 @@ import 'package:meta/meta.dart';
 ///          blend: 20,
 ///          child: Row(
 ///             children: [
-///               LiquidGlass(
-///                 shape: LiquidOval(),
-///                 child: SizedBox.square(
+///               LiquidGlass.blended(
+///                 shape: const LiquidOval(),
+///                 child: const SizedBox.square(
 ///                   dimension: 100,
 ///                 ),
 ///               ),
-///               LiquidGlass(
-///                 shape: LiquidRoundedSuperellipse(
-///                   borderRadius: Radius.circular(20),
+///               LiquidGlass.blended(
+///                 shape: const LiquidRoundedSuperellipse(
+///                   borderRadius: 20,
 ///                 ),
-///                 child: SizedBox.square(
+///                 child: const SizedBox.square(
 ///                   dimension: 100,
 ///                 ),
 ///               ),

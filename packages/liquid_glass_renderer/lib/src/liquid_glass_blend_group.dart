@@ -283,7 +283,8 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
 
         if (existingShape == null) {
           anyShapeChangedInLayer = true;
-        } else if (existingShape.shapeBounds != shapeData.shapeBounds) {
+        } else if (existingShape.shapeBounds != shapeData.shapeBounds ||
+            existingShape.shape != shapeData.shape) {
           anyShapeChangedInLayer = true;
         }
       } catch (e) {

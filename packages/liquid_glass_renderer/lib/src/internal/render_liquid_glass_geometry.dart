@@ -228,19 +228,25 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     }
 
     final snappedBounds = layerBounds.snapToPixels(devicePixelRatio);
+    final matteBounds = Rect.fromLTWH(
+      snappedBounds.left * devicePixelRatio,
+      snappedBounds.top * devicePixelRatio,
+      snappedBounds.width * devicePixelRatio,
+      snappedBounds.height * devicePixelRatio,
+    ).snapToPixels(1);
 
-    final image = _buildGeometryPicture(snappedBounds, shapes);
+    final picture = _buildGeometryPicture(snappedBounds, shapes);
+    final image = picture.toImageSync(
+      matteBounds.width.toInt(),
+      matteBounds.height.toInt(),
+    );
+    picture.dispose();
 
     // Set the new geometry
     final newGeo = geometry = Geometry(
       matte: image,
       bounds: snappedBounds,
-      matteBounds: Rect.fromLTWH(
-        snappedBounds.left * devicePixelRatio,
-        snappedBounds.top * devicePixelRatio,
-        snappedBounds.width * devicePixelRatio,
-        snappedBounds.height * devicePixelRatio,
-      ).snapToPixels(1),
+      matteBounds: matteBounds,
       shapes: shapes,
       path: getPath(shapes),
     );
@@ -305,7 +311,7 @@ class Geometry {
   });
 
   /// The matte image representing the geometry.
-  final Picture matte;
+  final Image matte;
 
   /// The bounds of the geometry in the coordinate space of its
   /// [RenderLiquidGlassGeometry] parent.

@@ -331,7 +331,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           geometry.matteBounds.topLeft.dx,
           geometry.matteBounds.topLeft.dy,
         )
-        ..drawPicture(geometry.matte)
+        ..drawImage(geometry.matte, Offset.zero, Paint())
         ..restore();
     }
 

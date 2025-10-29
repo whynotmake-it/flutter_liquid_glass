@@ -70,10 +70,7 @@ void main() {
         );
         final geo = ro.geometry;
         expect(geo, isNotNull);
-        final matteImage = geo!.matte.toImage(
-          geo.matteBounds.width.ceil(),
-          geo.matteBounds.height.ceil(),
-        );
+        final matteImage = geo!.matte;
 
         await expectLater(
           matteImage,
