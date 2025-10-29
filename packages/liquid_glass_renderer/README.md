@@ -12,6 +12,7 @@
 > 
 > **Before deploying to production:**
 > - **Take a look at the [Limitations](#limitations) and [Performance](#-a-word-on-performance) sections** before even thinking about using this package in production.
+> - **Make sure your App is built on Impeller**. Skia is unsupported for now
 > - **Test thoroughly on your target devices**, especially lower-end and mid-range devices
 > - **Monitor performance metrics** (memory usage, frame rates, power consumption, jank)
 > - **Use `FakeGlass` strategically**: Swap out `LiquidGlass` widgets with `FakeGlass` when they're not highly visible, off-screen, or have low visual impact
@@ -95,9 +96,8 @@ This package provides several widgets to create the glass effect:
 
 As this is a pre-release, there are a few things to keep in mind:
 
-
-- **Memory spike when animating shapes** There is a [bug in Flutter](https://github.com/flutter/flutter/issues/138627) that prevents us from disposing generated textures immediately, leading to temporary memory spikes when animating glass shapes. Read [A word on Performance](#-a-word-on-performance) for tips on minimizing this.
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
+- **Memory spike when animating shapes** There is a [bug in Flutter](https://github.com/flutter/flutter/issues/138627) that prevents us from disposing generated textures immediately, leading to temporary memory spikes when animating glass shapes. Read [A word on Performance](#-a-word-on-performance) for tips on minimizing this.
 - **Maximum of 16 shapes** can be blended in a `LiquidGlassBlendGroup`, and performance will degrade significantly with the more shapes you add in the same group.
 - **Blur** introduces artifacts when blending shapes, and is entirely unsupported for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
 
