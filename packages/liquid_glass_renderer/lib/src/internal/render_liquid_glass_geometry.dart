@@ -215,6 +215,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !anyShapeChangedInLayer &&
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
+      renderLink?.setGeometry(this, geometry!);
       geometryState = LiquidGlassGeometryState.updated;
       return;
     }

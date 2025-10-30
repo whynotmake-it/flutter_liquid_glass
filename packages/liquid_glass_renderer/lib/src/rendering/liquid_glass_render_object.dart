@@ -188,8 +188,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       return;
     }
 
-    if (needsGeometryUpdate || _geometryImage == null) {
+    if (needsGeometryUpdate || _geometryImage == null || link.dirty) {
       _clearGeometryImage();
+      link.dirty = false;
 
       needsGeometryUpdate = false;
 
@@ -335,8 +336,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           -boundsInMatteSpace.left,
           -boundsInMatteSpace.top,
         )
-        ..transform(transform.storage)
         ..transform(matteTransform.storage)
+        ..transform(transform.storage)
         ..scale(1 / devicePixelRatio)
         ..translate(
           geometry.matteBounds.topLeft.dx,
@@ -364,12 +365,15 @@ class GeometryRenderLink with ChangeNotifier {
   UnmodifiableMapView<RenderLiquidGlassGeometry, Geometry> get shapes =>
       UnmodifiableMapView(_shapeGeometries);
 
+  bool dirty = false;
+
   void setGeometry(
     RenderLiquidGlassGeometry renderObject,
     Geometry geometry,
   ) {
+    dirty = true;
     _shapeGeometries[renderObject] = geometry;
-    notifyListeners();
+    //notifyListeners();
   }
 
   void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
