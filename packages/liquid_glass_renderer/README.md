@@ -39,6 +39,7 @@ A Flutter package for creating a stunning "liquid glass" or "frosted glass" effe
 As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
+> **Note:** As of Flutter 3.27 release, Impeller is the default rendering engine for both iOS and Android API 29+. So use the latest versions to avoid the Impeller issue.
 - **Maximum of 64 shapes** can be blended in a `LiquidGlassLayer`, and performance will degrade significantly with the more shapes you add in the same layer.
 - **Blur** introduces artifacts when blending shapes, and is entirely unsupported for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
 
