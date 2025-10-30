@@ -32,7 +32,7 @@ enum LiquidGlassGeometryState {
 
 /// A base class for any render object that represents liquid glass geometry.
 ///
-/// This will paint to the screen normally, but use a [BlendGroupLink] to gather
+/// This will paint to the screen normally, but use a [GlassGroupLink] to gather
 /// shape information and generate a geometry matte using the provided
 /// [geometryShader].
 @internal
@@ -155,7 +155,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   @override
   @mustCallSuper
   void dispose() {
+    _renderLink?.unregisterGeometry(this);
     geometry?.dispose();
+    geometry = null;
     super.dispose();
   }
 

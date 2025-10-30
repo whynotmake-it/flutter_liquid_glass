@@ -11,7 +11,7 @@ import 'package:meta/meta.dart';
 
 /// A widget that groups multiple liquid glass shapes for blending.
 ///
-/// Any [LiquidGlass.blended] widgets inside this group will blend together.
+/// Any [LiquidGlass.grouped] widgets inside this group will blend together.
 ///
 /// This widget will expect a parent [LiquidGlassLayer] to render the liquid
 /// glass effect on.
@@ -35,19 +35,19 @@ class LiquidGlassBlendGroup extends StatefulWidget {
   /// Maximum number of shapes supported per layer.
   static const int maxShapesPerLayer = 16;
 
-  /// Retrieves the [BlendGroupLink] from the nearest ancestor
+  /// Retrieves the [GlassGroupLink] from the nearest ancestor
   /// [LiquidGlassBlendGroup].
   ///
   /// Can be used by child shapes to register themselves for blending.
-  static BlendGroupLink of(BuildContext context) {
+  static GlassGroupLink of(BuildContext context) {
     final inherited = _InheritedLiquidGlassBlendGroup.of(context);
     assert(inherited != null, 'No LiquidGlassBlendGroup found in context');
     return inherited!.link;
   }
 
-  /// Retrieves the [BlendGroupLink] from the nearest ancestor
+  /// Retrieves the [GlassGroupLink] from the nearest ancestor
   /// [LiquidGlassBlendGroup], or null if none is found.
-  static BlendGroupLink? maybeOf(BuildContext context) {
+  static GlassGroupLink? maybeOf(BuildContext context) {
     final inherited = _InheritedLiquidGlassBlendGroup.of(context);
     return inherited?.link;
   }
@@ -57,7 +57,7 @@ class LiquidGlassBlendGroup extends StatefulWidget {
 }
 
 class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
-  late final BlendGroupLink _geometryLink = BlendGroupLink();
+  late final GlassGroupLink _geometryLink = GlassGroupLink();
 
   @override
   void dispose() {
@@ -100,7 +100,7 @@ class _InheritedLiquidGlassBlendGroup extends InheritedWidget {
     required super.child,
   });
 
-  final BlendGroupLink link;
+  final GlassGroupLink link;
 
   static _InheritedLiquidGlassBlendGroup? of(BuildContext context) {
     return context
@@ -127,7 +127,7 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
   final double blend;
   final FragmentShader shader;
   final GeometryRenderLink renderLink;
-  final BlendGroupLink link;
+  final GlassGroupLink link;
   final LiquidGlassSettings settings;
 
   @override
@@ -164,19 +164,19 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     required super.devicePixelRatio,
     required super.geometryShader,
     required super.settings,
-    required BlendGroupLink link,
+    required GlassGroupLink link,
     required double blend,
   })  : _link = link,
         _blend = blend {
     link.addListener(_onLinkUpdate);
   }
 
-  BlendGroupLink _link;
+  GlassGroupLink _link;
 
   /// The link that provides shape information to this geometry.
-  BlendGroupLink get link => _link;
+  GlassGroupLink get link => _link;
 
-  set link(BlendGroupLink value) {
+  set link(GlassGroupLink value) {
     if (_link == value) return;
     _link.removeListener(_onLinkUpdate);
     _link = value;
@@ -362,9 +362,9 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
 /// [LiquidGlassBlendGroup] for efficient communication of position, size, and
 /// transform changes.
 @internal
-class BlendGroupLink with ChangeNotifier {
-  /// Creates a new [BlendGroupLink].
-  BlendGroupLink();
+class GlassGroupLink with ChangeNotifier {
+  /// Creates a new [GlassGroupLink].
+  GlassGroupLink();
 
   /// Information about a shape registered with this link.
   final Map<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>

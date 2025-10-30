@@ -15,7 +15,7 @@ import 'package:meta/meta.dart';
 ///
 /// This can either create a single shape, or be blended together with other
 /// shapes in a parent [LiquidGlassBlendGroup] by using the
-/// [LiquidGlass.blended] constructor.
+/// [LiquidGlass.grouped] constructor.
 ///
 /// If you only need a single shape with its own settings, you can also use the
 /// [LiquidGlass.withOwnLayer] constructor, which will create its own
@@ -42,7 +42,7 @@ class LiquidGlass extends StatelessWidget {
   /// This will expect a parent [LiquidGlassBlendGroup] to be present in the
   /// widget tree, as well as a parent [LiquidGlassLayer] above that, where the
   /// result will be rendered.
-  const LiquidGlass.blended({
+  const LiquidGlass.grouped({
     required this.child,
     required this.shape,
     super.key,
@@ -96,7 +96,7 @@ class LiquidGlass extends StatelessWidget {
   final Clip clipBehavior;
 
   /// The link to this glass's blend group if it is part of one.
-  final BlendGroupLink? blendGroupLink;
+  final GlassGroupLink? blendGroupLink;
 
   /// The settings for this glass if it is supposed to create its own layer.
   final (LiquidGlassSettings settings, bool fake)? ownLayerConfig;
@@ -156,7 +156,7 @@ class LiquidGlass extends StatelessWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, [BlendGroupLink? blendGroupLink]) {
+  Widget _buildContent(BuildContext context, [GlassGroupLink? blendGroupLink]) {
     final settings = LiquidGlassSettings.of(context);
 
     return _RawLiquidGlass(
@@ -189,7 +189,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 
   final bool glassContainsChild;
 
-  final BlendGroupLink? blendGroupLink;
+  final GlassGroupLink? blendGroupLink;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -218,7 +218,7 @@ class RenderLiquidGlass extends RenderProxyBox
   RenderLiquidGlass({
     required LiquidShape shape,
     required bool glassContainsChild,
-    required BlendGroupLink? blendGroupLink,
+    required GlassGroupLink? blendGroupLink,
   })  : _shape = shape,
         _glassContainsChild = glassContainsChild,
         _blendGroupLink = blendGroupLink;
@@ -240,8 +240,8 @@ class RenderLiquidGlass extends RenderProxyBox
     _updateBlendGroupLink();
   }
 
-  BlendGroupLink? _blendGroupLink;
-  set blendGroupLink(BlendGroupLink? value) {
+  GlassGroupLink? _blendGroupLink;
+  set blendGroupLink(GlassGroupLink? value) {
     if (_blendGroupLink == value) return;
     _unregisterFromParentLayer();
     _blendGroupLink = value;

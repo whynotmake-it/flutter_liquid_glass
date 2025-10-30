@@ -86,7 +86,7 @@ This package provides several widgets to create the glass effect:
 | ------------------------- | ------------------------------------------------------------------------------------------ |
 | `LiquidGlassLayer`        | Container for all liquid glass effects. Required parent for `LiquidGlass` widgets.         |
 | `LiquidGlass`             | Creates a single glass shape. Must be inside a `LiquidGlassLayer`.                         |
-| `LiquidGlassBlendGroup`   | Groups multiple `LiquidGlass.blended` shapes to blend them together seamlessly.            |
+| `LiquidGlassBlendGroup`   | Groups multiple `LiquidGlass.grouped` shapes to blend them together seamlessly.            |
 | `FakeGlass`               | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
 | `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
 | `LiquidStretch`           | Add interactive squash and stretch effects to glass widgets.                               |
@@ -208,7 +208,7 @@ All shapes take a simple `double` for `borderRadius` instead of `BorderRasdius` 
 
 ![Blending Demo](doc/blended.png)
 
-To blend multiple glass shapes together seamlessly, wrap them in a `LiquidGlassBlendGroup` inside a `LiquidGlassLayer`. Use `LiquidGlass.blended()` for shapes that should blend together.
+To blend multiple glass shapes together seamlessly, wrap them in a `LiquidGlassBlendGroup` inside a `LiquidGlassLayer`. Use `LiquidGlass.grouped()` for shapes that should blend together.
 
 ```dart
 LiquidGlassLayer(
@@ -221,14 +221,14 @@ LiquidGlassLayer(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        LiquidGlass.blended(
+        LiquidGlass.grouped(
           shape: LiquidRoundedSuperellipse(
             borderRadius: 40,
           ),
           child: const SizedBox.square(dimension: 100),
         ),
         const SizedBox(height: 50),
-        LiquidGlass.blended(
+        LiquidGlass.grouped(
           shape: LiquidRoundedSuperellipse(
             borderRadius: 40,
           ),
@@ -240,7 +240,7 @@ LiquidGlassLayer(
 )
 ```
 
-You can have multiple `LiquidGlass` widgets in a `LiquidGlassLayer` without blending by using the default `LiquidGlass()` constructor (not `.blended()`).
+You can have multiple `LiquidGlass` widgets in a `LiquidGlassLayer` without blending by using the default `LiquidGlass()` constructor (not `.grouped()`).
 
 ## Customization
 
@@ -259,7 +259,7 @@ LiquidGlassLayer(
   ),
   child: LiquidGlassBlendGroup(
     blend: 40, // blend is now on LiquidGlassBlendGroup, not settings
-    child: // ... your LiquidGlass.blended widgets
+    child: // ... your LiquidGlass.grouped widgets
   ),
 )
 ```

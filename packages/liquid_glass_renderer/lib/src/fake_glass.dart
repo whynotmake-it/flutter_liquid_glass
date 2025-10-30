@@ -301,7 +301,7 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     paint
       ..strokeWidth = ui.lerpDouble(.5, 1.5, lightIntensity)!
-      ..color = color.withValues(alpha: color.a * 0.5)
+      ..color = color.withValues(alpha: color.a * 0.8)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
   }

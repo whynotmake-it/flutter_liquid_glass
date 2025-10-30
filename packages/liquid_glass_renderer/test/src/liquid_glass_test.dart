@@ -89,7 +89,7 @@ void main() {
                         glassColor: Colors.blue.withValues(alpha: 0.5),
                       ),
                       child: LiquidGlassBlendGroup(
-                        child: LiquidGlass.blended(
+                        child: LiquidGlass.grouped(
                           glassContainsChild: true,
                           shape: LiquidRoundedSuperellipse(
                             borderRadius: radius,
@@ -137,17 +137,17 @@ void main() {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          LiquidGlass.blended(
+                          LiquidGlass.grouped(
                             shape: LiquidOval(),
                             child: SizedBox.square(dimension: 100),
                           ),
-                          LiquidGlass.blended(
+                          LiquidGlass.grouped(
                             shape: LiquidRoundedRectangle(
                               borderRadius: 20,
                             ),
                             child: SizedBox.square(dimension: 100),
                           ),
-                          LiquidGlass.blended(
+                          LiquidGlass.grouped(
                             shape: LiquidRoundedSuperellipse(
                               borderRadius: 20,
                             ),

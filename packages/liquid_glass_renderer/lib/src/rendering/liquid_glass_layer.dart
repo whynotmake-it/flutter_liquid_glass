@@ -46,13 +46,13 @@ import 'package:meta/meta.dart';
 ///          blend: 20,
 ///          child: Row(
 ///             children: [
-///               LiquidGlass.blended(
+///               LiquidGlass.grouped(
 ///                 shape: const LiquidOval(),
 ///                 child: const SizedBox.square(
 ///                   dimension: 100,
 ///                 ),
 ///               ),
-///               LiquidGlass.blended(
+///               LiquidGlass.grouped(
 ///                 shape: const LiquidRoundedSuperellipse(
 ///                   borderRadius: 20,
 ///                 ),

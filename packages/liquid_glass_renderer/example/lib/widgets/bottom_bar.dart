@@ -124,7 +124,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                   tabCount: widget.tabs.length,
                   indicatorColor: widget.indicatorColor,
                   onTabChanged: widget.onTabSelected,
-                  child: LiquidGlass.blended(
+                  child: LiquidGlass.grouped(
                     clipBehavior: Clip.none,
                     shape: const LiquidRoundedSuperellipse(borderRadius: 32),
                     child: Container(
@@ -307,7 +307,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
         child: Semantics(
           button: true,
           label: widget.config.label,
-          child: LiquidGlass.blended(
+          child: LiquidGlass.grouped(
             shape: const LiquidOval(),
             child: GlassGlow(
               child: Container(

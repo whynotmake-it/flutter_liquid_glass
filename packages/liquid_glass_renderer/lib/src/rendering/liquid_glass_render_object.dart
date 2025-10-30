@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'dart:ui';
@@ -138,10 +139,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
     logger.finer('$hashCode Painting liquid glass with '
-        '${link.shapeGeometries.length} shapes.');
-    if (link.shapeGeometries.isEmpty) {
-      _geometryImage?.dispose();
-      _geometryImage = null;
+        '${link._shapeGeometries.length} shapes.');
+    if (link._shapeGeometries.isEmpty) {
+      _clearGeometryImage();
 
       super.paint(context, offset);
       return;
@@ -153,9 +153,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     Rect? boundingBox;
 
     for (final MapEntry(key: geometryRo, value: geometry)
-        in link.shapeGeometries.entries) {
+        in link.shapes.entries) {
       final transform = geometryRo.getTransformTo(this);
-
       shapesWithGeometry.add((geometryRo, geometry, transform));
 
       final geoBounds = MatrixUtils.transformRect(
@@ -170,6 +169,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     _paintBounds = boundingBox ?? ui.Rect.zero;
 
     if (settings.effectiveThickness <= 0) {
+      _clearGeometryImage();
       paintShapeContents(
         context,
         offset,
@@ -182,14 +182,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         shapesWithGeometry,
         insideGlass: false,
       );
-      _geometryImage?.dispose();
-      _geometryImage = null;
       super.paint(context, offset);
       return;
     }
 
     if (needsGeometryUpdate || _geometryImage == null) {
-      _geometryImage?.dispose();
+      _clearGeometryImage();
+
       needsGeometryUpdate = false;
 
       final (image, matteBounds) = _buildGeometryImage(
@@ -234,6 +233,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     }
 
     super.paint(context, offset);
+  }
+
+  void _clearGeometryImage() {
+    _geometryImage?.dispose();
+    _geometryImage = null;
   }
 
   /// Subclasses implement the actual glass rendering
@@ -285,7 +289,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @mustCallSuper
   void dispose() {
-    _geometryImage?.dispose();
+    _clearGeometryImage();
     super.dispose();
   }
 
@@ -297,7 +301,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   void _onLinkNotification() {
     needsGeometryUpdate = true;
     logger.finer('$hashCode Marking layer for repaint due to link change with '
-        '${link.shapeGeometries.length} shapes.');
+        '${link._shapeGeometries.length} shapes.');
     markNeedsPaint();
   }
 
@@ -316,6 +320,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     final recorder = ui.PictureRecorder();
 
     final canvas = Canvas(recorder);
+
     for (final (_, geometry, transform) in geometries) {
       canvas
         ..save()
@@ -340,8 +345,48 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       size.width.ceil(),
       size.height.ceil(),
     );
+
     picture.dispose();
     return (image, boundsInMatteSpace);
+  }
+}
+
+@internal
+class GeometryRenderLink with ChangeNotifier {
+  final Map<RenderLiquidGlassGeometry, Geometry> _shapeGeometries = {};
+
+  UnmodifiableMapView<RenderLiquidGlassGeometry, Geometry> get shapes =>
+      UnmodifiableMapView(_shapeGeometries);
+
+  void setGeometry(
+    RenderLiquidGlassGeometry renderObject,
+    Geometry geometry,
+  ) {
+    _shapeGeometries[renderObject] = geometry;
+    notifyListeners();
+  }
+
+  void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
+    _shapeGeometries.remove(renderObject);
+    notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (super.hasListeners) super.notifyListeners();
+      });
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _shapeGeometries.clear();
+    super.dispose();
   }
 }
 
@@ -364,35 +409,5 @@ class InheritedGeometryRenderLink extends InheritedWidget {
   @override
   bool updateShouldNotify(covariant InheritedGeometryRenderLink oldWidget) {
     return oldWidget.link != link;
-  }
-}
-
-@internal
-class GeometryRenderLink with ChangeNotifier {
-  Map<RenderLiquidGlassGeometry, Geometry> shapeGeometries = {};
-
-  void setGeometry(
-    RenderLiquidGlassGeometry renderObject,
-    Geometry geometry,
-  ) {
-    shapeGeometries[renderObject] = geometry;
-    notifyListeners();
-  }
-
-  void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
-    shapeGeometries.remove(renderObject);
-    notifyListeners();
-  }
-
-  @override
-  void notifyListeners() {
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (super.hasListeners) super.notifyListeners();
-      });
-      return;
-    }
-    super.notifyListeners();
   }
 }

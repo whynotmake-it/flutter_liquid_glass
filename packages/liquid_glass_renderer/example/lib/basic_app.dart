@@ -96,7 +96,7 @@ class BasicApp extends HookWidget {
                             spacing: 16,
                             children: [
                               LiquidStretch(
-                                child: LiquidGlass.blended(
+                                child: LiquidGlass.grouped(
                                   shape: LiquidRoundedSuperellipse(
                                     borderRadius: 20,
                                   ),
@@ -113,7 +113,7 @@ class BasicApp extends HookWidget {
                                 ),
                               ),
                               LiquidStretch(
-                                child: LiquidGlass.blended(
+                                child: LiquidGlass.grouped(
                                   shape: LiquidRoundedSuperellipse(
                                     borderRadius: 20,
                                   ),
@@ -135,7 +135,7 @@ class BasicApp extends HookWidget {
                             ],
                           ),
                           LiquidStretch(
-                            child: LiquidGlass.blended(
+                            child: LiquidGlass.grouped(
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: 9000,
                               ),
