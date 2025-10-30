@@ -142,7 +142,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     logger.finer('$hashCode Painting liquid glass with '
         '${link._shapeGeometries.length} shapes.');
-    if (link._shapeGeometries.isEmpty) {
+    if (link.shapes.entries.every((e) => e.value == null)) {
       _clearGeometryImage();
 
       super.paint(context, offset);
@@ -156,6 +156,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     for (final MapEntry(key: geometryRo, value: geometry)
         in link.shapes.entries) {
+      if (geometry == null) continue;
       final transform = geometryRo.getTransformTo(this);
       shapesWithGeometry.add((geometryRo, geometry, transform));
 
@@ -360,12 +361,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
 @internal
 class GeometryRenderLink with ChangeNotifier {
-  final Map<RenderLiquidGlassGeometry, Geometry> _shapeGeometries = {};
+  final Map<RenderLiquidGlassGeometry, Geometry?> _shapeGeometries = {};
 
-  UnmodifiableMapView<RenderLiquidGlassGeometry, Geometry> get shapes =>
+  UnmodifiableMapView<RenderLiquidGlassGeometry, Geometry?> get shapes =>
       UnmodifiableMapView(_shapeGeometries);
 
   bool dirty = false;
+
+  void registerGeometry(
+    RenderLiquidGlassGeometry renderObject,
+  ) {
+    dirty = true;
+    _shapeGeometries[renderObject] = null;
+  }
 
   void setGeometry(
     RenderLiquidGlassGeometry renderObject,

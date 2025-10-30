@@ -96,6 +96,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     if (_renderLink == value) return;
     _renderLink?.unregisterGeometry(this);
     _renderLink = value;
+    _renderLink?.registerGeometry(this);
     if (geometry case final geometry?) {
       value?.setGeometry(this, geometry);
     }
@@ -132,6 +133,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   @override
   @mustCallSuper
   void attach(PipelineOwner owner) {
+    _renderLink?.registerGeometry(this);
+
     if (geometry case final geometry?) {
       _renderLink?.setGeometry(this, geometry);
     }
