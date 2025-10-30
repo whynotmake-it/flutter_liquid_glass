@@ -34,7 +34,8 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     super.key,
-  })  : blendGroupLink = null,
+  })  : grouped = false,
+        blendGroupLink = null,
         ownLayerConfig = null;
 
   /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
@@ -49,7 +50,8 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
-  }) : ownLayerConfig = null;
+  })  : ownLayerConfig = null,
+        grouped = true;
 
   /// Creates a new [LiquidGlass] that creates its own [LiquidGlassLayer].
   ///
@@ -67,7 +69,8 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
-  }) : ownLayerConfig = (settings, fake);
+  })  : ownLayerConfig = (settings, fake),
+        grouped = false;
 
   /// The child of this widget.
   ///
@@ -94,6 +97,9 @@ class LiquidGlass extends StatelessWidget {
   ///
   /// Defaults to [Clip.none], so [child] will not be clipped.
   final Clip clipBehavior;
+
+  /// Whether this glass is part of a blend group.
+  final bool grouped;
 
   /// The link to this glass's blend group if it is part of one.
   final GlassGroupLink? blendGroupLink;
@@ -133,8 +139,9 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    final blendGroupLink =
-        this.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context);
+    final blendGroupLink = grouped
+        ? this.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context)
+        : null;
 
     if (blendGroupLink == null) {
       // For now we create our own blend group until we support non-blended

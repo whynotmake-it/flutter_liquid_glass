@@ -97,9 +97,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     _renderLink?.unregisterGeometry(this);
     _renderLink = value;
     _renderLink?.registerGeometry(this);
-    if (geometry case final geometry?) {
-      value?.setGeometry(this, geometry);
-    }
   }
 
   /// The current state of the geometry.
@@ -108,6 +105,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   LiquidGlassGeometryState geometryState = LiquidGlassGeometryState.needsUpdate;
 
   /// The current geometry matte image.
+  @visibleForTesting
+  @protected
   Geometry? geometry;
 
   /// Marks the geometry as needing an update.
@@ -134,10 +133,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   @mustCallSuper
   void attach(PipelineOwner owner) {
     _renderLink?.registerGeometry(this);
-
-    if (geometry case final geometry?) {
-      _renderLink?.setGeometry(this, geometry);
-    }
     super.attach(owner);
   }
 
@@ -146,13 +141,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   void detach() {
     _renderLink?.unregisterGeometry(this);
     super.detach();
-  }
-
-  @override
-  @mustCallSuper
-  void paint(PaintingContext context, Offset offset) {
-    _maybeRebuildGeometry();
-    super.paint(context, offset);
   }
 
   @override
@@ -207,9 +195,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   }
 
   /// Should be called from within [paint] to maybe rebuild the [geometry].
-  void _maybeRebuildGeometry() {
+  Geometry? maybeRebuildGeometry() {
     if (geometryState == LiquidGlassGeometryState.updated && geometry != null) {
-      return;
+      return geometry!;
     }
 
     final (layerBounds, shapes, anyShapeChangedInLayer) = gatherShapeData();
@@ -218,9 +206,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !anyShapeChangedInLayer &&
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
-      renderLink?.setGeometry(this, geometry!);
+      renderLink?.markRebuilt(this);
       geometryState = LiquidGlassGeometryState.updated;
-      return;
+      return geometry!;
     }
 
     logger.finer('$hashCode Rebuilding geometry');
@@ -230,7 +218,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     geometryState = LiquidGlassGeometryState.updated;
 
     if (shapes.isEmpty) {
-      return;
+      return null;
     }
 
     final snappedBounds = layerBounds.snapToPixels(devicePixelRatio);
@@ -258,7 +246,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     );
 
     // We have updated the geometry.
-    _renderLink?.setGeometry(this, newGeo);
+    _renderLink?.markRebuilt(this);
+    return newGeo;
   }
 
   Picture _buildGeometryPicture(

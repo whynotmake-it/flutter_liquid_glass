@@ -104,50 +104,53 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
     return LiquidGlassLayer(
       settings: glassSettings,
       fake: widget.fake,
-      child: Padding(
-        padding: EdgeInsets.only(
-          right: widget.horizontalPadding,
-          left: widget.horizontalPadding,
-          bottom: widget.bottomPadding,
-          top: widget.bottomPadding,
-        ),
-        child: Row(
-          spacing: widget.spacing,
-          children: [
-            Expanded(
-              child: _TabIndicator(
-                fake: widget.fake,
-                visible: widget.showIndicator,
-                tabIndex: widget.selectedIndex,
-                tabCount: widget.tabs.length,
-                indicatorColor: widget.indicatorColor,
-                onTabChanged: widget.onTabSelected,
-                child: LiquidGlass(
-                  clipBehavior: Clip.none,
-                  shape: const LiquidRoundedSuperellipse(borderRadius: 32),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    height: widget.barHeight,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        for (var i = 0; i < widget.tabs.length; i++)
-                          Expanded(
-                            child: _BottomBarTab(
-                              tab: widget.tabs[i],
-                              selected: widget.selectedIndex == i,
-                              onTap: () => widget.onTabSelected(i),
+      child: LiquidGlassBlendGroup(
+        blend: 10,
+        child: Padding(
+          padding: EdgeInsets.only(
+            right: widget.horizontalPadding,
+            left: widget.horizontalPadding,
+            bottom: widget.bottomPadding,
+            top: widget.bottomPadding,
+          ),
+          child: Row(
+            spacing: widget.spacing,
+            children: [
+              Expanded(
+                child: _TabIndicator(
+                  fake: widget.fake,
+                  visible: widget.showIndicator,
+                  tabIndex: widget.selectedIndex,
+                  tabCount: widget.tabs.length,
+                  indicatorColor: widget.indicatorColor,
+                  onTabChanged: widget.onTabSelected,
+                  child: LiquidGlass.grouped(
+                    clipBehavior: Clip.none,
+                    shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      height: widget.barHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < widget.tabs.length; i++)
+                            Expanded(
+                              child: _BottomBarTab(
+                                tab: widget.tabs[i],
+                                selected: widget.selectedIndex == i,
+                                onTap: () => widget.onTabSelected(i),
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            if (widget.extraButton != null)
-              _ExtraButton(config: widget.extraButton!, fake: widget.fake),
-          ],
+              if (widget.extraButton != null)
+                _ExtraButton(config: widget.extraButton!, fake: widget.fake),
+            ],
+          ),
         ),
       ),
     );
@@ -304,7 +307,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
         child: Semantics(
           button: true,
           label: widget.config.label,
-          child: LiquidGlass(
+          child: LiquidGlass.grouped(
             shape: const LiquidOval(),
             child: GlassGlow(
               child: Container(
