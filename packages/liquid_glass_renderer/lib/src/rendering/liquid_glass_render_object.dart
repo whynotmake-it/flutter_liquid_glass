@@ -135,11 +135,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
-    logger.finer('$hashCode Painting liquid glass with '
+    logger.finest('$hashCode Painting liquid glass with '
         '${link._shapeGeometries.length} shapes.');
 
     final shapesWithGeometry =
-        <(RenderLiquidGlassGeometry, Geometry, Matrix4)>[];
+        <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
 
     Rect? boundingBox;
 
@@ -248,7 +248,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
-    List<(RenderLiquidGlassGeometry, Geometry, Matrix4)> shapes,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
   );
 
@@ -256,7 +256,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   void paintShapeContents(
     PaintingContext context,
     Offset offset,
-    List<(RenderLiquidGlassGeometry, Geometry, Matrix4)> shapes, {
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes, {
     required bool insideGlass,
   }) {
     for (final (geometryRenderObject, _, _) in shapes) {
@@ -306,7 +306,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   bool needsGeometryUpdate = true;
 
   (ui.Image, Rect) _buildGeometryImage(
-    List<(RenderLiquidGlassGeometry, Geometry, Matrix4)> geometries,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
     Rect bounds,
   ) {
     final boundsInMatteSpace = MatrixUtils.transformRect(
@@ -315,8 +315,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     ).snapToPixels(devicePixelRatio);
 
     final size = boundsInMatteSpace.size * devicePixelRatio;
-    logger.fine('$hashCode Building geometry image with '
-        '${geometries.length} shapes at size ${size.width}x${size.height}');
+
+    final buffer = StringBuffer('$hashCode Built geometry image with '
+        '${geometries.length} shapes at size ${size.width}x${size.height}:\n');
+
     final recorder = ui.PictureRecorder();
 
     final canvas = Canvas(recorder);
@@ -335,9 +337,22 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         ..translate(
           geometry.matteBounds.topLeft.dx,
           geometry.matteBounds.topLeft.dy,
-        )
-        ..drawImage(geometry.matte, Offset.zero, Paint())
-        ..restore();
+        );
+
+      switch (geometry) {
+        case UnrenderedGeometryCache(matte: final picture):
+          buffer.writeln(
+            '- Unrendered @ ${geometry.bounds}',
+          );
+          canvas.drawPicture(picture);
+        case RenderedGeometryCache(matte: final image):
+          buffer.writeln(
+            '- Rendered @ ${geometry.bounds}',
+          );
+          canvas.drawImage(image, Offset.zero, Paint());
+      }
+
+      canvas.restore();
     }
 
     final picture = recorder.endRecording();
@@ -346,6 +361,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       size.height.ceil(),
     );
 
+    logger.fine(buffer.toString());
     picture.dispose();
     return (image, boundsInMatteSpace);
   }

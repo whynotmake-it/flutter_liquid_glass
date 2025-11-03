@@ -67,7 +67,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     if (_settings == value) return;
 
     if (value.requiresGeometryRebuild(_settings)) {
-      logger.finer('$hashCode geometry rebuild due to settings change.');
+      logger.finer('$hashCode rebuild ');
       markGeometryNeedsUpdate(force: true);
     }
 
@@ -107,7 +107,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   /// The current geometry matte image.
   @visibleForTesting
   @protected
-  Geometry? geometry;
+  GeometryCache? geometry;
 
   /// Marks the geometry as needing an update.
   ///
@@ -195,9 +195,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   }
 
   /// Should be called from within [paint] to maybe rebuild the [geometry].
-  Geometry? maybeRebuildGeometry() {
+  GeometryCache? maybeRebuildGeometry() {
     if (geometryState == LiquidGlassGeometryState.updated && geometry != null) {
-      return geometry!;
+      return geometry;
     }
 
     final (layerBounds, shapes, anyShapeChangedInLayer) = gatherShapeData();
@@ -207,14 +207,17 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
       renderLink?.markRebuilt(this);
+
+      // Only render once we are done building
+      geometry = geometry!.render();
       geometryState = LiquidGlassGeometryState.updated;
-      return geometry!;
+      return geometry;
     }
 
     logger.finer('$hashCode Rebuilding geometry');
 
     geometry?.dispose();
-    geometry = null;
+    this.geometry = null;
     geometryState = LiquidGlassGeometryState.updated;
 
     if (shapes.isEmpty) {
@@ -229,16 +232,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
       snappedBounds.height * devicePixelRatio,
     ).snapToPixels(1);
 
-    final picture = _buildGeometryPicture(snappedBounds, shapes);
-    final image = picture.toImageSync(
-      matteBounds.width.toInt(),
-      matteBounds.height.toInt(),
-    );
-    picture.dispose();
-
     // Set the new geometry
-    final newGeo = geometry = Geometry(
-      matte: image,
+    final newGeo = geometry = UnrenderedGeometryCache(
+      matte: _buildGeometryPicture(snappedBounds, shapes),
       bounds: snappedBounds,
       matteBounds: matteBounds,
       shapes: shapes,
@@ -292,21 +288,15 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   }
 }
 
-/// Represents a current snapshot of the geometry used for liquid glass
-/// rendering.
 @immutable
 @internal
-class Geometry {
-  const Geometry({
-    required this.matte,
+sealed class GeometryCache {
+  const GeometryCache({
     required this.matteBounds,
     required this.bounds,
     required this.shapes,
     required this.path,
   });
-
-  /// The matte image representing the geometry.
-  final Image matte;
 
   /// The bounds of the geometry in the coordinate space of its
   /// [RenderLiquidGlassGeometry] parent.
@@ -319,8 +309,101 @@ class Geometry {
 
   final Path path;
 
+  /// Ensure that this geometry is rendered and potentially dispose this
+  /// instance.
+  ///
+  /// Using this object isn't safe after calling this method.
+  /// Make sure to only use the returned object after calling this.
+  ///
+  /// If this is a [UnrenderedGeometryCache], this will produce a
+  /// [RenderedGeometryCache].
+  ///
+  /// If this is already rendered, it will return itself.
+  RenderedGeometryCache render();
+
+  Future<RenderedGeometryCache> renderAsync();
+
+  void dispose();
+}
+
+/// Represents a current snapshot of the geometry used for liquid glass
+/// rendering.
+@immutable
+@internal
+class UnrenderedGeometryCache extends GeometryCache {
+  const UnrenderedGeometryCache({
+    required this.matte,
+    required super.matteBounds,
+    required super.bounds,
+    required super.shapes,
+    required super.path,
+  });
+
+  /// The matte image representing the geometry.
+  final Picture matte;
+
+  @override
+  Future<RenderedGeometryCache> renderAsync() async {
+    final image = await matte.toImage(
+      matteBounds.width.ceil(),
+      matteBounds.height.ceil(),
+    );
+    return RenderedGeometryCache(
+      matte: image,
+      matteBounds: matteBounds,
+      bounds: bounds,
+      shapes: shapes,
+      path: path,
+    );
+  }
+
+  @override
+  RenderedGeometryCache render() {
+    final image = matte.toImageSync(
+      matteBounds.width.ceil(),
+      matteBounds.height.ceil(),
+    );
+    dispose();
+    return RenderedGeometryCache(
+      matte: image,
+      matteBounds: matteBounds,
+      bounds: bounds,
+      shapes: shapes,
+      path: path,
+    );
+  }
+
   /// Disposes of the resources used by the geometry.
-  @mustCallSuper
+  @override
+  void dispose() {
+    matte.dispose();
+  }
+}
+
+/// Represents a current snapshot of the geometry used for liquid glass
+/// rendering.
+@immutable
+@internal
+class RenderedGeometryCache extends GeometryCache {
+  const RenderedGeometryCache({
+    required this.matte,
+    required super.matteBounds,
+    required super.bounds,
+    required super.shapes,
+    required super.path,
+  });
+
+  /// The matte image representing the geometry.
+  final Image matte;
+
+  @override
+  RenderedGeometryCache render() => this;
+
+  @override
+  Future<RenderedGeometryCache> renderAsync() => Future.value(this);
+
+  /// Disposes of the resources used by the geometry.
+  @override
   void dispose() {
     matte.dispose();
   }

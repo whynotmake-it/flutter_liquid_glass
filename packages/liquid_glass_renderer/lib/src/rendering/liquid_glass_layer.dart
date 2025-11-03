@@ -239,7 +239,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
-    List<(RenderLiquidGlassGeometry, Geometry, Matrix4)> shapes,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
   ) {
     if (!attached) return;
