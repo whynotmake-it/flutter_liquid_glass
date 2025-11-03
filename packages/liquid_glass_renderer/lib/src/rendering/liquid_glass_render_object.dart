@@ -35,7 +35,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     _updateShaderSettings();
   }
 
-  static final logger = Logger(LgrLogNames.object);
+  static final logger = Logger(LgrLogNames.render);
 
   final FragmentShader renderShader;
 
@@ -342,12 +342,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       switch (geometry) {
         case UnrenderedGeometryCache(matte: final picture):
           buffer.writeln(
-            '- Unrendered @ ${geometry.bounds}',
+            '\t- Unrendered @ ${geometry.bounds}',
           );
           canvas.drawPicture(picture);
         case RenderedGeometryCache(matte: final image):
           buffer.writeln(
-            '- Rendered @ ${geometry.bounds}',
+            '\t- Rendered @ ${geometry.bounds}',
           );
           canvas.drawImage(image, Offset.zero, Paint());
       }

@@ -279,8 +279,8 @@ class SettingsSheet extends HookWidget {
                               refractiveIndex: value,
                             );
                           },
-                          min: 0,
-                          max: 3,
+                          min: 1,
+                          max: 2,
                         ),
                       ],
                     ),

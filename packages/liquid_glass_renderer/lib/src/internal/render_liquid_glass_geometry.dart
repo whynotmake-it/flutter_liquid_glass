@@ -7,8 +7,8 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
+import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
-import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 
 /// The state of liquid glass geometry, used to determine if it needs to be
@@ -51,7 +51,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   }
 
   /// The logger for liquid glass geometry.
-  final Logger logger = Logger('lgr.LiquidGlassGeometry');
+  final Logger logger = Logger(LgrLogNames.geometry);
 
   /// The shader that generates the geometry matte.
   final FragmentShader geometryShader;
@@ -217,7 +217,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     logger.finer('$hashCode Rebuilding geometry');
 
     geometry?.dispose();
-    this.geometry = null;
+    geometry = null;
     geometryState = LiquidGlassGeometryState.updated;
 
     if (shapes.isEmpty) {
