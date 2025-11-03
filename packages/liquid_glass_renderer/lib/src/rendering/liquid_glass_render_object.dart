@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -13,10 +12,6 @@ import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:meta/meta.dart';
-
-@internal
-@pragma('vm:platform-const-if', !kDebugMode)
-bool debugPaintLiquidGlassGeometry = false;
 
 /// A render object that can assemble [RenderLiquidGlassGeometry] shapes and
 /// render them to the screen with the liquid glass effect.
