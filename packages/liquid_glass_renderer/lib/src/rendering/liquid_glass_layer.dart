@@ -113,9 +113,17 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   late final logger = Logger(LgrLogNames.layer);
 
+  late final iridescenceController = AnimationController(
+    vsync: this,
+    lowerBound: 0,
+    upperBound: 20,
+    duration: const Duration(seconds: 5),
+  )..repeat(reverse: true);
+
   @override
   void dispose() {
     _link.dispose();
+    iridescenceController.dispose();
     super.dispose();
   }
 
@@ -146,18 +154,24 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         child: InheritedGeometryRenderLink(
           link: _link,
-          child: ShaderBuilder(
-            assetKey: ShaderKeys.liquidGlassRender,
-            (context, shader, child) => _RawShapes(
-              renderShader: shader,
-              backdropKey: widget.useBackdropGroup
-                  ? BackdropGroup.of(context)?.backdropKey
-                  : null,
-              settings: widget.settings,
-              link: _link,
-              child: child!,
-            ),
-            child: widget.child,
+          child: ValueListenableBuilder(
+            valueListenable: iridescenceController,
+            builder: (context, value, child) {
+              return ShaderBuilder(
+                assetKey: ShaderKeys.liquidGlassRenderIridescent,
+                (context, shader, child) => _RawShapes(
+                  renderShader: shader,
+                  backdropKey: widget.useBackdropGroup
+                      ? BackdropGroup.of(context)?.backdropKey
+                      : null,
+                  settings: widget.settings,
+                  link: _link,
+                  time: value,
+                  child: child!,
+                ),
+                child: widget.child,
+              );
+            },
           ),
         ),
       ),
@@ -172,12 +186,14 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.settings,
     required Widget super.child,
     required this.link,
+    required this.time,
   });
 
   final FragmentShader renderShader;
   final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GeometryRenderLink link;
+  final double time;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -199,7 +215,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..link = link
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
-      ..backdropKey = backdropKey;
+      ..backdropKey = backdropKey
+      ..time = time;
   }
 }
 
@@ -228,6 +245,21 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   Matrix4 get matteTransform => getTransformTo(null);
+
+  double _time = 0;
+
+  set time(double value) {
+    if (_time == value) return;
+    _time = value;
+    renderShader.setFloat(18, _time);
+    markNeedsPaint();
+  }
+
+  @override
+  void updateShaderSettings() {
+    super.updateShaderSettings();
+    renderShader.setFloat(19, 1);
+  }
 
   @override
   void onTransformChanged() {

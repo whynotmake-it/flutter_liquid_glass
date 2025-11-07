@@ -27,7 +27,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         _devicePixelRatio = devicePixelRatio,
         _backdropKey = backdropKey,
         _link = link {
-    _updateShaderSettings();
+    updateShaderSettings();
   }
 
   static final logger = Logger(LgrLogNames.render);
@@ -52,7 +52,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     _settings = value;
-    _updateShaderSettings();
+    updateShaderSettings();
     markNeedsPaint();
   }
 
@@ -99,7 +99,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     super.layout(constraints, parentUsesSize: parentUsesSize);
   }
 
-  void _updateShaderSettings() {
+  @protected
+  void updateShaderSettings() {
     renderShader.setFloatUniforms(initialIndex: 6, (value) {
       value
         ..setColor(settings.effectiveGlassColor)
