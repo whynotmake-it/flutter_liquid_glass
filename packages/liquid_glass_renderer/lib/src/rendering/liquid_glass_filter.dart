@@ -142,6 +142,17 @@ class _RenderLiquidGlassFilter extends LiquidGlassRenderObject {
   Matrix4 get matteTransform => Matrix4.identity();
 
   @override
+  void prepareShaderForPaint(ui.Image geometryMatte, Rect geometryMatteBounds) {
+    renderShader
+      ..setFloatUniforms((value) {
+        value
+          ..setOffset(geometryMatteBounds.topLeft * devicePixelRatio)
+          ..setSize(geometryMatteBounds.size * devicePixelRatio);
+      })
+      ..setImageSampler(0, geometryMatte);
+  }
+
+  @override
   void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
@@ -237,10 +248,6 @@ class _ShaderLayer extends OffsetLayer {
     {
       addChildrenToScene(builder);
       if (childImage != null) {
-        shader
-          ..setImageSampler(0, childImage!)
-          ..setFloat(0, bounds.width * devicePixelRatio)
-          ..setFloat(1, bounds.height * devicePixelRatio);
         canvas
           ..scale(1 / devicePixelRatio)
           ..drawRect(

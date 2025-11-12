@@ -27,7 +27,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         _devicePixelRatio = devicePixelRatio,
         _backdropKey = backdropKey,
         _link = link {
-    _updateShaderSettings();
+    updateShaderSettings();
   }
 
   static final logger = Logger(LgrLogNames.render);
@@ -52,7 +52,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     _settings = value;
-    _updateShaderSettings();
+    updateShaderSettings();
     markNeedsPaint();
   }
 
@@ -84,6 +84,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
 
+  @protected
+  Rect get geometryMatteBounds => _geometryMatteBounds;
+
   @override
   @mustCallSuper
   void attach(PipelineOwner owner) {
@@ -102,7 +105,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     super.layout(constraints, parentUsesSize: parentUsesSize);
   }
 
-  void _updateShaderSettings() {
+  @protected
+  void updateShaderSettings() {
     renderShader.setFloatUniforms(initialIndex: 6, (value) {
       value
         ..setColor(settings.effectiveGlassColor)
@@ -129,6 +133,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   ui.Rect get paintBounds => _paintBounds;
 
   // MARK: Painting
+
+  void prepareShaderForPaint(
+    ui.Image geometryMatte,
+    Rect geometryMatteBounds,
+  );
 
   @override
   @nonVirtual
@@ -217,13 +226,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       );
     } else {
       if (_geometryImage case final geometryImage?) {
-        renderShader
-          ..setFloatUniforms(initialIndex: 2, (value) {
-            value
-              ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
-              ..setSize(_geometryMatteBounds.size * devicePixelRatio);
-          })
-          ..setImageSampler(1, geometryImage);
+        prepareShaderForPaint(
+          geometryImage,
+          _geometryMatteBounds,
+        );
         paintLiquidGlass(
           context,
           offset,

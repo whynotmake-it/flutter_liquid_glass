@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math';
+import 'dart:ui' as ui;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -7,7 +9,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
@@ -135,7 +136,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
       }
 
       rawLayer = ShaderBuilder(
-        assetKey: ShaderKeys.liquidGlassRender,
+        assetKey: ShaderKeys.lighting,
         (context, shader, child) => _RawFakeGlassLayer(
           renderShader: shader,
           backdropKey: widget.useBackdropGroup
@@ -243,6 +244,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   void onTransformChanged() {
     needsGeometryUpdate = true;
     markNeedsPaint();
+  }
+
+  @override
+  void prepareShaderForPaint(ui.Image geometryMatte, Rect geometryMatteBounds) {
+    renderShader
+      ..setFloatUniforms(initialIndex: 2, (value) {
+        value
+          ..setOffset(geometryMatteBounds.topLeft * devicePixelRatio)
+          ..setSize(geometryMatteBounds.size * devicePixelRatio);
+      })
+      ..setImageSampler(1, geometryMatte);
   }
 
   @override
@@ -397,6 +409,34 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
   }
 
   @override
+  void updateShaderSettings() {
+    renderShader.setFloatUniforms(initialIndex: 4, (value) {
+      value
+        ..setFloats([
+          settings.effectiveLightIntensity,
+          settings.effectiveAmbientStrength,
+          settings.effectiveThickness,
+        ])
+        ..setOffset(
+          Offset(
+            cos(settings.lightAngle),
+            sin(settings.lightAngle),
+          ),
+        );
+    });
+  }
+
+  @override
+  void prepareShaderForPaint(ui.Image geometryMatte, Rect geometryMatteBounds) {
+    renderShader
+      ..setFloatUniforms((value) {
+        value.setSize(geometryMatteBounds.size);
+        value.setOffset(geometryMatteBounds.topLeft);
+      })
+      ..setImageSampler(0, geometryMatte);
+  }
+
+  @override
   void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
@@ -451,22 +491,15 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
       offset,
       boundingBox,
       (context, offset) {
-        if (geometryImage case final geometryImage?) {
-          final bounds = paintBounds.snapToPixels(devicePixelRatio);
-          context.canvas
-            ..save()
-            ..translate(
-              bounds.left,
-              bounds.top,
-            )
-            ..scale(1 / devicePixelRatio)
-            ..drawImage(
-              geometryImage,
-              offset * devicePixelRatio,
-              _getColorPaint(),
-            )
-            ..restore();
-        }
+        context.canvas
+          ..save()
+          ..drawRect(
+            boundingBox,
+            Paint()
+              ..shader = renderShader
+              ..blendMode = BlendMode.screen,
+          )
+          ..restore();
 
         paintShapeContents(
           context,
@@ -477,18 +510,6 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
       },
       oldLayer: _clipRectLayerHandle.layer,
     );
-  }
-
-  Paint _getColorPaint() {
-    final color = settings.effectiveGlassColor;
-    final luminance = settings.effectiveGlassColor.computeLuminance();
-
-    final blendMode = luminance < 0.5 ? BlendMode.multiply : BlendMode.screen;
-
-    final paint = Paint()
-      ..color = color
-      ..blendMode = blendMode;
-    return paint;
   }
 
   @override
