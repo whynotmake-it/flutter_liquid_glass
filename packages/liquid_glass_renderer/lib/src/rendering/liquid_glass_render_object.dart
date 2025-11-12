@@ -77,6 +77,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
 
+  @protected
+  ui.Image? get geometryImage => _geometryImage;
+
   /// The bounding box of the geometry matte in the coordinate space of the
   /// shader
   Rect _geometryMatteBounds = Rect.zero;

@@ -5,7 +5,6 @@ import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:meta/meta.dart';
 
 /// A liquid glass shape.
@@ -111,31 +110,15 @@ class LiquidGlass extends StatelessWidget {
   Widget build(BuildContext context) {
     // If we have our own layer config, we create our own layer.
     if (ownLayerConfig case (final settings, final fake)) {
-      if (fake) {
-        return FakeGlass(
-          shape: shape,
-          settings: settings,
-          child: child,
-        );
-      }
-
       return LiquidGlassLayer(
         settings: settings,
+        fake: fake,
         child: LiquidGlassBlendGroup(
           blend: 0,
           child: Builder(
             builder: _buildContent,
           ),
         ),
-      );
-    }
-
-    final fake = LiquidGlassRenderScope.of(context).useFake;
-
-    if (fake) {
-      return FakeGlass.inLayer(
-        shape: shape,
-        child: child,
       );
     }
 

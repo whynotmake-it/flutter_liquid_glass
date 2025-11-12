@@ -3,7 +3,6 @@ library liquid_glass_renderer;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
 
-export 'src/fake_glass.dart' show FakeGlass;
 export 'src/glass_glow.dart' show GlassGlow, GlassGlowLayer;
 export 'src/liquid_glass.dart' show LiquidGlass;
 export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
