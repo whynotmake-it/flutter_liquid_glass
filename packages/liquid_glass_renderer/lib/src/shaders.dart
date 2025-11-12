@@ -29,7 +29,6 @@ abstract class ShaderKeys {
   static final String lighting =
       '${_shadersRoot}lib/assets/shaders/liquid_glass_lighting_only.frag';
 
-  @Deprecated('This shader is only for legacy reasons and reference.')
-  static final legacyLiquidGlass =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass.frag';
+  static final String color =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_color_only.frag';
 }

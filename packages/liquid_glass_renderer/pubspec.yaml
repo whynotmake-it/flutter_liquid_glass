@@ -48,3 +48,4 @@ flutter:
     - lib/assets/shaders/liquid_glass_arbitrary.frag
     - lib/assets/shaders/liquid_glass_final_render.frag
     - lib/assets/shaders/liquid_glass_lighting_only.frag
+    - lib/assets/shaders/liquid_glass_color_only.frag

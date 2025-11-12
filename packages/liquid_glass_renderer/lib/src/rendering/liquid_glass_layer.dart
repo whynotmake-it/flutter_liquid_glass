@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -135,10 +136,14 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             'on Skia.');
       }
 
-      rawLayer = ShaderBuilder(
-        assetKey: ShaderKeys.lighting,
+      rawLayer = MultiShaderBuilder(
+        assetKeys: [
+          ShaderKeys.lighting,
+          ShaderKeys.color,
+        ],
         (context, shader, child) => _RawFakeGlassLayer(
-          renderShader: shader,
+          renderShader: shader[0],
+          colorShader: shader[1],
           backdropKey: widget.useBackdropGroup
               ? BackdropGroup.of(context)?.backdropKey
               : null,
@@ -345,6 +350,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 class _RawFakeGlassLayer extends SingleChildRenderObjectWidget {
   const _RawFakeGlassLayer({
     required this.renderShader,
+    required this.colorShader,
     required this.backdropKey,
     required this.settings,
     required Widget super.child,
@@ -352,6 +358,7 @@ class _RawFakeGlassLayer extends SingleChildRenderObjectWidget {
   });
 
   final FragmentShader renderShader;
+  final FragmentShader colorShader;
   final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GeometryRenderLink link;
@@ -361,6 +368,7 @@ class _RawFakeGlassLayer extends SingleChildRenderObjectWidget {
     return RenderFakeGlassLayer(
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       renderShader: renderShader,
+      colorShader: colorShader,
       backdropKey: backdropKey,
       settings: settings,
       link: link,
@@ -385,13 +393,14 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
     with TransformTrackingRenderObjectMixin {
   RenderFakeGlassLayer({
     required super.renderShader,
+    required this.colorShader,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
     required super.link,
   });
 
-  final _shaderHandle = LayerHandle<BackdropFilterLayer>();
+  final FragmentShader colorShader;
   final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
   final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
@@ -424,14 +433,30 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
           ),
         );
     });
+
+    colorShader.setFloatUniforms(initialIndex: 4, (value) {
+      value
+        ..setColor(
+          settings.effectiveGlassColor,
+        );
+    });
   }
 
   @override
   void prepareShaderForPaint(ui.Image geometryMatte, Rect geometryMatteBounds) {
     renderShader
       ..setFloatUniforms((value) {
-        value.setSize(geometryMatteBounds.size);
-        value.setOffset(geometryMatteBounds.topLeft);
+        value
+          ..setSize(geometryMatteBounds.size)
+          ..setOffset(geometryMatteBounds.topLeft);
+      })
+      ..setImageSampler(0, geometryMatte);
+
+    colorShader
+      ..setFloatUniforms((value) {
+        value
+          ..setSize(geometryMatteBounds.size)
+          ..setOffset(geometryMatteBounds.topLeft);
       })
       ..setImageSampler(0, geometryMatte);
   }
@@ -500,6 +525,19 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
               ..blendMode = BlendMode.screen,
           )
           ..restore();
+        context.canvas
+          ..save()
+          ..drawRect(
+            boundingBox,
+            Paint()
+              ..shader = colorShader
+              ..blendMode =
+                  switch (settings.effectiveGlassColor.computeLuminance()) {
+                > 0.5 => BlendMode.screen,
+                _ => BlendMode.darken,
+              },
+          )
+          ..restore();
 
         paintShapeContents(
           context,
@@ -515,7 +553,6 @@ class RenderFakeGlassLayer extends LiquidGlassRenderObject
   @override
   void dispose() {
     _blurLayerHandle.layer = null;
-    _shaderHandle.layer = null;
     _clipPathLayerHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     super.dispose();
