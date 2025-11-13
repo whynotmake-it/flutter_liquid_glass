@@ -171,6 +171,10 @@ class _RenderFakeGlass extends RenderProxyBox {
     context.pushLayer(
       layer,
       (context, offset) {
+        // If we are on Skia, we need to avoid the raster cache.
+        if (!ui.ImageFilter.isShaderFilterSupported) {
+          context.setWillChangeHint();
+        }
         final path = shape.getOuterPath(offset & size);
         _paintColor(context.canvas, path);
         _paintSpecular(context.canvas, path, offset & size);
@@ -210,19 +214,9 @@ class _RenderFakeGlass extends RenderProxyBox {
     final blendMode = luminance < 0.5 ? BlendMode.multiply : BlendMode.screen;
 
     final paint = Paint()
-      ..color = color.withValues(alpha: color.a * .8)
+      ..color = color
       ..blendMode = blendMode
       ..style = PaintingStyle.fill;
-
-    canvas.drawPath(path, paint);
-
-    // Paint a blurred stroke to simulate the glass edge
-    paint
-      ..maskFilter = MaskFilter.blur(
-          BlurStyle.normal, (settings.effectiveThickness).clamp(5, 100))
-      ..style = PaintingStyle.stroke
-      ..color = color.withValues(alpha: color.a * .5)
-      ..strokeWidth = settings.effectiveThickness;
 
     canvas.drawPath(path, paint);
   }
@@ -293,16 +287,20 @@ class _RenderFakeGlass extends RenderProxyBox {
     final paint = Paint()
       ..shader = shader
       ..color = color
-      ..blendMode = BlendMode.softLight
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2 * (settings.effectiveThickness / 20);
-
-    canvas.drawPath(path, paint);
-
-    paint
-      ..strokeWidth = ui.lerpDouble(.5, 1.5, lightIntensity)!
-      ..color = color.withValues(alpha: color.a * 0.8)
+      ..strokeWidth = ui.lerpDouble(1, 2, lightIntensity)!
+      ..color = color.withValues(alpha: color.a * 0.3)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
+
+    final overlay = Paint()
+      ..shader = shader
+      ..color = color.withValues(alpha: color.a * 0.6)
+      ..style = PaintingStyle.stroke
+      ..maskFilter =
+          MaskFilter.blur(BlurStyle.normal, (settings.effectiveThickness / 40))
+      ..strokeWidth = (settings.effectiveThickness / 10)
+      ..blendMode = BlendMode.overlay;
+    canvas.drawPath(path, overlay);
   }
 }
