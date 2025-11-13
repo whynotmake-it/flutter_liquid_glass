@@ -212,16 +212,7 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final paint = Paint()
       ..color = color
-      ..blendMode = BlendMode.srcOver
       ..style = PaintingStyle.fill;
-
-    canvas.drawPath(path, paint);
-
-    paint
-      ..color = color.withValues(
-        alpha: color.a * 0.5,
-      )
-      ..blendMode = BlendMode.hue;
 
     canvas.drawPath(path, paint);
   }
