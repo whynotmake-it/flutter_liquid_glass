@@ -209,13 +209,9 @@ class _RenderFakeGlass extends RenderProxyBox {
 
   void _paintColor(Canvas canvas, Path path) {
     final color = settings.effectiveGlassColor;
-    final luminance = settings.effectiveGlassColor.computeLuminance();
-
-    final blendMode = luminance < 0.5 ? BlendMode.multiply : BlendMode.screen;
 
     final paint = Paint()
       ..color = color
-      ..blendMode = blendMode
       ..style = PaintingStyle.fill;
 
     canvas.drawPath(path, paint);
@@ -235,10 +231,9 @@ class _RenderFakeGlass extends RenderProxyBox {
     final lightIntensity = settings.effectiveLightIntensity.clamp(0.0, 1.0);
     final ambientStrength = settings.effectiveAmbientStrength.clamp(0.0, 1.0);
 
-    final thicknessFactor = (settings.effectiveThickness / 5).clamp(0.0, 1.0);
     final alpha = Curves.easeOut.transform(lightIntensity);
     final color = Colors.white.withValues(
-      alpha: alpha * thicknessFactor,
+      alpha: alpha,
     );
     final rad = settings.lightAngle;
 
@@ -289,7 +284,7 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = ui.lerpDouble(1, 2, lightIntensity)!
-      ..color = color.withValues(alpha: color.a * 0.3)
+      ..color = color.withValues(alpha: color.a * 0.4)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
 
@@ -297,8 +292,6 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..shader = shader
       ..color = color.withValues(alpha: color.a * 0.6)
       ..style = PaintingStyle.stroke
-      ..maskFilter =
-          MaskFilter.blur(BlurStyle.normal, (settings.effectiveThickness / 40))
       ..strokeWidth = (settings.effectiveThickness / 10)
       ..blendMode = BlendMode.overlay;
     canvas.drawPath(path, overlay);

@@ -87,7 +87,10 @@ void main() {
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
     }
     
-    vec4 finalColor = applyGlassColor(refractColor, uGlassColor);
+    // Apply glass color using alpha blending
+    vec4 finalColor;
+    finalColor.rgb = uGlassColor.rgb * uGlassColor.a + refractColor.rgb * (1.0 - uGlassColor.a);
+    finalColor.a = refractColor.a;
     finalColor.rgb = applySaturation(finalColor.rgb, uSaturation);
 
     // Compute edge lighting
@@ -109,7 +112,7 @@ void main() {
         float ambient = uAmbientStrength * 0.5;
         
         float brightness = (directional + ambient) * edgeFactor * thicknessScale * 0.8;
-        
+
         vec3 bgColor = refractColor.rgb;
         float bgLuminance = dot(bgColor, LUMA_WEIGHTS);
         vec3 highlightColor;
@@ -120,7 +123,7 @@ void main() {
         float colorMix = clamp(colorfulness * 1.0 + 0.5, 0.5, 1.0);
         highlightColor = mix(vec3(1.0), saturatedBg, colorMix);
        
-        
+
         finalColor.rgb = mix(finalColor.rgb, highlightColor, brightness);
     }
 
