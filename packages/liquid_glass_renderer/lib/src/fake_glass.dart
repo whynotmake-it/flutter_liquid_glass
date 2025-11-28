@@ -217,86 +217,87 @@ class _RenderFakeGlass extends RenderProxyBox {
     canvas.drawPath(path, paint);
   }
 
-  /// Paints an approximation for specular highlights by using a linear
-  /// gradient that is aligned with the light angle and painting a strokw with
-  /// that gradient.
   void _paintSpecular(Canvas canvas, Path path, Rect bounds) {
-    // Expand bounds to a square to make sure the gradient angle will match the
-    // light angle correctly. A squashed gradient would change the angle.
-    final squareBounds = Rect.fromCircle(
-      center: bounds.center,
-      radius: bounds.size.longestSide / 2,
-    );
-
     final lightIntensity = settings.effectiveLightIntensity.clamp(0.0, 1.0);
-    final ambientStrength = settings.effectiveAmbientStrength.clamp(0.0, 1.0);
 
     final thicknessFactor = (settings.effectiveThickness / 5).clamp(0.0, 1.0);
     final alpha = Curves.easeOut.transform(lightIntensity);
     final color = Colors.white.withValues(
       alpha: alpha * thicknessFactor,
     );
-    final rad = settings.lightAngle;
 
-    final x = math.cos(rad);
-    final y = math.sin(rad);
+    final thickness = settings.effectiveThickness / 40;
 
-    // How far the light covers the glass, used to adjust the gradient stops
-    final lightCoverage = ui.lerpDouble(.3, .5, lightIntensity)!;
+    void drawHighlight(
+      Canvas canvas,
+      Path path,
+      Rect bounds,
+      Paint paint,
+      // ignore: avoid_positional_boolean_parameters
+      bool invert,
+    ) {
+      canvas.saveLayer(bounds, paint);
+      {
+        // Calculate gradient points relative to the bounds to ensure coverage
+        // regardless of aspect ratio.
+        final center = bounds.center;
+        final diagonal = bounds.size.longestSide; // Safe over-estimate
+        final lightDir = Offset(
+          math.cos(settings.lightAngle),
+          math.sin(settings.lightAngle),
+        );
+        final offset = invert ? -lightDir : lightDir;
 
-    // How perpendicular we are to the shortest side of the box, 1 means the
-    // light is hitting the shortest side directly, 0 means it's hitting the
-    // longest side directly.
-    final alignmentWithShortestSide = (size.aspectRatio < 1 ? y : x).abs();
+        final start = center - offset * (diagonal / 2);
 
-    // How far we are from a square aspect ratio, used to adjust the gradient
-    final aspectAdjustment = 1 - 1 / size.aspectRatio;
+        final shader = ui.Gradient.linear(
+          start,
+          center,
+          [
+            color,
+            color.withValues(alpha: .2), // Fade out
+          ],
+        );
 
-    // We scale the gradient when we are at a non-square aspect ratio, and the
-    // light is aligned with the longest side.
-    final gradientScale = aspectAdjustment * (1 - alignmentWithShortestSide);
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = const Color(0xFFFFFFFF)
+            ..shader = shader,
+        );
 
-    // How far the outer stops are inset
-    final inset = ui.lerpDouble(0, .5, gradientScale.clamp(0, 1))!;
-
-    // How far the second stops are inset
-    final secondInset =
-        ui.lerpDouble(lightCoverage, .5, gradientScale.clamp(0, 1))!;
-
-    final shader = LinearGradient(
-      colors: [
-        color,
-        color.withValues(alpha: ambientStrength),
-        color.withValues(alpha: ambientStrength),
-        color,
-      ],
-      stops: [
-        inset,
-        secondInset,
-        1 - secondInset,
-        1 - inset,
-      ],
-      begin: Alignment(x, y),
-      end: Alignment(-x, -y),
-    ).createShader(squareBounds);
+        final eraser = Paint()
+          ..blendMode = BlendMode.dstOut
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
+        canvas
+          ..save()
+          ..translate(
+            offset.dx * thickness,
+            offset.dy * thickness,
+          )
+          ..drawPath(path, eraser)
+          ..restore();
+      }
+      canvas.restore();
+    }
 
     final paint = Paint()
-      ..shader = shader
-      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = ui.lerpDouble(1, 2, lightIntensity)!
       ..color = color.withValues(alpha: color.a * 0.3)
       ..blendMode = BlendMode.hardLight;
-    canvas.drawPath(path, paint);
 
     final overlay = Paint()
-      ..shader = shader
-      ..color = color.withValues(alpha: color.a * 0.6)
+      ..color = color.withValues(alpha: color.a * 0.7)
       ..style = PaintingStyle.stroke
-      ..maskFilter =
-          MaskFilter.blur(BlurStyle.normal, (settings.effectiveThickness / 40))
       ..strokeWidth = (settings.effectiveThickness / 10)
       ..blendMode = BlendMode.overlay;
-    canvas.drawPath(path, overlay);
+
+    drawHighlight(canvas, path, bounds, paint, false);
+    drawHighlight(canvas, path, bounds, overlay, false);
+
+    // Ambient highlight (inverted)
+    drawHighlight(canvas, path, bounds, paint, true);
+    drawHighlight(canvas, path, bounds, overlay, true);
   }
 }
