@@ -292,7 +292,7 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..shader = shader
       ..color = color.withValues(alpha: color.a * 0.6)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (settings.effectiveThickness / 10)
+      ..strokeWidth = (settings.effectiveThickness / 20)
       ..blendMode = BlendMode.overlay;
     canvas.drawPath(path, overlay);
   }
