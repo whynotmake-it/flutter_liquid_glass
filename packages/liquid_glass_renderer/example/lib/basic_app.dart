@@ -28,79 +28,90 @@ class BasicApp extends HookWidget {
 
     final light = AlwaysStoppedAnimation(pi / 4);
 
-    return GestureDetector(
-      onTap: () {
-        SettingsSheet(
-          blendNotifier: blendNotifier,
-          settingsNotifier: settingsNotifier,
-          lightAngleAnimation: light,
-        ).show(context);
-      },
-      child: CupertinoPageScaffold(
-        child: Stack(
-          children: [
-            CustomScrollView(
-              slivers: [
-                SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Image.network(
-                            fit: BoxFit.cover,
-                            'https://picsum.photos/500/500?random=$index',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+    return CupertinoPageScaffold(
+      child: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
                 ),
-              ],
-            ),
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: CupertinoSwitch(
-                  value: fake.value,
-                  onChanged: (v) => fake.value = v,
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image.network(
+                          fit: BoxFit.cover,
+                          'https://picsum.photos/500/500?random=$index',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            ],
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: CupertinoSwitch(
+                value: fake.value,
+                onChanged: (v) => fake.value = v,
+              ),
             ),
-            Center(
-              child: ListenableBuilder(
-                listenable: Listenable.merge([
-                  settingsNotifier,
-                  light,
-                  blendNotifier,
-                ]),
-                builder: (context, child) {
-                  final settings = settingsNotifier.value.copyWith(
-                    glassColor: CupertinoTheme.of(
-                      context,
-                    ).barBackgroundColor.withValues(alpha: 0.2),
-                  );
-                  return LiquidGlassLayer(
-                    fake: fake.value,
-                    settings: settings.copyWith(lightAngle: light.value),
-                    child: LiquidGlassBlendGroup(
-                      blend: blendNotifier.value,
-                      child: Column(
-                        spacing: 16,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            spacing: 16,
-                            children: [
-                              LiquidStretch(
-                                child: LiquidGlass.grouped(
-                                  shape: LiquidRoundedSuperellipse(
-                                    borderRadius: 20,
+          ),
+          Center(
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                settingsNotifier,
+                light,
+                blendNotifier,
+              ]),
+              builder: (context, child) {
+                final settings = settingsNotifier.value.copyWith(
+                  glassColor: CupertinoTheme.of(
+                    context,
+                  ).barBackgroundColor.withValues(alpha: 0.2),
+                );
+                return LiquidGlassLayer(
+                  fake: fake.value,
+                  settings: settings.copyWith(lightAngle: light.value),
+                  child: LiquidGlassBlendGroup(
+                    blend: blendNotifier.value,
+                    child: Column(
+                      spacing: 16,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 16,
+                          children: [
+                            LiquidStretch(
+                              child: LiquidGlass.grouped(
+                                shape: LiquidRoundedSuperellipse(
+                                  borderRadius: 20,
+                                ),
+                                child: GlassGlow(
+                                  child: SizedBox.square(
+                                    dimension: 100,
+                                    child: Center(
+                                      child: fake.value
+                                          ? Text('FAKE')
+                                          : Text('REAL'),
+                                    ),
                                   ),
-                                  child: GlassGlow(
+                                ),
+                              ),
+                            ),
+                            LiquidStretch(
+                              child: LiquidGlass.grouped(
+                                shape: LiquidRoundedSuperellipse(
+                                  borderRadius: 20,
+                                ),
+                                child: GlassGlow(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
                                     child: SizedBox.square(
                                       dimension: 100,
                                       child: Center(
@@ -112,99 +123,103 @@ class BasicApp extends HookWidget {
                                   ),
                                 ),
                               ),
-                              LiquidStretch(
-                                child: LiquidGlass.grouped(
-                                  shape: LiquidRoundedSuperellipse(
-                                    borderRadius: 20,
-                                  ),
-                                  child: GlassGlow(
-                                    child: GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      child: SizedBox.square(
-                                        dimension: 100,
-                                        child: Center(
-                                          child: fake.value
-                                              ? Text('FAKE')
-                                              : Text('REAL'),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          LiquidStretch(
-                            child: LiquidGlass.grouped(
-                              shape: LiquidRoundedSuperellipse(
-                                borderRadius: 9000,
-                              ),
-                              child: GlassGlow(
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  child: SizedBox(
-                                    width: 400,
-                                    height: 64,
-                                    child: Center(
-                                      child: fake.value
-                                          ? Text('FAKE')
-                                          : Text('REAL'),
-                                    ),
+                            ),
+                          ],
+                        ),
+                        LiquidStretch(
+                          child: LiquidGlass.grouped(
+                            shape: LiquidRoundedSuperellipse(
+                              borderRadius: 9000,
+                            ),
+                            child: GlassGlow(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                child: SizedBox(
+                                  width: 400,
+                                  height: 64,
+                                  child: Center(
+                                    child: fake.value
+                                        ? Text('FAKE')
+                                        : Text('REAL'),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        LiquidStretch(
+                          child: LiquidGlass.grouped(
+                            shape: LiquidRoundedSuperellipse(
+                              borderRadius: 9000,
+                            ),
+                            child: GlassGlow(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  SettingsSheet(
+                                    blendNotifier: blendNotifier,
+                                    settingsNotifier: settingsNotifier,
+                                    lightAngleAnimation: light,
+                                  ).show(context);
+                                },
+                                child: SizedBox(
+                                  width: 400,
+                                  height: 64,
+                                  child: Center(child: Text('SETTINGS')),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
+                  ),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: LiquidGlassBottomBar(
+                fake: fake.value,
+                extraButton: LiquidGlassBottomBarExtraButton(
+                  icon: CupertinoIcons.add_circled,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (context) => CupertinoPageScaffold(
+                          child: SizedBox(),
+                          navigationBar: CupertinoNavigationBar.large(),
+                        ),
+                      ),
+                    );
+                  },
+                  label: '',
+                ),
+                tabs: [
+                  LiquidGlassBottomBarTab(
+                    label: 'Home',
+                    icon: CupertinoIcons.home,
+                  ),
+                  LiquidGlassBottomBarTab(
+                    label: 'Profile',
+                    icon: CupertinoIcons.person,
+                  ),
+                  LiquidGlassBottomBarTab(
+                    label: 'Settings',
+                    icon: CupertinoIcons.settings,
+                  ),
+                ],
+                selectedIndex: tab.value,
+                onTabSelected: (index) {
+                  tab.value = index;
                 },
               ),
             ),
-            SafeArea(
-              bottom: false,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: LiquidGlassBottomBar(
-                  fake: fake.value,
-                  extraButton: LiquidGlassBottomBarExtraButton(
-                    icon: CupertinoIcons.add_circled,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        CupertinoPageRoute(
-                          builder: (context) => CupertinoPageScaffold(
-                            child: SizedBox(),
-                            navigationBar: CupertinoNavigationBar.large(),
-                          ),
-                        ),
-                      );
-                    },
-                    label: '',
-                  ),
-                  tabs: [
-                    LiquidGlassBottomBarTab(
-                      label: 'Home',
-                      icon: CupertinoIcons.home,
-                    ),
-                    LiquidGlassBottomBarTab(
-                      label: 'Profile',
-                      icon: CupertinoIcons.person,
-                    ),
-                    LiquidGlassBottomBarTab(
-                      label: 'Settings',
-                      icon: CupertinoIcons.settings,
-                    ),
-                  ],
-                  selectedIndex: tab.value,
-                  onTabSelected: (index) {
-                    tab.value = index;
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

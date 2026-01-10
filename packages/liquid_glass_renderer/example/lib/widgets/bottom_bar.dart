@@ -521,6 +521,7 @@ class _TabIndicatorState extends State<_TabIndicator>
       onHorizontalDragCancel: () => setState(() {
         _isDragging = false;
         _isDown = false;
+        xAlign = computeXAlignmentForTab(widget.tabIndex);
       }),
       child: VelocityMotionBuilder(
         converter: SingleMotionConverter(),
