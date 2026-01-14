@@ -254,7 +254,6 @@ LiquidGlassLayer(
     thickness: 10,
     glassColor: Color(0x1AFFFFFF),
     lightIntensity: 1.5,
-    outlineIntensity: 0.5,
     saturation: 1.2,
   ),
   child: LiquidGlassBlendGroup(
@@ -272,7 +271,6 @@ Here's a breakdown of the key settings:
 -   `refractiveIndex`: The refractive index of the glass material (1.0 = no refraction, ~1.5 = realistic glass).
 -   `lightAngle`, `lightIntensity`: Control the direction and brightness of the virtual light source, creating highlights.
 -   `ambientStrength`: The intensity of ambient light on the glass.
--   `outlineIntensity`: The visibility of the glass outline/edge.
 -   `saturation`: Adjusts the color saturation of background pixels visible through the glass (1.0 = no change, <1.0 = desaturated, >1.0 = more saturated).
 
 **Note:** The `blend` parameter has been moved from `LiquidGlassSettings` to the `LiquidGlassBlendGroup` constructor, as it specifically controls shape blending behavior.
