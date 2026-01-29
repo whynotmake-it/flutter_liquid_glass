@@ -5,6 +5,40 @@ import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
+/// The edge profile type for liquid glass rendering.
+///
+/// Different profiles create different curvature patterns at the glass edges,
+/// affecting how light refracts through the surface.
+enum EdgeProfile {
+  /// Convex circular profile - classic hemisphere shape.
+  ///
+  /// Formula: `y = sqrt(1 - (1-x)²)`
+  ///
+  /// This is the default profile and the most performant option.
+  convexCircle,
+
+  /// Convex squircle profile - softer superellipse edges.
+  ///
+  /// Formula: `y = (1 - (1-x)⁴)^(1/4)`
+  ///
+  /// Creates smoother transitions than convexCircle.
+  convexSquircle,
+
+  /// Concave profile - inverted curvature, lower in the middle.
+  ///
+  /// Formula: `y = 1 - convexCircle(x)`
+  ///
+  /// Refracts light outward instead of inward.
+  concave,
+
+  /// Lip profile - convex outside, concave inside.
+  ///
+  /// Blends convex and concave via smootherstep transition.
+  ///
+  /// Note: This is the most expensive profile due to the blend calculation.
+  lip,
+}
+
 /// Represents the settings for a liquid glass effect.
 class LiquidGlassSettings with EquatableMixin {
   /// Creates a new [LiquidGlassSettings] with the given settings.
@@ -19,6 +53,7 @@ class LiquidGlassSettings with EquatableMixin {
     this.ambientStrength = 0,
     this.refractiveIndex = 1.2,
     this.saturation = 1.5,
+    this.edgeProfile = EdgeProfile.convexCircle,
   });
 
   /// Creates a new [LiquidGlassSettings] with the given settings where each
@@ -33,6 +68,7 @@ class LiquidGlassSettings with EquatableMixin {
     double lightIntensity = 50,
     double lightAngle = 0.5 * pi,
     Color glassColor = const Color.fromARGB(0, 255, 255, 255),
+    EdgeProfile edgeProfile = EdgeProfile.convexCircle,
   }) : this(
           visibility: visibility,
           refractiveIndex: 1 + (refraction / 100) * 0.2,
@@ -44,6 +80,7 @@ class LiquidGlassSettings with EquatableMixin {
           ambientStrength: 0.1,
           saturation: 1.5,
           glassColor: glassColor,
+          edgeProfile: edgeProfile,
         );
 
   /// Retrieves the nearest [LiquidGlassSettings] from the widget tree.
@@ -133,6 +170,15 @@ class LiquidGlassSettings with EquatableMixin {
   /// The effective saturation taking visibility into account.
   double get effectiveSaturation => 1 + (saturation - 1) * visibility;
 
+  /// The edge profile type for the glass surface curvature.
+  ///
+  /// Different profiles create different refraction patterns:
+  /// - [EdgeProfile.convexCircle]: Classic hemisphere (default, most performant)
+  /// - [EdgeProfile.convexSquircle]: Softer superellipse edges
+  /// - [EdgeProfile.concave]: Inverted, lower in middle
+  /// - [EdgeProfile.lip]: Convex outside, concave inside (most expensive)
+  final EdgeProfile edgeProfile;
+
   /// Creates a new [LiquidGlassSettings] with the given settings.
   LiquidGlassSettings copyWith({
     double? visibility,
@@ -146,6 +192,7 @@ class LiquidGlassSettings with EquatableMixin {
     double? ambientStrength,
     double? refractiveIndex,
     double? saturation,
+    EdgeProfile? edgeProfile,
   }) =>
       LiquidGlassSettings(
         visibility: visibility ?? this.visibility,
@@ -158,6 +205,7 @@ class LiquidGlassSettings with EquatableMixin {
         ambientStrength: ambientStrength ?? this.ambientStrength,
         refractiveIndex: refractiveIndex ?? this.refractiveIndex,
         saturation: saturation ?? this.saturation,
+        edgeProfile: edgeProfile ?? this.edgeProfile,
       );
 
   @override
@@ -172,5 +220,6 @@ class LiquidGlassSettings with EquatableMixin {
         ambientStrength,
         refractiveIndex,
         saturation,
+        edgeProfile,
       ];
 }

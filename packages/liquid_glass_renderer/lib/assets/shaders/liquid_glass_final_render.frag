@@ -93,36 +93,47 @@ void main() {
     finalColor.a = refractColor.a;
     finalColor.rgb = applySaturation(finalColor.rgb, uSaturation);
 
-    // Compute edge lighting
-    float normalizedHeight = geometryData.b;
-    
-    float thicknessScale = clamp(40.0 / max(uThickness, 1.0), 1.0, 4.0);
-    float edgeThreshold = mix(0.8, 0.5, 1.0 / thicknessScale);
-    float edgeFactor = 1.0 - smoothstep(0.0, edgeThreshold, normalizedHeight);
-    
-    if (edgeFactor > 0.01) {
-        vec2 normalXY = normalize(displacement);
-        
+    // Compute edge lighting using PROFILE-INDEPENDENT and THICKNESS-INDEPENDENT specular
+    // B channel contains normalized signed distance: 0 = at edge, 1 = 10px inside
+    // Encoding uses 10px range (SPECULAR_ENCODING_RANGE) to allow natural falloff
+    float normalizedSd = geometryData.b;
+
+    // Fixed-width rim specular using rational approximation: 1/(1+k*x^2)
+    // With 10px encoding range, k=40 gives half-intensity at ~1.5px (matching kube.io)
+    // At 1.5px: normalizedSd=0.15, rimFactor=1/(1+40*0.0225)=0.53
+    // At 3px: normalizedSd=0.3, rimFactor=0.22
+    // At 6px: normalizedSd=0.6, rimFactor=0.065
+    float k = 40.0;
+    float rimFactor = 1.0 / (1.0 + k * normalizedSd * normalizedSd);
+
+    // Smoothly fade in the entire lighting effect based on thickness
+    // Very thin glass (< 5px) gets reduced highlights to avoid visual noise
+    float thicknessFade = clamp((uThickness - 5.0) * 0.2, 0.0, 1.0);
+
+    float dispLen = length(displacement);
+    if (rimFactor > 0.01 && thicknessFade > 0.01 && dispLen > 0.1) {
+        // Use displacement direction for light angle (normalized)
+        vec2 normalXY = displacement / dispLen;
+
         float mainLight = max(0.0, dot(normalXY, uLightDirection));
         float oppositeLight = max(0.0, dot(normalXY, -uLightDirection));
-        
+
         float totalInfluence = mainLight + oppositeLight * 0.8;
-        
-        float directional = pow(totalInfluence, 1.5) * uLightIntensity * 3.0;
-        float ambient = uAmbientStrength * 0.5;
-        
-        float brightness = (directional + ambient) * edgeFactor * thicknessScale * 0.8;
+
+        // Thickness-independent brightness calculation
+        float directional = pow(totalInfluence, 1.5) * uLightIntensity * 2.5;
+        float ambient = uAmbientStrength * 0.4;
+
+        float brightness = (directional + ambient) * rimFactor * thicknessFade;
 
         vec3 bgColor = refractColor.rgb;
         float bgLuminance = dot(bgColor, LUMA_WEIGHTS);
-        vec3 highlightColor;
-        
+
         vec3 saturatedBg = bgColor / max(bgLuminance, 0.001);
         saturatedBg = mix(bgColor, saturatedBg, 0.8);
         float colorfulness = length(bgColor - vec3(bgLuminance));
         float colorMix = clamp(colorfulness * 1.0 + 0.5, 0.5, 1.0);
-        highlightColor = mix(vec3(1.0), saturatedBg, colorMix);
-       
+        vec3 highlightColor = mix(vec3(1.0), saturatedBg, colorMix);
 
         finalColor.rgb = mix(finalColor.rgb, highlightColor, brightness);
     }

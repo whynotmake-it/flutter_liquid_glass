@@ -219,6 +219,11 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
         blend * devicePixelRatio,
       ]);
     });
+
+    // Set edge profile at index 6 (after vec4 optical props at 2-5)
+    geometryShader.setFloatUniforms(initialIndex: 6, (value) {
+      value.setFloat(settings.edgeProfile.index.toDouble());
+    });
   }
 
   @override
@@ -232,7 +237,8 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
       );
     }
 
-    geometryShader.setFloatUniforms(initialIndex: 6, (value) {
+    // Shape data starts at index 7 (after uEdgeProfile at index 6)
+    geometryShader.setFloatUniforms(initialIndex: 7, (value) {
       value.setFloat(shapes.length.toDouble());
       for (final shape in shapes) {
         final center = shape.shapeBounds.center;

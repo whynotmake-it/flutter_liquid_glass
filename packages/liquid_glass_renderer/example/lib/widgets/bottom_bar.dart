@@ -572,6 +572,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                       child: LiquidGlass.withOwnLayer(
                         fake: widget.fake,
                         settings: LiquidGlassSettings(
+                          edgeProfile: EdgeProfile.concave,
                           visibility: thickness,
                           glassColor: Color.from(
                             alpha: .1,
@@ -580,8 +581,8 @@ class _TabIndicatorState extends State<_TabIndicator>
                             blue: 1,
                           ),
                           saturation: 1.5,
-                          refractiveIndex: 1.15,
-                          thickness: 20,
+                          refractiveIndex: 1.2,
+                          thickness: 30,
                           lightIntensity: 2,
                           chromaticAberration: .5,
                           blur: 0,

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
@@ -65,7 +66,6 @@ class _GlassifyState extends State<Glassify>
       );
       return widget.child;
     }
-
     return ShaderBuilder(
       assetKey: ShaderKeys.glassify,
       (context, shader, child) => _RawGlassify(

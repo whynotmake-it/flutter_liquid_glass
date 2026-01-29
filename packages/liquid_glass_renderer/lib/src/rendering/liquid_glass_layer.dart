@@ -264,30 +264,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         matrix4: geometry.$3.storage,
       );
     }
-    _clipPathLayerHandle.layer = context
-        // First we push the clipped blur layer
-        .pushClipPath(
-      needsCompositing,
-      offset,
-      boundingBox,
-      clipPath,
-      (context, offset) {
-        context.pushLayer(
-          blurLayer,
-          (context, offset) {
-            // If glass contains child we paint it above blur but below shader
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: true,
-            );
-          },
-          offset,
-        );
-      },
-      oldLayer: _clipPathLayerHandle.layer,
-    );
+
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,
@@ -296,6 +273,29 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         context.pushLayer(
           shaderLayer,
           (context, offset) {
+            _clipPathLayerHandle.layer = context
+                // First we push the clipped blur layer
+                .pushClipPath(
+              needsCompositing,
+              offset,
+              boundingBox,
+              clipPath,
+              (context, offset) {
+                context.pushLayer(
+                  blurLayer,
+                  (context, offset) {
+                    paintShapeContents(
+                      context,
+                      offset,
+                      shapes,
+                      insideGlass: true,
+                    );
+                  },
+                  offset,
+                );
+              },
+              oldLayer: _clipPathLayerHandle.layer,
+            );
             paintShapeContents(
               context,
               offset,

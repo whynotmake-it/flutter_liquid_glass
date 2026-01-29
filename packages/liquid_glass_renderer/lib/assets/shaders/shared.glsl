@@ -62,7 +62,70 @@ vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
     return mix(whiteHighlight, coloredHighlight, colorInfluence);
 }
 
-// Calculate height/depth of the liquid surface
+// Edge profile constants
+const float PROFILE_CONVEX_CIRCLE = 0.0;
+const float PROFILE_CONVEX_SQUIRCLE = 1.0;
+const float PROFILE_CONCAVE = 2.0;
+const float PROFILE_LIP = 3.0;
+
+// Edge profile functions (from kube.io liquid glass implementation)
+// x = normalized distance from edge (0 at edge, 1 at center)
+
+// Convex Circle: y = sqrt(1-(1-x)²) - classic hemisphere
+float profileConvexCircle(float x) {
+    float t = 1.0 - x;
+    return sqrt(max(0.0, 1.0 - t * t));
+}
+
+// Convex Squircle: y = (1-(1-x)⁴)^(1/4) - softer superellipse
+float profileConvexSquircle(float x) {
+    float t = 1.0 - x;
+    float t2 = t * t;
+    return pow(max(0.0, 1.0 - t2 * t2), 0.25);
+}
+
+// Concave: y = 1 - convex(x) - inverted, lower in middle
+float profileConcave(float x) {
+    return 1.0 - profileConvexCircle(x);
+}
+
+// Lip: convex outside, concave inside via smootherstep blend
+float profileLip(float x) {
+    // Convex part scaled to outer region
+    float convexPart = profileConvexSquircle(min(x * 2.0, 1.0));
+    // Concave part with slight offset
+    float concavePart = profileConcave(x) + 0.1;
+    // Smootherstep blend: 6x⁵ - 15x⁴ + 10x³
+    float x2 = x * x;
+    float x3 = x2 * x;
+    float blend = 6.0 * x3 * x2 - 15.0 * x2 * x2 + 10.0 * x3;
+    return mix(convexPart, concavePart, blend);
+}
+
+// Get profile height for a given normalized distance and profile type
+float getProfileHeight(float normalizedDist, float profileType) {
+    if (profileType < 0.5) {
+        return profileConvexCircle(normalizedDist);
+    } else if (profileType < 1.5) {
+        return profileConvexSquircle(normalizedDist);
+    } else if (profileType < 2.5) {
+        return profileConcave(normalizedDist);
+    } else {
+        return profileLip(normalizedDist);
+    }
+}
+
+// Compute numerical derivative of profile for normal calculation
+float getProfileDerivative(float normalizedDist, float profileType) {
+    float delta = 0.001;
+    float x1 = max(0.0, normalizedDist - delta);
+    float x2 = min(1.0, normalizedDist + delta);
+    float y1 = getProfileHeight(x1, profileType);
+    float y2 = getProfileHeight(x2, profileType);
+    return (y2 - y1) / (x2 - x1);
+}
+
+// Calculate height/depth of the liquid surface (original convex circle)
 float getHeight(float sd, float thickness) {
     if (sd >= 0.0 || thickness <= 0.0) {
         return 0.0;
@@ -70,9 +133,28 @@ float getHeight(float sd, float thickness) {
     if (sd < -thickness) {
         return thickness;
     }
-    
+
     float x = thickness + sd;
     return sqrt(max(0.0, thickness * thickness - x * x));
+}
+
+// Calculate height/depth using selected edge profile
+float getHeightWithProfile(float sd, float thickness, float profileType) {
+    if (sd >= 0.0 || thickness <= 0.0) {
+        return 0.0;
+    }
+    if (sd < -thickness) {
+        return thickness;
+    }
+
+    // Normalize distance from edge: 0 at edge, 1 at center (when sd = -thickness)
+    float normalizedDist = clamp(-sd / thickness, 0.0, 1.0);
+
+    // Get profile-based height (0-1 range)
+    float profileHeight = getProfileHeight(normalizedDist, profileType);
+
+    // Scale by thickness
+    return profileHeight * thickness;
 }
 
 // Calculate lighting effects based on displacement data

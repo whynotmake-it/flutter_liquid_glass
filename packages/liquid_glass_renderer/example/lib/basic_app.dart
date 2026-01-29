@@ -78,6 +78,7 @@ class BasicApp extends HookWidget {
                 ]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
+                    edgeProfile: EdgeProfile.convexSquircle,
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.2),

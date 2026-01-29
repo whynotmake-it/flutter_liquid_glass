@@ -414,7 +414,8 @@ extension on LiquidGlassSettings {
     if (other == null) return false;
 
     return effectiveThickness != other.effectiveThickness ||
-        refractiveIndex != other.refractiveIndex;
+        refractiveIndex != other.refractiveIndex ||
+        edgeProfile != other.edgeProfile;
   }
 }
 
