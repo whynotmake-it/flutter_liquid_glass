@@ -29,17 +29,24 @@ class _GlassDragBuilderState extends State<GlassDragBuilder> {
   Widget build(BuildContext context) {
     return Listener(
       behavior: widget.behavior,
-      onPointerDown: (event) => setState(() {
+      onPointerDown: (event) {
+        if (!mounted) return;
         setState(() {
           currentDragOffset = Offset.zero;
         });
-      }),
-      onPointerMove: (event) => setState(() {
-        currentDragOffset = (currentDragOffset ?? Offset.zero) + event.delta;
-      }),
-      onPointerUp: (event) => setState(() {
-        currentDragOffset = null;
-      }),
+      },
+      onPointerMove: (event) {
+        if (!mounted) return;
+        setState(() {
+          currentDragOffset = (currentDragOffset ?? Offset.zero) + event.delta;
+        });
+      },
+      onPointerUp: (event) {
+        if (!mounted) return;
+        setState(() {
+          currentDragOffset = null;
+        });
+      },
       child: widget.builder(context, currentDragOffset, widget.child),
     );
   }
