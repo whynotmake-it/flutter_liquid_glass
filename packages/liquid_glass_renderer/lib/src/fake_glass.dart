@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:meta/meta.dart';
 
 /// A widget that aims to provide a similar look to [LiquidGlass], but without
@@ -47,8 +48,8 @@ class FakeGlass extends StatelessWidget {
     // If we are in a layer, we accept that layer's backdrop key.
     final backdropKey =
         this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
-    return ClipPath(
-      clipper: ShapeBorderClipper(shape: shape),
+    return OptimizedClip(
+      shape: shape,
       child: RawFakeGlass(
         shape: shape,
         settings: settings,
