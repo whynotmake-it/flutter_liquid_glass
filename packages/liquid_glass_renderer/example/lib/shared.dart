@@ -93,12 +93,15 @@ class SettingsSheet extends HookWidget {
     required this.blendNotifier,
     required this.settingsNotifier,
     required this.lightAngleAnimation,
+    required this.fake,
   });
 
   final ValueNotifier<double> blendNotifier;
   final ValueNotifier<LiquidGlassSettings> settingsNotifier;
 
   final Animation<double> lightAngleAnimation;
+
+  final bool fake;
 
   Future<void> show(BuildContext context) {
     return Navigator.push(
@@ -119,6 +122,7 @@ class SettingsSheet extends HookWidget {
       child: SafeArea(
         minimum: const EdgeInsets.all(16.0),
         child: LiquidGlass.auto(
+          fake: fake,
           settings: LiquidGlassSettings.figma(
             depth: 50,
             refraction: 100,

@@ -162,6 +162,14 @@ class _RenderFakeGlass extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  final _saturationLayerHandle = LayerHandle<BackdropFilterLayer>();
+
+  @override
+  void dispose() {
+    _saturationLayerHandle.layer = null;
+    super.dispose();
+  }
+
   bool get _hasBackdropEffect =>
       settings.effectiveBlur != 0 || settings.effectiveSaturation != 1;
 
@@ -177,6 +185,7 @@ class _RenderFakeGlass extends RenderProxyBox {
       // No blur or saturation change — skip the BackdropFilterLayer entirely
       // and just paint the specular highlights and child directly.
       this.layer = null;
+      _saturationLayerHandle.layer = null;
       final path = shape.getOuterPath(offset & size);
       _paintColor(context.canvas, path);
       _paintSpecular(context.canvas, path, offset & size);
@@ -190,19 +199,10 @@ class _RenderFakeGlass extends RenderProxyBox {
       tileMode: TileMode.mirror,
     );
 
-    final saturationFilter = _getSaturationFilter(settings);
-
-    // Compose: blur first (inner), then color+saturation shader (outer).
-    // The shader only runs on the clipped region
-    final combinedFilter = saturationFilter != null
-        ? ui.ImageFilter.compose(
-            inner: blurFilter,
-            outer: saturationFilter,
-          )
-        : blurFilter;
+    final saturationFilter = _getBackdropFilter(settings);
 
     final layer = (this.layer ??= BackdropFilterLayer())
-      ..filter = combinedFilter
+      ..filter = blurFilter
       ..blendMode = BlendMode.srcATop
       ..backdropKey = backdropKey;
 
@@ -213,22 +213,54 @@ class _RenderFakeGlass extends RenderProxyBox {
         if (!ui.ImageFilter.isShaderFilterSupported) {
           context.setWillChangeHint();
         }
-        final path = shape.getOuterPath(offset & size);
 
-        if (saturationFilter == null) {
-          // If we don't have a shader filter, we need to paint the color
-          // ourselves.
-          _paintColor(context.canvas, path);
-        }
-
-        _paintSpecular(context.canvas, path, offset & size);
-        super.paint(context, offset);
+        _paintContent(
+          context,
+          offset,
+          saturationFilter: saturationFilter,
+        );
       },
       offset,
     );
   }
 
-  ui.ImageFilter? _getSaturationFilter(LiquidGlassSettings settings) {
+  /// Paints the saturation layer (if needed), glass color, specular highlights,
+  /// and child.
+  void _paintContent(
+    PaintingContext context,
+    Offset offset, {
+    ui.ImageFilter? saturationFilter,
+  }) {
+    if (saturationFilter != null) {
+      final saturationLayer = (_saturationLayerHandle.layer ??=
+          BackdropFilterLayer())
+        ..filter = saturationFilter
+        ..blendMode = BlendMode.srcATop;
+      context.pushLayer(
+        saturationLayer,
+        _paintInnerContent,
+        offset,
+      );
+    } else {
+      _saturationLayerHandle.layer = null;
+      _paintInnerContent(context, offset);
+    }
+  }
+
+  /// Paints the glass color (when the shader isn't handling it), specular
+  /// highlights, and child.
+  void _paintInnerContent(PaintingContext context, Offset offset) {
+    final path = shape.getOuterPath(offset & size);
+    if (!ui.ImageFilter.isShaderFilterSupported) {
+      // The shader handles color when it's active, so only paint color
+      // manually when there's no shader (Skia) or no saturation change.
+      _paintColor(context.canvas, path);
+    }
+    _paintSpecular(context.canvas, path, offset & size);
+    super.paint(context, offset);
+  }
+
+  ui.ImageFilter? _getBackdropFilter(LiquidGlassSettings settings) {
     if (settings.effectiveSaturation == 1) {
       return null; // No saturation change, so no filter needed.
     }
@@ -245,9 +277,10 @@ class _RenderFakeGlass extends RenderProxyBox {
       });
       return ui.ImageFilter.shader(_colorShader);
     }
-
-    final matrix = _createSaturationMatrix(settings.effectiveSaturation);
-    return ui.ColorFilter.matrix(matrix);
+    // Skia fallback: use a color matrix for saturation only.
+    return ui.ColorFilter.matrix(
+      _createSaturationMatrix(settings.effectiveSaturation),
+    );
   }
 
   /// Creates a saturation adjustment matrix

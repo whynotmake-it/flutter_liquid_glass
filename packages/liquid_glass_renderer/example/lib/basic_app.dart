@@ -31,6 +31,7 @@ class BasicApp extends HookWidget {
     return GestureDetector(
       onTap: () {
         SettingsSheet(
+          fake: fake.value,
           blendNotifier: blendNotifier,
           settingsNotifier: settingsNotifier,
           lightAngleAnimation: light,
