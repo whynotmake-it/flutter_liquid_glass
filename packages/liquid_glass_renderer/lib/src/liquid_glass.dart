@@ -144,7 +144,7 @@ class LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasLayer = LiquidGlassRenderScope.maybeOf(context) != null;
+    final hasLayer = LiquidGlassLayer.existsIn(context);
     // If we are in auto mode, check if a parent layer exists.
     // If it does, render on the parent layer instead of creating our own.
     if (_auto && hasLayer) {

@@ -103,6 +103,12 @@ class LiquidGlassLayer extends StatefulWidget {
   /// Defaults to false.
   final bool useBackdropGroup;
 
+  /// Whether there is a [LiquidGlassLayer] in the widget tree above the given
+  /// [context].
+  static bool existsIn(BuildContext context, {bool watch = true}) {
+    return LiquidGlassRenderScope.maybeOf(context, watch: watch) != null;
+  }
+
   @override
   State<LiquidGlassLayer> createState() => _LiquidGlassLayerState();
 }
