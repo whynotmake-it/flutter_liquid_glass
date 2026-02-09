@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -39,6 +40,7 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
+    this.shadows = const [],
     super.key,
   })  : grouped = false,
         blendGroupLink = null,
@@ -63,6 +65,7 @@ class LiquidGlass extends StatelessWidget {
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
+    this.shadows = const [],
   })  : grouped = true,
         blendGroupLink = null,
         ownLayerConfig = (settings, fake),
@@ -80,6 +83,7 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
+    this.shadows = const [],
   })  : ownLayerConfig = null,
         grouped = true,
         _auto = false;
@@ -100,6 +104,7 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
+    this.shadows = const [],
   })  : ownLayerConfig = (settings, fake),
         grouped = false,
         _auto = false;
@@ -139,6 +144,9 @@ class LiquidGlass extends StatelessWidget {
   /// The settings for this glass if it is supposed to create its own layer.
   final (LiquidGlassSettings settings, bool fake)? ownLayerConfig;
 
+  /// The list of shadows to paint.
+  final List<BoxShadow> shadows;
+
   /// Whether this glass should automatically detect a parent layer.
   final bool _auto;
 
@@ -157,6 +165,7 @@ class LiquidGlass extends StatelessWidget {
         return FakeGlass(
           shape: shape,
           settings: settings,
+          shadows: shadows,
           child: child,
         );
       }
@@ -172,11 +181,13 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    final fake = LiquidGlassRenderScope.of(context).useFake;
+    final scopeSettings = LiquidGlassRenderScope.of(context);
+    final fake = scopeSettings.useFake;
 
     if (fake) {
       return FakeGlass.inLayer(
         shape: shape,
+        shadows: shadows,
         child: child,
       );
     }
@@ -210,11 +221,13 @@ class LiquidGlass extends StatelessWidget {
   /// This is used by the [LiquidGlass.auto] constructor when a parent layer
   /// is detected.
   Widget _buildWithParentLayer(BuildContext context) {
-    final fake = LiquidGlassRenderScope.of(context).useFake;
+    final scopeSettings = LiquidGlassRenderScope.of(context);
+    final fake = scopeSettings.useFake;
 
     if (fake) {
       return FakeGlass.inLayer(
         shape: shape,
+        shadows: shadows,
         child: child,
       );
     }
@@ -245,23 +258,29 @@ class LiquidGlass extends StatelessWidget {
     final settings = LiquidGlassSettings.of(context);
 
     if (!ImageFilter.isShaderFilterSupported) {
-      return FakeGlass.inLayer(
+      return FakeGlass(
         shape: shape,
+        shadows: shadows,
         child: child,
       );
     }
 
-    return _RawLiquidGlass(
-      blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
+    return GlassShadow(
+      settings: settings,
       shape: shape,
-      glassContainsChild: glassContainsChild,
-      child: ClipPath(
-        clipper: ShapeBorderClipper(shape: shape),
-        clipBehavior: clipBehavior,
-        child: Opacity(
-          opacity: settings.visibility.clamp(0, 1),
-          child: GlassGlowLayer(
-            child: child,
+      shadows: shadows,
+      child: _RawLiquidGlass(
+        blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
+        shape: shape,
+        glassContainsChild: glassContainsChild,
+        child: ClipPath(
+          clipper: ShapeBorderClipper(shape: shape),
+          clipBehavior: clipBehavior,
+          child: Opacity(
+            opacity: settings.visibility.clamp(0, 1),
+            child: GlassGlowLayer(
+              child: child,
+            ),
           ),
         ),
       ),

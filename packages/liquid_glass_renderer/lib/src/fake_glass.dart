@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
@@ -20,6 +21,7 @@ class FakeGlass extends StatelessWidget {
     required this.shape,
     required this.child,
     LiquidGlassSettings this.settings = const LiquidGlassSettings(),
+    this.shadows = const [],
     super.key,
   });
 
@@ -28,6 +30,7 @@ class FakeGlass extends StatelessWidget {
   const FakeGlass.inLayer({
     required this.shape,
     required this.child,
+    this.shadows = const [],
     super.key,
   }) : settings = null;
 
@@ -40,6 +43,9 @@ class FakeGlass extends StatelessWidget {
   /// `refractiveIndex`, since there is no actual refraction happening.
   final LiquidGlassSettings? settings;
 
+  /// The list of shadows to paint around the glass shape.
+  final List<BoxShadow> shadows;
+
   /// The child widget that will be displayed inside the glass.
   final Widget child;
 
@@ -50,26 +56,31 @@ class FakeGlass extends StatelessWidget {
     // If we are in a layer, we accept that layer's backdrop key.
     final backdropKey =
         this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
-    return OptimizedClip(
+    return GlassShadow(
       shape: shape,
-      child: ShaderBuilder(
-        assetKey: ShaderKeys.fakeGlassColor,
-        (context, shader, child) => RawFakeGlass(
-          shape: shape,
-          settings: settings,
-          backdropKey: backdropKey,
-          colorShader: shader,
+      shadows: shadows,
+      settings: settings,
+      child: OptimizedClip(
+        shape: shape,
+        child: ShaderBuilder(
+          assetKey: ShaderKeys.fakeGlassColor,
+          (context, shader, child) => RawFakeGlass(
+            shape: shape,
+            settings: settings,
+            backdropKey: backdropKey,
+            colorShader: shader,
+            child: Opacity(
+              opacity: settings.visibility.clamp(0, 1),
+              child: GlassGlowLayer(
+                child: this.child,
+              ),
+            ),
+          ),
           child: Opacity(
             opacity: settings.visibility.clamp(0, 1),
             child: GlassGlowLayer(
-              child: this.child,
+              child: child,
             ),
-          ),
-        ),
-        child: Opacity(
-          opacity: settings.visibility.clamp(0, 1),
-          child: GlassGlowLayer(
-            child: child,
           ),
         ),
       ),

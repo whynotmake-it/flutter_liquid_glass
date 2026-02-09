@@ -28,6 +28,19 @@ class BasicApp extends HookWidget {
 
     final light = AlwaysStoppedAnimation(pi / 4);
 
+    const shadows = [
+      BoxShadow(
+        blurStyle: BlurStyle.outer,
+        color: Color.from(alpha: 0.05, red: 0, green: 0, blue: 0),
+        blurRadius: 2,
+      ),
+      BoxShadow(
+        blurStyle: BlurStyle.outer,
+        color: Color.from(alpha: 0.1, red: 0, green: 0, blue: 0),
+        blurRadius: 30,
+      ),
+    ];
+
     return GestureDetector(
       onTap: () {
         SettingsSheet(
@@ -98,6 +111,7 @@ class BasicApp extends HookWidget {
                             children: [
                               LiquidStretch(
                                 child: LiquidGlass.auto(
+                                  shadows: shadows,
                                   shape: LiquidRoundedSuperellipse(
                                     borderRadius: 20,
                                   ),
@@ -115,6 +129,7 @@ class BasicApp extends HookWidget {
                               ),
                               LiquidStretch(
                                 child: LiquidGlass.auto(
+                                  shadows: shadows,
                                   shape: LiquidRoundedSuperellipse(
                                     borderRadius: 20,
                                   ),
@@ -137,6 +152,7 @@ class BasicApp extends HookWidget {
                           ),
                           LiquidStretch(
                             child: LiquidGlass.auto(
+                              shadows: shadows,
                               shape: LiquidRoundedSuperellipse(
                                 borderRadius: 9000,
                               ),
