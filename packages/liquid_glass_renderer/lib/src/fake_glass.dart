@@ -162,14 +162,28 @@ class _RenderFakeGlass extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  bool get _hasBackdropEffect =>
+      settings.effectiveBlur != 0 || settings.effectiveSaturation != 1;
+
   @override
-  bool get alwaysNeedsCompositing => true;
+  bool get alwaysNeedsCompositing => _hasBackdropEffect;
 
   @override
   BackdropFilterLayer? get layer => super.layer as BackdropFilterLayer?;
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    if (!_hasBackdropEffect) {
+      // No blur or saturation change — skip the BackdropFilterLayer entirely
+      // and just paint the specular highlights and child directly.
+      this.layer = null;
+      final path = shape.getOuterPath(offset & size);
+      _paintColor(context.canvas, path);
+      _paintSpecular(context.canvas, path, offset & size);
+      super.paint(context, offset);
+      return;
+    }
+
     final blurFilter = ui.ImageFilter.blur(
       sigmaX: settings.effectiveBlur,
       sigmaY: settings.effectiveBlur,
