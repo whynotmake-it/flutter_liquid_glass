@@ -5,8 +5,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
+import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// A widget that aims to provide a similar look to [LiquidGlass], but without
@@ -50,10 +52,20 @@ class FakeGlass extends StatelessWidget {
         this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
     return OptimizedClip(
       shape: shape,
-      child: RawFakeGlass(
-        shape: shape,
-        settings: settings,
-        backdropKey: backdropKey,
+      child: ShaderBuilder(
+        assetKey: ShaderKeys.fakeGlassColor,
+        (context, shader, child) => RawFakeGlass(
+          shape: shape,
+          settings: settings,
+          backdropKey: backdropKey,
+          colorShader: shader,
+          child: Opacity(
+            opacity: settings.visibility.clamp(0, 1),
+            child: GlassGlowLayer(
+              child: this.child,
+            ),
+          ),
+        ),
         child: Opacity(
           opacity: settings.visibility.clamp(0, 1),
           child: GlassGlowLayer(
@@ -70,6 +82,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
   const RawFakeGlass({
     required this.shape,
     required super.child,
+    required this.colorShader,
     this.backdropKey,
     this.settings = const LiquidGlassSettings(),
     super.key,
@@ -81,12 +94,15 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
   final BackdropKey? backdropKey;
 
+  final ui.FragmentShader colorShader;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return _RenderFakeGlass(
       shape: shape,
       settings: settings,
       backdropKey: backdropKey,
+      colorShader: colorShader,
     );
   }
 
@@ -97,7 +113,8 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
       renderObject
         ..shape = shape
         ..settings = settings
-        .._backdropKey = backdropKey;
+        .._backdropKey = backdropKey
+        ..colorShader = colorShader;
     }
   }
 }
@@ -107,9 +124,11 @@ class _RenderFakeGlass extends RenderProxyBox {
     required LiquidShape shape,
     required LiquidGlassSettings settings,
     required BackdropKey? backdropKey,
+    required ui.FragmentShader colorShader,
   })  : _shape = shape,
         _settings = settings,
-        _backdropKey = backdropKey;
+        _backdropKey = backdropKey,
+        _colorShader = colorShader;
 
   LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -135,6 +154,14 @@ class _RenderFakeGlass extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  ui.FragmentShader _colorShader;
+  ui.FragmentShader get colorShader => _colorShader;
+  set colorShader(ui.FragmentShader value) {
+    if (_colorShader == value) return;
+    _colorShader = value;
+    markNeedsPaint();
+  }
+
   @override
   bool get alwaysNeedsCompositing => true;
 
@@ -143,24 +170,20 @@ class _RenderFakeGlass extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    // Create saturation filter if needed
-    final ui.ImageFilter? saturationFilter = settings.effectiveSaturation != 1.0
-        ? ui.ColorFilter.matrix(
-            _createSaturationMatrix(settings.effectiveSaturation),
-          )
-        : null;
-
     final blurFilter = ui.ImageFilter.blur(
       sigmaX: settings.effectiveBlur,
       sigmaY: settings.effectiveBlur,
       tileMode: TileMode.mirror,
     );
 
-    // Combine blur and saturation filters
+    final saturationFilter = _getSaturationFilter(settings);
+
+    // Compose: blur first (inner), then color+saturation shader (outer).
+    // The shader only runs on the clipped region
     final combinedFilter = saturationFilter != null
         ? ui.ImageFilter.compose(
-            inner: saturationFilter,
-            outer: blurFilter,
+            inner: blurFilter,
+            outer: saturationFilter,
           )
         : blurFilter;
 
@@ -177,12 +200,40 @@ class _RenderFakeGlass extends RenderProxyBox {
           context.setWillChangeHint();
         }
         final path = shape.getOuterPath(offset & size);
-        _paintColor(context.canvas, path);
+
+        if (saturationFilter == null) {
+          // If we don't have a shader filter, we need to paint the color
+          // ourselves.
+          _paintColor(context.canvas, path);
+        }
+
         _paintSpecular(context.canvas, path, offset & size);
         super.paint(context, offset);
       },
       offset,
     );
+  }
+
+  ui.ImageFilter? _getSaturationFilter(LiquidGlassSettings settings) {
+    if (settings.effectiveSaturation == 1) {
+      return null; // No saturation change, so no filter needed.
+    }
+    if (ui.ImageFilter.isShaderFilterSupported) {
+      // We will use our shader to apply saturation and color at once
+      final glassColor = settings.effectiveGlassColor;
+
+      _colorShader.setFloatUniforms((value) {
+        // uSize (vec2)
+        value
+          ..setSize(size)
+          ..setColor(glassColor)
+          ..setFloat(settings.effectiveSaturation);
+      });
+      return ui.ImageFilter.shader(_colorShader);
+    }
+
+    final matrix = _createSaturationMatrix(settings.effectiveSaturation);
+    return ui.ColorFilter.matrix(matrix);
   }
 
   /// Creates a saturation adjustment matrix
@@ -215,7 +266,8 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..color = color
       ..style = PaintingStyle.fill;
 
-    canvas.drawPath(path, paint);
+    // We can actually fill the canvas, since we are clipping.
+    canvas.drawPaint(paint);
   }
 
   /// Paints an approximation for specular highlights by using a linear

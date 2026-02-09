@@ -40,6 +40,7 @@ dev_dependencies:
     sdk: flutter
   lintervention: ^0.3.1
   mocktail: ^1.0.3
+  snaptest: ^0.2.3
 
 flutter:
   shaders:
@@ -47,3 +48,4 @@ flutter:
     - lib/assets/shaders/liquid_glass_filter.frag
     - lib/assets/shaders/liquid_glass_arbitrary.frag
     - lib/assets/shaders/liquid_glass_final_render.frag
+    - lib/assets/shaders/fake_glass_color.frag
