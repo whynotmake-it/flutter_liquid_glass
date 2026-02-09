@@ -86,6 +86,7 @@ This package provides several widgets to create the glass effect:
 | ------------------------- | ------------------------------------------------------------------------------------------ |
 | `LiquidGlassLayer`        | Container for all liquid glass effects. Required parent for `LiquidGlass` widgets.         |
 | `LiquidGlass`             | Creates a single glass shape. Must be inside a `LiquidGlassLayer`.                         |
+| `LiquidGlass.auto`        | Automatically uses a parent `LiquidGlassLayer` if available, or creates its own.           |
 | `LiquidGlassBlendGroup`   | Groups multiple `LiquidGlass.grouped` shapes to blend them together seamlessly.            |
 | `FakeGlass`               | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
 | `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
@@ -191,6 +192,21 @@ LiquidGlass.withOwnLayer(
 )
 ```
 
+If you don't know whether a `LiquidGlassLayer` exists as an ancestor, use `LiquidGlass.auto`. It will render on a parent layer if one is found, or create its own layer otherwise:
+
+```dart
+LiquidGlass.auto(
+  settings: const LiquidGlassSettings(
+    thickness: 15,
+    blur: 8,
+  ),
+  shape: LiquidRoundedSuperellipse(borderRadius: 30),
+  child: const SizedBox.square(dimension: 100),
+)
+```
+
+The `settings` and `fake` parameters are only used as a fallback when no parent layer is present. When a parent layer exists, its settings take precedence.
+
 **Note:** Make sure you have read the [Performance](#-a-word-on-performance) section for tips on getting the best performance out of the package.
 
 #### Supported Shapes
@@ -246,7 +262,7 @@ You can have multiple `LiquidGlass` widgets in a `LiquidGlassLayer` without blen
 
 ### `LiquidGlassSettings`
 
-You can customize the appearance of the glass by providing `LiquidGlassSettings` to a `LiquidGlassLayer` or `LiquidGlass.withOwnLayer()`. All glass widgets within that layer will share these settings.
+You can customize the appearance of the glass by providing `LiquidGlassSettings` to a `LiquidGlassLayer`, `LiquidGlass.withOwnLayer()`, or `LiquidGlass.auto()`. All glass widgets within that layer will share these settings.
 
 ```dart
 LiquidGlassLayer(

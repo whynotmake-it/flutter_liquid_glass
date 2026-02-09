@@ -118,7 +118,7 @@ class SettingsSheet extends HookWidget {
       stretch: .1,
       child: SafeArea(
         minimum: const EdgeInsets.all(16.0),
-        child: LiquidGlass.withOwnLayer(
+        child: LiquidGlass.auto(
           settings: LiquidGlassSettings.figma(
             depth: 50,
             refraction: 100,
