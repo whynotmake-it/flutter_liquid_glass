@@ -30,25 +30,11 @@ void main() {
 
     vec4 bg = texture(uBackgroundTexture, uv);
 
-    // --- Apply glass color (same blend logic as render.glsl) ---
-    vec4 color = bg;
-    if (uGlassColor.a > 0.0) {
-        float glassLuminance = dot(uGlassColor.rgb, LUMA_WEIGHTS);
-
-        if (glassLuminance < 0.5) {
-            // Multiply blend for dark tints
-            vec3 darkened = bg.rgb * (uGlassColor.rgb * 2.0);
-            color.rgb = mix(bg.rgb, darkened, uGlassColor.a);
-        } else {
-            // Screen blend for light tints
-            vec3 screened = vec3(1.0) - ((vec3(1.0) - bg.rgb) * (vec3(1.0) - uGlassColor.rgb));
-            color.rgb = mix(bg.rgb, screened, uGlassColor.a);
-        }
-    }
+    vec3 color = mix(bg.rgb, uGlassColor.rgb, uGlassColor.a);
 
     // --- Apply saturation boost ---
-    float luminance = dot(color.rgb, LUMA_WEIGHTS);
-    color.rgb = clamp(mix(vec3(luminance), color.rgb, uSaturation), 0.0, 1.0);
+    float luminance = dot(color, LUMA_WEIGHTS);
+    color = clamp(mix(vec3(luminance), color, uSaturation), 0.0, 1.0);
 
-    fragColor = vec4(color.rgb, bg.a);
+    fragColor = vec4(color, bg.a);
 }
