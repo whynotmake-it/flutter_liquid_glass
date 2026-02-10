@@ -10,6 +10,43 @@ void main() {
 
 enum BlurMode { backdrop, progressiveBlur, softEdgeBlur }
 
+class _GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFFFFFFF),
+    );
+
+    final paint = Paint()
+      ..color = const Color(0xFFCCCCCC)
+      ..strokeWidth = 0.5;
+
+    const spacing = 25.0;
+    for (double x = 0; x <= size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y <= size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+
+    // Heavier lines every 100px.
+    final heavyPaint = Paint()
+      ..color = const Color(0xFF999999)
+      ..strokeWidth = 1.0;
+
+    for (double x = 0; x <= size.width; x += 100) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), heavyPaint);
+    }
+    for (double y = 0; y <= size.height; y += 100) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), heavyPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class BlurComparisonApp extends StatefulWidget {
   const BlurComparisonApp({super.key});
 
@@ -21,20 +58,11 @@ class _BlurComparisonAppState extends State<BlurComparisonApp> {
   BlurMode _mode = BlurMode.backdrop;
 
   Widget _buildScrollContent() {
-    return CustomScrollView(
-      slivers: [
-        SliverGrid(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-          ),
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => Image.network(
-              fit: BoxFit.cover,
-              'https://picsum.photos/500/500?random=$index',
-            ),
-          ),
-        ),
-      ],
+    return SingleChildScrollView(
+      child: CustomPaint(
+        size: const Size(double.infinity, 2000),
+        painter: _GridPainter(),
+      ),
     );
   }
 

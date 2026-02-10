@@ -1,0 +1,23 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "E34E3C8F5D9E4F12442B6977E1D8F0F0737FB814",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "E34E3C8F5D9E4F12442B6977E1D8F0F0737FB814" : 0
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "E3E3893D-9905-4248-AF30-862168D177D7",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "E34E3C8F5D9E4F12442B6977E1D8F0F0737FB814" : "flutter_liquid_glass\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "Runner",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "packages\/blur_progressive\/example\/macos\/Runner.xcworkspace",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "git@github.com:whynotmake-it\/flutter_liquid_glass.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "E34E3C8F5D9E4F12442B6977E1D8F0F0737FB814"
+    }
+  ]
+}
