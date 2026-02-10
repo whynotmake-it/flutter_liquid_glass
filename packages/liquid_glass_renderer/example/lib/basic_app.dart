@@ -189,7 +189,7 @@ class BasicApp extends HookWidget {
                     icon: CupertinoIcons.add_circled,
                     onTap: () {
                       Navigator.of(context).push(
-                        CupertinoPageRoute(
+                        CupertinoPageRoute<void>(
                           builder: (context) => CupertinoPageScaffold(
                             child: SizedBox(),
                             navigationBar: CupertinoNavigationBar.large(),
