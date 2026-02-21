@@ -101,14 +101,16 @@ void main() {
     float edgeFactor = 1.0 - smoothstep(0.0, edgeThreshold, normalizedHeight);
     
     if (edgeFactor > 0.01) {
-        vec2 normalXY = normalize(displacement);
+        float dispLen = length(displacement);
+        vec2 normalXY = dispLen > 0.0001 ? displacement / dispLen : vec2(0.0, 1.0);
         
         float mainLight = max(0.0, dot(normalXY, uLightDirection));
         float oppositeLight = max(0.0, dot(normalXY, -uLightDirection));
         
         float totalInfluence = mainLight + oppositeLight * 0.8;
         
-        float directional = pow(totalInfluence, 1.5) * uLightIntensity * 3.0;
+        // Prevent pow(0.0, >0) NaN on some Android/Impeller devices
+        float directional = pow(max(0.0001, totalInfluence), 1.5) * uLightIntensity * 3.0;
         float ambient = uAmbientStrength * 0.5;
         
         float brightness = (directional + ambient) * edgeFactor * thicknessScale * 0.8;

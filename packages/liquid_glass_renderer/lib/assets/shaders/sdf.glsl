@@ -112,5 +112,7 @@ vec3 getNormal(float sd, float thickness) {
     float n_cos = max(thickness + sd, 0.0) / thickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
     
-    return normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
+    vec3 rawNormal = vec3(dx * n_cos, dy * n_cos, n_sin);
+    float nLen = length(rawNormal);
+    return nLen > 0.0001 ? rawNormal / nLen : vec3(0.0, 0.0, 1.0);
 }

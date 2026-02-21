@@ -45,7 +45,9 @@ void main() {
     float n_cos = max(uThickness + sd, 0.0) / uThickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
     
-    vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
+    vec3 rawNormal = vec3(dx * n_cos, dy * n_cos, n_sin);
+    float nLen = length(rawNormal);
+    vec3 normal = nLen > 0.0001 ? rawNormal / nLen : vec3(0.0, 0.0, 1.0);
     
     if (sd >= 0.0 || uThickness <= 0.0) {
         fragColor = vec4(0.0);
