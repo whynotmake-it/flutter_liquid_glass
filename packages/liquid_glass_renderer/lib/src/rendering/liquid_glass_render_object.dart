@@ -194,6 +194,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         boundingBox,
       );
 
+      if (image == null) {
+        // Degenerate size — skip glass rendering, paint children normally.
+        super.paint(context, offset);
+        return;
+      }
+
       _geometryImage = image;
       _geometryMatteBounds = matteBounds;
     }
@@ -300,7 +306,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @protected
   bool needsGeometryUpdate = true;
 
-  (ui.Image, Rect) _buildGeometryImage(
+  (ui.Image?, Rect) _buildGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
     Rect bounds,
   ) {
@@ -310,6 +316,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     ).snapToPixels(devicePixelRatio);
 
     final size = boundsInMatteSpace.size * devicePixelRatio;
+
+    // Guard against degenerate sizes that cause toInt() to throw
+    // "Unsupported operation: Infinity or NaN toInt" (#131).
+    // This can happen during layout transitions when the render object
+    // temporarily receives zero or invalid constraints.
+    if (size.width <= 0 ||
+        size.height <= 0 ||
+        !size.width.isFinite ||
+        !size.height.isFinite) {
+      return (null, boundsInMatteSpace);
+    }
+    final w = size.width.ceil();
+    final h = size.height.ceil();
 
     final buffer = StringBuffer('$hashCode Built geometry image with '
         '${geometries.length} shapes at size ${size.width}x${size.height}:\n');
@@ -351,10 +370,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     }
 
     final picture = recorder.endRecording();
-    final image = picture.toImageSync(
-      size.width.ceil(),
-      size.height.ceil(),
-    );
+    final image = picture.toImageSync(w, h);
 
     logger.fine(buffer.toString());
     picture.dispose();
