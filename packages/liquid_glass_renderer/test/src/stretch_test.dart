@@ -40,6 +40,58 @@ void main() {
 
         expect(buttonPressedCount, 1);
       });
+
+      testWidgets(
+        'gestureDetector: no stretch until pan wins over nested button',
+        (tester) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: LiquidStretch(
+                    gestureMode: GestureMode.gestureDetector,
+                    child: ElevatedButton(
+                      key: buttonKey,
+                      onPressed: () {},
+                      child: const Text('Press me'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          final center = tester.getCenter(find.byKey(buttonKey));
+          final gesture = await tester.startGesture(center);
+          // Hold the pointer down while the button's tap recognizer competes 
+          // with the parent pan; onPanStart must not run until the pan wins, 
+          // so the interaction scale should stay at 1.0.
+          await tester.pump(const Duration(milliseconds: 100));
+          final scaleFinder = find.descendant(
+            of: find.byType(LiquidStretch),
+            matching: find.byType(Transform),
+          );
+          expect(scaleFinder, findsWidgets);
+          expect(
+            tester
+                .widget<Transform>(scaleFinder.first)
+                .transform
+                .getMaxScaleOnAxis(),
+            moreOrLessEquals(1),
+          );
+
+          await gesture.up();
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<Transform>(scaleFinder.first)
+                .transform
+                .getMaxScaleOnAxis(),
+            moreOrLessEquals(1),
+          );
+        },
+      );
+
       Widget build() {
         return MaterialApp(
           home: Scaffold(

@@ -62,7 +62,7 @@ mixin TransformTrackingRenderObjectMixin on RenderProxyBox {
   }
 
   GeometryTransformTrackingLayer setUpLayer(Offset offset) {
-    return (this.layer ??= GeometryTransformTrackingLayer())
+    return (layer ??= GeometryTransformTrackingLayer())
       ..renderObject = this
       ..onTransformChanged = () {
         if (attached) {
