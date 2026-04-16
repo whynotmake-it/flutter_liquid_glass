@@ -34,6 +34,7 @@ class GlassShadow extends SingleChildRenderObjectWidget {
     return _RenderGlassShadow(
       shape: shape,
       shadows: shadows,
+      visibility: settings.visibility,
     );
   }
 
@@ -45,7 +46,8 @@ class GlassShadow extends SingleChildRenderObjectWidget {
   ) {
     renderObject
       ..shape = shape
-      ..shadows = shadows;
+      ..shadows = shadows
+      ..visibility = settings.visibility;
   }
 }
 
@@ -53,8 +55,10 @@ class _RenderGlassShadow extends RenderProxyBox {
   _RenderGlassShadow({
     required LiquidShape shape,
     required List<BoxShadow> shadows,
+    required double visibility,
   })  : _shape = shape,
-        _shadows = shadows;
+        _shadows = shadows,
+        _visibility = visibility.clamp(0, 1);
 
   LiquidShape get shape => _shape;
   LiquidShape _shape;
@@ -100,8 +104,11 @@ class _RenderGlassShadow extends RenderProxyBox {
 
         switch (shape) {
           case LiquidRoundedSuperellipse(:final borderRadius):
-            canvas.drawRRect(
-              RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
+            canvas.drawRSuperellipse(
+              RSuperellipse.fromRectAndRadius(
+                shadowRect,
+                Radius.circular(borderRadius),
+              ),
               paint,
             );
 

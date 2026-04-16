@@ -181,8 +181,11 @@ class _RenderFakeGlass extends RenderProxyBox {
     super.dispose();
   }
 
-  bool get _hasBackdropEffect =>
-      settings.effectiveBlur != 0 || settings.effectiveSaturation != 1;
+  bool get _hasBlur => settings.effectiveBlur != 0;
+
+  bool get _hasSaturationChange => settings.effectiveSaturation != 1;
+
+  bool get _hasBackdropEffect => _hasBlur || _hasSaturationChange;
 
   @override
   bool get alwaysNeedsCompositing => _hasBackdropEffect;
@@ -201,6 +204,20 @@ class _RenderFakeGlass extends RenderProxyBox {
       _paintColor(context.canvas, path);
       _paintSpecular(context.canvas, path, offset & size);
       super.paint(context, offset);
+      return;
+    }
+
+    if (!_hasBlur) {
+      // No blur, but saturation needs changing — skip the blur
+      // BackdropFilterLayer (a zero-blur BackdropFilterLayer with srcATop can
+      // produce empty output on Impeller) and only apply saturation.
+      this.layer = null;
+      final saturationFilter = _getBackdropFilter(settings);
+      _paintContent(
+        context,
+        offset,
+        saturationFilter: saturationFilter,
+      );
       return;
     }
 
