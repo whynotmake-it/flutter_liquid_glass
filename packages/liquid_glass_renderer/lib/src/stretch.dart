@@ -20,6 +20,7 @@ class LiquidStretch extends StatelessWidget {
     this.stretch = .5,
     this.resistance = .08,
     this.hitTestBehavior = HitTestBehavior.opaque,
+    this.gestureMode = GestureMode.listener,
     super.key,
   });
 
@@ -58,6 +59,11 @@ class LiquidStretch extends StatelessWidget {
   /// Defaults to [HitTestBehavior.opaque].
   final HitTestBehavior hitTestBehavior;
 
+  /// {@macro gesture_mode}
+  ///
+  /// Defaults to [GestureMode.listener].
+  final GestureMode gestureMode;
+
   /// The child widget to apply the stretch effect to.
   final Widget child;
 
@@ -69,6 +75,7 @@ class LiquidStretch extends StatelessWidget {
 
     return GlassDragBuilder(
       behavior: hitTestBehavior,
+      gestureMode: gestureMode,
       builder: (context, value, child) {
         final scale = value == null ? 1.0 : interactionScale;
         return SingleMotionBuilder(

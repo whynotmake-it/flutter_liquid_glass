@@ -7,8 +7,39 @@ void main() {
     setUp(() {});
 
     const childKey = Key('child');
+    const buttonKey = Key('button');
 
     group('stretching', () {
+      testWidgets('gestureDetector mode allows nested button to work',
+          (tester) async {
+        var buttonPressedCount = 0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: LiquidStretch(
+                  gestureMode: GestureMode.gestureDetector,
+                  child: ElevatedButton(
+                    key: buttonKey,
+                    onPressed: () => buttonPressedCount++,
+                    child: const Text('Press me'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final buttonFinder = find.byKey(buttonKey);
+        expect(buttonFinder, findsOneWidget);
+
+        // Tap the button - should trigger button press, not stretch effect
+        await tester.tap(buttonFinder);
+        await tester.pumpAndSettle();
+
+        expect(buttonPressedCount, 1);
+      });
       Widget build() {
         return MaterialApp(
           home: Scaffold(
