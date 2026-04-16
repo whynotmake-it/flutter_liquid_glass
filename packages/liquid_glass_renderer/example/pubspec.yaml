@@ -15,12 +15,10 @@ dependencies:
   leak_tracker: any
   liquid_glass_renderer:
     path: ../
-  heroine: ^0.5.0-dev.6
-  rivership: ^0.3.0-dev.6
-  smooth_sheets: ^0.12.0
+  rivership: ^0.4.0+8
   motor: ^1.0.0-dev.3
   google_fonts: ^6.2.1
-  stupid_simple_sheet: ^0.5.0
+  stupid_simple_sheet: ^0.9.1+1
   flutter_shaders: ^0.1.3
 
 dev_dependencies:
