@@ -101,5 +101,40 @@ void main() {
         ],
       ),
     );
+
+    goldenTest(
+      'offset shadow is cut out behind glass',
+      fileName: 'fake_glass_offset_shadow_cutout',
+      pumpBeforeTest: pumpOnce,
+      builder: () => GoldenTestGroup(
+        scenarioConstraints: testScenarioConstraints,
+        children: [
+          for (final visibility in [0.0, 0.5, 1.0])
+            GoldenTestScenario(
+              name: 'visibility ${visibility.toStringAsFixed(1)}',
+              child: buildWithGridPaper(
+                FakeGlass(
+                  settings: LiquidGlassSettings(
+                    visibility: visibility,
+                    blur: 0,
+                    saturation: 1,
+                    chromaticAberration: 0,
+                    lightIntensity: 0,
+                    glassColor: const Color.fromARGB(128, 0, 0, 255),
+                  ),
+                  shadows: const [
+                    BoxShadow(
+                      offset: Offset(16, 16),
+                      blurRadius: 24,
+                    ),
+                  ],
+                  shape: const LiquidRoundedSuperellipse(borderRadius: 40),
+                  child: const SizedBox.square(dimension: 300),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   });
 }
