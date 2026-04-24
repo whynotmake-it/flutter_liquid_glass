@@ -44,6 +44,11 @@ class FakeGlass extends StatelessWidget {
   final LiquidGlassSettings? settings;
 
   /// The list of shadows to paint around the glass shape.
+  ///
+  /// Only outer-equivalent shadows are supported; [BoxShadow.blurStyle] is
+  /// ignored. When any shadow has a non-zero [BoxShadow.offset], the glass
+  /// shape is cut out of the composed shadow stack so the shadow does not
+  /// bleed through the translucent glass body.
   final List<BoxShadow> shadows;
 
   /// The child widget that will be displayed inside the glass.

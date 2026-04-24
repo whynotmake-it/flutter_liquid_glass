@@ -26,17 +26,25 @@ class BasicApp extends HookWidget {
     final tab = useState(0);
     final fake = useState(false);
 
+    final visibility = useState(true);
+    final visibilityValue = useSingleMotion(
+      value: visibility.value ? 1.0 : 0.0,
+      motion: Motion.smoothSpring(),
+    );
+
     final light = AlwaysStoppedAnimation(pi / 4);
 
     const shadows = [
       BoxShadow(
         blurStyle: BlurStyle.outer,
         color: Color.from(alpha: 0.05, red: 0, green: 0, blue: 0),
+        offset: Offset(0, 1),
         blurRadius: 2,
       ),
       BoxShadow(
         blurStyle: BlurStyle.outer,
         color: Color.from(alpha: 0.1, red: 0, green: 0, blue: 0),
+        offset: Offset(0, 8),
         blurRadius: 30,
       ),
     ];
@@ -95,9 +103,11 @@ class BasicApp extends HookWidget {
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.2),
+                    visibility: visibilityValue,
                   );
                   return LiquidGlassLayer(
                     fake: fake.value,
+                    useBackdropGroup: true,
                     settings: settings.copyWith(lightAngle: light.value),
                     child: LiquidGlassBlendGroup(
                       blend: blendNotifier.value,
@@ -109,19 +119,23 @@ class BasicApp extends HookWidget {
                             mainAxisSize: MainAxisSize.min,
                             spacing: 16,
                             children: [
-                              LiquidStretch(
-                                child: LiquidGlass.auto(
-                                  shadows: shadows,
-                                  shape: LiquidRoundedSuperellipse(
-                                    borderRadius: 20,
-                                  ),
-                                  child: GlassGlow(
-                                    child: SizedBox.square(
-                                      dimension: 100,
-                                      child: Center(
-                                        child: fake.value
-                                            ? Text('FAKE')
-                                            : Text('REAL'),
+                              GestureDetector(
+                                onTap: () =>
+                                    visibility.value = !visibility.value,
+                                child: LiquidStretch(
+                                  child: LiquidGlass.auto(
+                                    shadows: shadows,
+                                    shape: LiquidRoundedSuperellipse(
+                                      borderRadius: 20,
+                                    ),
+                                    child: GlassGlow(
+                                      child: SizedBox.square(
+                                        dimension: 100,
+                                        child: Center(
+                                          child: fake.value
+                                              ? Text('FAKE')
+                                              : Text('REAL'),
+                                        ),
                                       ),
                                     ),
                                   ),
