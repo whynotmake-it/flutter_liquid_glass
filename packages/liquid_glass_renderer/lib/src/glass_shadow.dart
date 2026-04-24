@@ -27,6 +27,11 @@ class GlassShadow extends SingleChildRenderObjectWidget {
   final LiquidGlassSettings settings;
 
   /// The list of shadows to paint.
+  ///
+  /// Only outer-equivalent shadows are supported; [BoxShadow.blurStyle] is
+  /// ignored. When any shadow has a non-zero [BoxShadow.offset], the glass
+  /// shape is cut out of the composed shadow stack so the shadow does not
+  /// bleed through the translucent glass body.
   final List<BoxShadow> shadows;
 
   @override
@@ -90,42 +95,69 @@ class _RenderGlassShadow extends RenderProxyBox {
       final rect = offset & size;
       final canvas = context.canvas;
 
+      final needsCutout = shadows.any((s) => s.offset != Offset.zero);
+
+      if (needsCutout) {
+        var layerBounds = rect;
+        for (final shadow in shadows) {
+          layerBounds = layerBounds.expandToInclude(
+            rect.shift(shadow.offset).inflate(
+                  shadow.spreadRadius + shadow.blurRadius * visibility,
+                ),
+          );
+        }
+        canvas.saveLayer(layerBounds, Paint());
+      }
+
       for (final shadow in shadows) {
         final shadowRect =
             rect.shift(shadow.offset).inflate(shadow.spreadRadius);
         final paint = shadow
             .copyWith(
               blurRadius: shadow.blurRadius * visibility,
+              blurStyle: needsCutout ? BlurStyle.normal : BlurStyle.outer,
               color: shadow.color.withValues(
                 alpha: shadow.color.a * visibility,
               ),
             )
             .toPaint();
 
-        switch (shape) {
-          case LiquidRoundedSuperellipse(:final borderRadius):
-            canvas.drawRSuperellipse(
-              RSuperellipse.fromRectAndRadius(
-                shadowRect,
-                Radius.circular(borderRadius),
-              ),
-              paint,
-            );
+        _drawShape(canvas, shadowRect, paint);
+      }
 
-          case LiquidOval():
-            canvas.drawOval(shadowRect, paint);
-          case LiquidRoundedRectangle(:final borderRadius):
-            canvas.drawRRect(
-              RRect.fromRectAndRadius(
-                shadowRect,
-                Radius.circular(borderRadius),
-              ),
-              paint,
-            );
-        }
+      if (needsCutout) {
+        _drawShape(
+          canvas,
+          rect.deflate(.5),
+          Paint()..blendMode = BlendMode.dstOut,
+        );
+        canvas.restore();
       }
     }
 
     super.paint(context, offset);
+  }
+
+  void _drawShape(Canvas canvas, Rect rect, Paint paint) {
+    switch (shape) {
+      case LiquidRoundedSuperellipse(:final borderRadius):
+        canvas.drawRSuperellipse(
+          RSuperellipse.fromRectAndRadius(
+            rect,
+            Radius.circular(borderRadius),
+          ),
+          paint,
+        );
+      case LiquidOval():
+        canvas.drawOval(rect, paint);
+      case LiquidRoundedRectangle(:final borderRadius):
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            rect,
+            Radius.circular(borderRadius),
+          ),
+          paint,
+        );
+    }
   }
 }
