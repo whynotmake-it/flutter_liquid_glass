@@ -151,7 +151,8 @@ vec3 getReconstructedNormal(vec2 p, float thickness) {
     // At center, normals should point more upward (z approaches 1)
     // Adjust this exponent to decide how gradual this transition should be. Higher values are more abrupt
     float normalExponent = .2;
-    float normalZ = pow(edgeDistance, normalExponent);
+    // Prevent pow(0.0, >0) NaN on some Android/Impeller devices
+    float normalZ = pow(max(0.0001, edgeDistance), normalExponent);
     
     // Scale xy components to maintain unit length
     float xyScale = sqrt(max(0.0, 1.0 - normalZ * normalZ));
