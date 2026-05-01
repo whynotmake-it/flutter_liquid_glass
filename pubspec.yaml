@@ -8,5 +8,5 @@ environment:
   flutter: ">=3.32.0"
 
 dev_dependencies:
-  lintervention: ^0.3.1
+  lintervention: ^0.4.0+1
   melos: ^6.3.3
