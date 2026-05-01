@@ -39,7 +39,7 @@ jobs:
           publish-dry-run: true
 
       - name: 🎋 Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           title: "chore(release): Publish packages"
           body: "Prepared all packages to be released to pub.dev"
