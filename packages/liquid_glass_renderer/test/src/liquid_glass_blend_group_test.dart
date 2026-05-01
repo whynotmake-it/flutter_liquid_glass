@@ -44,7 +44,7 @@ void main() {
       );
     }
 
-    testWidgets('generates a geometry image', (tester) async {
+    testWidgets('generates a geometry image', tags: ['golden'], (tester) async {
       final thicknesses = [10, 20, 30];
       final refractiveIndices = [1.0, 1.1, 1.2, 1.3];
       final blendValues = [0.0, 10, 20, 30, 300];

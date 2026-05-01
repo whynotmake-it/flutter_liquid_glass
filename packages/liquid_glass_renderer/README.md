@@ -271,7 +271,6 @@ LiquidGlassLayer(
     thickness: 10,
     glassColor: Color(0x1AFFFFFF),
     lightIntensity: 1.5,
-    outlineIntensity: 0.5,
     saturation: 1.2,
   ),
   child: LiquidGlassBlendGroup(
@@ -286,15 +285,35 @@ Here's a breakdown of the key settings:
 -   `glassColor`: The color tint of the glass. The alpha channel controls the intensity.
 -   `thickness`: How much the glass refracts the background (higher = more distortion).
 -   `blur`: Background blur strength (0 = no blur).
+-   `chromaticAberration`: Creates color fringing effects at glass edges (higher values = more pronounced color separation). This effect is still a work in progress and may look imperfect.
+-   `visibility`: A scaling factor (0.0 to 1.0) that affects all thickness-related properties (thickness, blur, chromatic aberration, light intensity, etc.). Useful for animating the glass effect in/out.
 -   `refractiveIndex`: The refractive index of the glass material (1.0 = no refraction, ~1.5 = realistic glass).
 -   `lightAngle`, `lightIntensity`: Control the direction and brightness of the virtual light source, creating highlights.
 -   `ambientStrength`: The intensity of ambient light on the glass.
--   `outlineIntensity`: The visibility of the glass outline/edge.
 -   `saturation`: Adjusts the color saturation of background pixels visible through the glass (1.0 = no change, <1.0 = desaturated, >1.0 = more saturated).
 
 **Note:** The `blend` parameter has been moved from `LiquidGlassSettings` to the `LiquidGlassBlendGroup` constructor, as it specifically controls shape blending behavior.
 
 Increasing saturation when using colored glass helps achieve an Apple-like aesthetic.
+
+#### Figma-style Settings (Experimental)
+
+For those familiar with Figma's glass effect controls, there's an experimental `.figma()` factory constructor that uses percentage-based parameters (0-100) similar to Figma's interface:
+
+```dart
+LiquidGlassLayer(
+  settings: LiquidGlassSettings.figma(
+    refraction: 50,    // 0-100: Controls refractiveIndex (0 = 1.0, 100 = 1.2)
+    depth: 20,         // Maps to thickness
+    dispersion: 25,    // 0-100: Controls chromaticAberration
+    frost: 10,         // Maps to blur
+    lightIntensity: 50, // 0-100: Controls light intensity
+  ),
+  child: // ... your glass widgets
+)
+```
+
+**Note:** This factory constructor was crudely eyeballed to approximate Figma's glass effect and may change in future versions as we refine the mapping between Figma's parameters and our internal settings.
 
 ### Adding Blur
 
