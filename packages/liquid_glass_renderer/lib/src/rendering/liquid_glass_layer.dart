@@ -4,8 +4,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -130,11 +130,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     if (widget.fake || !ImageFilter.isShaderFilterSupported) {
       if (!ImageFilter.isShaderFilterSupported) {
         logger.warning(
-            'LiquidGlassLayer is only supported when using Impeller at the '
-            'moment. Falling back to FakeGlass for LiquidGlassLayer. '
-            'To prevent this warning, enable Impeller, or set '
-            'LiquidGlassLayer.fake to true before you use liquid glass widgets '
-            'on Skia.');
+          'LiquidGlassLayer is only supported when using Impeller at the '
+          'moment. Falling back to FakeGlass for LiquidGlassLayer. '
+          'To prevent this warning, enable Impeller, or set '
+          'LiquidGlassLayer.fake to true before you use liquid glass widgets '
+          'on Skia.',
+        );
       }
 
       return LiquidGlassRenderScope(
@@ -152,10 +153,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         child: InheritedGeometryRenderLink(
           link: _link,
-          child: ShaderBuilder(
-            assetKey: ShaderKeys.liquidGlassRender,
-            (context, shader, child) => _RawShapes(
-              renderShader: shader,
+          child: MultiShaderBuilder(
+            assetKeys: [
+              ShaderKeys.liquidGlassRender,
+            ],
+            (context, shaders, child) => _RawShapes(
+              renderShader: shaders[0],
               backdropKey: widget.useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null,
@@ -258,9 +261,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
     final shaderFilter = switch (blurFilter) {
       final blur? => ImageFilter.compose(
-          inner: blur,
-          outer: ImageFilter.shader(renderShader),
-        ),
+        inner: blur,
+        outer: ImageFilter.shader(renderShader),
+      ),
       null => ImageFilter.shader(renderShader),
     };
 
@@ -280,21 +283,21 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _clipPathLayerHandle.layer = context
         // First we push the clipped blur layer
         .pushClipPath(
-      needsCompositing,
-      offset,
-      boundingBox,
-      clipPath,
-      (context, offset) {
-        // If glass contains child we paint it above blur but below shader
-        paintShapeContents(
-          context,
+          needsCompositing,
           offset,
-          shapes,
-          insideGlass: true,
+          boundingBox,
+          clipPath,
+          (context, offset) {
+            // If glass contains child we paint it above blur but below shader
+            paintShapeContents(
+              context,
+              offset,
+              shapes,
+              insideGlass: true,
+            );
+          },
+          oldLayer: _clipPathLayerHandle.layer,
         );
-      },
-      oldLayer: _clipPathLayerHandle.layer,
-    );
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,

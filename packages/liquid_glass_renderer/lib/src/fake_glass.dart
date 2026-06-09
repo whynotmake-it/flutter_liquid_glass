@@ -59,8 +59,9 @@ class FakeGlass extends StatelessWidget {
     final settings = this.settings ?? LiquidGlassSettings.of(context);
 
     // If we are in a layer, we accept that layer's backdrop key.
-    final backdropKey =
-        this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
+    final backdropKey = this.settings == null
+        ? BackdropGroup.of(context)?.backdropKey
+        : null;
     return GlassShadow(
       shape: shape,
       shadows: shadows,
@@ -124,7 +125,9 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, covariant RenderObject renderObject) {
+    BuildContext context,
+    covariant RenderObject renderObject,
+  ) {
     if (renderObject is _RenderFakeGlass) {
       renderObject
         ..shape = shape
@@ -141,10 +144,10 @@ class _RenderFakeGlass extends RenderProxyBox {
     required LiquidGlassSettings settings,
     required BackdropKey? backdropKey,
     required ui.FragmentShader colorShader,
-  })  : _shape = shape,
-        _settings = settings,
-        _backdropKey = backdropKey,
-        _colorShader = colorShader;
+  }) : _shape = shape,
+       _settings = settings,
+       _backdropKey = backdropKey,
+       _colorShader = colorShader;
 
   LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -265,10 +268,10 @@ class _RenderFakeGlass extends RenderProxyBox {
     ui.ImageFilter? saturationFilter,
   }) {
     if (saturationFilter != null) {
-      final saturationLayer = (_saturationLayerHandle.layer ??=
-          BackdropFilterLayer())
-        ..filter = saturationFilter
-        ..blendMode = BlendMode.srcATop;
+      final saturationLayer =
+          (_saturationLayerHandle.layer ??= BackdropFilterLayer())
+            ..filter = saturationFilter
+            ..blendMode = BlendMode.srcATop;
       context.pushLayer(
         saturationLayer,
         _paintInnerContent,
@@ -351,7 +354,7 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   /// Paints an approximation for specular highlights by using a linear
-  /// gradient that is aligned with the light angle and painting a strokw with
+  /// gradient that is aligned with the light angle and painting a stroke with
   /// that gradient.
   void _paintSpecular(Canvas canvas, Path path, Rect bounds) {
     // Expand bounds to a square to make sure the gradient angle will match the
@@ -363,18 +366,31 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final lightIntensity = settings.effectiveLightIntensity.clamp(0.0, 1.0);
     final ambientStrength = settings.effectiveAmbientStrength.clamp(0.0, 1.0);
+    final specularWrap = settings.specularWrap.clamp(0.0, 1.0);
 
-    final alpha = Curves.easeOut.transform(lightIntensity);
-    final color = Colors.white.withValues(
-      alpha: alpha,
+    final highlightAlpha = Curves.easeOut.transform(lightIntensity) * 0.78;
+    final highlightColor = settings.effectiveHighlightColor.withValues(
+      alpha: settings.effectiveHighlightColor.a * highlightAlpha,
     );
-    final rad = settings.lightAngle;
+    final edgeColor = settings.effectiveEdgeColor.withValues(
+      alpha:
+          settings.effectiveEdgeColor.a *
+          0.95 *
+          Curves.easeOut.transform(
+            ui.lerpDouble(0.35, 1.0, specularWrap)!,
+          ),
+    );
 
+    final softEdgeColor = edgeColor.withValues(
+      alpha: edgeColor.a * ui.lerpDouble(0.9, 1.0, ambientStrength)!,
+    );
+
+    final rad = settings.lightAngle;
     final x = math.cos(rad);
     final y = math.sin(rad);
 
     // How far the light covers the glass, used to adjust the gradient stops
-    final lightCoverage = ui.lerpDouble(.3, .5, lightIntensity)!;
+    final lightCoverage = ui.lerpDouble(.12, .5, specularWrap)!;
 
     // How perpendicular we are to the shortest side of the box, 1 means the
     // light is hitting the shortest side directly, 0 means it's hitting the
@@ -392,20 +408,25 @@ class _RenderFakeGlass extends RenderProxyBox {
     final inset = ui.lerpDouble(0, .5, gradientScale.clamp(0, 1))!;
 
     // How far the second stops are inset
-    final secondInset =
-        ui.lerpDouble(lightCoverage, .5, gradientScale.clamp(0, 1))!;
+    final secondInset = ui.lerpDouble(
+      lightCoverage,
+      .5,
+      gradientScale.clamp(0, 1),
+    )!;
+    final edgeStart = ui.lerpDouble(secondInset, .5, .35)!;
+    final edgeEnd = 1 - edgeStart;
 
     final shader = LinearGradient(
       colors: [
-        color,
-        color.withValues(alpha: ambientStrength),
-        color.withValues(alpha: ambientStrength),
-        color,
+        highlightColor,
+        softEdgeColor,
+        softEdgeColor,
+        highlightColor,
       ],
       stops: [
         inset,
-        secondInset,
-        1 - secondInset,
+        edgeStart,
+        edgeEnd,
         1 - inset,
       ],
       begin: Alignment(x, y),
@@ -414,18 +435,17 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final paint = Paint()
       ..shader = shader
-      ..color = color
+      ..color = highlightColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = ui.lerpDouble(1, 2, lightIntensity)!
-      ..color = color.withValues(alpha: color.a * 0.4)
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
 
     final overlay = Paint()
       ..shader = shader
-      ..color = color.withValues(alpha: color.a * 0.6)
+      ..color = highlightColor.withValues(alpha: highlightColor.a * 0.45)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (settings.effectiveThickness / 20)
+      ..strokeWidth = (settings.effectiveThickness / 24)
       ..blendMode = BlendMode.overlay;
     canvas.drawPath(path, overlay);
   }

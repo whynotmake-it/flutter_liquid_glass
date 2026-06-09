@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -13,7 +11,9 @@ void main() {
 }
 
 final settingsNotifier = ValueNotifier(
-  LiquidGlassSettings(glassColor: Colors.white.withValues(alpha: 0.2)),
+  LiquidGlassSettings(
+    glassColor: Colors.white.withValues(alpha: 0.2),
+  ),
 );
 
 final blendNotifier = ValueNotifier(10.0);
@@ -31,8 +31,6 @@ class BasicApp extends HookWidget {
       value: visibility.value ? 1.0 : 0.0,
       motion: Motion.smoothSpring(),
     );
-
-    final light = AlwaysStoppedAnimation(pi / 4);
 
     const shadows = [
       BoxShadow(
@@ -55,7 +53,6 @@ class BasicApp extends HookWidget {
           fake: fake.value,
           blendNotifier: blendNotifier,
           settingsNotifier: settingsNotifier,
-          lightAngleAnimation: light,
         ).show(context);
       },
       child: CupertinoPageScaffold(
@@ -95,7 +92,6 @@ class BasicApp extends HookWidget {
               child: ListenableBuilder(
                 listenable: Listenable.merge([
                   settingsNotifier,
-                  light,
                   blendNotifier,
                 ]),
                 builder: (context, child) {
@@ -103,12 +99,18 @@ class BasicApp extends HookWidget {
                     glassColor: CupertinoTheme.of(
                       context,
                     ).barBackgroundColor.withValues(alpha: 0.2),
+                    edgeColor: Color.from(
+                      alpha: .5,
+                      red: .1,
+                      green: .1,
+                      blue: .1,
+                    ),
                     visibility: visibilityValue,
                   );
                   return LiquidGlassLayer(
                     fake: fake.value,
                     useBackdropGroup: true,
-                    settings: settings.copyWith(lightAngle: light.value),
+                    settings: settings,
                     child: LiquidGlassBlendGroup(
                       blend: blendNotifier.value,
                       child: Column(
