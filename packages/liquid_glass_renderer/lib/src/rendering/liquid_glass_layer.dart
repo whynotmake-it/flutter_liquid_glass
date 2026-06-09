@@ -229,10 +229,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   Size get desiredMatteSize => switch (owner?.rootNode) {
-        final RenderView rv => rv.size,
-        final RenderBox rb => rb.size,
-        _ => Size.zero,
-      };
+    final RenderView rv => rv.size,
+    final RenderBox rb => rb.size,
+    _ => Size.zero,
+  };
 
   @override
   Matrix4 get matteTransform => getTransformTo(null);
