@@ -59,8 +59,10 @@ vec2 findShapeCenter(vec2 currentUV) {
     vec2 centerSum = vec2(0.0);
     float totalAlpha = 0.0;
     
-    // Sample in a reasonable radius around the current point
-    int sampleRadius = 10;
+    // Sample in a reasonable radius around the current point.
+    // Must be a compile-time constant: SkSL requires loop-index initializers
+    // (`for (int x = -sampleRadius; ...)`) to be constant expressions.
+    const int sampleRadius = 10;
     for (int y = -sampleRadius; y <= sampleRadius; y++) {
         for (int x = -sampleRadius; x <= sampleRadius; x++) {
             vec2 sampleUV = currentUV + vec2(float(x), float(y)) * texelSize;

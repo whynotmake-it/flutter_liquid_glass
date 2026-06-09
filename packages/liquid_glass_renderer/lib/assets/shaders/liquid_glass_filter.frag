@@ -15,7 +15,8 @@ precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
 #include "shared.glsl"
-#include "sdf.glsl"
+
+#define MAX_SHAPES 16
 
 // Optimized uniform layout - grouped into vectors for better performance
 layout(location = 0) uniform vec2 uSize;                    // width, height
@@ -37,6 +38,9 @@ float uSaturation = uLightConfig.w;
 layout(location = 5) uniform float uNumShapes;             // numShapes  
 layout(location = 6) uniform float uShapeData[MAX_SHAPES * 6];
 
+// Included after uShapeData so the SDF helpers can read the uniform directly.
+#include "sdf.glsl"
+
 uniform sampler2D uBlurredTexture;
 layout(location = 0) out vec4 fragColor;
 
@@ -52,7 +56,7 @@ void main() {
     #endif
     
     // Generate shape and calculate normal using shader-specific method
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uShapeData, uBlend);
+    float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
     // Early discard for pixels outside glass shapes to reduce overdraw

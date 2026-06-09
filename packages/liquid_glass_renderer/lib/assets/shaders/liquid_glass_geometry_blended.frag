@@ -8,13 +8,17 @@
 precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
-#include "sdf.glsl"
 #include "displacement_encoding.glsl"
+
+#define MAX_SHAPES 16
 
 layout(location = 0) uniform vec2 uSize;
 layout(location = 1) uniform vec4 uOpticalProps;
 layout(location = 2) uniform float uNumShapes;
 layout(location = 3) uniform float uShapeData[MAX_SHAPES * 6];
+
+// Included after uShapeData so the SDF helpers can read the uniform directly.
+#include "sdf.glsl"
 
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
@@ -31,7 +35,7 @@ void main() {
         vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
     #endif
     
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uShapeData, uBlend);
+    float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
     
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
     if (foregroundAlpha < 0.01) {
