@@ -224,22 +224,34 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     with TransformTrackingRenderObjectMixin {
   RenderLiquidGlassLayer({
     required super.renderShader,
+    required this.specularShader,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
     required super.link,
   });
 
+  /// Shader for the separate specular highlight layer. It computes the
+  /// height-based rim edge profile from the geometry texture and is applied as
+  /// an [ImageFilter] over that texture, then composited additively on top of
+  /// the refracted/colored glass.
+  final FragmentShader specularShader;
+
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
   final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
+  bool get _shouldRenderSpecular =>
+      settings.effectiveLightIntensity > 0.01 ||
+      settings.effectiveEdgeColor.a > 0.01 ||
+      settings.effectiveAmbientStrength > 0.01;
+
   @override
   Size get desiredMatteSize => switch (owner?.rootNode) {
-        final RenderView rv => rv.size,
-        final RenderBox rb => rb.size,
-        _ => Size.zero,
-      };
+    final RenderView rv => rv.size,
+    final RenderBox rb => rb.size,
+    _ => Size.zero,
+  };
 
   @override
   Matrix4 get matteTransform => getTransformTo(null);
