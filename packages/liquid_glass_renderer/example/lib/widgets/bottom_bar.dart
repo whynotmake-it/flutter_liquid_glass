@@ -92,10 +92,16 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           refractiveIndex: 1.21,
           thickness: 30,
           blur: 8,
+          edgeColor: Color.from(
+            alpha: .8,
+            red: .1,
+            green: .1,
+            blue: .1,
+          ),
           saturation: 1.5,
           lightIntensity: isDark ? .7 : 1,
           ambientStrength: isDark ? .2 : .5,
-          lightAngle: math.pi / 4,
+          bleedStrength: 1,
           glassColor: CupertinoTheme.of(
             context,
           ).barBackgroundColor.withValues(alpha: 0.6),

@@ -1,11 +1,13 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -130,11 +132,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     if (widget.fake || !ImageFilter.isShaderFilterSupported) {
       if (!ImageFilter.isShaderFilterSupported) {
         logger.warning(
-            'LiquidGlassLayer is only supported when using Impeller at the '
-            'moment. Falling back to FakeGlass for LiquidGlassLayer. '
-            'To prevent this warning, enable Impeller, or set '
-            'LiquidGlassLayer.fake to true before you use liquid glass widgets '
-            'on Skia.');
+          'LiquidGlassLayer is only supported when using Impeller at the '
+          'moment. Falling back to FakeGlass for LiquidGlassLayer. '
+          'To prevent this warning, enable Impeller, or set '
+          'LiquidGlassLayer.fake to true before you use liquid glass widgets '
+          'on Skia.',
+        );
       }
 
       return LiquidGlassRenderScope(
@@ -152,10 +155,14 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         child: InheritedGeometryRenderLink(
           link: _link,
-          child: ShaderBuilder(
-            assetKey: ShaderKeys.liquidGlassRender,
-            (context, shader, child) => _RawShapes(
-              renderShader: shader,
+          child: MultiShaderBuilder(
+            assetKeys: [
+              ShaderKeys.liquidGlassRender,
+              ShaderKeys.liquidGlassSpecular,
+            ],
+            (context, shaders, child) => _RawShapes(
+              renderShader: shaders[0],
+              specularShader: shaders[1],
               backdropKey: widget.useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null,
@@ -174,6 +181,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 class _RawShapes extends SingleChildRenderObjectWidget {
   const _RawShapes({
     required this.renderShader,
+    required this.specularShader,
     required this.backdropKey,
     required this.settings,
     required Widget super.child,
@@ -181,6 +189,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   });
 
   final FragmentShader renderShader;
+  final FragmentShader specularShader;
   final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GeometryRenderLink link;
@@ -190,6 +199,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     return RenderLiquidGlassLayer(
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       renderShader: renderShader,
+      specularShader: specularShader,
       backdropKey: backdropKey,
       settings: settings,
       link: link,
@@ -258,9 +268,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
     final shaderFilter = switch (blurFilter) {
       final blur? => ImageFilter.compose(
-          inner: blur,
-          outer: ImageFilter.shader(renderShader),
-        ),
+        inner: blur,
+        outer: ImageFilter.shader(renderShader),
+      ),
       null => ImageFilter.shader(renderShader),
     };
 
@@ -280,21 +290,21 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _clipPathLayerHandle.layer = context
         // First we push the clipped blur layer
         .pushClipPath(
-      needsCompositing,
-      offset,
-      boundingBox,
-      clipPath,
-      (context, offset) {
-        // If glass contains child we paint it above blur but below shader
-        paintShapeContents(
-          context,
+          needsCompositing,
           offset,
-          shapes,
-          insideGlass: true,
+          boundingBox,
+          clipPath,
+          (context, offset) {
+            // If glass contains child we paint it above blur but below shader
+            paintShapeContents(
+              context,
+              offset,
+              shapes,
+              insideGlass: true,
+            );
+          },
+          oldLayer: _clipPathLayerHandle.layer,
         );
-      },
-      oldLayer: _clipPathLayerHandle.layer,
-    );
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,
@@ -315,6 +325,85 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       },
       oldLayer: _clipRectLayerHandle.layer,
     );
+
+    // Separate specular layer: an additive edge-profile highlight rendered on
+    // top of the refracted/colored glass. The highlight is reconstructed from
+    // the SDF stored in the geometry texture, so the previous (height-based)
+    // specular has been removed from the final render shader.
+    if (_shouldRenderSpecular) {
+      _paintSpecular(context, offset);
+    }
+  }
+
+  void _paintSpecular(PaintingContext context, Offset offset) {
+    final geometryImage = this.geometryImage;
+    if (geometryImage == null) return;
+
+    _configureSpecularShader();
+
+    _paintGeometryImageFilter(
+      context,
+      offset,
+      Paint()
+        ..blendMode = BlendMode.srcATop
+        ..imageFilter = ImageFilter.shader(specularShader),
+    );
+  }
+
+  void _paintGeometryImageFilter(
+    PaintingContext context,
+    Offset offset,
+    Paint paint,
+  ) {
+    final geometryImage = this.geometryImage;
+    if (geometryImage == null) return;
+
+    // The geometry image lives in matte (screen) space. Instead of passing a
+    // transform to the shader, we apply the matte transform on the Flutter
+    // canvas and draw the geometry image with a shader ImageFilter.
+    // ImageFilters are evaluated in the source image's coordinate
+    // space (so FlutterFragCoord maps 1:1 to the geometry texels) and the
+    // canvas transform positions the additive result on top of the glass.
+    final backToThis = Matrix4.inverted(matteTransform).storage;
+    final bounds = geometryMatteBounds;
+
+    context.canvas
+      ..save()
+      ..transform(backToThis)
+      ..translate(bounds.left, bounds.top)
+      ..scale(1 / devicePixelRatio)
+      ..drawImage(
+        geometryImage,
+        offset * devicePixelRatio,
+        paint,
+      )
+      ..restore();
+  }
+
+  void _configureSpecularShader() {
+    // uSize (indices 0-1) and the input sampler are provided automatically by
+    // the engine because the shader runs as an ImageFilter over the geometry
+    // image. We only set the lighting uniforms (from index 2 onwards).
+    //
+    // The shader expects straight (non-premultiplied) colors and premultiplies
+    // them itself, so the colors are written with premultiply: false (the
+    // default for the uniform setter).
+    specularShader.setFloatUniforms(initialIndex: 2, (value) {
+      value
+        ..setFloat(settings.effectiveLightIntensity)
+        ..setFloat(settings.effectiveAmbientStrength)
+        ..setFloat(settings.effectiveThickness)
+        ..setFloat(settings.effectiveBleedStrength)
+        ..setFloat(settings.specularWrap)
+        ..setOffset(
+          Offset(
+            cos(settings.lightAngle),
+            sin(settings.lightAngle),
+          ),
+        )
+        ..setColor(settings.effectiveHighlightColor)
+        ..setColor(settings.effectiveEdgeColor);
+    });
   }
 
   @override

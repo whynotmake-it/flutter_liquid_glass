@@ -6,8 +6,9 @@ import 'package:meta/meta.dart';
 @visibleForTesting
 bool isLocalTest = false;
 
-final String _shadersRoot =
-    !kIsWeb && isLocalTest ? '' : 'packages/liquid_glass_renderer/';
+final String _shadersRoot = !kIsWeb && isLocalTest
+    ? ''
+    : 'packages/liquid_glass_renderer/';
 
 @internal
 abstract class ShaderKeys {
@@ -18,6 +19,9 @@ abstract class ShaderKeys {
 
   static final liquidGlassRender =
       '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
+
+  static final liquidGlassSpecular =
+      '${_shadersRoot}lib/assets/shaders/liquid_glass_specular.frag';
 
   static final String liquidGlassFilterShader =
       '${_shadersRoot}lib/assets/shaders/liquid_glass_filter.frag';

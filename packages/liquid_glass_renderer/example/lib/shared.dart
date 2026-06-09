@@ -92,14 +92,11 @@ class SettingsSheet extends HookWidget {
     super.key,
     required this.blendNotifier,
     required this.settingsNotifier,
-    required this.lightAngleAnimation,
     required this.fake,
   });
 
   final ValueNotifier<double> blendNotifier;
   final ValueNotifier<LiquidGlassSettings> settingsNotifier;
-
-  final Animation<double> lightAngleAnimation;
 
   final bool fake;
 
@@ -113,7 +110,6 @@ class SettingsSheet extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final settings = useValueListenable(settingsNotifier);
-    final lightAngle = useValueListenable(lightAngleAnimation);
     final blend = useValueListenable(blendNotifier);
 
     return LiquidStretch(
@@ -126,7 +122,6 @@ class SettingsSheet extends HookWidget {
           settings: LiquidGlassSettings.figma(
             depth: 50,
             refraction: 100,
-            lightAngle: lightAngle,
             dispersion: 4,
             frost: 2,
             glassColor: Theme.of(
@@ -215,6 +210,40 @@ class SettingsSheet extends HookWidget {
                           },
                           min: 0,
                           max: 5,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Bleed Strength:'),
+                            Text(settings.bleedStrength.toStringAsFixed(2)),
+                          ],
+                        ),
+                        CupertinoSlider(
+                          value: settings.bleedStrength,
+                          onChanged: (value) {
+                            settingsNotifier.value = settings.copyWith(
+                              bleedStrength: value,
+                            );
+                          },
+                          min: 0,
+                          max: 1,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Specular Wrap:'),
+                            Text(settings.specularWrap.toStringAsFixed(2)),
+                          ],
+                        ),
+                        CupertinoSlider(
+                          value: settings.specularWrap,
+                          onChanged: (value) {
+                            settingsNotifier.value = settings.copyWith(
+                              specularWrap: value,
+                            );
+                          },
+                          min: 0,
+                          max: 1,
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

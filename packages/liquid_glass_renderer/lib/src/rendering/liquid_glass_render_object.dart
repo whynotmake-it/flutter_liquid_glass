@@ -23,10 +23,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
     required BackdropKey? backdropKey,
-  })  : _settings = settings,
-        _devicePixelRatio = devicePixelRatio,
-        _backdropKey = backdropKey,
-        _link = link {
+  }) : _settings = settings,
+       _devicePixelRatio = devicePixelRatio,
+       _backdropKey = backdropKey,
+       _link = link {
     _updateShaderSettings();
   }
 
@@ -81,6 +81,20 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
 
+  /// The pre-rendered geometry texture in screen space.
+  ///
+  /// Exposed for subclasses that render additional passes (such as the separate
+  /// specular layer) from the same geometry texture.
+  @protected
+  ui.Image? get geometryImage => _geometryImage;
+
+  /// The bounding box of the geometry matte in screen space.
+  ///
+  /// Exposed for subclasses that need to map the geometry texture into their
+  /// own coordinate space.
+  @protected
+  Rect get geometryMatteBounds => _geometryMatteBounds;
+
   @override
   @mustCallSuper
   void attach(PipelineOwner owner) {
@@ -130,8 +144,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
-    logger.finest('$hashCode Painting liquid glass with '
-        '${link._shapeGeometries.length} shapes.');
+    logger.finest(
+      '$hashCode Painting liquid glass with '
+      '${link._shapeGeometries.length} shapes.',
+    );
 
     final shapesWithGeometry =
         <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
@@ -311,8 +327,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     final size = boundsInMatteSpace.size * devicePixelRatio;
 
-    final buffer = StringBuffer('$hashCode Built geometry image with '
-        '${geometries.length} shapes at size ${size.width}x${size.height}:\n');
+    final buffer = StringBuffer(
+      '$hashCode Built geometry image with '
+      '${geometries.length} shapes at size ${size.width}x${size.height}:\n',
+    );
 
     final recorder = ui.PictureRecorder();
 
