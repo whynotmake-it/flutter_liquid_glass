@@ -221,7 +221,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   });
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
-  final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
   final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
@@ -249,16 +248,24 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     Rect boundingBox,
   ) {
     if (!attached) return;
-    final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
-      ..backdropKey = backdropKey
-      ..filter = ImageFilter.blur(
-        tileMode: TileMode.mirror,
-        sigmaX: settings.effectiveBlur,
-        sigmaY: settings.effectiveBlur,
-      );
+    final blurFilter = settings.effectiveBlur > 0
+        ? ImageFilter.blur(
+            tileMode: TileMode.mirror,
+            sigmaX: settings.effectiveBlur,
+            sigmaY: settings.effectiveBlur,
+          )
+        : null;
+
+    final shaderFilter = switch (blurFilter) {
+      final blur? => ImageFilter.compose(
+          inner: blur,
+          outer: ImageFilter.shader(renderShader),
+        ),
+      null => ImageFilter.shader(renderShader),
+    };
 
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
-      ..filter = ImageFilter.shader(renderShader);
+      ..filter = shaderFilter;
 
     final clipPath = Path();
     for (final geometry in shapes) {
@@ -278,18 +285,12 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       boundingBox,
       clipPath,
       (context, offset) {
-        context.pushLayer(
-          blurLayer,
-          (context, offset) {
-            // If glass contains child we paint it above blur but below shader
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: true,
-            );
-          },
+        // If glass contains child we paint it above blur but below shader
+        paintShapeContents(
+          context,
           offset,
+          shapes,
+          insideGlass: true,
         );
       },
       oldLayer: _clipPathLayerHandle.layer,
@@ -318,7 +319,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void dispose() {
-    _blurLayerHandle.layer = null;
     _shaderHandle.layer = null;
     _clipPathLayerHandle.layer = null;
     _clipRectLayerHandle.layer = null;
