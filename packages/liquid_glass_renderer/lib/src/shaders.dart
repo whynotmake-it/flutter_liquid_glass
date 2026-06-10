@@ -23,9 +23,6 @@ abstract class ShaderKeys {
   static final String liquidGlassFilterShader =
       '${_shadersRoot}lib/assets/shaders/liquid_glass_filter.frag';
 
-  static final String glassify =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass_arbitrary.frag';
-
   static final String fakeGlassColor =
       '${_shadersRoot}lib/assets/shaders/fake_glass_color.frag';
 

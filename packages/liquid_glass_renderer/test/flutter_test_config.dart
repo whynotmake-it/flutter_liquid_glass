@@ -12,7 +12,6 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     ShaderKeys.blendedGeometry,
     ShaderKeys.liquidGlassRender,
     ShaderKeys.liquidGlassFilterShader,
-    ShaderKeys.glassify,
   ]);
 
   return AlchemistConfig.runWithConfig(

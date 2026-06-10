@@ -576,23 +576,40 @@ class _TabIndicatorState extends State<_TabIndicator>
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass.withOwnLayer(
+                        shadows: [
+                          BoxShadow(
+                            color: Color.from(
+                              alpha: 0.1,
+                              red: 0,
+                              green: 0,
+                              blue: 0,
+                            ),
+                            blurRadius: 30,
+                          ),
+                        ],
                         fake: widget.fake,
                         settings: LiquidGlassSettings(
                           visibility: thickness,
+
                           glassColor: Color.from(
                             alpha: .1,
                             red: 1,
                             green: 1,
                             blue: 1,
                           ),
+                          edgeColor: Color.from(
+                            alpha: .1,
+                            red: 0,
+                            green: 0,
+                            blue: 0,
+                          ),
                           saturation: 1.5,
                           refractiveIndex: 1.15,
                           thickness: 20,
-                          lightIntensity: 2,
+                          lightIntensity: 1,
                           chromaticAberration: .5,
                           blur: 0,
                         ),
-
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: 64,
                         ),
