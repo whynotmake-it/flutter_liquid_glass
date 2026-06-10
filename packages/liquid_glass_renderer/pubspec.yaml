@@ -46,7 +46,6 @@ flutter:
   shaders:
     - lib/assets/shaders/liquid_glass_geometry_blended.frag
     - lib/assets/shaders/liquid_glass_filter.frag
-    - lib/assets/shaders/liquid_glass_arbitrary.frag
     - lib/assets/shaders/liquid_glass_final_render.frag
     - lib/assets/shaders/liquid_glass_specular.frag
     - lib/assets/shaders/fake_glass_color.frag

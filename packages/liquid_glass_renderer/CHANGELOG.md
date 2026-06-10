@@ -27,6 +27,7 @@
  - **FEAT**: cache geometry images as well to make sure we only run the geometry shader when absolutely necessary.
  - **DOCS**: mention Impeller requirement earlier in README.
  - **DOCS**: update README with newest changes and performance tips.
+ - **BREAKING** **REFACTOR**: remove the unsupported experimental widget API.
  - **BREAKING** **REFACTOR**: renamed many constructors and default `LiquidGlass` to not creating its own layer.
 
     Please read the README to understand how to use this package.
@@ -86,13 +87,6 @@
     are static on screen. Moving glass elements will still induce the same
     performance cost as before.
 
-
-## 0.1.1-dev.21
-
-> Note: This release has breaking changes.
-
- - **BREAKING** **FIX**: drop support for blur in `Glassify` for significant performance gains (#90).
-
 ## 0.1.1-dev.20
 
  - **FIX**: `resistance` parameter didn't actually get used.
@@ -106,7 +100,6 @@
  - **FEAT**: allow customizing `resistance` in `LiquidStretch`.
  - **FEAT**: expose `RawLiquidStretch` for custom pixel-based stretching.
  - **FEAT**: expose `Offset.withResistance` extension method.
- - **BREAKING** **REFACTOR**: move `Glassify` to an `experimental.dart` import.
  - **BREAKING** **FEAT**: `LiquidStretch` now bases its stretch on the child's size.
 
 ## 0.1.1-dev.18
@@ -176,7 +169,6 @@
 
 ## 0.1.1-dev.8
 
- - **FEAT**: added experimental `Glassify` widget that turns any child shape into liquid glass.
  - **FIX**: glass now also renders when blend is set to 0.
  - **FIX**: sharper glass edges whithout background shining through.
  - **FEAT**: added refractive index to settings and show values in example.
