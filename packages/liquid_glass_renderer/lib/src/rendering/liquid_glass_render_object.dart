@@ -18,15 +18,12 @@ import 'package:meta/meta.dart';
 @internal
 abstract class LiquidGlassRenderObject extends RenderProxyBox {
   LiquidGlassRenderObject({
-    required GeometryRenderLink link,
+    required this._link,
     required this.renderShader,
-    required LiquidGlassSettings settings,
-    required double devicePixelRatio,
-    required BackdropKey? backdropKey,
-  }) : _settings = settings,
-       _devicePixelRatio = devicePixelRatio,
-       _backdropKey = backdropKey,
-       _link = link {
+    required LiquidGlassSettings this._settings,
+    required this._devicePixelRatio,
+    required this._backdropKey,
+  }) {
     _updateShaderSettings();
   }
 

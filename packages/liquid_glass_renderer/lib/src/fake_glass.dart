@@ -140,14 +140,11 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
 class _RenderFakeGlass extends RenderProxyBox {
   _RenderFakeGlass({
-    required LiquidShape shape,
-    required LiquidGlassSettings settings,
-    required BackdropKey? backdropKey,
-    required ui.FragmentShader colorShader,
-  }) : _shape = shape,
-       _settings = settings,
-       _backdropKey = backdropKey,
-       _colorShader = colorShader;
+    required this._shape,
+    required this._settings,
+    required this._backdropKey,
+    required this._colorShader,
+  });
 
   LiquidShape _shape;
   LiquidShape get shape => _shape;

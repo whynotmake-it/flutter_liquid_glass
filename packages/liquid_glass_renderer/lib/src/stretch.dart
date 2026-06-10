@@ -145,8 +145,8 @@ class RawLiquidStretch extends SingleChildRenderObjectWidget {
 @internal
 class RenderRawLiquidStretch extends RenderProxyBox {
   RenderRawLiquidStretch({
-    required Offset stretchPixels,
-  }) : _stretchPixels = stretchPixels;
+    required this._stretchPixels,
+  });
 
   Offset _stretchPixels;
 

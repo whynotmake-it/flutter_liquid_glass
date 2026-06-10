@@ -58,12 +58,10 @@ class GlassShadow extends SingleChildRenderObjectWidget {
 
 class _RenderGlassShadow extends RenderProxyBox {
   _RenderGlassShadow({
-    required LiquidShape shape,
-    required List<BoxShadow> shadows,
+    required this._shape,
+    required this._shadows,
     required double visibility,
-  })  : _shape = shape,
-        _shadows = shadows,
-        _visibility = visibility.clamp(0, 1);
+  }) : _visibility = visibility.clamp(0, 1);
 
   LiquidShape get shape => _shape;
   LiquidShape _shape;
@@ -101,7 +99,9 @@ class _RenderGlassShadow extends RenderProxyBox {
         var layerBounds = rect;
         for (final shadow in shadows) {
           layerBounds = layerBounds.expandToInclude(
-            rect.shift(shadow.offset).inflate(
+            rect
+                .shift(shadow.offset)
+                .inflate(
                   shadow.spreadRadius + shadow.blurRadius * visibility,
                 ),
           );
@@ -110,8 +110,9 @@ class _RenderGlassShadow extends RenderProxyBox {
       }
 
       for (final shadow in shadows) {
-        final shadowRect =
-            rect.shift(shadow.offset).inflate(shadow.spreadRadius);
+        final shadowRect = rect
+            .shift(shadow.offset)
+            .inflate(shadow.spreadRadius);
         final paint = shadow
             .copyWith(
               blurRadius: shadow.blurRadius * visibility,

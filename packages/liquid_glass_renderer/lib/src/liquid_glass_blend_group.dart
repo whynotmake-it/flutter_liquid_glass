@@ -164,10 +164,9 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     required super.devicePixelRatio,
     required super.geometryShader,
     required super.settings,
-    required GlassGroupLink link,
-    required double blend,
-  })  : _link = link,
-        _blend = blend {
+    required this._link,
+    required this._blend,
+  }) {
     link.addListener(_onLinkUpdate);
   }
 
@@ -263,8 +262,9 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
           MapEntry(
             key: renderObject,
             value: (shape, glassContainsChild),
-          )
-        ) in link.shapeEntries.indexed) {
+          ),
+        )
+        in link.shapeEntries.indexed) {
       if (!renderObject.attached || !renderObject.hasSize) continue;
 
       try {
@@ -275,11 +275,13 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
         );
         shapes.add(shapeData);
 
-        layerBounds = layerBounds?.expandToInclude(shapeData.shapeBounds) ??
+        layerBounds =
+            layerBounds?.expandToInclude(shapeData.shapeBounds) ??
             shapeData.shapeBounds;
 
-        final existingShape =
-            cachedShapes.length > index ? cachedShapes[index] : null;
+        final existingShape = cachedShapes.length > index
+            ? cachedShapes[index]
+            : null;
 
         if (existingShape == null) {
           anyShapeChangedInLayer = true;
@@ -368,12 +370,12 @@ class GlassGroupLink with ChangeNotifier {
 
   /// Information about a shape registered with this link.
   final Map<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
-      _shapes = {};
+  _shapes = {};
 
   List<
-      MapEntry<RenderLiquidGlass,
-          (LiquidShape shape, bool glassContainsChild)>> get shapeEntries =>
-      _shapes.entries.toList();
+    MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
+  >
+  get shapeEntries => _shapes.entries.toList();
 
   /// Check if any shapes are registered.
   bool get hasShapes => _shapes.isNotEmpty;

@@ -40,13 +40,12 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   /// Creates a new [RenderLiquidGlassGeometry] with the given
   /// [geometryShader].
   RenderLiquidGlassGeometry({
-    required GeometryRenderLink renderLink,
+    required GeometryRenderLink this._renderLink,
     required this.geometryShader,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
-  })  : _renderLink = renderLink,
-        _settings = settings,
-        _devicePixelRatio = devicePixelRatio {
+  }) : _settings = settings,
+       _devicePixelRatio = devicePixelRatio {
     updateShaderWithSettings(settings, devicePixelRatio);
   }
 
@@ -178,7 +177,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     Rect bounds,
     List<ShapeGeometry> geometries,
     bool needsUpdate,
-  ) gatherShapeData();
+  )
+  gatherShapeData();
 
   Path getPath(
     List<ShapeGeometry> geometries,
@@ -453,8 +453,8 @@ class ShapeGeometry extends Equatable {
     required this.glassContainsChild,
     required this.shapeBounds,
     this.shapeToGeometry,
-  })  : rawCornerRadius = _getRadiusFromGlassShape(shape),
-        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+  }) : rawCornerRadius = _getRadiusFromGlassShape(shape),
+       rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
 
   static double _getRadiusFromGlassShape(LiquidShape shape) {
     switch (shape) {
@@ -484,9 +484,9 @@ class ShapeGeometry extends Equatable {
 
   @override
   List<Object?> get props => [
-        renderObject,
-        shape,
-        glassContainsChild,
-        shapeBounds,
-      ];
+    renderObject,
+    shape,
+    glassContainsChild,
+    shapeBounds,
+  ];
 }
