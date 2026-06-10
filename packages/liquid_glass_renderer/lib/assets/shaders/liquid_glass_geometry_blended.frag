@@ -1,7 +1,8 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
 // Geometry precomputation shader for blended liquid glass shapes
-// This shader pre-computes the refraction displacement and encodes it into a texture
+// This shader pre-computes refraction displacement and inward edge distance,
+// then encodes them into a texture.
 // Only needs to be re-run when shape geometry or layout changes
 
 #version 460 core
@@ -69,6 +70,13 @@ void main() {
     vec2 displacement = baseRefract.xy * baseRefractLength;
     
     float maxDisplacement = uThickness * 10.0;
+    float edgeDistance = -sd;
     
-    fragColor = encodeDisplacementData(displacement, maxDisplacement, height, uThickness, foregroundAlpha);
+    fragColor = encodeDisplacementData(
+        displacement,
+        maxDisplacement,
+        edgeDistance,
+        uThickness,
+        foregroundAlpha
+    );
 }

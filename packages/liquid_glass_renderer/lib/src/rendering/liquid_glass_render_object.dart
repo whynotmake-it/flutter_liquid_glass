@@ -127,7 +127,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
             cos(settings.lightAngle),
             sin(settings.lightAngle),
           ),
-        );
+        )
+        ..setColor(settings.effectiveHighlightColor)
+        ..setColor(settings.effectiveEdgeColor)
+        ..setFloats([
+          settings.effectiveEdgeWidth,
+          settings.edgeInset,
+          settings.effectiveBleedStrength,
+          settings.specularWrap,
+        ]);
     });
   }
 

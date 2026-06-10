@@ -21,6 +21,9 @@ uniform vec4 uGlassColor;
 uniform vec3 uOpticalProps;
 uniform vec3 uLightConfig;
 uniform vec2 uLightDirection;
+uniform vec4 uHighlightColor;
+uniform vec4 uEdgeColor;
+uniform vec4 uSpecularConfig;
 
 float uRefractiveIndex = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -28,11 +31,127 @@ float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
 float uAmbientStrength = uLightConfig.y;
 float uSaturation = uLightConfig.z;
+float uEdgeWidth = uSpecularConfig.x;
+float uEdgeInset = uSpecularConfig.y;
+float uBleedStrength = uSpecularConfig.z;
+float uSpecularWrap = uSpecularConfig.w;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
 
 layout(location = 0) out vec4 fragColor;
+
+vec3 applySpecularHighlights(
+    vec3 baseColor,
+    vec4 geometryData,
+    vec2 displacement,
+    float alpha
+) {
+    if (
+        uLightIntensity < 0.01 &&
+        uAmbientStrength < 0.01 &&
+        uEdgeColor.a < 0.01
+    ) {
+        return baseColor;
+    }
+
+    float opticalThickness = max(uThickness, 1.0);
+    float inwardDistance = geometryData.b * opticalThickness;
+    float edgeWidth = min(max(uEdgeWidth, 0.0), opticalThickness * 0.5);
+    float highlightInset = edgeWidth * clamp(uEdgeInset, 0.0, 1.0);
+    float edgeFeather = max(fwidth(inwardDistance), 0.5);
+
+    float innerRimMask = edgeWidth > 0.0
+        ? smoothstep(
+            highlightInset - edgeFeather,
+            highlightInset + edgeFeather,
+            inwardDistance
+        )
+        : 1.0;
+    float outlineInnerMask = edgeWidth > 0.0
+        ? smoothstep(
+            edgeWidth - edgeFeather,
+            edgeWidth + edgeFeather,
+            inwardDistance
+        )
+        : 1.0;
+    float outlineCoverage = edgeWidth > 0.0
+        ? (1.0 - outlineInnerMask) * alpha
+        : 0.0;
+
+    float thicknessScale = clamp(40.0 / max(uThickness, 1.0), 1.0, 4.0);
+    float edgeThreshold = mix(0.8, 0.5, 1.0 / thicknessScale);
+
+    float shiftedDistance = max(inwardDistance - highlightInset, 0.0);
+    float shiftedDistanceRatio = clamp(
+        shiftedDistance / opticalThickness,
+        0.0,
+        1.0
+    );
+    float shiftedHeight = sqrt(
+        max(0.0, shiftedDistanceRatio * (2.0 - shiftedDistanceRatio))
+    );
+    float edgeFactor =
+        (1.0 - smoothstep(0.0, edgeThreshold, shiftedHeight)) *
+        innerRimMask;
+
+    float bleedThreshold = clamp(edgeThreshold * 2.2, 0.0, 1.0);
+    float bleedBand =
+        (1.0 - smoothstep(0.0, bleedThreshold, shiftedHeight)) *
+        innerRimMask;
+
+    if (outlineCoverage < 0.01 && edgeFactor < 0.01 && bleedBand < 0.01) {
+        return baseColor;
+    }
+
+    float dispLength = length(displacement);
+    vec2 normalXY = dispLength > 0.001 ? displacement / dispLength : vec2(0.0);
+
+    float mainLight = max(0.0, dot(normalXY, uLightDirection));
+    float oppositeLight = max(0.0, dot(normalXY, -uLightDirection));
+    float directness = max(mainLight, oppositeLight);
+
+    float wrap = clamp(uSpecularWrap, 0.0, 1.0);
+    float wrapCenter = mix(0.96, -0.3, wrap);
+    float wrapSoftness = mix(0.04, 0.3, wrap);
+    float specularEnvelope = smoothstep(
+        wrapCenter - wrapSoftness,
+        wrapCenter + wrapSoftness,
+        directness
+    );
+    float highlightMix = smoothstep(wrapCenter, 1.0, directness);
+    float lightIntensity = max(uLightIntensity, 0.0);
+    float highlightMask = specularEnvelope * highlightMix;
+    float visibleHighlightMask = highlightMask * min(lightIntensity * 0.5, 1.0);
+
+    float highlightCoverage =
+        edgeFactor * alpha * highlightMask * lightIntensity * 0.8;
+    float ambientCoverage =
+        edgeFactor * alpha * clamp(uAmbientStrength, 0.0, 1.0) * 0.35;
+    float bleed =
+        bleedBand *
+        specularEnvelope *
+        lightIntensity *
+        uBleedStrength *
+        alpha *
+        0.5;
+    float highlightAmount = clamp(
+        highlightCoverage + ambientCoverage + bleed,
+        0.0,
+        1.0
+    );
+
+    vec3 highlightColor = getHighlightColor(baseColor, 1.0) * uHighlightColor.rgb;
+    vec3 result = baseColor + highlightColor * highlightAmount;
+
+    float edgeDuck =
+        smoothstep(0.05, 0.35, visibleHighlightMask) * innerRimMask;
+    float edgeVisibility = 1.0 - edgeDuck;
+    float edgeAmount = clamp(outlineCoverage * edgeVisibility * uEdgeColor.a, 0.0, 1.0);
+    result = mix(result, uEdgeColor.rgb, edgeAmount);
+
+    return result;
+}
 
 void main() {
     // FlutterFragCoord() returns logical pixels, but our geometry texture is in physical pixels

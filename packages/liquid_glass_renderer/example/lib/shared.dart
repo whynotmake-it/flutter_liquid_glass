@@ -189,14 +189,14 @@ class SettingsSheet extends HookWidget {
                           ],
                         ),
                         CupertinoSlider(
-                          value: settings.lightIntensity,
+                          value: lightIntensity,
                           onChanged: (value) {
                             settingsNotifier.value = settings.copyWith(
                               lightIntensity: value,
                             );
                           },
                           min: 0,
-                          max: 5,
+                          max: 1,
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -206,14 +206,14 @@ class SettingsSheet extends HookWidget {
                           ],
                         ),
                         CupertinoSlider(
-                          value: settings.ambientStrength,
+                          value: ambientStrength,
                           onChanged: (value) {
                             settingsNotifier.value = settings.copyWith(
                               ambientStrength: value,
                             );
                           },
                           min: 0,
-                          max: 5,
+                          max: 1,
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -244,6 +244,40 @@ class SettingsSheet extends HookWidget {
                           onChanged: (value) {
                             settingsNotifier.value = settings.copyWith(
                               specularWrap: value,
+                            );
+                          },
+                          min: 0,
+                          max: 1,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Edge Width:'),
+                            Text(settings.edgeWidth.toStringAsFixed(2)),
+                          ],
+                        ),
+                        CupertinoSlider(
+                          value: edgeWidth,
+                          onChanged: (value) {
+                            settingsNotifier.value = settings.copyWith(
+                              edgeWidth: value,
+                            );
+                          },
+                          min: 0,
+                          max: 8,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Edge Inset:'),
+                            Text(settings.edgeInset.toStringAsFixed(2)),
+                          ],
+                        ),
+                        CupertinoSlider(
+                          value: edgeInset,
+                          onChanged: (value) {
+                            settingsNotifier.value = settings.copyWith(
+                              edgeInset: value,
                             );
                           },
                           min: 0,

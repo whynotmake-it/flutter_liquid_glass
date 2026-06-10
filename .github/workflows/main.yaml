@@ -51,7 +51,7 @@ jobs:
   check_generation:
     name: Check Code Generation
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4

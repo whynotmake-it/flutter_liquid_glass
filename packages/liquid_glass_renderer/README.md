@@ -98,6 +98,7 @@ This package provides several widgets to create the glass effect:
 As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
+- **SkSL/Skia shader warnings can be ignored**: Flutter may warn that these shaders are incompatible with SkSL or the Skia backend. This package intentionally uses Impeller-only shader features, so those warnings do not matter as long as your app is running with Impeller. See [flutter/flutter#183656](https://github.com/flutter/flutter/issues/183656) for the upstream warning discussion.
 - **Memory spike when animating shapes** There is a [bug in Flutter](https://github.com/flutter/flutter/issues/138627) that prevents us from disposing generated textures immediately, leading to temporary memory spikes when animating glass shapes. Read [A word on Performance](#-a-word-on-performance) for tips on minimizing this.
 - **Maximum of 16 shapes** can be blended in a `LiquidGlassBlendGroup`, and performance will degrade significantly with the more shapes you add in the same group.
 
