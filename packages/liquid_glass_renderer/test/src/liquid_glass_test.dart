@@ -130,11 +130,12 @@ void main() {
                 child: buildWithGridPaper(
                   LiquidGlassLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      blend: blend,
                       glassColor: Colors.red.withValues(alpha: 0.5),
                     ),
-                    child: const LiquidGlassBlendGroup(
-                      child: Row(
+                    child: LiquidGlassBlendGroup(
+                      blend: blend,
+
+                      child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           LiquidGlass.grouped(
