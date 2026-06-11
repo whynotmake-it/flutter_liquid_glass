@@ -116,6 +116,52 @@ void main() {
       );
     });
 
+    group('sparse blend group', () {
+      goldenTest(
+        'far-apart shapes render correctly (component splitting)',
+        fileName: 'sparse_blend_group',
+        pumpBeforeTest: pumpOnce,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: testScenarioConstraints,
+          children: [
+            GoldenTestScenario(
+              name: 'two shapes far apart',
+              child: buildWithGridPaper(
+                LiquidGlassLayer(
+                  settings: settingsWithoutLighting.copyWith(
+                    glassColor: Colors.blue.withValues(alpha: 0.3),
+                  ),
+                  child: LiquidGlassBlendGroup(
+                    blend: 20,
+                    child: const Stack(
+                      children: [
+                        Positioned(
+                          left: 20,
+                          top: 20,
+                          child: LiquidGlass.grouped(
+                            shape: LiquidRoundedSuperellipse(borderRadius: 30),
+                            child: SizedBox.square(dimension: 120),
+                          ),
+                        ),
+                        Positioned(
+                          right: 20,
+                          bottom: 20,
+                          child: LiquidGlass.grouped(
+                            shape: LiquidOval(),
+                            child: SizedBox.square(dimension: 120),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+
     group('merging', () {
       goldenTest(
         'shapes merge with different blend values',

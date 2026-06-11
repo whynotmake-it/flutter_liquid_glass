@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -92,6 +94,24 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
       ),
     );
   }
+}
+
+/// Per-shape screen-space data used to build direct render uniforms.
+class _DirectShape {
+  _DirectShape({
+    required this.screenRect,
+    required this.meanScale,
+    required this.uniforms,
+  });
+
+  /// The shape's bounding rect in logical screen coordinates.
+  final Rect screenRect;
+
+  /// The mean of the per-axis screen scale (for blend/radius scaling).
+  final double meanScale;
+
+  /// The six geometry-shader floats (type, cx, cy, w, h, r) in physical px.
+  final List<double> uniforms;
 }
 
 class _InheritedLiquidGlassBlendGroup extends InheritedWidget {
@@ -245,6 +265,213 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
           ..setFloat(shape.rawCornerRadius * devicePixelRatio);
       }
     });
+  }
+
+  @override
+  List<double>? gatherDirectShapeData(double devicePixelRatio) {
+    final shapes = _buildDirectShapes(devicePixelRatio);
+    if (shapes == null || shapes.isEmpty) return null;
+
+    final referenceScale = shapes.first.meanScale;
+    final data = <double>[];
+    for (final shape in shapes) {
+      data.addAll(shape.uniforms);
+    }
+
+    final blendPhysical = blend * devicePixelRatio * referenceScale;
+    return [shapes.length.toDouble(), blendPhysical, ...data];
+  }
+
+  @override
+  List<DirectComponent>? gatherDirectComponents(double devicePixelRatio) {
+    if (!RenderLiquidGlassGeometry.componentSplittingEnabled) return null;
+
+    // Multi-pass paints all children on top of the glass, so it cannot honor
+    // shapes that render their child inside the glass.
+    if (link.shapeEntries.any((e) => e.value.$2)) return null;
+
+    final shapes = _buildDirectShapes(devicePixelRatio);
+    if (shapes == null || shapes.length < 2) return null;
+
+    // Union-find clustering: two shapes belong to the same component when their
+    // bounds are within the blend distance (they can influence each other's
+    // SDF). A small hysteresis margin avoids churn right at the threshold.
+    final threshold = blend * 1.2;
+    final parent = List<int>.generate(shapes.length, (i) => i);
+    int find(int start) {
+      var i = start;
+      while (parent[i] != i) {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+      }
+      return i;
+    }
+
+    for (var i = 0; i < shapes.length; i++) {
+      for (var j = i + 1; j < shapes.length; j++) {
+        if (_rectDistance(shapes[i].screenRect, shapes[j].screenRect) <=
+            threshold) {
+          parent[find(i)] = find(j);
+        }
+      }
+    }
+
+    final groups = <int, List<_DirectShape>>{};
+    for (var i = 0; i < shapes.length; i++) {
+      (groups[find(i)] ??= []).add(shapes[i]);
+    }
+
+    if (groups.length < 2) return null;
+    if (groups.length > _maxDirectComponents) return null;
+
+    // Only worth multiple passes (each a render-pass break) when the shapes are
+    // genuinely sparse: the combined component area is much smaller than the
+    // union bounding box that a single pass would have to cover.
+    Rect? union;
+    var componentAreaSum = 0.0;
+    final components = <DirectComponent>[];
+    for (final group in groups.values) {
+      Rect? bounds;
+      final data = <double>[];
+      for (final shape in group) {
+        data.addAll(shape.uniforms);
+        bounds = bounds == null
+            ? shape.screenRect
+            : bounds.expandToInclude(shape.screenRect);
+        union = union == null
+            ? shape.screenRect
+            : union.expandToInclude(shape.screenRect);
+      }
+      final clip = bounds!.inflate(blend);
+      componentAreaSum += clip.width * clip.height;
+      final blendPhysical =
+          blend * devicePixelRatio * group.first.meanScale;
+      components.add(
+        DirectComponent(
+          uniforms: [group.length.toDouble(), blendPhysical, ...data],
+          clipBoundsLogical: clip,
+        ),
+      );
+    }
+
+    final unionArea = union!.width * union.height;
+    if (componentAreaSum > unionArea * 0.6) return null;
+
+    return components;
+  }
+
+  /// Builds per-shape screen-space direct render data, or `null` if any shape
+  /// is rotated/skewed/mirrored (unsupported by the axis-aligned screen SDF).
+  List<_DirectShape>? _buildDirectShapes(double devicePixelRatio) {
+    final entries = link.shapeEntries;
+    if (entries.isEmpty ||
+        entries.length > LiquidGlassBlendGroup.maxShapesPerLayer) {
+      return null;
+    }
+
+    final result = <_DirectShape>[];
+    for (final entry in entries) {
+      final renderObject = entry.key;
+      final (shape, _) = entry.value;
+      if (!renderObject.attached || !renderObject.hasSize) continue;
+
+      final transform = renderObject.getTransformTo(null);
+      final scale = _decomposeAxisAlignedScale(transform);
+      if (scale == null) return null;
+      final (sx, sy) = scale;
+
+      final screenRect = MatrixUtils.transformRect(
+        transform,
+        Offset.zero & renderObject.size,
+      );
+      final center = screenRect.center;
+      final size = screenRect.size;
+      final meanScale = 0.5 * (sx + sy);
+      final rawRadius = ShapeGeometry.rawCornerRadiusOf(shape) * meanScale;
+
+      result.add(
+        _DirectShape(
+          screenRect: screenRect,
+          meanScale: meanScale,
+          uniforms: [
+            RawShapeType.fromLiquidGlassShape(shape).shaderIndex,
+            center.dx * devicePixelRatio,
+            center.dy * devicePixelRatio,
+            size.width * devicePixelRatio,
+            size.height * devicePixelRatio,
+            rawRadius * devicePixelRatio,
+          ],
+        ),
+      );
+    }
+    return result;
+  }
+
+  static const int _maxDirectComponents = 4;
+
+  /// Minimum gap between two axis-aligned rectangles (0 if they overlap).
+  static double _rectDistance(Rect a, Rect b) {
+    final dx = a.left > b.right
+        ? a.left - b.right
+        : (b.left > a.right ? b.left - a.right : 0.0);
+    final dy = a.top > b.bottom
+        ? a.top - b.bottom
+        : (b.top > a.bottom ? b.top - a.bottom : 0.0);
+    if (dx == 0 && dy == 0) return 0;
+    return dx > dy ? dx : dy;
+  }
+
+  /// Decomposes [transform] into its per-axis scale, returning `null` if the
+  /// transform contains rotation, skew, perspective or a non-positive scale.
+  static (double sx, double sy)? _decomposeAxisAlignedScale(Matrix4 transform) {
+    const eps = 1e-3;
+    final s = transform.storage;
+    // Off-diagonal terms of the 2D linear part (skew / rotation).
+    if (s[1].abs() > eps || s[4].abs() > eps) return null;
+    // Any coupling with the z axis.
+    if (s[2].abs() > eps || s[6].abs() > eps || s[8].abs() > eps ||
+        s[9].abs() > eps) {
+      return null;
+    }
+    // Perspective.
+    if (s[3].abs() > eps || s[7].abs() > eps || s[11].abs() > eps) return null;
+    final sx = s[0];
+    final sy = s[5];
+    if (sx <= eps || sy <= eps) return null;
+    return (sx, sy);
+  }
+
+  @override
+  Picture renderNineSlicePicture(ShapeGeometry shape, NineSlice nineSlice) {
+    final texW = nineSlice.textureSize.width;
+    final texH = nineSlice.textureSize.height;
+
+    // A single shape filling the reduced texture's bounding box, keeping the
+    // original corner radius (in physical pixels). Coordinates are already
+    // physical, so they are uploaded without an additional dpr scale.
+    geometryShader
+      ..setFloatUniforms((value) {
+        value
+          ..setFloat(texW)
+          ..setFloat(texH);
+      })
+      ..setFloatUniforms(initialIndex: 6, (value) {
+        value
+          ..setFloat(1)
+          ..setFloat(shape.rawShapeType.shaderIndex)
+          ..setFloat(texW / 2)
+          ..setFloat(texH / 2)
+          ..setFloat(texW)
+          ..setFloat(texH)
+          ..setFloat(shape.rawCornerRadius * devicePixelRatio);
+      });
+
+    final recorder = PictureRecorder();
+    Canvas(recorder).drawRect(
+      Rect.fromLTWH(0, 0, texW, texH),
+      Paint()..shader = geometryShader,
+    );
+    return recorder.endRecording();
   }
 
   @override

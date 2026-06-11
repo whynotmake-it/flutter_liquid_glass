@@ -1,35 +1,40 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
-// Final rendering pass for liquid glass with pre-computed geometry
-// This shader reads displacement data from a pre-computed texture and applies
-// the liquid glass effect efficiently
+// Direct rendering pass for liquid glass *without* a pre-computed geometry
+// texture. This computes the SDF, normal and refraction displacement inline
+// from shape uniforms, then applies the exact same glass effect as
+// `liquid_glass_final_render.frag`.
+//
+// It is used while shape geometry is actively animating, so that no
+// intermediate displacement texture has to be allocated per frame. Once the
+// geometry settles, the renderer bakes a texture again and switches back to
+// the cheaper `liquid_glass_final_render.frag` path.
+//
+// Constraint: shapes must be uploaded in screen-physical pixel space and may
+// only be translated/scaled (no rotation), because the SDF is evaluated
+// directly in screen space.
 
 #version 460 core
 precision mediump float;
 
-#define DEBUG_GEOMETRY 0
-
 #include <flutter/runtime_effect.glsl>
-#include "displacement_encoding.glsl"
 #include "render.glsl"
 
-uniform vec2 uSize;
-uniform vec2 uGeometryOffset;
-uniform vec2 uGeometrySize;
+#define MAX_SHAPES 16
 
+uniform vec2 uSize;             // auto-populated by ImageFilter.shader
 uniform vec4 uGlassColor;
-uniform vec3 uOpticalProps;
-uniform vec3 uLightConfig;
+uniform vec3 uOpticalProps;     // refractiveIndex, chromaticAberration, thickness
+uniform vec3 uLightConfig;      // lightIntensity, ambientStrength, saturation
 uniform vec2 uLightDirection;
 uniform vec4 uHighlightColor;
 uniform vec4 uEdgeColor;
-uniform vec4 uSpecularConfig;
-// Nine-slice mapping of the geometry texture. uNineSliceTexSize is the actual
-// matte texture size (physical px); when it equals uGeometrySize (and inset is
-// 0) the mapping is the identity. uNineSliceInset is the fixed (unstretched)
-// border in output-space physical px.
-uniform vec2 uNineSliceInset;
-uniform vec2 uNineSliceTexSize;
+uniform vec4 uSpecularConfig;   // edgeWidth, edgeInset, bleedStrength, specularWrap
+uniform vec2 uShapeConfig;      // numShapes, blend
+uniform float uShapeData[MAX_SHAPES * 6];
+
+// Included after uShapeData so the SDF helpers can read the uniform directly.
+#include "sdf.glsl"
 
 float uRefractiveIndex = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -41,30 +46,15 @@ float uEdgeWidth = uSpecularConfig.x;
 float uEdgeInset = uSpecularConfig.y;
 float uBleedStrength = uSpecularConfig.z;
 float uSpecularWrap = uSpecularConfig.w;
+float uNumShapes = uShapeConfig.x;
+float uBlend = uShapeConfig.y;
 
 uniform sampler2D uBackgroundTexture;
-uniform sampler2D uGeometryTexture;
 
 layout(location = 0) out vec4 fragColor;
 
-// Maps an output-space coordinate to a texture-space coordinate for a single
-// nine-patch axis. With inset == 0 (or a texture the same size as the output)
-// this is the identity remap p -> p.
-float ninePatchCoord(float p, float outSize, float texSize, float inset) {
-    if (inset <= 0.0 || inset * 2.0 >= outSize || inset * 2.0 >= texSize) {
-        return p / outSize * texSize;
-    }
-    if (p <= inset) {
-        return p;
-    }
-    if (p >= outSize - inset) {
-        return texSize - (outSize - p);
-    }
-    float outMid = outSize - 2.0 * inset;
-    float texMid = texSize - 2.0 * inset;
-    return inset + (p - inset) / outMid * texMid;
-}
-
+// Identical to `applySpecularHighlights` in liquid_glass_final_render.frag so
+// that the lit result matches the two-pass path exactly.
 vec3 applySpecularHighlights(
     vec3 baseColor,
     vec4 geometryData,
@@ -178,43 +168,54 @@ vec3 applySpecularHighlights(
 }
 
 void main() {
-    // FlutterFragCoord() returns logical pixels, but our geometry texture is in physical pixels
-    // So we need to scale by devicePixelRatio to work in physical pixel space
     vec2 fragCoord = FlutterFragCoord().xy;
-    
-    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);        
-        
+
+    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
     #ifdef IMPELLER_TARGET_OPENGLES
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
-    vec2 geomPx = fragCoord - uGeometryOffset;
-    vec2 geomTexel = vec2(
-        ninePatchCoord(geomPx.x, uGeometrySize.x, uNineSliceTexSize.x, uNineSliceInset.x),
-        ninePatchCoord(geomPx.y, uGeometrySize.y, uNineSliceTexSize.y, uNineSliceInset.y)
-    );
-    vec2 geometryUV = geomTexel / uNineSliceTexSize;
-    #ifdef IMPELLER_TARGET_OPENGLES
-        geometryUV.y = 1.0 - geometryUV.y;
-    #endif
+    // --- Inline geometry (mirrors liquid_glass_geometry_blended.frag) ---
+    float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
 
-    vec4 geometryData = texture(uGeometryTexture, geometryUV);
-    
-    #if DEBUG_GEOMETRY
-        fragColor = geometryData;
-        return;
-    #endif
-    
-    if (geometryData.a < 0.01) {
-        fragColor = vec4(0);
+    float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
+    if (foregroundAlpha < 0.01) {
+        fragColor = vec4(0.0);
         return;
     }
-    
-    float maxDisplacement = uThickness * 10.0;
-    vec2 displacement = decodeDisplacement(geometryData, maxDisplacement);
-    
+
+    if (sd >= 0.0 || uThickness <= 0.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    float dx = dFdx(sd);
+    float dy = dFdy(sd);
+
+    float n_cos = max(uThickness + sd, 0.0) / uThickness;
+    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
+    vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
+
+    float x = uThickness + sd;
+    float sqrtTerm = sqrt(max(0.0, uThickness * uThickness - x * x));
+    float height = mix(sqrtTerm, uThickness, float(sd < -uThickness));
+
+    float baseHeight = uThickness * 8.0;
+    vec3 incident = vec3(0.0, 0.0, -1.0);
+    float invRefractiveIndex = 1.0 / uRefractiveIndex;
+    vec3 baseRefract = refract(incident, normal, invRefractiveIndex);
+    float baseRefractLength =
+        (height + baseHeight) / max(0.001, abs(baseRefract.z));
+    vec2 displacement = baseRefract.xy * baseRefractLength;
+
+    float edgeDistance = -sd;
+    float normalizedEdgeDistance =
+        clamp(edgeDistance / max(uThickness, 1e-4), 0.0, 1.0);
+    vec4 geometryData = vec4(0.0, 0.0, normalizedEdgeDistance, foregroundAlpha);
+
+    // --- Refraction + glass color (mirrors liquid_glass_final_render.frag) ---
     vec2 invUSize = 1.0 / uSize;
-    
+
     vec4 refractColor;
     if (uChromaticAberration < 0.01) {
         vec2 refractedUV = screenUV + displacement * invUSize;
@@ -223,21 +224,21 @@ void main() {
         float dispersionStrength = uChromaticAberration * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
-        
+
         vec2 redUV = screenUV + redOffset * invUSize;
         vec2 greenUV = screenUV + displacement * invUSize;
         vec2 blueUV = screenUV + blueOffset * invUSize;
-        
+
         float red = texture(uBackgroundTexture, redUV).r;
         vec4 greenSample = texture(uBackgroundTexture, greenUV);
         float blue = texture(uBackgroundTexture, blueUV).b;
-        
+
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
     }
-    
-    // Apply glass color using alpha blending
+
     vec4 finalColor;
-    finalColor.rgb = uGlassColor.rgb * uGlassColor.a + refractColor.rgb * (1.0 - uGlassColor.a);
+    finalColor.rgb =
+        uGlassColor.rgb * uGlassColor.a + refractColor.rgb * (1.0 - uGlassColor.a);
     finalColor.a = refractColor.a;
     finalColor.rgb = applySaturation(finalColor.rgb, uSaturation);
 
