@@ -286,10 +286,6 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   List<DirectComponent>? gatherDirectComponents(double devicePixelRatio) {
     if (!RenderLiquidGlassGeometry.componentSplittingEnabled) return null;
 
-    // Multi-pass paints all children on top of the glass, so it cannot honor
-    // shapes that render their child inside the glass.
-    if (link.shapeEntries.any((e) => e.value.$2)) return null;
-
     final shapes = _buildDirectShapes(devicePixelRatio);
     if (shapes == null || shapes.length < 2) return null;
 
@@ -372,7 +368,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     final result = <_DirectShape>[];
     for (final entry in entries) {
       final renderObject = entry.key;
-      final (shape, _) = entry.value;
+      final shape = entry.value;
       if (!renderObject.attached || !renderObject.hasSize) continue;
 
       final transform = renderObject.getTransformTo(null);
@@ -486,20 +482,13 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
 
     for (final (
           index,
-          MapEntry(
-            key: renderObject,
-            value: (shape, glassContainsChild),
-          ),
+          MapEntry(key: renderObject, value: shape),
         )
         in link.shapeEntries.indexed) {
       if (!renderObject.attached || !renderObject.hasSize) continue;
 
       try {
-        final shapeData = _computeShapeInfo(
-          renderObject,
-          shape,
-          glassContainsChild,
-        );
+        final shapeData = _computeShapeInfo(renderObject, shape);
         shapes.add(shapeData);
 
         layerBounds =
@@ -532,15 +521,11 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   void paintShapeContents(
     RenderObject from,
     PaintingContext context,
-    Offset offset, {
-    required bool insideGlass,
-  }) {
+    Offset offset,
+  ) {
     for (final shapeEntry in link.shapeEntries) {
       final renderObject = shapeEntry.key;
-      if (!renderObject.attached ||
-          renderObject.glassContainsChild != insideGlass) {
-        continue;
-      }
+      if (!renderObject.attached) continue;
 
       renderObject.paintFromLayer(
         context,
@@ -553,7 +538,6 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   ShapeGeometry _computeShapeInfo(
     RenderLiquidGlass renderObject,
     LiquidShape shape,
-    bool glassContainsChild,
   ) {
     if (!hasSize) {
       throw StateError(
@@ -580,7 +564,6 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     return ShapeGeometry(
       renderObject: renderObject,
       shape: shape,
-      glassContainsChild: glassContainsChild,
       shapeBounds: blendGroupRect,
       shapeToGeometry: transformToGeometry,
     );
@@ -596,13 +579,10 @@ class GlassGroupLink with ChangeNotifier {
   GlassGroupLink();
 
   /// Information about a shape registered with this link.
-  final Map<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
-  _shapes = {};
+  final Map<RenderLiquidGlass, LiquidShape> _shapes = {};
 
-  List<
-    MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
-  >
-  get shapeEntries => _shapes.entries.toList();
+  List<MapEntry<RenderLiquidGlass, LiquidShape>> get shapeEntries =>
+      _shapes.entries.toList();
 
   /// Check if any shapes are registered.
   bool get hasShapes => _shapes.isNotEmpty;
@@ -610,10 +590,9 @@ class GlassGroupLink with ChangeNotifier {
   /// Register a shape with this link.
   void registerShape(
     RenderLiquidGlass renderObject,
-    LiquidShape shape, {
-    required bool glassContainsChild,
-  }) {
-    _shapes[renderObject] = (shape, glassContainsChild);
+    LiquidShape shape,
+  ) {
+    _shapes[renderObject] = shape;
     notifyListeners();
   }
 
@@ -626,10 +605,9 @@ class GlassGroupLink with ChangeNotifier {
   /// Update the shape properties for a registered render object.
   void updateShape(
     RenderLiquidGlass renderObject,
-    LiquidShape shape, {
-    required bool glassContainsChild,
-  }) {
-    _shapes[renderObject] = (shape, glassContainsChild);
+    LiquidShape shape,
+  ) {
+    _shapes[renderObject] = shape;
     notifyListeners();
   }
 

@@ -61,7 +61,6 @@ void main() {
                         thickness: 2,
                         glassColor: Colors.blue.withValues(alpha: 0.5),
                       ),
-                      glassContainsChild: true,
                       shape: LiquidRoundedSuperellipse(
                         borderRadius: radius,
                       ),
@@ -90,7 +89,6 @@ void main() {
                       ),
                       child: LiquidGlassBlendGroup(
                         child: LiquidGlass.grouped(
-                          glassContainsChild: true,
                           shape: LiquidRoundedSuperellipse(
                             borderRadius: radius,
                           ),

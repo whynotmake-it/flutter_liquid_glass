@@ -188,9 +188,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   void paintShapeContents(
     RenderObject from,
     PaintingContext context,
-    Offset offset, {
-    required bool insideGlass,
-  });
+    Offset offset,
+  );
 
   /// Gathers all shapes and computes them in both layer and screen space
   /// Returns (layerBounds, shapes, anyShapeChangedInLayer)
@@ -662,7 +661,6 @@ class ShapeGeometry extends Equatable {
   ShapeGeometry({
     required this.renderObject,
     required this.shape,
-    required this.glassContainsChild,
     required this.shapeBounds,
     this.shapeToGeometry,
   }) : rawCornerRadius = rawCornerRadiusOf(shape),
@@ -691,18 +689,11 @@ class ShapeGeometry extends Equatable {
 
   final double rawCornerRadius;
 
-  final bool glassContainsChild;
-
   /// Bounds in geometry-local coordinates (for painting)
   final Rect shapeBounds;
 
   final Matrix4? shapeToGeometry;
 
   @override
-  List<Object?> get props => [
-    renderObject,
-    shape,
-    glassContainsChild,
-    shapeBounds,
-  ];
+  List<Object?> get props => [renderObject, shape, shapeBounds];
 }

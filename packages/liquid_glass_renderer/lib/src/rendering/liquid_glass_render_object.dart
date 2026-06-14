@@ -218,18 +218,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     if (settings.effectiveThickness <= 0) {
       _clearGeometryImage();
-      paintShapeContents(
-        context,
-        offset,
-        shapesWithGeometry,
-        insideGlass: true,
-      );
-      paintShapeContents(
-        context,
-        offset,
-        shapesWithGeometry,
-        insideGlass: false,
-      );
+      paintShapeContents(context, offset, shapesWithGeometry);
       super.paint(context, offset);
       return;
     }
@@ -407,18 +396,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     if (debugPaintLiquidGlassGeometry) {
       _debugPaintGeometry(context, offset);
-      paintShapeContents(
-        context,
-        offset,
-        shapesWithGeometry,
-        insideGlass: true,
-      );
-      paintShapeContents(
-        context,
-        offset,
-        shapesWithGeometry,
-        insideGlass: false,
-      );
+      paintShapeContents(context, offset, shapesWithGeometry);
     } else {
       final sampler = directGroup != null
           ? _resolveDirectGroupSampler(directGroup)
@@ -619,16 +597,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   void paintShapeContents(
     PaintingContext context,
     Offset offset,
-    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes, {
-    required bool insideGlass,
-  }) {
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
+  ) {
     for (final (geometryRenderObject, _, _) in shapes) {
-      geometryRenderObject.paintShapeContents(
-        this,
-        context,
-        offset,
-        insideGlass: insideGlass,
-      );
+      geometryRenderObject.paintShapeContents(this, context, offset);
     }
   }
 

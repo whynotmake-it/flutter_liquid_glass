@@ -309,13 +309,6 @@ LiquidGlassLayer(
 )
 ```
 
-### Child Placement
-
-The `child` of a `LiquidGlass` widget can be rendered either "inside" the glass or on top of it using the `glassContainsChild` property.
-
--   `glassContainsChild: false` (default): The child is rendered normally on top of the glass effect.
--   `glassContainsChild: true`: The child is part of the glass, affected by color tint and refraction.
-
 ### Shadows
 
 You can add shadows to any `LiquidGlass` widget using the `shadows` parameter. Shadows are rendered using optimized canvas primitives (e.g. `drawRRect`, `drawOval`) matched to the glass shape, rather than rasterizing an arbitrary `Path` with a blur `MaskFilter`, so they remain performant.

@@ -217,7 +217,6 @@ class LiquidGlassSettings with EquatableMixin {
     double? thickness,
     double? blur,
     double? chromaticAberration,
-    double? blend,
     double? lightAngle,
     double? lightIntensity,
     double? ambientStrength,

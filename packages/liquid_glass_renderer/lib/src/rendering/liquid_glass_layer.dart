@@ -287,7 +287,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
-  final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
   /// Per-component layer handles for multi-pass (Phase 6) rendering.
@@ -410,9 +409,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       );
     }
 
-    // Children paint on top of all glass passes. Component splitting only
-    // engages when no shape draws its child inside the glass.
-    paintShapeContents(context, offset, shapes, insideGlass: false);
+    // Children always paint on top of all glass passes.
+    paintShapeContents(context, offset, shapes);
   }
 
   void _resizeComponentHandles(int count) {
@@ -522,34 +520,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       // group (LiquidGlassLayer.useBackdropGroup) to avoid redundant snapshots.
       ..backdropKey = backdropKey;
 
-    final clipPath = Path();
-    for (final geometry in shapes) {
-      if (!geometry.$1.attached) continue;
-
-      clipPath.addPath(
-        geometry.$2.path,
-        Offset.zero,
-        matrix4: geometry.$3.storage,
-      );
-    }
-    _clipPathLayerHandle.layer = context
-        // First we push the clipped blur layer
-        .pushClipPath(
-          needsCompositing,
-          offset,
-          boundingBox,
-          clipPath,
-          (context, offset) {
-            // If glass contains child we paint it above blur but below shader
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: true,
-            );
-          },
-          oldLayer: _clipPathLayerHandle.layer,
-        );
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,
@@ -558,12 +528,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         context.pushLayer(
           shaderLayer,
           (context, offset) {
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: false,
-            );
+            paintShapeContents(context, offset, shapes);
           },
           offset,
         );
@@ -575,7 +540,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @override
   void dispose() {
     _shaderHandle.layer = null;
-    _clipPathLayerHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     for (final handle in _componentBackdropHandles) {
       handle.layer = null;
