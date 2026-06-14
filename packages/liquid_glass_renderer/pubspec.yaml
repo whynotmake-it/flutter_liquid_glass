@@ -16,8 +16,8 @@ topics:
   - effects
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.32.4"
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0"
 
 # We only support Platforms that support Impeller.
 platforms:
@@ -46,6 +46,6 @@ flutter:
   shaders:
     - lib/assets/shaders/liquid_glass_geometry_blended.frag
     - lib/assets/shaders/liquid_glass_filter.frag
-    - lib/assets/shaders/liquid_glass_arbitrary.frag
     - lib/assets/shaders/liquid_glass_final_render.frag
+    - lib/assets/shaders/liquid_glass_direct_render.frag
     - lib/assets/shaders/fake_glass_color.frag

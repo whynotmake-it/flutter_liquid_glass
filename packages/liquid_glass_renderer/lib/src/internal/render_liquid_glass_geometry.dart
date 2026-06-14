@@ -40,13 +40,12 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   /// Creates a new [RenderLiquidGlassGeometry] with the given
   /// [geometryShader].
   RenderLiquidGlassGeometry({
-    required GeometryRenderLink renderLink,
+    required GeometryRenderLink this._renderLink,
     required this.geometryShader,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
-  })  : _renderLink = renderLink,
-        _settings = settings,
-        _devicePixelRatio = devicePixelRatio {
+  }) : _settings = settings,
+       _devicePixelRatio = devicePixelRatio {
     updateShaderWithSettings(settings, devicePixelRatio);
   }
 
@@ -163,14 +162,34 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     List<ShapeGeometry> shapes,
   );
 
+  /// Renders a reduced nine-slice matte `Picture` for a single [shape].
+  ///
+  /// The returned picture is `nineSlice.textureSize` physical pixels and
+  /// contains the shape's corners and a minimal straight-edge band, to be
+  /// expanded back to the full region via nine-patch mapping.
+  Picture renderNineSlicePicture(ShapeGeometry shape, NineSlice nineSlice);
+
+  /// Globally toggles the nine-slice border-matte optimization.
+  static bool nineSliceEnabled = true;
+
+  /// Globally toggles connected-component splitting of sparse blend groups
+  /// into independent direct-render passes (no union-AABB composite texture).
+  static bool componentSplittingEnabled = true;
+
+  /// Global resolution scale (<= 1.0) for non-nine-sliced geometry mattes.
+  ///
+  /// Opt-in quality tradeoff: values below 1.0 (e.g. 0.5) render mattes at a
+  /// lower resolution for ~`scale^2` less texture memory, at the cost of
+  /// slightly softer edge anti-aliasing. Defaults to 1.0 (no change).
+  static double geometryResolutionScale = 1;
+
   /// Paints the contents of all shapes to the given [context] at the given
   /// [offset].
   void paintShapeContents(
     RenderObject from,
     PaintingContext context,
-    Offset offset, {
-    required bool insideGlass,
-  });
+    Offset offset,
+  );
 
   /// Gathers all shapes and computes them in both layer and screen space
   /// Returns (layerBounds, shapes, anyShapeChangedInLayer)
@@ -178,7 +197,26 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     Rect bounds,
     List<ShapeGeometry> geometries,
     bool needsUpdate,
-  ) gatherShapeData();
+  )
+  gatherShapeData();
+
+  /// Gathers shape data in screen-physical pixel space for the inline
+  /// (texture-less) "direct" render path.
+  ///
+  /// Returns a flat float list laid out as
+  /// `[numShapes, blend, type0, cx0, cy0, w0, h0, r0, type1, ...]`, with all
+  /// positions/sizes already multiplied by [devicePixelRatio].
+  ///
+  /// Returns `null` if direct rendering is not applicable, e.g. because a shape
+  /// is rotated/skewed/mirrored (the screen-space SDF only supports
+  /// translation + positive scale) or there are no renderable shapes.
+  List<double>? gatherDirectShapeData(double devicePixelRatio);
+
+  /// Splits this geometry into proximity-connected components for independent
+  /// direct render passes, or `null` when splitting is disabled, not
+  /// beneficial, or not applicable (e.g. a single component, too many
+  /// components, or a non-axis-aligned shape).
+  List<DirectComponent>? gatherDirectComponents(double devicePixelRatio);
 
   Path getPath(
     List<ShapeGeometry> geometries,
@@ -194,6 +232,21 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     return path;
   }
 
+  /// Ensures the current [geometry] is rendered to a texture (converting an
+  /// [UnrenderedGeometryCache] into a [RenderedGeometryCache] in place) and
+  /// returns it, or `null` if there is no geometry.
+  ///
+  /// Used by the single-group direct-sampling path, which samples this matte
+  /// straight from the final shader instead of compositing it into a separate
+  /// screen-space texture.
+  RenderedGeometryCache? ensureRenderedMatte() {
+    final current = geometry;
+    if (current == null) return null;
+    final rendered = current.render();
+    geometry = rendered;
+    return rendered;
+  }
+
   /// Should be called from within [paint] to maybe rebuild the [geometry].
   GeometryCache? maybeRebuildGeometry() {
     if (geometryState == LiquidGlassGeometryState.updated && geometry != null) {
@@ -206,11 +259,21 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !anyShapeChangedInLayer &&
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
-      renderLink?.markRebuilt(this);
+
+      // Only mark the link dirty if rendering actually produces a *new*
+      // texture. An already-rendered cache's `render()` is a no-op, so forcing
+      // a dirty here would make the layer rebuild its composite every frame
+      // (e.g. while the whole layer is merely translating), defeating caching.
+      final wasUnrendered = geometry is UnrenderedGeometryCache;
 
       // Only render once we are done building
       geometry = geometry!.render();
       geometryState = LiquidGlassGeometryState.updated;
+
+      if (wasUnrendered) {
+        renderLink?.markRebuilt(this);
+      }
+
       return geometry;
     }
 
@@ -232,17 +295,34 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
       snappedBounds.height * devicePixelRatio,
     ).snapToPixels(1);
 
-    // Set the new geometry
-    final newGeo = geometry = UnrenderedGeometryCache(
-      matte: _buildGeometryPicture(snappedBounds, shapes),
-      bounds: snappedBounds,
-      matteBounds: matteBounds,
-      shapes: shapes,
-      path: getPath(shapes),
-    );
+    final nineSlice = _tryComputeNineSlice(shapes, matteBounds);
 
-    // We have updated the geometry.
-    _renderLink?.markRebuilt(this);
+    final GeometryCache newGeo;
+    if (nineSlice != null) {
+      // Render the small border matte eagerly (it is tiny) so the composite
+      // can expand it via drawImageNine and the direct path can sample it.
+      newGeo = geometry = UnrenderedGeometryCache(
+        matte: renderNineSlicePicture(shapes.first, nineSlice),
+        bounds: snappedBounds,
+        matteBounds: matteBounds,
+        shapes: shapes,
+        path: getPath(shapes),
+        nineSlice: nineSlice,
+      ).render();
+    } else {
+      newGeo = geometry = UnrenderedGeometryCache(
+        matte: _buildGeometryPicture(snappedBounds, shapes),
+        bounds: snappedBounds,
+        matteBounds: matteBounds,
+        shapes: shapes,
+        path: getPath(shapes),
+        resolutionScale: RenderLiquidGlassGeometry.geometryResolutionScale
+            .clamp(0.1, 1.0),
+      );
+    }
+
+    // We have updated the geometry with an actual shape-data change.
+    _renderLink?.markFullRebuild(this);
     return newGeo;
   }
 
@@ -286,6 +366,85 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
 
     return recorder.endRecording();
   }
+
+  /// Decides whether the matte described by [matteBounds] can be stored as a
+  /// reduced nine-slice border matte, returning its descriptor or `null`.
+  ///
+  /// Only a single shape with straight edges (rounded rectangle / squircle, not
+  /// an ellipse) that is large enough to actually save pixels qualifies. The
+  /// inset is intentionally generous so the fixed border fully contains the
+  /// corner curvature and the inward refraction falloff, keeping the expanded
+  /// result identical to a full matte.
+  NineSlice? _tryComputeNineSlice(
+    List<ShapeGeometry> shapes,
+    Rect matteBounds,
+  ) {
+    if (!RenderLiquidGlassGeometry.nineSliceEnabled) return null;
+    if (shapes.length != 1) return null;
+
+    final shape = shapes.first;
+    if (shape.rawShapeType == RawShapeType.ellipse) return null;
+
+    final thickness = settings.effectiveThickness;
+    if (thickness <= 0) return null;
+
+    // Generous border: corner curvature (squircles overshoot the radius) plus
+    // the inward displacement falloff (~thickness) plus anti-alias padding.
+    final insetLogical = shape.rawCornerRadius * 1.5 + thickness + 4;
+    final inset = insetLogical * devicePixelRatio;
+
+    const middle = 4.0;
+    final minReduced = 2 * inset + middle;
+
+    final reduceX = matteBounds.width > minReduced + 1;
+    final reduceY = matteBounds.height > minReduced + 1;
+    if (!reduceX && !reduceY) return null;
+
+    return NineSlice(
+      inset: inset,
+      textureSize: Size(
+        reduceX ? minReduced : matteBounds.width,
+        reduceY ? minReduced : matteBounds.height,
+      ),
+    );
+  }
+}
+
+/// Describes a nine-slice (nine-patch) matte: the actual texture is smaller
+/// than the region it represents, with a fixed [inset] border and a
+/// stretchable middle.
+@immutable
+@internal
+class NineSlice {
+  const NineSlice({
+    required this.inset,
+    required this.textureSize,
+  });
+
+  /// The fixed (unstretched) border, in physical pixels, shared by the texture
+  /// and the output region.
+  final double inset;
+
+  /// The actual matte texture size in physical pixels.
+  final Size textureSize;
+}
+
+/// One proximity-connected component of a blend group, rendered as an
+/// independent direct (texture-less) pass.
+@immutable
+@internal
+class DirectComponent {
+  const DirectComponent({
+    required this.uniforms,
+    required this.clipBoundsLogical,
+  });
+
+  /// Direct-render shape uniforms laid out as `[numShapes, blend, ...shapes]`,
+  /// with positions/sizes in physical pixels.
+  final List<double> uniforms;
+
+  /// The logical-space clip bounds for this component's pass.
+  final Rect clipBoundsLogical;
 }
 
 @immutable
@@ -296,14 +455,29 @@ sealed class GeometryCache {
     required this.bounds,
     required this.shapes,
     required this.path,
+    this.nineSlice,
+    this.resolutionScale = 1.0,
   });
+
+  /// Factor (<= 1.0) the matte texture is rendered at relative to its full
+  /// resolution. Below 1.0 trades anti-aliasing sharpness for less texture
+  /// memory; the shader bilinearly upsamples. Ignored when [nineSlice] is set.
+  final double resolutionScale;
 
   /// The bounds of the geometry in the coordinate space of its
   /// [RenderLiquidGlassGeometry] parent.
   final Rect bounds;
 
   /// The bounds of the matte image in physical pixels.
+  ///
+  /// This is the *full* region the matte represents on screen. When
+  /// [nineSlice] is set, the actual texture is smaller (see
+  /// [NineSlice.textureSize]) and is expanded to these bounds via nine-patch
+  /// mapping.
   final Rect matteBounds;
+
+  /// Nine-slice descriptor, or `null` for a full-size matte.
+  final NineSlice? nineSlice;
 
   final List<ShapeGeometry> shapes;
 
@@ -337,32 +511,65 @@ class UnrenderedGeometryCache extends GeometryCache {
     required super.bounds,
     required super.shapes,
     required super.path,
+    super.nineSlice,
+    super.resolutionScale,
   });
 
   /// The matte image representing the geometry.
   final Picture matte;
 
+  int get _textureWidth => nineSlice != null
+      ? nineSlice!.textureSize.width.ceil()
+      : (matteBounds.width * resolutionScale).ceil();
+
+  int get _textureHeight => nineSlice != null
+      ? nineSlice!.textureSize.height.ceil()
+      : (matteBounds.height * resolutionScale).ceil();
+
+  /// Whether the full-resolution [matte] picture must be downscaled when
+  /// rasterizing (resolution-scale path, distinct from the nine-slice path
+  /// whose picture is already rendered at the reduced size).
+  bool get _needsDownscaleRaster => nineSlice == null && resolutionScale != 1.0;
+
+  Picture _scaledPicture() {
+    final recorder = PictureRecorder();
+    Canvas(recorder)
+      ..scale(resolutionScale)
+      ..drawPicture(matte);
+    return recorder.endRecording();
+  }
+
   @override
   Future<RenderedGeometryCache> renderAsync() async {
-    final image = await matte.toImage(
-      matteBounds.width.ceil(),
-      matteBounds.height.ceil(),
-    );
+    final Image image;
+    if (_needsDownscaleRaster) {
+      final scaled = _scaledPicture();
+      image = await scaled.toImage(_textureWidth, _textureHeight);
+      scaled.dispose();
+    } else {
+      image = await matte.toImage(_textureWidth, _textureHeight);
+    }
     return RenderedGeometryCache(
       matte: image,
       matteBounds: matteBounds,
       bounds: bounds,
       shapes: shapes,
       path: path,
+      nineSlice: nineSlice,
+      resolutionScale: resolutionScale,
     );
   }
 
   @override
   RenderedGeometryCache render() {
-    final image = matte.toImageSync(
-      matteBounds.width.ceil(),
-      matteBounds.height.ceil(),
-    );
+    final Image image;
+    if (_needsDownscaleRaster) {
+      final scaled = _scaledPicture();
+      image = scaled.toImageSync(_textureWidth, _textureHeight);
+      scaled.dispose();
+    } else {
+      image = matte.toImageSync(_textureWidth, _textureHeight);
+    }
     dispose();
     return RenderedGeometryCache(
       matte: image,
@@ -370,6 +577,8 @@ class UnrenderedGeometryCache extends GeometryCache {
       bounds: bounds,
       shapes: shapes,
       path: path,
+      nineSlice: nineSlice,
+      resolutionScale: resolutionScale,
     );
   }
 
@@ -391,6 +600,8 @@ class RenderedGeometryCache extends GeometryCache {
     required super.bounds,
     required super.shapes,
     required super.path,
+    super.nineSlice,
+    super.resolutionScale,
   });
 
   /// The matte image representing the geometry.
@@ -450,11 +661,14 @@ class ShapeGeometry extends Equatable {
   ShapeGeometry({
     required this.renderObject,
     required this.shape,
-    required this.glassContainsChild,
     required this.shapeBounds,
     this.shapeToGeometry,
-  })  : rawCornerRadius = _getRadiusFromGlassShape(shape),
-        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+  }) : rawCornerRadius = rawCornerRadiusOf(shape),
+       rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+
+  /// The raw corner radius the geometry shader expects for [shape].
+  static double rawCornerRadiusOf(LiquidShape shape) =>
+      _getRadiusFromGlassShape(shape);
 
   static double _getRadiusFromGlassShape(LiquidShape shape) {
     switch (shape) {
@@ -475,18 +689,11 @@ class ShapeGeometry extends Equatable {
 
   final double rawCornerRadius;
 
-  final bool glassContainsChild;
-
   /// Bounds in geometry-local coordinates (for painting)
   final Rect shapeBounds;
 
   final Matrix4? shapeToGeometry;
 
   @override
-  List<Object?> get props => [
-        renderObject,
-        shape,
-        glassContainsChild,
-        shapeBounds,
-      ];
+  List<Object?> get props => [renderObject, shape, shapeBounds];
 }

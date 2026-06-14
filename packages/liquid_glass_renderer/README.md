@@ -92,16 +92,15 @@ This package provides several widgets to create the glass effect:
 | `FakeGlass`               | Lightweight glass appearance without refraction. Better performance, less visual fidelity. |
 | `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
 | `LiquidStretch`           | Add interactive squash and stretch effects to glass widgets.                               |
-| `Glassify` (Experimental) | To apply a glass effect to any arbitrary widget (e.g., text, icons). Less performant.      |
 
 ### ⚠️ Limitations
 
 As this is a pre-release, there are a few things to keep in mind:
 
 - **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
+- **SkSL/Skia shader warnings can be ignored**: Flutter may warn that these shaders are incompatible with SkSL or the Skia backend. This package intentionally uses Impeller-only shader features, so those warnings do not matter as long as your app is running with Impeller. See [flutter/flutter#183656](https://github.com/flutter/flutter/issues/183656) for the upstream warning discussion.
 - **Memory spike when animating shapes** There is a [bug in Flutter](https://github.com/flutter/flutter/issues/138627) that prevents us from disposing generated textures immediately, leading to temporary memory spikes when animating glass shapes. Read [A word on Performance](#-a-word-on-performance) for tips on minimizing this.
 - **Maximum of 16 shapes** can be blended in a `LiquidGlassBlendGroup`, and performance will degrade significantly with the more shapes you add in the same group.
-- **Blur** introduces artifacts when blending shapes, and is entirely unsupported for `Glassify`. Upvote [this issue](https://github.com/flutter/flutter/issues/170820) to get that fixed.
 
 
 ### 🚨 A word on Performance
@@ -310,15 +309,6 @@ LiquidGlassLayer(
 )
 ```
 
-**Note:** Blur is not supported in `Glassify` due to performance constraints.
-
-### Child Placement
-
-The `child` of a `LiquidGlass` widget can be rendered either "inside" the glass or on top of it using the `glassContainsChild` property.
-
--   `glassContainsChild: false` (default): The child is rendered normally on top of the glass effect.
--   `glassContainsChild: true`: The child is part of the glass, affected by color tint and refraction.
-
 ### Shadows
 
 You can add shadows to any `LiquidGlass` widget using the `shadows` parameter. Shadows are rendered using optimized canvas primitives (e.g. `drawRRect`, `drawOval`) matched to the glass shape, rather than rasterizing an arbitrary `Path` with a blur `MaskFilter`, so they remain performant.
@@ -431,54 +421,6 @@ LiquidStretch(
 ```
 
 The widget listens to drag gestures and applies smooth squash and stretch transformations without interfering with other gestures.
-
-
-### `Glassify`: Glass Effect on Any Shape (Experimental)
-
-
-
-> ⚠️ `Glassify` is experimental. It is significantly less performant and will produce lower-quality results than `LiquidGlass`. 
->
-> **Don't use it in production unless you have clearly tested and validated it on your target devices.**
-> 
-> **Never use it for primitive shapes that could be rendered with `LiquidGlass`!**
-
-![Glassify Demo](doc/clock.gif)
-
-The `Glassify` widget can apply the glass effect to any child widget, not just a predefined shape. This is useful for text, icons, or custom-painted widgets.
-
-Apple themselves barely use this effect, one of their uses is the time on the lock screen. 
-To make it look best, consider a few key tips:
-
-- Try to limit the use of these widgets on each screen, to keep the performance good
-- **Note: Blur is not supported in `Glassify`** due to performance constraints. The shader has been optimized to remove blur to improve mobile GPU performance.
-- The algorithm often falls apart for high thicknesses, try to keep it below 20px for best results
-- Depending on the shape, you might need to adjust `lightIntensity` and `ambientStrength` to make it look best
-- Colors help maintain readability
-
-```dart
-// Important: You need to import from experimental.dart
-import 'package:liquid_glass_renderer/experimental.dart';
-
-Center(
-  child: Glassify(
-    settings: const LiquidGlassSettings(
-      thickness: 5,
-      glassColor: Color(0x33FFFFFF),
-    ),
-    child: const Text(
-      'Liquid',
-      style: TextStyle(
-        fontSize: 120,
-        fontWeight: FontWeight.bold,
-        color: Colors.black,
-      ),
-    ),
-  ),
-)
-```
-
----
 
 ---
 

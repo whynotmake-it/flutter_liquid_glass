@@ -1,11 +1,13 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -119,6 +121,38 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   late final logger = Logger(LgrLogNames.layer);
 
+  /// Extra direct-render shader instances for connected-component multi-pass
+  /// rendering (Phase 6). Each pass needs its own instance because
+  /// `ImageFilter.shader` reads the shader's uniforms at composite time.
+  List<FragmentShader>? _componentShaders;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComponentShaders();
+  }
+
+  Future<void> _loadComponentShaders() async {
+    try {
+      final program = await FragmentProgram.fromAsset(
+        ShaderKeys.liquidGlassDirectRender,
+      );
+      if (!mounted) return;
+      setState(() {
+        _componentShaders = List.generate(
+          _maxComponentPasses,
+          (_) => program.fragmentShader(),
+        );
+      });
+    } on Object catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack),
+      );
+    }
+  }
+
+  static const int _maxComponentPasses = 4;
+
   @override
   void dispose() {
     _link.dispose();
@@ -130,11 +164,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     if (widget.fake || !ImageFilter.isShaderFilterSupported) {
       if (!ImageFilter.isShaderFilterSupported) {
         logger.warning(
-            'LiquidGlassLayer is only supported when using Impeller at the '
-            'moment. Falling back to FakeGlass for LiquidGlassLayer. '
-            'To prevent this warning, enable Impeller, or set '
-            'LiquidGlassLayer.fake to true before you use liquid glass widgets '
-            'on Skia.');
+          'LiquidGlassLayer is only supported when using Impeller at the '
+          'moment. Falling back to FakeGlass for LiquidGlassLayer. '
+          'To prevent this warning, enable Impeller, or set '
+          'LiquidGlassLayer.fake to true before you use liquid glass widgets '
+          'on Skia.',
+        );
       }
 
       return LiquidGlassRenderScope(
@@ -152,10 +187,15 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         settings: widget.settings,
         child: InheritedGeometryRenderLink(
           link: _link,
-          child: ShaderBuilder(
-            assetKey: ShaderKeys.liquidGlassRender,
-            (context, shader, child) => _RawShapes(
-              renderShader: shader,
+          child: MultiShaderBuilder(
+            assetKeys: [
+              ShaderKeys.liquidGlassRender,
+              ShaderKeys.liquidGlassDirectRender,
+            ],
+            (context, shaders, child) => _RawShapes(
+              renderShader: shaders[0],
+              directRenderShader: shaders[1],
+              componentShaders: _componentShaders,
               backdropKey: widget.useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null,
@@ -174,6 +214,8 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 class _RawShapes extends SingleChildRenderObjectWidget {
   const _RawShapes({
     required this.renderShader,
+    required this.directRenderShader,
+    required this.componentShaders,
     required this.backdropKey,
     required this.settings,
     required Widget super.child,
@@ -181,6 +223,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   });
 
   final FragmentShader renderShader;
+  final FragmentShader directRenderShader;
+  final List<FragmentShader>? componentShaders;
   final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GeometryRenderLink link;
@@ -190,6 +234,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     return RenderLiquidGlassLayer(
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       renderShader: renderShader,
+      directRenderShader: directRenderShader,
+      componentShaders: componentShaders,
       backdropKey: backdropKey,
       settings: settings,
       link: link,
@@ -204,6 +250,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     renderObject
       ..link = link
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
+      ..directRenderShader = directRenderShader
+      ..componentShaders = componentShaders
       ..settings = settings
       ..backdropKey = backdropKey;
   }
@@ -214,23 +262,43 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     with TransformTrackingRenderObjectMixin {
   RenderLiquidGlassLayer({
     required super.renderShader,
+    required this._directRenderShader,
+    required this._componentShaders,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
     required super.link,
   });
 
+  FragmentShader _directRenderShader;
+  FragmentShader get directRenderShader => _directRenderShader;
+  set directRenderShader(FragmentShader value) {
+    if (_directRenderShader == value) return;
+    _directRenderShader = value;
+    markNeedsPaint();
+  }
+
+  List<FragmentShader>? _componentShaders;
+  List<FragmentShader>? get componentShaders => _componentShaders;
+  set componentShaders(List<FragmentShader>? value) {
+    if (_componentShaders == value) return;
+    _componentShaders = value;
+    markNeedsPaint();
+  }
+
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
-  final _blurLayerHandle = LayerHandle<BackdropFilterLayer>();
-  final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
+
+  /// Per-component layer handles for multi-pass (Phase 6) rendering.
+  final _componentBackdropHandles = <LayerHandle<BackdropFilterLayer>>[];
+  final _componentClipHandles = <LayerHandle<ClipRectLayer>>[];
 
   @override
   Size get desiredMatteSize => switch (owner?.rootNode) {
-        final RenderView rv => rv.size,
-        final RenderBox rb => rb.size,
-        _ => Size.zero,
-      };
+    final RenderView rv => rv.size,
+    final RenderBox rb => rb.size,
+    _ => Size.zero,
+  };
 
   @override
   Matrix4 get matteTransform => getTransformTo(null);
@@ -249,51 +317,209 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     Rect boundingBox,
   ) {
     if (!attached) return;
-    final blurLayer = (_blurLayerHandle.layer ??= BackdropFilterLayer())
-      ..backdropKey = backdropKey
-      ..filter = ImageFilter.blur(
-        tileMode: TileMode.mirror,
-        sigmaX: settings.effectiveBlur,
-        sigmaY: settings.effectiveBlur,
-      );
+    _pushGlassLayers(
+      context,
+      offset,
+      shapes,
+      boundingBox,
+      ImageFilter.shader(renderShader),
+    );
+  }
 
-    final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
-      ..filter = ImageFilter.shader(renderShader);
+  @override
+  List<double>? gatherDirectShapeUniforms() {
+    // Direct rendering is only supported for a single (axis-aligned) blend
+    // group; otherwise we cannot collapse the geometry into a single inline
+    // SDF evaluation and fall back to the texture pipeline.
+    final geometries = link.shapes;
+    if (geometries.length != 1) return null;
+    return geometries.first.gatherDirectShapeData(devicePixelRatio);
+  }
 
-    final clipPath = Path();
-    for (final geometry in shapes) {
-      if (!geometry.$1.attached) continue;
+  @override
+  List<DirectComponent>? gatherDirectComponents() {
+    final shaders = _componentShaders;
+    if (shaders == null) return null;
+    final geometries = link.shapes;
+    if (geometries.length != 1) return null;
+    final components = geometries.first.gatherDirectComponents(
+      devicePixelRatio,
+    );
+    if (components == null || components.length > shaders.length) return null;
+    return components;
+  }
 
-      clipPath.addPath(
-        geometry.$2.path,
-        Offset.zero,
-        matrix4: geometry.$3.storage,
+  @override
+  void paintLiquidGlassComponents(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
+    Rect boundingBox,
+    List<DirectComponent> components,
+  ) {
+    if (!attached) return;
+    final shaders = _componentShaders!;
+
+    _resizeComponentHandles(components.length);
+
+    final blurFilter = settings.effectiveBlur > 0
+        ? ImageFilter.blur(
+            tileMode: TileMode.mirror,
+            sigmaX: settings.effectiveBlur,
+            sigmaY: settings.effectiveBlur,
+          )
+        : null;
+
+    // One independent, clipped backdrop pass per component. Each uses its own
+    // shader instance so the uniforms survive until composite time.
+    for (var i = 0; i < components.length; i++) {
+      final component = components[i];
+      final shader = shaders[i];
+      _updateDirectShaderSettingsOn(shader);
+
+      final numShapes = component.uniforms[0];
+      final blend = component.uniforms[1];
+      final shapeData = component.uniforms.sublist(2);
+      shader.setFloatUniforms(initialIndex: 26, (value) {
+        value
+          ..setFloat(numShapes)
+          ..setFloat(blend)
+          ..setFloats(shapeData);
+      });
+
+      final glassFilter = ImageFilter.shader(shader);
+      final composedFilter = switch (blurFilter) {
+        final blur? => ImageFilter.compose(inner: blur, outer: glassFilter),
+        null => glassFilter,
+      };
+
+      final shaderLayer =
+          (_componentBackdropHandles[i].layer ??= BackdropFilterLayer())
+            ..filter = composedFilter
+            ..backdropKey = backdropKey;
+
+      _componentClipHandles[i].layer = context.pushClipRect(
+        needsCompositing,
+        offset,
+        component.clipBoundsLogical,
+        (context, offset) {
+          context.pushLayer(shaderLayer, (context, offset) {}, offset);
+        },
+        oldLayer: _componentClipHandles[i].layer,
       );
     }
-    _clipPathLayerHandle.layer = context
-        // First we push the clipped blur layer
-        .pushClipPath(
-      needsCompositing,
+
+    // Children always paint on top of all glass passes.
+    paintShapeContents(context, offset, shapes);
+  }
+
+  void _resizeComponentHandles(int count) {
+    while (_componentBackdropHandles.length < count) {
+      _componentBackdropHandles.add(LayerHandle<BackdropFilterLayer>());
+      _componentClipHandles.add(LayerHandle<ClipRectLayer>());
+    }
+    // Release any passes no longer needed this frame.
+    for (var i = count; i < _componentBackdropHandles.length; i++) {
+      _componentBackdropHandles[i].layer = null;
+      _componentClipHandles[i].layer = null;
+    }
+  }
+
+  @override
+  void paintLiquidGlassDirect(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
+    Rect boundingBox,
+    List<double> directUniforms,
+  ) {
+    if (!attached) return;
+
+    _updateDirectShaderSettingsOn(_directRenderShader);
+
+    final numShapes = directUniforms[0];
+    final blend = directUniforms[1];
+    final shapeData = directUniforms.sublist(2);
+
+    _directRenderShader.setFloatUniforms(initialIndex: 26, (value) {
+      value
+        ..setFloat(numShapes)
+        ..setFloat(blend)
+        ..setFloats(shapeData);
+    });
+
+    _pushGlassLayers(
+      context,
       offset,
+      shapes,
       boundingBox,
-      clipPath,
-      (context, offset) {
-        context.pushLayer(
-          blurLayer,
-          (context, offset) {
-            // If glass contains child we paint it above blur but below shader
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: true,
-            );
-          },
-          offset,
-        );
-      },
-      oldLayer: _clipPathLayerHandle.layer,
+      ImageFilter.shader(_directRenderShader),
     );
+  }
+
+  /// Uploads the current [LiquidGlassSettings] to a direct render shader.
+  ///
+  /// Layout mirrors `liquid_glass_direct_render.frag`: `uSize` (indices 0-1) is
+  /// populated automatically by `ImageFilter.shader`, so the settings start at
+  /// index 2 and the shape data follows at index 26.
+  void _updateDirectShaderSettingsOn(FragmentShader shader) {
+    shader.setFloatUniforms(initialIndex: 2, (value) {
+      value
+        ..setColor(settings.effectiveGlassColor)
+        ..setFloats([
+          settings.refractiveIndex,
+          settings.effectiveChromaticAberration,
+          settings.effectiveThickness,
+          settings.effectiveLightIntensity,
+          settings.effectiveAmbientStrength,
+          settings.effectiveSaturation,
+        ])
+        ..setOffset(
+          Offset(
+            cos(settings.lightAngle),
+            sin(settings.lightAngle),
+          ),
+        )
+        ..setColor(settings.effectiveHighlightColor)
+        ..setColor(settings.effectiveEdgeColor)
+        ..setFloats([
+          settings.effectiveEdgeWidth,
+          settings.edgeInset,
+          settings.effectiveBleedStrength,
+          settings.specularWrap,
+        ]);
+    });
+  }
+
+  void _pushGlassLayers(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
+    Rect boundingBox,
+    ImageFilter glassFilter,
+  ) {
+    final blurFilter = settings.effectiveBlur > 0
+        ? ImageFilter.blur(
+            tileMode: TileMode.mirror,
+            sigmaX: settings.effectiveBlur,
+            sigmaY: settings.effectiveBlur,
+          )
+        : null;
+
+    final composedFilter = switch (blurFilter) {
+      final blur? => ImageFilter.compose(
+        inner: blur,
+        outer: glassFilter,
+      ),
+      null => glassFilter,
+    };
+
+    final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
+      ..filter = composedFilter
+      // Share the backdrop capture across layers that opt into a backdrop
+      // group (LiquidGlassLayer.useBackdropGroup) to avoid redundant snapshots.
+      ..backdropKey = backdropKey;
+
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,
@@ -302,12 +528,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         context.pushLayer(
           shaderLayer,
           (context, offset) {
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: false,
-            );
+            paintShapeContents(context, offset, shapes);
           },
           offset,
         );
@@ -318,10 +539,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void dispose() {
-    _blurLayerHandle.layer = null;
     _shaderHandle.layer = null;
-    _clipPathLayerHandle.layer = null;
     _clipRectLayerHandle.layer = null;
+    for (final handle in _componentBackdropHandles) {
+      handle.layer = null;
+    }
+    for (final handle in _componentClipHandles) {
+      handle.layer = null;
+    }
     super.dispose();
   }
 }

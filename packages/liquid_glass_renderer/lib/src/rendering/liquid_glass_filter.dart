@@ -156,19 +156,7 @@ class _RenderLiquidGlassFilter extends LiquidGlassRenderObject {
     //   ..shapeBounds = boundingBox
     //   ..blur = settings.effectiveBlur;
 
-    paintShapeContents(
-      context,
-      offset,
-      shapes,
-      insideGlass: true,
-    );
-
-    paintShapeContents(
-      context,
-      offset,
-      shapes,
-      insideGlass: false,
-    );
+    paintShapeContents(context, offset, shapes);
   }
 }
 

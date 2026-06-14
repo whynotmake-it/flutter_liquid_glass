@@ -29,6 +29,20 @@ void main() {
       }, reportKey: 'basic_test_with_glass');
     });
 
+    testWidgets('measures performance of a translating liquid glass element', (
+      tester,
+    ) async {
+      // Exercises the translation fast path: a large glass element slides every
+      // frame, which previously re-baked a full-screen geometry texture per
+      // frame (memory spikes). It should now reuse the cached matte.
+      await binding.traceAction(() async {
+        await tester.pumpFrames(
+          const _AnimatedTranslateTestApp(),
+          duration,
+        );
+      }, reportKey: 'animated_translate_with_glass');
+    });
+
     testWidgets('measures performance with multiple liquid glass elements', (
       tester,
     ) async {
@@ -133,6 +147,60 @@ class _SingleTestApp extends StatelessWidget {
       home: Scaffold(
         body: _GridPaperBackground(
           child: LiquidGlassLayer(settings: settings, child: glass),
+        ),
+      ),
+    );
+  }
+}
+
+/// A large glass panel that continuously translates, mimicking an animated
+/// sheet. Drives the Phase 1 translation fast path (zero per-frame texture
+/// allocations).
+class _AnimatedTranslateTestApp extends StatefulWidget {
+  const _AnimatedTranslateTestApp();
+
+  @override
+  State<_AnimatedTranslateTestApp> createState() =>
+      _AnimatedTranslateTestAppState();
+}
+
+class _AnimatedTranslateTestAppState extends State<_AnimatedTranslateTestApp>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const settings = LiquidGlassSettings(thickness: 50, blur: 2);
+    return MaterialApp(
+      home: Scaffold(
+        body: _GridPaperBackground(
+          child: LiquidGlassLayer(
+            settings: settings,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, _controller.value * 400 - 200),
+                  child: child,
+                );
+              },
+              child: Center(
+                child: LiquidGlass(
+                  shape: LiquidRoundedSuperellipse(borderRadius: 32),
+                  child: const SizedBox(width: 320, height: 480),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

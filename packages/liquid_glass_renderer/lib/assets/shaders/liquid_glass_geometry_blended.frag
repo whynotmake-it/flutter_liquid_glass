@@ -1,20 +1,25 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
 // Geometry precomputation shader for blended liquid glass shapes
-// This shader pre-computes the refraction displacement and encodes it into a texture
+// This shader pre-computes refraction displacement and inward edge distance,
+// then encodes them into a texture.
 // Only needs to be re-run when shape geometry or layout changes
 
 #version 460 core
 precision mediump float;
 
 #include <flutter/runtime_effect.glsl>
-#include "sdf.glsl"
 #include "displacement_encoding.glsl"
+
+#define MAX_SHAPES 16
 
 layout(location = 0) uniform vec2 uSize;
 layout(location = 1) uniform vec4 uOpticalProps;
 layout(location = 2) uniform float uNumShapes;
 layout(location = 3) uniform float uShapeData[MAX_SHAPES * 6];
+
+// Included after uShapeData so the SDF helpers can read the uniform directly.
+#include "sdf.glsl"
 
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
@@ -31,7 +36,7 @@ void main() {
         vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
     #endif
     
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uShapeData, uBlend);
+    float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
     
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
     if (foregroundAlpha < 0.01) {
@@ -65,6 +70,13 @@ void main() {
     vec2 displacement = baseRefract.xy * baseRefractLength;
     
     float maxDisplacement = uThickness * 10.0;
+    float edgeDistance = -sd;
     
-    fragColor = encodeDisplacementData(displacement, maxDisplacement, height, uThickness, foregroundAlpha);
+    fragColor = encodeDisplacementData(
+        displacement,
+        maxDisplacement,
+        edgeDistance,
+        uThickness,
+        foregroundAlpha
+    );
 }

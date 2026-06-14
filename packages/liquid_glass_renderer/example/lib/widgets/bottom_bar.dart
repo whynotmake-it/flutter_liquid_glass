@@ -92,10 +92,16 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
           refractiveIndex: 1.21,
           thickness: 30,
           blur: 8,
+          edgeColor: Color.from(
+            alpha: .8,
+            red: .1,
+            green: .1,
+            blue: .1,
+          ),
           saturation: 1.5,
           lightIntensity: isDark ? .7 : 1,
           ambientStrength: isDark ? .2 : .5,
-          lightAngle: math.pi / 4,
+          bleedStrength: 1,
           glassColor: CupertinoTheme.of(
             context,
           ).barBackgroundColor.withValues(alpha: 0.6),
@@ -570,23 +576,40 @@ class _TabIndicatorState extends State<_TabIndicator>
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass.withOwnLayer(
+                        shadows: [
+                          BoxShadow(
+                            color: Color.from(
+                              alpha: 0.1,
+                              red: 0,
+                              green: 0,
+                              blue: 0,
+                            ),
+                            blurRadius: 30,
+                          ),
+                        ],
                         fake: widget.fake,
                         settings: LiquidGlassSettings(
                           visibility: thickness,
+
                           glassColor: Color.from(
                             alpha: .1,
                             red: 1,
                             green: 1,
                             blue: 1,
                           ),
+                          edgeColor: Color.from(
+                            alpha: .1,
+                            red: 0,
+                            green: 0,
+                            blue: 0,
+                          ),
                           saturation: 1.5,
                           refractiveIndex: 1.15,
                           thickness: 20,
-                          lightIntensity: 2,
+                          lightIntensity: 1,
                           chromaticAberration: .5,
                           blur: 0,
                         ),
-
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: 64,
                         ),

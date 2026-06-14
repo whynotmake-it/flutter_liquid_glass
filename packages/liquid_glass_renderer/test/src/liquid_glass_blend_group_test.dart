@@ -66,7 +66,9 @@ void main() {
           find.byWidget(blendGroup),
         );
         final geo = ro.geometry;
-        expect(geo, isA<UnrenderedGeometryCache>());
+        // The cache may already be rendered: a single blend group is sampled
+        // directly by the layer (Phase 3), which renders its matte eagerly.
+        expect(geo, isA<GeometryCache>());
 
         final renderedGeo = await geo!.renderAsync();
         final matteImage = renderedGeo.matte;

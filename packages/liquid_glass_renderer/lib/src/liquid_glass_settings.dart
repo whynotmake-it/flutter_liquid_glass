@@ -15,8 +15,14 @@ class LiquidGlassSettings with EquatableMixin {
     this.blur = 5,
     this.chromaticAberration = .01,
     this.lightAngle = 0.5 * pi,
-    this.lightIntensity = .5,
+    this.lightIntensity = 1,
     this.ambientStrength = 0,
+    this.highlightColor = const Color.fromARGB(255, 255, 255, 255),
+    this.edgeColor = const Color.fromARGB(0, 255, 255, 255),
+    this.edgeWidth = 0,
+    this.edgeInset = 0.5,
+    this.specularWrap = 0.35,
+    this.bleedStrength = 0.5,
     this.refractiveIndex = 1.2,
     this.saturation = 1.5,
   });
@@ -34,17 +40,17 @@ class LiquidGlassSettings with EquatableMixin {
     double lightAngle = 0.5 * pi,
     Color glassColor = const Color.fromARGB(0, 255, 255, 255),
   }) : this(
-          visibility: visibility,
-          refractiveIndex: 1 + (refraction / 100) * 0.2,
-          thickness: depth,
-          chromaticAberration: 4 * (dispersion / 100),
-          lightIntensity: lightIntensity / 100,
-          blur: frost,
-          lightAngle: lightAngle,
-          ambientStrength: 0.1,
-          saturation: 1.5,
-          glassColor: glassColor,
-        );
+         visibility: visibility,
+         refractiveIndex: 1 + (refraction / 100) * 0.2,
+         thickness: depth,
+         chromaticAberration: 4 * (dispersion / 100),
+         lightIntensity: lightIntensity / 100,
+         blur: frost,
+         lightAngle: lightAngle,
+         ambientStrength: 0.1,
+         saturation: 1.5,
+         glassColor: glassColor,
+       );
 
   /// Retrieves the nearest [LiquidGlassSettings] from the widget tree.
   ///
@@ -101,13 +107,23 @@ class LiquidGlassSettings with EquatableMixin {
   /// This determines where the highlights on shapes will come from.
   final double lightAngle;
 
-  /// The intensity of the light source.
+  /// An optional multiplier on top of the light intensity.
   ///
-  /// Higher values create more pronounced highlights.
+  /// The primary control for how strong the light is, is the alpha of
+  /// [highlightColor]. This multiplier lets you overdrive the light *past* full
+  /// intensity (values > 1) or dim it globally, on top of that alpha.
+  ///
+  /// Defaults to `1.0`, in which case the highlight color's alpha alone
+  /// determines the light intensity.
   final double lightIntensity;
 
-  /// The effective light intensity taking visibility into account.
-  double get effectiveLightIntensity => lightIntensity * visibility;
+  /// The effective light intensity.
+  ///
+  /// This combines the [highlightColor]'s alpha (the base intensity) with the
+  /// [lightIntensity] overdrive multiplier and [visibility]. It is the single
+  /// value that drives all lighting, both the glass body and the specular rim.
+  double get effectiveLightIntensity =>
+      effectiveHighlightColor.a * lightIntensity;
 
   /// The strength of the ambient light.
   ///
@@ -116,6 +132,67 @@ class LiquidGlassSettings with EquatableMixin {
 
   /// The effective ambient strength taking visibility into account.
   double get effectiveAmbientStrength => ambientStrength * visibility;
+
+  /// The color of the specular highlight where the light hits the edge.
+  ///
+  /// Its alpha is the primary control for the overall light intensity (of both
+  /// the glass body and the specular rim): `0` means no light, fully opaque
+  /// means full intensity. Use [lightIntensity] to overdrive past that.
+  ///
+  /// Defaults to opaque white.
+  final Color highlightColor;
+
+  /// The effective highlight color taking visibility into account.
+  Color get effectiveHighlightColor =>
+      highlightColor.withValues(alpha: highlightColor.a * visibility);
+
+  /// The color of the thin outline at the outer edge of the specular rim.
+  ///
+  /// Set this to a slightly dark, semi-transparent color to give the glass edge
+  /// more presence. Defaults to fully transparent.
+  final Color edgeColor;
+
+  /// The effective edge color taking visibility into account.
+  Color get effectiveEdgeColor =>
+      edgeColor.withValues(alpha: edgeColor.a * visibility);
+
+  /// The width of the [edgeColor] outline.
+  ///
+  /// The highlight is moved inward by this amount. Defaults to `0`.
+  final double edgeWidth;
+
+  /// The effective edge width taking visibility into account.
+  double get effectiveEdgeWidth => edgeWidth * visibility;
+
+  /// How far the specular highlight is inset into the edge width.
+  ///
+  /// `0` means the highlight starts at the outer edge. `0.5` means it starts
+  /// halfway through [edgeWidth]. `1` means it starts after the full edge
+  /// width.
+  ///
+  /// Defaults to `0.5`.
+  final double edgeInset;
+
+  /// How far the specular highlight wraps around the edge, from `0` (tight
+  /// directional highlight) to `1` (broad wrap).
+  ///
+  /// Higher values make the highlight softer and broader around the rim.
+  ///
+  /// Defaults to `0.35`.
+  final double specularWrap;
+
+  /// How visible the subtle light bleed is, from `0` (off) to `1` (full).
+  ///
+  /// The bleed is a soft glow of the [highlightColor] that spreads inward from
+  /// the lit edges into the body of the glass, applied equally to both
+  /// highlight directions. It is always more subtle than the crisp rim
+  /// highlight.
+  ///
+  /// Defaults to `0.5`.
+  final double bleedStrength;
+
+  /// The effective bleed strength taking visibility into account.
+  double get effectiveBleedStrength => bleedStrength * visibility;
 
   /// The strength of the refraction.
   ///
@@ -140,37 +217,53 @@ class LiquidGlassSettings with EquatableMixin {
     double? thickness,
     double? blur,
     double? chromaticAberration,
-    double? blend,
     double? lightAngle,
     double? lightIntensity,
     double? ambientStrength,
+    Color? highlightColor,
+    Color? edgeColor,
+    double? edgeWidth,
+    double? edgeInset,
+    double? specularWrap,
+    double? bleedStrength,
     double? refractiveIndex,
     double? saturation,
-  }) =>
-      LiquidGlassSettings(
-        visibility: visibility ?? this.visibility,
-        glassColor: glassColor ?? this.glassColor,
-        thickness: thickness ?? this.thickness,
-        blur: blur ?? this.blur,
-        chromaticAberration: chromaticAberration ?? this.chromaticAberration,
-        lightAngle: lightAngle ?? this.lightAngle,
-        lightIntensity: lightIntensity ?? this.lightIntensity,
-        ambientStrength: ambientStrength ?? this.ambientStrength,
-        refractiveIndex: refractiveIndex ?? this.refractiveIndex,
-        saturation: saturation ?? this.saturation,
-      );
+  }) => LiquidGlassSettings(
+    visibility: visibility ?? this.visibility,
+    glassColor: glassColor ?? this.glassColor,
+    thickness: thickness ?? this.thickness,
+    blur: blur ?? this.blur,
+    chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+    lightAngle: lightAngle ?? this.lightAngle,
+    lightIntensity: lightIntensity ?? this.lightIntensity,
+    ambientStrength: ambientStrength ?? this.ambientStrength,
+    highlightColor: highlightColor ?? this.highlightColor,
+    edgeColor: edgeColor ?? this.edgeColor,
+    edgeWidth: edgeWidth ?? this.edgeWidth,
+    edgeInset: edgeInset ?? this.edgeInset,
+    specularWrap: specularWrap ?? this.specularWrap,
+    bleedStrength: bleedStrength ?? this.bleedStrength,
+    refractiveIndex: refractiveIndex ?? this.refractiveIndex,
+    saturation: saturation ?? this.saturation,
+  );
 
   @override
   List<Object?> get props => [
-        visibility,
-        glassColor,
-        thickness,
-        blur,
-        chromaticAberration,
-        lightAngle,
-        lightIntensity,
-        ambientStrength,
-        refractiveIndex,
-        saturation,
-      ];
+    visibility,
+    glassColor,
+    thickness,
+    blur,
+    chromaticAberration,
+    lightAngle,
+    lightIntensity,
+    ambientStrength,
+    highlightColor,
+    edgeColor,
+    edgeWidth,
+    edgeInset,
+    specularWrap,
+    bleedStrength,
+    refractiveIndex,
+    saturation,
+  ];
 }
