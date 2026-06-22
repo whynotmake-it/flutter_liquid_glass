@@ -6,5 +6,9 @@
     "GeometryTestFragment": {
         "type": "fragment",
         "file": "lib/assets/shaders/gpu/geometry_test_fragment.glsl"
+    },
+    "GeometryFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/geometry_fragment.glsl"
     }
 }
