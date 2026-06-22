@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
@@ -23,6 +24,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     required LiquidGlassSettings this._settings,
     required this._devicePixelRatio,
     required this._backdropKey,
+    this._gpuGeometryRenderer,
   }) {
     _updateShaderSettings();
   }
@@ -35,6 +37,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   Size get desiredMatteSize;
 
   Matrix4 get matteTransform;
+
+  /// Maps local matte bounds into the coordinate space used by
+  /// `FlutterFragCoord` in the final image-filter shader.
+  Matrix4 get shaderCoordinateTransform => Matrix4.identity();
 
   late GeometryRenderLink _link;
   GeometryRenderLink get link => _link;
@@ -58,6 +64,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set backdropKey(BackdropKey? value) {
     if (_backdropKey == value) return;
     _backdropKey = value;
+  }
+
+  FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
+  FlutterGpuGeometryRenderer? get gpuGeometryRenderer => _gpuGeometryRenderer;
+  set gpuGeometryRenderer(FlutterGpuGeometryRenderer? value) {
+    if (_gpuGeometryRenderer == value) return;
+    _gpuGeometryRenderer = value;
+    markNeedsPaint();
   }
 
   double _devicePixelRatio;
@@ -111,7 +125,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   }
 
   void _updateShaderSettings() {
-    renderShader.setFloatUniforms(initialIndex: 6, (value) {
+    renderShader.setFloatUniforms(initialIndex: 12, (value) {
       value
         ..setColor(settings.effectiveGlassColor)
         ..setFloats([
@@ -204,19 +218,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     }
 
     if (needsGeometryUpdate || _geometryImage == null || link._dirty) {
-      link.updateAllGeometries();
-      _clearGeometryImage();
-      link._dirty = false;
+      link
+        ..updateAllGeometries()
+        .._dirty = false;
 
       needsGeometryUpdate = false;
 
-      final (image, matteBounds) = _buildGeometryImage(
+      final gpuResult = _buildGpuGeometryImage(
         shapesWithGeometry,
         boundingBox,
       );
-
-      _geometryImage = image;
-      _geometryMatteBounds = matteBounds;
+      _clearGeometryImage();
+      _geometryImage = gpuResult.$1;
+      _geometryMatteBounds = gpuResult.$2;
     }
 
     if (debugPaintLiquidGlassGeometry) {
@@ -235,11 +249,37 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       );
     } else {
       if (_geometryImage case final geometryImage?) {
+        final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
+        final inverseOrigin = MatrixUtils.transformPoint(
+          globalToMatte,
+          Offset.zero,
+        );
+        final inverseX = MatrixUtils.transformPoint(
+          globalToMatte,
+          const Offset(1, 0),
+        );
+        final inverseY = MatrixUtils.transformPoint(
+          globalToMatte,
+          const Offset(0, 1),
+        );
+        final inverseAxisX = inverseX - inverseOrigin;
+        final inverseAxisY = inverseY - inverseOrigin;
         renderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
             value
+              // The matte is local and physical-resolution. Convert global
+              // physical fragment coordinates back into that local space so
+              // scale/rotation are not baked into the matte and composited a
+              // second time.
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
-              ..setSize(_geometryMatteBounds.size * devicePixelRatio);
+              ..setSize(_geometryMatteBounds.size * devicePixelRatio)
+              ..setFloats([
+                inverseAxisX.dx,
+                inverseAxisY.dx,
+                inverseAxisX.dy,
+                inverseAxisY.dy,
+              ])
+              ..setOffset(inverseOrigin * devicePixelRatio);
           })
           ..setImageSampler(1, geometryImage);
         paintLiquidGlass(
@@ -255,7 +295,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   }
 
   void _clearGeometryImage() {
-    _geometryImage?.dispose();
     _geometryImage = null;
   }
 
@@ -313,6 +352,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @mustCallSuper
   void dispose() {
     _clearGeometryImage();
+    _gpuGeometryRenderer = null;
     super.dispose();
   }
 
@@ -321,67 +361,167 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @protected
   bool needsGeometryUpdate = true;
 
-  (ui.Image, Rect) _buildGeometryImage(
+  (ui.Image, Rect) _buildGpuGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
     Rect bounds,
   ) {
-    final boundsInMatteSpace = MatrixUtils.transformRect(
-      matteTransform,
-      bounds,
-    ).snapToPixels(devicePixelRatio);
-
-    final size = boundsInMatteSpace.size * devicePixelRatio;
-
-    final buffer = StringBuffer(
-      '$hashCode Built geometry image with '
-      '${geometries.length} shapes at size ${size.width}x${size.height}:\n',
-    );
-
-    final recorder = ui.PictureRecorder();
-
-    final canvas = Canvas(recorder);
-
-    for (final (_, geometry, transform) in geometries) {
-      canvas
-        ..save()
-        ..scale(devicePixelRatio)
-        ..translate(
-          -boundsInMatteSpace.left,
-          -boundsInMatteSpace.top,
-        )
-        ..transform(matteTransform.storage)
-        ..transform(transform.storage)
-        ..scale(1 / devicePixelRatio)
-        ..translate(
-          geometry.matteBounds.topLeft.dx,
-          geometry.matteBounds.topLeft.dy,
-        );
-
-      switch (geometry) {
-        case UnrenderedGeometryCache(matte: final picture):
-          buffer.writeln(
-            '\t- Unrendered @ ${geometry.bounds}',
-          );
-          canvas.drawPicture(picture);
-        case RenderedGeometryCache(matte: final image):
-          buffer.writeln(
-            '\t- Rendered @ ${geometry.bounds}',
-          );
-          canvas.drawImage(image, Offset.zero, Paint());
-      }
-
-      canvas.restore();
+    final renderer = _gpuGeometryRenderer;
+    if (renderer == null) {
+      throw StateError(
+        'Flutter GPU is required for LiquidGlass. Enable it in the platform '
+        'manifest or with --enable-flutter-gpu.',
+      );
     }
 
-    final picture = recorder.endRecording();
-    final image = picture.toImageSync(
-      size.width.ceil(),
-      size.height.ceil(),
-    );
+    try {
+      final boundsInMatteSpace = MatrixUtils.transformRect(
+        matteTransform,
+        bounds,
+      ).snapToPixels(devicePixelRatio);
 
-    logger.fine(buffer.toString());
-    picture.dispose();
-    return (image, boundsInMatteSpace);
+      final textureWidth = (boundsInMatteSpace.width * devicePixelRatio).ceil();
+      final textureHeight = (boundsInMatteSpace.height * devicePixelRatio)
+          .ceil();
+
+      if (textureWidth <= 0 || textureHeight <= 0) {
+        throw StateError('Cannot render empty liquid-glass geometry.');
+      }
+
+      // Gather shapes in cache order. A negative blend marker starts a new
+      // group; this preserves smooth unions within a group without blending
+      // unrelated standalone glass widgets together.
+      final shapeData = <double>[];
+      var numShapes = 0;
+
+      for (final (_, geometry, geometryToLayer) in geometries) {
+        var firstInGroup = true;
+        for (final shape in geometry.shapes) {
+          if (numShapes >= 16) break; // MAX_SHAPES limit
+
+          final shapeToGeometry = shape.shapeToGeometry ?? Matrix4.identity();
+          final shapeOriginInGeometry = MatrixUtils.transformPoint(
+            shapeToGeometry,
+            Offset.zero,
+          );
+          final shapeXInGeometry = MatrixUtils.transformPoint(
+            shapeToGeometry,
+            const Offset(1, 0),
+          );
+          final shapeYInGeometry = MatrixUtils.transformPoint(
+            shapeToGeometry,
+            const Offset(0, 1),
+          );
+
+          Offset toMatte(Offset point) => MatrixUtils.transformPoint(
+            matteTransform,
+            MatrixUtils.transformPoint(geometryToLayer, point),
+          );
+
+          final origin = toMatte(shapeOriginInGeometry);
+          final xPoint = toMatte(shapeXInGeometry);
+          final yPoint = toMatte(shapeYInGeometry);
+          final axisX = xPoint - origin;
+          final axisY = yPoint - origin;
+          final determinant = axisX.dx * axisY.dy - axisY.dx * axisX.dy;
+          if (determinant.abs() < 1e-8) continue;
+
+          // Inverse 2D affine basis maps matte-space physical pixels back to
+          // the shape's own physical-pixel coordinate system.
+          final inverse00 = axisY.dy / determinant;
+          final inverse01 = -axisY.dx / determinant;
+          final inverse10 = -axisX.dy / determinant;
+          final inverse11 = axisX.dx / determinant;
+
+          // The minimum singular value conservatively converts local SDF
+          // distances back to screen pixels under non-uniform scaling.
+          final trace =
+              axisX.dx * axisX.dx +
+              axisX.dy * axisX.dy +
+              axisY.dx * axisY.dx +
+              axisY.dy * axisY.dy;
+          final discriminant = max(
+            0,
+            trace * trace - 4 * determinant * determinant,
+          );
+          final distanceScale = sqrt(
+            max(0.0, (trace - sqrt(discriminant)) * 0.5),
+          );
+
+          final centerInGeometry = MatrixUtils.transformPoint(
+            shapeToGeometry,
+            Offset(
+              shape.renderObject.size.width / 2,
+              shape.renderObject.size.height / 2,
+            ),
+          );
+          final centerInLayer = MatrixUtils.transformPoint(
+            geometryToLayer,
+            centerInGeometry,
+          );
+          final centerInMatte = MatrixUtils.transformPoint(
+            matteTransform,
+            centerInLayer,
+          );
+
+          // The inverse affine basis above already maps matte coordinates back
+          // into the shape's local coordinate system. Using the transformed
+          // AABB here would apply scale a second time (and turn rotations into
+          // oversized primitives), which is especially visible for stretched
+          // shapes in a blend group.
+          final size = shape.renderObject.size;
+          final blendMarker = firstInGroup
+              ? -(geometry.blend * devicePixelRatio + 1)
+              : geometry.blend * devicePixelRatio;
+
+          shapeData
+            // vec4 0: primitive parameters.
+            ..add(shape.rawShapeType.shaderIndex)
+            ..add(size.width * devicePixelRatio)
+            ..add(size.height * devicePixelRatio)
+            ..add(shape.rawCornerRadius * devicePixelRatio)
+            // vec4 1: inverse affine basis.
+            ..add(inverse00)
+            ..add(inverse01)
+            ..add(inverse10)
+            ..add(inverse11)
+            // vec4 2: transformed center, distance scale, group marker.
+            ..add(centerInMatte.dx * devicePixelRatio)
+            ..add(centerInMatte.dy * devicePixelRatio)
+            ..add(distanceScale)
+            ..add(blendMarker);
+          numShapes++;
+          firstInGroup = false;
+        }
+      }
+
+      if (numShapes == 0) {
+        throw StateError('No invertible liquid-glass shapes to render.');
+      }
+
+      final result = renderer.render(
+        width: textureWidth,
+        height: textureHeight,
+        shapeData: shapeData,
+        numShapes: numShapes,
+        refractiveIndex: settings.refractiveIndex,
+        chromaticAberration: settings.effectiveChromaticAberration,
+        thickness: settings.effectiveThickness,
+        offsetX: boundsInMatteSpace.left * devicePixelRatio,
+        offsetY: boundsInMatteSpace.top * devicePixelRatio,
+      );
+
+      return (
+        result.image,
+        Rect.fromLTWH(
+          boundsInMatteSpace.left,
+          boundsInMatteSpace.top,
+          result.width / devicePixelRatio,
+          result.height / devicePixelRatio,
+        ),
+      );
+    } catch (e) {
+      throw StateError('Flutter GPU geometry render failed: $e');
+    }
   }
 }
 

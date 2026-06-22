@@ -5,6 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -15,8 +16,8 @@ on:
 jobs:
   benchmark:
     name: Run Performance Benchmarks
-    runs-on: macos-15
-    timeout-minutes: 30
+    runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       pull-requests: write
       contents: read
@@ -29,7 +30,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Enable macOS desktop support
@@ -38,6 +39,13 @@ jobs:
       - name: 🔧 Get dependencies
         working-directory: packages/liquid_glass_renderer/example
         run: flutter pub get
+
+      - name: Verify Flutter GPU capability fallback
+        working-directory: packages/liquid_glass_renderer
+        run: >-
+          flutter test --enable-impeller
+          --dart-define=EXPECT_FLUTTER_GPU_FALLBACK=true
+          test/src/flutter_gpu_fallback_test.dart
 
       - name: 🏃‍♂️ Run benchmark tests
         working-directory: packages/liquid_glass_renderer/example
@@ -49,9 +57,14 @@ jobs:
         id: parse-results
         working-directory: packages/liquid_glass_renderer/example
         run: |
-          dart tool/parse_benchmark_results.dart >> $GITHUB_OUTPUT
+          dart run tool/parse_benchmark_results.dart \
+            --input build/benchmark \
+            --markdown build/benchmark/summary.md \
+            --json build/benchmark/summary.json \
+            --enforce true
 
       - name: 📝 Find existing comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/find-comment@v4
         id: find-comment
         with:
@@ -60,6 +73,7 @@ jobs:
           body-includes: 'Performance Benchmark Results'
 
       - name: 💬 Create or update PR comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
@@ -71,6 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results-${{ github.event.pull_request.number }}
-          path: packages/liquid_glass_renderer/example/build/*.timeline*.json
+          name: benchmark-results-${{ github.run_id }}
+          path: |
+            packages/liquid_glass_renderer/example/build/benchmark/
           retention-days: 30

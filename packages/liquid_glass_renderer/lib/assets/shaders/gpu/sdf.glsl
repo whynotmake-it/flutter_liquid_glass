@@ -1,8 +1,9 @@
-// Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
-// Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
+// Three vec4s per shape: primitive parameters, inverse affine basis, and
+// transformed center/distance/group data. vec4 packing avoids std140's
+// 16-byte stride for scalar arrays.
 //
 // IMPORTANT: Every shader that includes this file must declare a
-// `uniform float uShapeData[MAX_SHAPES * 6];` *before* the include. The SDF
+// `uniform vec4 uShapeData[MAX_SHAPES * 3];` *before* the include. The SDF
 // helpers below read that global uniform directly instead of taking it as a
 // function parameter on purpose: passing an array by value makes spirv-cross
 // emit an array copy-initializer (`float param[96] = uShapeData;`) which is
@@ -71,53 +72,47 @@ float getShapeSDF(float type, vec2 p, vec2 center, vec2 size, float r) {
 
 // Reads the globally declared `uShapeData` uniform directly (see note above).
 float getShapeSDFFromArray(int index, vec2 p) {
-    int baseIndex = index * 6;
-    float type = uShapeData[baseIndex];
-    vec2 center = vec2(uShapeData[baseIndex + 1], uShapeData[baseIndex + 2]);
-    vec2 size = vec2(uShapeData[baseIndex + 3], uShapeData[baseIndex + 4]);
-    float cornerRadius = uShapeData[baseIndex + 5];
-    
-    return getShapeSDF(type, p, center, size, cornerRadius);
+    int baseIndex = index * 3;
+    vec4 primitive = uShapeData[baseIndex];
+    vec4 inverseBasis = uShapeData[baseIndex + 1];
+    vec4 placement = uShapeData[baseIndex + 2];
+    vec2 delta = p - placement.xy;
+    vec2 localPoint = vec2(
+        inverseBasis.x * delta.x + inverseBasis.y * delta.y,
+        inverseBasis.z * delta.x + inverseBasis.w * delta.y
+    );
+    float localDistance = getShapeSDF(
+        primitive.x,
+        localPoint,
+        vec2(0.0),
+        primitive.yz,
+        primitive.w
+    );
+    return localDistance * placement.z;
 }
 
-float sceneSDF(vec2 p, int numShapes, float blend) {
+float sceneSDF(vec2 p, int numShapes) {
     if (numShapes == 0) {
         return 1e9;
     }
     
-    float result = getShapeSDFFromArray(0, p);
-    
-    // Optimized: unroll for common cases (1-4 shapes), use loop for 5+ shapes
-    if (numShapes <= 4) {
-        // Fully unrolled for 1-4 shapes (covers 90%+ of use cases)
-        if (numShapes >= 2) {
-            float shapeSDF = getShapeSDFFromArray(1, p);
-            result = smoothUnion(result, shapeSDF, blend);
-        }
-        if (numShapes >= 3) {
-            float shapeSDF = getShapeSDFFromArray(2, p);
-            result = smoothUnion(result, shapeSDF, blend);
-        }
-        if (numShapes >= 4) {
-            float shapeSDF = getShapeSDFFromArray(3, p);
-            result = smoothUnion(result, shapeSDF, blend);
-        }
-    } else {
-        // Dynamic loop for 5+ shapes (uncommon cases).
-        // SkSL requires the loop bound to be a constant expression, so we
-        // iterate up to the constant MAX_SHAPES and break once we run out of
-        // real shapes. (SkSL also has no integer min() overload.)
-        int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
-        for (int i = 1; i < MAX_SHAPES; i++) {
-            if (i >= shapeCount) {
-                break;
-            }
-            float shapeSDF = getShapeSDFFromArray(i, p);
-            result = smoothUnion(result, shapeSDF, blend);
+    float result = 1e9;
+    float groupResult = 1e9;
+    int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
+    for (int i = 0; i < MAX_SHAPES; i++) {
+        if (i >= shapeCount) break;
+        float marker = uShapeData[i * 3 + 2].w;
+        bool startsGroup = marker < 0.0;
+        float groupBlend = startsGroup ? -marker - 1.0 : marker;
+        float shapeSDF = getShapeSDFFromArray(i, p);
+        if (startsGroup) {
+            result = min(result, groupResult);
+            groupResult = shapeSDF;
+        } else {
+            groupResult = smoothUnion(groupResult, shapeSDF, groupBlend);
         }
     }
-    
-    return result;
+    return min(result, groupResult);
 }
 
 // Calculate 3D normal using derivatives (shader-specific normal calculation)

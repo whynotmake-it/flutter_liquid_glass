@@ -85,7 +85,7 @@ The liquid glass effect works by capturing and distorting background pixels thro
 4. **Geometry Rendering** (`lib/src/internal/render_liquid_glass_geometry.dart`): Renders glass shape geometry into textures for shader processing. Caches geometry to avoid re-rendering on every frame.
 
 5. **Shader Pipeline** (`lib/src/shaders.dart` and `lib/assets/shaders/`):
-   - `liquid_glass_geometry_blended.frag`: Renders blended glass geometry
+   - `gpu/geometry_fragment.glsl`: Renders transformed and blended geometry
    - `liquid_glass_filter.frag`: Applies glass effects (refraction, blur)
    - `liquid_glass_final_render.frag`: Final composition
 

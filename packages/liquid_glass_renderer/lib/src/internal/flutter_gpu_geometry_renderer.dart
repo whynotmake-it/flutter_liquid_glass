@@ -19,16 +19,15 @@ class FlutterGpuGeometryRenderer {
   FlutterGpuGeometryRenderer({
     required gpu.Shader vertexShader,
     required gpu.Shader fragmentShader,
-  })  : _vertexShader = vertexShader,
-        _fragmentShader = fragmentShader {
+  }) {
     _pipeline = gpu.gpuContext.createRenderPipeline(
-      _vertexShader,
-      _fragmentShader,
+      vertexShader,
+      fragmentShader,
     );
     _hostBuffer = gpu.gpuContext.createHostBuffer();
 
     // Cache uniform slot reflection info.
-    _uniformSlot = _fragmentShader.getUniformSlot('GeometryUniforms');
+    _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
     _uniformSize = _uniformSlot.sizeInBytes ?? 0;
     _offsetUSize = _uniformSlot.getMemberOffsetInBytes('uSize') ?? 0;
     _offsetUOffset = _uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
@@ -41,8 +40,22 @@ class FlutterGpuGeometryRenderer {
     _createVertexBuffer();
   }
 
-  final gpu.Shader _vertexShader;
-  final gpu.Shader _fragmentShader;
+  factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
+    final library = gpu.ShaderLibrary.fromAsset(assetKey);
+    final vertexShader = library?['GeometryVertex'];
+    final fragmentShader = library?['GeometryFragment'];
+    if (vertexShader == null || fragmentShader == null) {
+      throw StateError(
+        'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer and '
+        'enable Flutter GPU for the target platform.',
+      );
+    }
+    return FlutterGpuGeometryRenderer(
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+    );
+  }
+
   late final gpu.RenderPipeline _pipeline;
   late final gpu.HostBuffer _hostBuffer;
 
@@ -57,6 +70,7 @@ class FlutterGpuGeometryRenderer {
 
   // Persistent render target texture — reused across frames.
   gpu.Texture? _texture;
+  ui.Image? _image;
   int _textureWidth = 0;
   int _textureHeight = 0;
 
@@ -80,32 +94,44 @@ class FlutterGpuGeometryRenderer {
   /// The returned image is a non-owning wrapper — do NOT dispose it.
   /// The underlying texture persists across frames.
   ///
-  /// Returns null if rendering fails (caller should fall back to old path).
-  ui.Image? render({
+  /// Returns the image view backed by the persistent render target.
+  ({ui.Image image, int width, int height}) render({
     required int width,
     required int height,
-    required double devicePixelRatio,
     required List<double> shapeData,
     required int numShapes,
     required double refractiveIndex,
     required double chromaticAberration,
     required double thickness,
-    required double blend,
     required double offsetX,
     required double offsetY,
   }) {
-    // Resize texture if needed (only allocates when size changes).
+    // Quantize transient render targets to 64-pixel buckets. This avoids an
+    // allocation for every intermediate size during resize animations.
+    final requestedWidth = _bucketDimension(width);
+    final requestedHeight = _bucketDimension(height);
+
     if (_texture == null ||
-        _textureWidth != width ||
-        _textureHeight != height) {
+        requestedWidth > _textureWidth ||
+        requestedHeight > _textureHeight) {
+      // Grow to a bucketed high-water mark and never shrink during this
+      // renderer's lifetime. Resize animations would otherwise leave several
+      // in-flight Metal textures awaiting GPU completion and garbage
+      // collection, producing large transient phys_footprint spikes.
+      final allocatedWidth = _grownDimension(_textureWidth, requestedWidth);
+      final allocatedHeight = _grownDimension(_textureHeight, requestedHeight);
       _texture = gpu.gpuContext.createTexture(
         gpu.StorageMode.devicePrivate,
-        width,
-        height,
+        allocatedWidth,
+        allocatedHeight,
       );
-      _textureWidth = width;
-      _textureHeight = height;
+      _image = _texture!.asImage();
+      _textureWidth = allocatedWidth;
+      _textureHeight = allocatedHeight;
     }
+
+    final allocatedWidth = _textureWidth;
+    final allocatedHeight = _textureHeight;
 
     final texture = _texture!;
     final renderTarget = gpu.RenderTarget.singleColor(
@@ -115,14 +141,13 @@ class FlutterGpuGeometryRenderer {
     // Pack uniform data into a byte buffer using reflected offsets.
     _hostBuffer.reset();
     final uniformData = _packUniformData(
-      width: width.toDouble(),
-      height: height.toDouble(),
+      width: allocatedWidth.toDouble(),
+      height: allocatedHeight.toDouble(),
       offsetX: offsetX,
       offsetY: offsetY,
       refractiveIndex: refractiveIndex,
       chromaticAberration: chromaticAberration,
       thickness: thickness,
-      blend: blend,
       numShapes: numShapes.toDouble(),
       shapeData: shapeData,
     );
@@ -130,9 +155,9 @@ class FlutterGpuGeometryRenderer {
     final uniformView = _hostBuffer.emplace(uniformData);
 
     final commandBuffer = gpu.gpuContext.createCommandBuffer();
-    final renderPass = commandBuffer.createRenderPass(renderTarget);
-    renderPass
+    commandBuffer.createRenderPass(renderTarget)
       ..bindPipeline(_pipeline)
+      ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
       ..bindVertexBuffer(
         gpu.BufferView(
@@ -145,7 +170,16 @@ class FlutterGpuGeometryRenderer {
       ..draw();
     commandBuffer.submit();
 
-    return texture.asImage();
+    return (image: _image!, width: allocatedWidth, height: allocatedHeight);
+  }
+
+  static int _bucketDimension(int value) => (value + 63) & ~63;
+
+  static int _grownDimension(int current, int requested) {
+    if (requested <= current) return current;
+    if (current == 0) return requested;
+    final geometricGrowth = _bucketDimension((current * 1.5).ceil());
+    return requested > geometricGrowth ? requested : geometricGrowth;
   }
 
   ByteData _packUniformData({
@@ -156,7 +190,6 @@ class FlutterGpuGeometryRenderer {
     required double refractiveIndex,
     required double chromaticAberration,
     required double thickness,
-    required double blend,
     required double numShapes,
     required List<double> shapeData,
   }) {
@@ -178,18 +211,17 @@ class FlutterGpuGeometryRenderer {
     floatData[opticalIndex] = refractiveIndex;
     floatData[opticalIndex + 1] = chromaticAberration;
     floatData[opticalIndex + 2] = thickness;
-    floatData[opticalIndex + 3] = blend;
+    floatData[opticalIndex + 3] = 0;
 
     // uNumShapes (float)
     final numShapesIndex = _offsetNumShapes ~/ 4;
     floatData[numShapesIndex] = numShapes;
 
-    // uShapeData (float array)
-    // In std140, float arrays are packed with 16-byte stride per element.
+    // uShapeData (vec4 array). Packing scalar shape values into vec4s avoids
+    // std140's 16-byte stride for every individual float.
     final shapeDataStartIndex = _offsetShapeData ~/ 4;
-    const stride = 16 ~/ 4; // 4 floats per array element in std140
-    for (var i = 0; i < shapeData.length && i < 96; i++) {
-      floatData[shapeDataStartIndex + i * stride] = shapeData[i];
+    for (var i = 0; i < shapeData.length && i < 192; i++) {
+      floatData[shapeDataStartIndex + i] = shapeData[i];
     }
 
     return data;
@@ -200,5 +232,6 @@ class FlutterGpuGeometryRenderer {
     // gpu.Texture does not have an explicit dispose method.
     // The texture is garbage collected when no longer referenced.
     _texture = null;
+    _image = null;
   }
 }

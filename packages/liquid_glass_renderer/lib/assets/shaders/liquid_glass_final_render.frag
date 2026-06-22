@@ -16,6 +16,8 @@ precision mediump float;
 uniform vec2 uSize;
 uniform vec2 uGeometryOffset;
 uniform vec2 uGeometrySize;
+uniform vec4 uGlobalToMatteBasis;
+uniform vec2 uGlobalToMatteOffset;
 
 uniform vec4 uGlassColor;
 uniform vec3 uOpticalProps;
@@ -59,7 +61,9 @@ vec3 applySpecularHighlights(
     float inwardDistance = geometryData.b * opticalThickness;
     float edgeWidth = min(max(uEdgeWidth, 0.0), opticalThickness * 0.5);
     float highlightInset = edgeWidth * clamp(uEdgeInset, 0.0, 1.0);
-    float edgeFeather = max(fwidth(inwardDistance), 0.5);
+    // Runtime-effect SkSL does not expose fragment derivatives. A half logical
+    // pixel keeps this shader portable across Impeller and Skia compilation.
+    float edgeFeather = 0.5;
 
     float innerRimMask = edgeWidth > 0.0
         ? smoothstep(
@@ -154,8 +158,9 @@ vec3 applySpecularHighlights(
 }
 
 void main() {
-    // FlutterFragCoord() returns logical pixels, but our geometry texture is in physical pixels
-    // So we need to scale by devicePixelRatio to work in physical pixel space
+    // Image-filter fragment coordinates and geometry bounds are physical
+    // pixels. Ancestor widget transforms are intentionally not baked into the
+    // matte; Flutter applies them once when compositing the finished layer.
     vec2 fragCoord = FlutterFragCoord().xy;
     
     vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);        
@@ -164,7 +169,11 @@ void main() {
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
-    vec2 geometryUV = (fragCoord - uGeometryOffset) / uGeometrySize;
+    vec2 matteCoord = vec2(
+        dot(uGlobalToMatteBasis.xy, fragCoord),
+        dot(uGlobalToMatteBasis.zw, fragCoord)
+    ) + uGlobalToMatteOffset;
+    vec2 geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize;
     #ifdef IMPELLER_TARGET_OPENGLES
         geometryUV.y = 1.0 - geometryUV.y;
     #endif

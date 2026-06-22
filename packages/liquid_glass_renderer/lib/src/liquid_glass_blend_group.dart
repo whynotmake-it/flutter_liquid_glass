@@ -1,12 +1,10 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// A widget that groups multiple liquid glass shapes for blending.
@@ -78,16 +76,11 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
 
     return _InheritedLiquidGlassBlendGroup(
       link: _geometryLink,
-      child: ShaderBuilder(
-        (context, shader, child) => _RawLiquidGlassBlendGroup(
-          blend: widget.blend,
-          shader: shader,
-          link: _geometryLink,
-          renderLink: InheritedGeometryRenderLink.of(context)!,
-          settings: LiquidGlassRenderScope.of(context).settings,
-          child: child,
-        ),
-        assetKey: ShaderKeys.blendedGeometry,
+      child: _RawLiquidGlassBlendGroup(
+        blend: widget.blend,
+        link: _geometryLink,
+        renderLink: InheritedGeometryRenderLink.of(context)!,
+        settings: LiquidGlassRenderScope.of(context).settings,
         child: widget.child,
       ),
     );
@@ -117,7 +110,6 @@ class _InheritedLiquidGlassBlendGroup extends InheritedWidget {
 class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
   const _RawLiquidGlassBlendGroup({
     required this.blend,
-    required this.shader,
     required this.renderLink,
     required this.link,
     required this.settings,
@@ -125,7 +117,6 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
   });
 
   final double blend;
-  final FragmentShader shader;
   final GeometryRenderLink renderLink;
   final GlassGroupLink link;
   final LiquidGlassSettings settings;
@@ -135,7 +126,6 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
     return RenderLiquidGlassBlendGroup(
       renderLink: renderLink,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      geometryShader: shader,
       settings: settings,
       link: link,
       blend: blend,
@@ -162,7 +152,6 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   RenderLiquidGlassBlendGroup({
     required super.renderLink,
     required super.devicePixelRatio,
-    required super.geometryShader,
     required super.settings,
     required this._link,
     required this._blend,
@@ -188,10 +177,12 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   set blend(double value) {
     if (_blend == value) return;
     _blend = value;
-    updateShaderWithSettings(settings, devicePixelRatio);
     markGeometryNeedsUpdate(force: true);
     markNeedsPaint();
   }
+
+  @override
+  double get geometryBlend => blend;
 
   void _onLinkUpdate() {
     // One of the shapes might have changed.
@@ -203,48 +194,6 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   void onTransformChanged() {
     markGeometryNeedsUpdate();
     markNeedsPaint();
-  }
-
-  @override
-  void updateShaderWithSettings(
-    LiquidGlassSettings settings,
-    double devicePixelRatio,
-  ) {
-    geometryShader.setFloatUniforms(initialIndex: 2, (value) {
-      value.setFloats([
-        settings.refractiveIndex,
-        settings.effectiveChromaticAberration,
-        settings.effectiveThickness,
-        blend * devicePixelRatio,
-      ]);
-    });
-  }
-
-  @override
-  void updateGeometryShaderShapes(
-    List<ShapeGeometry> shapes,
-  ) {
-    if (shapes.length > LiquidGlassBlendGroup.maxShapesPerLayer) {
-      throw UnsupportedError(
-        'Only ${LiquidGlassBlendGroup.maxShapesPerLayer} shapes are supported '
-        'at the moment!',
-      );
-    }
-
-    geometryShader.setFloatUniforms(initialIndex: 6, (value) {
-      value.setFloat(shapes.length.toDouble());
-      for (final shape in shapes) {
-        final center = shape.shapeBounds.center;
-        final size = shape.shapeBounds.size;
-        value
-          ..setFloat(shape.rawShapeType.shaderIndex)
-          ..setFloat((center.dx) * devicePixelRatio)
-          ..setFloat((center.dy) * devicePixelRatio)
-          ..setFloat(size.width * devicePixelRatio)
-          ..setFloat(size.height * devicePixelRatio)
-          ..setFloat(shape.rawCornerRadius * devicePixelRatio);
-      }
-    });
   }
 
   @override
@@ -286,7 +235,11 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
         if (existingShape == null) {
           anyShapeChangedInLayer = true;
         } else if (existingShape.shapeBounds != shapeData.shapeBounds ||
-            existingShape.shape != shapeData.shape) {
+            existingShape.shape != shapeData.shape ||
+            !MatrixUtils.matrixEquals(
+              existingShape.shapeToGeometry,
+              shapeData.shapeToGeometry,
+            )) {
           anyShapeChangedInLayer = true;
         }
       } catch (e) {

@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +11,7 @@ void main() {
   group('FakeGlass', () {
     goldenTest(
       'renders with zero blur',
-      fileName: 'fake_glass_zero_blur',
+      fileName: _backendGolden('fake_glass_zero_blur'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(
         scenarioConstraints: testScenarioConstraints,
@@ -69,7 +71,7 @@ void main() {
 
     goldenTest(
       'shadow visibility scales with settings',
-      fileName: 'fake_glass_shadow_visibility',
+      fileName: _backendGolden('fake_glass_shadow_visibility'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(
         scenarioConstraints: testScenarioConstraints,
@@ -104,7 +106,7 @@ void main() {
 
     goldenTest(
       'offset shadow is cut out behind glass',
-      fileName: 'fake_glass_offset_shadow_cutout',
+      fileName: _backendGolden('fake_glass_offset_shadow_cutout'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(
         scenarioConstraints: testScenarioConstraints,
@@ -138,3 +140,6 @@ void main() {
     );
   });
 }
+
+String _backendGolden(String name) =>
+    ui.ImageFilter.isShaderFilterSupported ? name : '${name}_skia';

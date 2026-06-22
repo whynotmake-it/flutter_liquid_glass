@@ -1,4 +1,4 @@
-// Ported from liquid_glass_geometry_blended.frag for flutter_gpu.
+// Geometry matte generation implemented directly with Flutter GPU.
 // Changes:
 // - Removed #include <flutter/runtime_effect.glsl>
 // - Replaced FlutterFragCoord().xy with gl_FragCoord.xy
@@ -12,7 +12,7 @@ layout(std140) uniform GeometryUniforms {
     vec2 uOffset;
     vec4 uOpticalProps;
     float uNumShapes;
-    float uShapeData[MAX_SHAPES * 6];
+    vec4 uShapeData[MAX_SHAPES * 3];
 };
 
 #include "displacement_encoding.glsl"
@@ -22,14 +22,12 @@ layout(std140) uniform GeometryUniforms {
 
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
-float uBlend = uOpticalProps.w;
-
 out vec4 fragColor;
 
 void main() {
     vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
+    float sd = sceneSDF(fragCoord, int(uNumShapes));
 
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
     if (foregroundAlpha < 0.01) {

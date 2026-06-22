@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
@@ -45,9 +46,11 @@ class LiquidGlassFilter extends StatefulWidget {
 
 class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
   late final _link = GeometryRenderLink();
+  FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
 
   @override
   void dispose() {
+    _gpuGeometryRenderer?.dispose();
     _link.dispose();
     super.dispose();
   }
@@ -69,6 +72,13 @@ class _LiquidGlassFilterState extends State<LiquidGlassFilter> {
               backdropKey: BackdropGroup.of(context)?.backdropKey,
               settings: widget.settings,
               link: _link,
+              gpuGeometryRenderer:
+                  widget.fake || !ui.ImageFilter.isShaderFilterSupported
+                  ? null
+                  : (_gpuGeometryRenderer ??=
+                        FlutterGpuGeometryRenderer.fromAsset(
+                          ShaderKeys.gpuGeometryShaderBundle,
+                        )),
               child: child,
             );
           },
@@ -85,6 +95,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
     required this.backdropKey,
     required this.settings,
     required this.link,
+    required this.gpuGeometryRenderer,
     required super.child,
   });
 
@@ -95,6 +106,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
   final LiquidGlassSettings settings;
 
   final GeometryRenderLink link;
+  final FlutterGpuGeometryRenderer? gpuGeometryRenderer;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -103,6 +115,7 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
       backdropKey: backdropKey,
       settings: settings,
       link: link,
+      gpuGeometryRenderer: gpuGeometryRenderer,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
     );
   }
@@ -116,7 +129,8 @@ class _RawLiquidGlassFilter extends SingleChildRenderObjectWidget {
       ..settings = settings
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..backdropKey = backdropKey
-      ..link = link;
+      ..link = link
+      ..gpuGeometryRenderer = gpuGeometryRenderer;
   }
 }
 
@@ -127,6 +141,7 @@ class _RenderLiquidGlassFilter extends LiquidGlassRenderObject {
     required super.devicePixelRatio,
     required super.settings,
     required super.link,
+    super.gpuGeometryRenderer,
   });
 
   @override

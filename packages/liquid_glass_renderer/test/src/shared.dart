@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
+const expectFlutterGpuFallback = bool.fromEnvironment(
+  'EXPECT_FLUTTER_GPU_FALLBACK',
+);
+
+bool get skipProperGlassTests => expectFlutterGpuFallback;
+
 final testScenarioConstraints = BoxConstraints.tight(const Size(500, 500));
 
 const settingsWithoutLighting = LiquidGlassSettings(

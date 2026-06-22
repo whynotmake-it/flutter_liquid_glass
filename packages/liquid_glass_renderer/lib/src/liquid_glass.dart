@@ -262,8 +262,9 @@ class LiquidGlass extends StatelessWidget {
   Widget _buildContent(BuildContext context, [GlassGroupLink? blendGroupLink]) {
     final settings = LiquidGlassSettings.of(context);
 
-    if (!ImageFilter.isShaderFilterSupported) {
-      return FakeGlass(
+    if (LiquidGlassRenderScope.of(context).useFake ||
+        !ImageFilter.isShaderFilterSupported) {
+      return FakeGlass.inLayer(
         shape: shape,
         shadows: shadows,
         child: child,

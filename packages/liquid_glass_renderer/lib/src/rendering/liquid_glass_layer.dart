@@ -2,9 +2,11 @@
 
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
@@ -12,7 +14,6 @@ import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
-import 'package:meta/meta.dart';
 
 /// Represents a layer of multiple [LiquidGlass] shapes or
 /// [LiquidGlassBlendGroup]s that have shared [LiquidGlassSettings] and will be
@@ -119,22 +120,52 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   late final logger = Logger(LgrLogNames.layer);
 
+  FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
+  bool _triedGpuGeometryRenderer = false;
+  bool _loggedFallback = false;
+
+  void _logDebugFallback(String message) {
+    if (!kDebugMode || _loggedFallback) return;
+    _loggedFallback = true;
+    debugPrint('liquid_glass_renderer: $message');
+  }
+
+  FlutterGpuGeometryRenderer? _tryCreateGpuGeometryRenderer() {
+    if (_triedGpuGeometryRenderer) return _gpuGeometryRenderer;
+    _triedGpuGeometryRenderer = true;
+    try {
+      return _gpuGeometryRenderer = FlutterGpuGeometryRenderer.fromAsset(
+        ShaderKeys.gpuGeometryShaderBundle,
+      );
+    } on Object catch (error) {
+      _logDebugFallback(
+        'Flutter GPU is unavailable; LiquidGlassLayer is using FakeGlass. '
+        'Enable Impeller and Flutter GPU for the full glass effect. $error',
+      );
+      return null;
+    }
+  }
+
   @override
   void dispose() {
+    _gpuGeometryRenderer?.dispose();
     _link.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.fake || !ImageFilter.isShaderFilterSupported) {
-      if (!ImageFilter.isShaderFilterSupported) {
-        logger.warning(
-          'LiquidGlassLayer is only supported when using Impeller at the '
-          'moment. Falling back to FakeGlass for LiquidGlassLayer. '
-          'To prevent this warning, enable Impeller, or set '
-          'LiquidGlassLayer.fake to true before you use liquid glass widgets '
-          'on Skia.',
+    final shaderFiltersSupported = ImageFilter.isShaderFilterSupported;
+    final gpuRenderer = widget.fake || !shaderFiltersSupported
+        ? null
+        : _tryCreateGpuGeometryRenderer();
+    final useFake =
+        widget.fake || !shaderFiltersSupported || gpuRenderer == null;
+    if (useFake) {
+      if (!widget.fake && !shaderFiltersSupported && kDebugMode) {
+        _logDebugFallback(
+          'Impeller shader filters are unavailable; LiquidGlassLayer is using '
+          'FakeGlass. Enable Impeller and Flutter GPU for the full effect.',
         );
       }
 
@@ -157,15 +188,18 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             assetKeys: [
               ShaderKeys.liquidGlassRender,
             ],
-            (context, shaders, child) => _RawShapes(
-              renderShader: shaders[0],
-              backdropKey: widget.useBackdropGroup
-                  ? BackdropGroup.of(context)?.backdropKey
-                  : null,
-              settings: widget.settings,
-              link: _link,
-              child: child!,
-            ),
+            (context, shaders, child) {
+              return _RawShapes(
+                renderShader: shaders[0],
+                backdropKey: widget.useBackdropGroup
+                    ? BackdropGroup.of(context)?.backdropKey
+                    : null,
+                settings: widget.settings,
+                link: _link,
+                gpuGeometryRenderer: gpuRenderer,
+                child: child!,
+              );
+            },
             child: widget.child,
           ),
         ),
@@ -181,12 +215,14 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.settings,
     required Widget super.child,
     required this.link,
+    this.gpuGeometryRenderer,
   });
 
   final FragmentShader renderShader;
   final BackdropKey? backdropKey;
   final LiquidGlassSettings settings;
   final GeometryRenderLink link;
+  final FlutterGpuGeometryRenderer? gpuGeometryRenderer;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -196,6 +232,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       backdropKey: backdropKey,
       settings: settings,
       link: link,
+      gpuGeometryRenderer: gpuGeometryRenderer,
     );
   }
 
@@ -208,7 +245,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..link = link
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
       ..settings = settings
-      ..backdropKey = backdropKey;
+      ..backdropKey = backdropKey
+      ..gpuGeometryRenderer = gpuGeometryRenderer;
   }
 }
 
@@ -221,6 +259,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     required super.devicePixelRatio,
     required super.settings,
     required super.link,
+    super.gpuGeometryRenderer,
   });
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
@@ -235,7 +274,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   };
 
   @override
-  Matrix4 get matteTransform => getTransformTo(null);
+  // Geometry is encoded in this layer's local coordinate space. Ancestor
+  // transforms are applied once by Flutter when the completed layer is
+  // composited. Baking getTransformTo(null) into the matte would apply scale
+  // and rotation here and then a second time during compositing.
+  Matrix4 get matteTransform => Matrix4.identity();
+
+  @override
+  Matrix4 get shaderCoordinateTransform => getTransformTo(null);
 
   @override
   void onTransformChanged() {

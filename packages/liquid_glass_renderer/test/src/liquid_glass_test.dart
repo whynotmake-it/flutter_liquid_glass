@@ -2,6 +2,7 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
 import 'shared.dart';
 
@@ -17,6 +18,7 @@ void main() {
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
         'should render a rounded superellipse with different thickness',
+        skip: skipProperGlassTests,
         fileName: 'rounded_superellipse_thicknesses',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
@@ -45,6 +47,7 @@ void main() {
 
       goldenTest(
         'should render a rounded superellipse with different radii',
+        skip: skipProperGlassTests,
         fileName: 'rounded_superellipse_radii',
         pumpBeforeTest: pumpOnce,
         builder: () {
@@ -119,6 +122,7 @@ void main() {
     group('merging', () {
       goldenTest(
         'shapes merge with different blend values',
+        skip: skipProperGlassTests,
         fileName: 'merging_blend_values',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
@@ -164,5 +168,207 @@ void main() {
         ),
       );
     });
+
+    group('transforms', () {
+      goldenTest(
+        'keeps stretched blend-group geometry aligned at DPR 2',
+        skip: skipProperGlassTests,
+        fileName: 'liquid_glass_blend_group_stretch_dpr2',
+        pumpBeforeTest: _pumpAtDpr2,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: testScenarioConstraints,
+          children: [
+            GoldenTestScenario(
+              name: 'non-uniform stretch and rotation are applied once',
+              child: buildWithGridPaper(
+                LiquidGlassLayer(
+                  settings: settingsWithoutLighting.copyWith(
+                    thickness: 18,
+                    glassColor: Colors.cyan.withValues(alpha: .25),
+                  ),
+                  child: LiquidGlassBlendGroup(
+                    child: Center(
+                      child: RawLiquidStretch(
+                        stretchPixels: const Offset(70, 0),
+                        child: Transform.rotate(
+                          angle: .3,
+                          child: LiquidGlass.grouped(
+                            glassContainsChild: true,
+                            shape: const LiquidRoundedRectangle(
+                              borderRadius: 28,
+                            ),
+                            child: Container(
+                              width: 220,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.red,
+                                  width: 3,
+                                ),
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      goldenTest(
+        'keeps the effect aligned with scaled content at DPR 2',
+        skip: skipProperGlassTests,
+        fileName: 'liquid_glass_transform_dpr2',
+        pumpBeforeTest: _pumpAtDpr2,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: testScenarioConstraints,
+          children: [
+            GoldenTestScenario(
+              name: 'scaled content and matte share logical coordinates',
+              child: buildWithGridPaper(
+                Transform.scale(
+                  scale: 1.45,
+                  child: LiquidGlass.withOwnLayer(
+                    settings: settingsWithoutLighting.copyWith(
+                      thickness: 18,
+                      glassColor: Colors.cyan.withValues(alpha: .25),
+                    ),
+                    glassContainsChild: true,
+                    shape: const LiquidRoundedRectangle(borderRadius: 28),
+                    child: Container(
+                      width: 220,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.red, width: 3),
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      goldenTest(
+        'keeps geometry aligned through affine and clipped transforms',
+        skip: skipProperGlassTests,
+        fileName: 'liquid_glass_transform_matrix',
+        pumpBeforeTest: pumpOnce,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: testScenarioConstraints,
+          children: [
+            GoldenTestScenario(
+              name: 'translated',
+              child: buildWithGridPaper(
+                Transform.translate(
+                  offset: const Offset(90, -55),
+                  child: _transformGlass(),
+                ),
+              ),
+            ),
+            GoldenTestScenario(
+              name: 'non-uniform scale',
+              child: buildWithGridPaper(
+                Transform.scale(
+                  scaleX: 1.55,
+                  scaleY: .65,
+                  child: _transformGlass(),
+                ),
+              ),
+            ),
+            GoldenTestScenario(
+              name: 'rotation',
+              child: buildWithGridPaper(
+                Transform.rotate(angle: .55, child: _transformGlass()),
+              ),
+            ),
+            GoldenTestScenario(
+              name: 'nested affine transform',
+              child: buildWithGridPaper(
+                Transform.translate(
+                  offset: const Offset(-70, 45),
+                  child: Transform.rotate(
+                    angle: -.35,
+                    child: Transform.scale(
+                      scaleX: .75,
+                      scaleY: 1.3,
+                      child: _transformGlass(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      testWidgets(
+        'updates layer paint bounds when an ancestor moves',
+        (
+          tester,
+        ) async {
+          final offset = ValueNotifier(Offset.zero);
+          addTearDown(offset.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: ValueListenableBuilder<Offset>(
+                valueListenable: offset,
+                builder: (_, value, __) => Transform.translate(
+                  offset: value,
+                  child: _transformGlass(),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          final renderObject = tester.allRenderObjects
+              .whereType<RenderLiquidGlassLayer>()
+              .where((renderObject) => renderObject.paintBounds != Rect.zero)
+              .last;
+          final initialBounds = MatrixUtils.transformRect(
+            renderObject.getTransformTo(null),
+            renderObject.paintBounds,
+          );
+
+          offset.value = const Offset(80, 45);
+          await tester.pump();
+          await tester.pump();
+          final movedBounds = MatrixUtils.transformRect(
+            renderObject.getTransformTo(null),
+            renderObject.paintBounds,
+          );
+
+          expect(
+            movedBounds.topLeft - initialBounds.topLeft,
+            const Offset(80, 45),
+          );
+          expect(movedBounds.size, initialBounds.size);
+        },
+        skip: expectFlutterGpuFallback,
+      );
+    });
   });
 }
+
+Future<void> _pumpAtDpr2(WidgetTester tester) async {
+  tester.view.devicePixelRatio = 2;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await pumpOnce(tester);
+}
+
+Widget _transformGlass() => LiquidGlass.withOwnLayer(
+  settings: settingsWithoutLighting.copyWith(
+    thickness: 18,
+    glassColor: Colors.cyan.withValues(alpha: .25),
+  ),
+  shape: const LiquidRoundedRectangle(borderRadius: 28),
+  child: const SizedBox(width: 240, height: 150),
+);
