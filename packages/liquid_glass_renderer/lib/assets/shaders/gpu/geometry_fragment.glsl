@@ -9,6 +9,7 @@
 
 layout(std140) uniform GeometryUniforms {
     vec2 uSize;
+    vec2 uOffset;
     vec4 uOpticalProps;
     float uNumShapes;
     float uShapeData[MAX_SHAPES * 6];
@@ -26,7 +27,7 @@ float uBlend = uOpticalProps.w;
 out vec4 fragColor;
 
 void main() {
-    vec2 fragCoord = gl_FragCoord.xy;
+    vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
     float sd = sceneSDF(fragCoord, int(uNumShapes), uBlend);
 
