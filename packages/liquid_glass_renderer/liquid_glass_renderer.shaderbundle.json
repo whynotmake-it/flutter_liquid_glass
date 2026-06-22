@@ -1,0 +1,10 @@
+{
+    "GeometryVertex": {
+        "type": "vertex",
+        "file": "lib/assets/shaders/gpu/geometry_vertex.glsl"
+    },
+    "GeometryTestFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/geometry_test_fragment.glsl"
+    }
+}
