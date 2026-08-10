@@ -36,9 +36,9 @@ void main() {
       'GeometryUniforms',
     );
     expect(uniformSlot.sizeInBytes, greaterThan(0));
-    expect(uniformSlot.getMemberOffsetInBytes('uSize'), isNotNull);
+    expect(uniformSlot.getMemberOffsetInBytes('uOffset'), isNotNull);
+    expect(uniformSlot.getMemberOffsetInBytes('uTextureSize'), isNotNull);
     expect(uniformSlot.getMemberOffsetInBytes('uOpticalProps'), isNotNull);
-    expect(uniformSlot.getMemberOffsetInBytes('uNumShapes'), isNotNull);
     expect(uniformSlot.getMemberOffsetInBytes('uShapeData'), isNotNull);
   }, skip: expectFallback);
 }

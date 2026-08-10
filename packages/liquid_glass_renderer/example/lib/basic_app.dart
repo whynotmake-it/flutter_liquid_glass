@@ -10,10 +10,35 @@ void main() {
   runApp(CupertinoApp(home: BasicApp()));
 }
 
+const _useTestBackground = bool.fromEnvironment(
+  'LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND',
+);
+const _testBlur = int.fromEnvironment(
+  'LIQUID_GLASS_EXAMPLE_TEST_BLUR',
+  defaultValue: 0,
+);
+const _testBackgroundColors = [
+  Color(0xffff595e),
+  Color(0xff8ac926),
+  Color(0xff1982c4),
+  Color(0xffc77dff),
+  Color(0xffffca3a),
+  Color(0xff00c2d1),
+];
+
 final settingsNotifier = ValueNotifier(
-  LiquidGlassSettings(
-    glassColor: Colors.white.withValues(alpha: 0.2),
-  ),
+  _useTestBackground
+      ? LiquidGlassSettings(
+          blur: _testBlur.toDouble(),
+          thickness: 40,
+          saturation: 1,
+        )
+      : LiquidGlassSettings(
+          thickness: 30,
+          blur: 1,
+          saturation: 1.2,
+          glassColor: Colors.white.withValues(alpha: 0.2),
+        ),
 );
 
 final blendNotifier = ValueNotifier(10.0);
@@ -68,10 +93,33 @@ class BasicApp extends HookWidget {
                     (context, index) => Stack(
                       children: [
                         Positioned.fill(
-                          child: Image.network(
-                            fit: BoxFit.cover,
-                            'https://picsum.photos/500/500?random=$index',
-                          ),
+                          child: _useTestBackground
+                              ? DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        _testBackgroundColors[index %
+                                            _testBackgroundColors.length],
+                                        _testBackgroundColors[(index + 3) %
+                                            _testBackgroundColors.length],
+                                      ],
+                                    ),
+                                  ),
+                                  child: GridPaper(
+                                    color: index.isEven
+                                        ? Colors.black87
+                                        : Colors.white70,
+                                    interval: 32,
+                                    divisions: 2,
+                                    subdivisions: 1,
+                                  ),
+                                )
+                              : Image.network(
+                                  fit: BoxFit.cover,
+                                  'https://picsum.photos/500/500?random=$index',
+                                ),
                         ),
                       ],
                     ),
@@ -98,9 +146,9 @@ class BasicApp extends HookWidget {
                   final settings = settingsNotifier.value.copyWith(
                     glassColor: CupertinoTheme.of(
                       context,
-                    ).barBackgroundColor.withValues(alpha: 0.2),
+                    ).barBackgroundColor.withValues(alpha: 0.1),
                     edgeColor: Color.from(
-                      alpha: .5,
+                      alpha: .3,
                       red: .1,
                       green: .1,
                       blue: .1,

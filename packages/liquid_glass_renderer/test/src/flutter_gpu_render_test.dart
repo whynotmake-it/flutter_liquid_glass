@@ -1,6 +1,6 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
@@ -96,7 +96,6 @@ void main() {
             ],
             numShapes: 1,
             refractiveIndex: 1.2,
-            chromaticAberration: 0,
             thickness: 10,
             offsetX: 0,
             offsetY: 0,
@@ -113,6 +112,53 @@ void main() {
       expect(identical(first.image, larger.image), isFalse);
       expect((smallerAgain.width, smallerAgain.height), (128, 128));
       expect(identical(larger.image, smallerAgain.image), isTrue);
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'geometry image keeps asymmetric rows in top-down order',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final library = gpu.ShaderLibrary.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      )!;
+      final renderer = FlutterGpuGeometryRenderer(
+        vertexShader: library['GeometryVertex']!,
+        fragmentShader: library['GeometryFragment']!,
+      );
+      addTearDown(renderer.dispose);
+
+      final result = renderer.render(
+        width: 64,
+        height: 64,
+        shapeData: const [
+          1, 20, 20, 0, // Narrow rectangle on the top row.
+          1, 0, 0, 1,
+          32, 16, 1, -1,
+          1, 50, 20, 0, // Wide rectangle on the bottom row.
+          1, 0, 0, 1,
+          32, 48, 1, -1,
+        ],
+        numShapes: 2,
+        refractiveIndex: 1.2,
+        thickness: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
+      final bytes = await result.image.toByteData();
+      expect(bytes, isNotNull);
+
+      int alphaAt(int x, int y) =>
+          bytes!.getUint8((y * result.width + x) * 4 + 3);
+
+      expect(alphaAt(10, 16), 0, reason: 'top row must stay narrow');
+      expect(
+        alphaAt(10, 48),
+        greaterThan(0),
+        reason: 'bottom row must be wide',
+      );
     },
     skip: expectFallback,
   );

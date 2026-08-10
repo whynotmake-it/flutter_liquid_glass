@@ -2,6 +2,7 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
 import 'shared.dart';
@@ -14,6 +15,43 @@ void main() {
         isA<Widget>(),
       );
     });
+
+    testWidgets(
+      'initializes Flutter GPU after the first surface frame',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: LiquidGlassLayer(
+              child: LiquidGlass(
+                shape: LiquidOval(),
+                child: SizedBox.square(dimension: 100),
+              ),
+            ),
+          ),
+        );
+
+        expect(
+          tester
+              .widget<LiquidGlassRenderScope>(
+                find.byType(LiquidGlassRenderScope),
+              )
+              .useFake,
+          isTrue,
+        );
+
+        await tester.pump();
+
+        expect(
+          tester
+              .widget<LiquidGlassRenderScope>(
+                find.byType(LiquidGlassRenderScope),
+              )
+              .useFake,
+          isFalse,
+        );
+      },
+      skip: expectFlutterGpuFallback,
+    );
 
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
@@ -170,6 +208,22 @@ void main() {
     });
 
     group('transforms', () {
+      goldenTest(
+        'keeps composed blur sampling aligned away from the surface origin',
+        skip: skipProperGlassTests,
+        fileName: 'liquid_glass_composed_filter_coordinates',
+        pumpBeforeTest: _pumpAtDpr2,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: BoxConstraints.tight(const Size(900, 600)),
+          children: [
+            GoldenTestScenario(
+              name: 'translated high-distortion glass with blur',
+              child: _coordinateRegressionScene(),
+            ),
+          ],
+        ),
+      );
+
       goldenTest(
         'keeps stretched blend-group geometry aligned at DPR 2',
         skip: skipProperGlassTests,
@@ -354,6 +408,81 @@ void main() {
         },
         skip: expectFlutterGpuFallback,
       );
+
+      testWidgets(
+        'reuses geometry when the complete layer moves',
+        (tester) async {
+          final offset = ValueNotifier(Offset.zero);
+          addTearDown(offset.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: ValueListenableBuilder<Offset>(
+                valueListenable: offset,
+                builder: (_, value, __) => Transform.translate(
+                  offset: value,
+                  child: _transformGlass(),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          final renderObject = tester.allRenderObjects
+              .whereType<RenderLiquidGlassLayer>()
+              .where((renderObject) => renderObject.gpuGeometryRenderer != null)
+              .last;
+          final renderer = renderObject.gpuGeometryRenderer!;
+          final initialRenderCount = renderer.debugRenderCount;
+
+          offset.value = const Offset(80, 45);
+          await tester.pump();
+          await tester.pump();
+
+          expect(renderer.debugRenderCount, initialRenderCount);
+        },
+        skip: expectFlutterGpuFallback,
+      );
+
+      testWidgets(
+        'only rebuilds geometry when settings change geometry inputs',
+        (tester) async {
+          final settings = ValueNotifier(
+            settingsWithoutLighting.copyWith(thickness: 18),
+          );
+          addTearDown(settings.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: ValueListenableBuilder<LiquidGlassSettings>(
+                valueListenable: settings,
+                builder: (_, value, __) => LiquidGlass.withOwnLayer(
+                  settings: value,
+                  shape: const LiquidRoundedRectangle(borderRadius: 28),
+                  child: const SizedBox(width: 240, height: 150),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          final renderObject = tester.allRenderObjects
+              .whereType<RenderLiquidGlassLayer>()
+              .where((renderObject) => renderObject.gpuGeometryRenderer != null)
+              .last;
+          final renderer = renderObject.gpuGeometryRenderer!;
+          final initialRenderCount = renderer.debugRenderCount;
+
+          settings.value = settings.value.copyWith(glassColor: Colors.cyan);
+          await tester.pump();
+          expect(renderer.debugRenderCount, initialRenderCount);
+
+          settings.value = settings.value.copyWith(thickness: 24);
+          await tester.pump();
+          expect(renderer.debugRenderCount, initialRenderCount + 1);
+        },
+        skip: expectFlutterGpuFallback,
+      );
     });
   });
 }
@@ -371,4 +500,46 @@ Widget _transformGlass() => LiquidGlass.withOwnLayer(
   ),
   shape: const LiquidRoundedRectangle(borderRadius: 28),
   child: const SizedBox(width: 240, height: 150),
+);
+
+Widget _coordinateRegressionScene() => Stack(
+  children: [
+    const SizedBox.expand(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xffff595e),
+              Color(0xff8ac926),
+              Color(0xff1982c4),
+              Color(0xffc77dff),
+              Color(0xffffca3a),
+            ],
+          ),
+        ),
+      ),
+    ),
+    const Positioned.fill(
+      child: GridPaper(
+        color: Colors.black,
+        interval: 40,
+        subdivisions: 1,
+      ),
+    ),
+    Positioned(
+      left: 390,
+      top: 250,
+      child: LiquidGlass.withOwnLayer(
+        settings: settingsWithoutLighting.copyWith(
+          blur: 5,
+          thickness: 60,
+          glassColor: Colors.white.withValues(alpha: .08),
+        ),
+        shape: const LiquidRoundedRectangle(borderRadius: 48),
+        child: const SizedBox(width: 390, height: 220),
+      ),
+    ),
+  ],
 );
