@@ -86,7 +86,7 @@ class LiquidGlassSettings with EquatableMixin {
   ///
   /// Higher values create a more frosted appearance.
   ///
-  /// Defaults to 0.
+  /// Defaults to 5.
   final double blur;
 
   /// The effective blur taking visibility into account.
@@ -197,14 +197,14 @@ class LiquidGlassSettings with EquatableMixin {
   /// The strength of the refraction.
   ///
   /// Higher values create more pronounced refraction.
-  /// Defaults to 1.51
+  /// Defaults to 1.2.
   final double refractiveIndex;
 
   /// The saturation adjustment for pixels that shine through the glass.
   ///
   /// 1.0 means no change, values < 1.0 desaturate the background,
   /// values > 1.0 increase saturation.
-  /// Defaults to 1.0
+  /// Defaults to 1.5.
   final double saturation;
 
   /// The effective saturation taking visibility into account.
@@ -217,7 +217,6 @@ class LiquidGlassSettings with EquatableMixin {
     double? thickness,
     double? blur,
     double? chromaticAberration,
-    double? blend,
     double? lightAngle,
     double? lightIntensity,
     double? ambientStrength,

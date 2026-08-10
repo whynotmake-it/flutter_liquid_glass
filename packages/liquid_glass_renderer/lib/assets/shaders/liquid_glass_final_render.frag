@@ -16,8 +16,8 @@ precision mediump float;
 uniform vec2 uSize;
 uniform vec2 uGeometryOffset;
 uniform vec2 uGeometrySize;
-uniform vec4 uGlobalToMatteBasis;
-uniform vec2 uGlobalToMatteOffset;
+uniform vec4 uFilterToMatteBasis;
+uniform vec2 uFilterToMatteOffset;
 
 uniform vec4 uGlassColor;
 uniform vec3 uOpticalProps;
@@ -43,6 +43,16 @@ uniform sampler2D uGeometryTexture;
 
 layout(location = 0) out vec4 fragColor;
 
+vec2 mirrorBackgroundUV(vec2 uv, vec2 inverseTextureSize) {
+    // Image-filter sampler edge behavior differs between Impeller backends.
+    // Preserve every coordinate inside the input texture exactly, and mirror
+    // only displaced samples that genuinely leave it. This avoids GLES decal
+    // black without clamping Metal samples into stretched edge pixels.
+    vec2 mirrored = vec2(1.0) - abs(mod(uv, vec2(2.0)) - vec2(1.0));
+    vec2 halfTexel = inverseTextureSize * 0.5;
+    return clamp(mirrored, halfTexel, vec2(1.0) - halfTexel);
+}
+
 vec3 applySpecularHighlights(
     vec3 baseColor,
     vec4 geometryData,
@@ -61,8 +71,9 @@ vec3 applySpecularHighlights(
     float inwardDistance = geometryData.b * opticalThickness;
     float edgeWidth = min(max(uEdgeWidth, 0.0), opticalThickness * 0.5);
     float highlightInset = edgeWidth * clamp(uEdgeInset, 0.0, 1.0);
-    // Runtime-effect SkSL does not expose fragment derivatives. A half logical
-    // pixel keeps this shader portable across Impeller and Skia compilation.
+    // Flutter runtime-effect shaders do not expose fragment derivatives, even
+    // when Impeller is the active renderer. Use a fixed half-pixel feather;
+    // this is cheaper than fwidth(), but does not adapt to local scaling.
     float edgeFeather = 0.5;
 
     float innerRimMask = edgeWidth > 0.0
@@ -158,28 +169,36 @@ vec3 applySpecularHighlights(
 }
 
 void main() {
-    // Image-filter fragment coordinates and geometry bounds are physical
-    // pixels. Ancestor widget transforms are intentionally not baked into the
-    // matte; Flutter applies them once when compositing the finished layer.
+    // Normalize the image-filter shader coordinate for backdrop sampling, and
+    // map the same coordinate through the layer-provided affine transform for
+    // matte sampling.
     vec2 fragCoord = FlutterFragCoord().xy;
-    
-    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);        
-        
+    vec2 screenUV = fragCoord / uSize;
     #ifdef IMPELLER_TARGET_OPENGLES
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
     vec2 matteCoord = vec2(
-        dot(uGlobalToMatteBasis.xy, fragCoord),
-        dot(uGlobalToMatteBasis.zw, fragCoord)
-    ) + uGlobalToMatteOffset;
+        dot(uFilterToMatteBasis.xy, fragCoord),
+        dot(uFilterToMatteBasis.zw, fragCoord)
+    ) + uFilterToMatteOffset;
     vec2 geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize;
     #ifdef IMPELLER_TARGET_OPENGLES
+        // Runtime-effect image samplers use bottom-up UVs on OpenGLES even
+        // after the geometry pass has canonicalized its fragment coordinates.
         geometryUV.y = 1.0 - geometryUV.y;
     #endif
 
+    if (
+        any(lessThan(geometryUV, vec2(0.0))) ||
+        any(greaterThan(geometryUV, vec2(1.0)))
+    ) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
     vec4 geometryData = texture(uGeometryTexture, geometryUV);
-    
+
     #if DEBUG_GEOMETRY
         fragColor = geometryData;
         return;
@@ -189,24 +208,40 @@ void main() {
         fragColor = vec4(0);
         return;
     }
-    
+
     float maxDisplacement = uThickness * 10.0;
     vec2 displacement = decodeDisplacement(geometryData, maxDisplacement);
-    
+
+    #ifdef IMPELLER_TARGET_OPENGLES
+        displacement.y = -displacement.y;
+    #endif
+
     vec2 invUSize = 1.0 / uSize;
     
     vec4 refractColor;
     if (uChromaticAberration < 0.01) {
-        vec2 refractedUV = screenUV + displacement * invUSize;
+        vec2 refractedUV = mirrorBackgroundUV(
+            screenUV + displacement * invUSize,
+            invUSize
+        );
         refractColor = texture(uBackgroundTexture, refractedUV);
     } else {
         float dispersionStrength = uChromaticAberration * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
         
-        vec2 redUV = screenUV + redOffset * invUSize;
-        vec2 greenUV = screenUV + displacement * invUSize;
-        vec2 blueUV = screenUV + blueOffset * invUSize;
+        vec2 redUV = mirrorBackgroundUV(
+            screenUV + redOffset * invUSize,
+            invUSize
+        );
+        vec2 greenUV = mirrorBackgroundUV(
+            screenUV + displacement * invUSize,
+            invUSize
+        );
+        vec2 blueUV = mirrorBackgroundUV(
+            screenUV + blueOffset * invUSize,
+            invUSize
+        );
         
         float red = texture(uBackgroundTexture, redUV).r;
         vec4 greenSample = texture(uBackgroundTexture, greenUV);

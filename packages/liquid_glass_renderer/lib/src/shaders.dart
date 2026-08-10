@@ -22,8 +22,4 @@ abstract class ShaderKeys {
 
   static final String gpuGeometryShaderBundle =
       '${_shadersRoot}build/shaderbundles/liquid_glass_renderer.shaderbundle';
-
-  @Deprecated('This shader is only for legacy reasons and reference.')
-  static final legacyLiquidGlass =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass.frag';
 }

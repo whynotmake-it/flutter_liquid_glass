@@ -8,12 +8,17 @@
 #define MAX_SHAPES 16
 
 layout(std140) uniform GeometryUniforms {
-    vec2 uSize;
     vec2 uOffset;
+    vec2 uTextureSize;
     vec4 uOpticalProps;
-    float uNumShapes;
     vec4 uShapeData[MAX_SHAPES * 3];
-};
+} geometryUniforms;
+
+#define uOffset geometryUniforms.uOffset
+#define uTextureSize geometryUniforms.uTextureSize
+#define uOpticalProps geometryUniforms.uOpticalProps
+#define uNumShapes (uOpticalProps.w)
+#define uShapeData geometryUniforms.uShapeData
 
 #include "displacement_encoding.glsl"
 
@@ -25,7 +30,13 @@ float uRefractiveIndex = uOpticalProps.x;
 out vec4 fragColor;
 
 void main() {
-    vec2 fragCoord = gl_FragCoord.xy + uOffset;
+    // Keep raster coordinates explicit here; the renderer supplies the
+    // backend-origin correction through uOpticalProps.y.
+    vec2 localFragCoord = gl_FragCoord.xy;
+    if (uOpticalProps.y > 0.5) {
+        localFragCoord.y = uTextureSize.y - localFragCoord.y;
+    }
+    vec2 fragCoord = localFragCoord + uOffset;
 
     float sd = sceneSDF(fragCoord, int(uNumShapes));
 

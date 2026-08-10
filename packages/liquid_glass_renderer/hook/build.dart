@@ -10,6 +10,7 @@ void main(List<String> args) async {
       includeDirectories: [
         input.packageRoot.resolve('lib/assets/shaders/gpu/'),
       ],
+      glesLanguageVersion: 300,
       assetMode: ShaderBundleAssetMode.dataAssetsIfAvailable,
     );
   });

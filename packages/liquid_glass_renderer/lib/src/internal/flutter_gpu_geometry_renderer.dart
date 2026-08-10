@@ -1,8 +1,7 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
-import 'package:meta/meta.dart';
 
 /// Renders the liquid glass geometry SDF shader to a persistent GPU texture
 /// using flutter_gpu.
@@ -29,11 +28,11 @@ class FlutterGpuGeometryRenderer {
     // Cache uniform slot reflection info.
     _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
     _uniformSize = _uniformSlot.sizeInBytes ?? 0;
-    _offsetUSize = _uniformSlot.getMemberOffsetInBytes('uSize') ?? 0;
     _offsetUOffset = _uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
+    _offsetUTextureSize =
+        _uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
     _offsetOpticalProps =
         _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
-    _offsetNumShapes = _uniformSlot.getMemberOffsetInBytes('uNumShapes') ?? 0;
     _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
 
     // Create the static full-screen quad vertex buffer.
@@ -57,15 +56,18 @@ class FlutterGpuGeometryRenderer {
   }
 
   late final gpu.RenderPipeline _pipeline;
+
+  /// Number of geometry command buffers submitted by this renderer.
+  @visibleForTesting
+  int debugRenderCount = 0;
   late final gpu.HostBuffer _hostBuffer;
 
   // Uniform slot reflection.
   late final gpu.UniformSlot _uniformSlot;
   late final int _uniformSize;
-  late final int _offsetUSize;
   late final int _offsetUOffset;
+  late final int _offsetUTextureSize;
   late final int _offsetOpticalProps;
-  late final int _offsetNumShapes;
   late final int _offsetShapeData;
 
   // Persistent render target texture — reused across frames.
@@ -101,25 +103,26 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required int numShapes,
     required double refractiveIndex,
-    required double chromaticAberration,
     required double thickness,
     required double offsetX,
     required double offsetY,
   }) {
-    // Quantize transient render targets to 64-pixel buckets. This avoids an
-    // allocation for every intermediate size during resize animations.
-    final requestedWidth = _bucketDimension(width);
-    final requestedHeight = _bucketDimension(height);
+    assert(() {
+      debugRenderCount++;
+      return true;
+    }(), 'Track geometry submissions in debug builds.');
+    final allocatedWidth = _grownDimension(
+      _textureWidth,
+      _bucketDimension(width),
+    );
+    final allocatedHeight = _grownDimension(
+      _textureHeight,
+      _bucketDimension(height),
+    );
 
     if (_texture == null ||
-        requestedWidth > _textureWidth ||
-        requestedHeight > _textureHeight) {
-      // Grow to a bucketed high-water mark and never shrink during this
-      // renderer's lifetime. Resize animations would otherwise leave several
-      // in-flight Metal textures awaiting GPU completion and garbage
-      // collection, producing large transient phys_footprint spikes.
-      final allocatedWidth = _grownDimension(_textureWidth, requestedWidth);
-      final allocatedHeight = _grownDimension(_textureHeight, requestedHeight);
+        allocatedWidth != _textureWidth ||
+        allocatedHeight != _textureHeight) {
       _texture = gpu.gpuContext.createTexture(
         gpu.StorageMode.devicePrivate,
         allocatedWidth,
@@ -130,9 +133,6 @@ class FlutterGpuGeometryRenderer {
       _textureHeight = allocatedHeight;
     }
 
-    final allocatedWidth = _textureWidth;
-    final allocatedHeight = _textureHeight;
-
     final texture = _texture!;
     final renderTarget = gpu.RenderTarget.singleColor(
       gpu.ColorAttachment(texture: texture),
@@ -141,12 +141,11 @@ class FlutterGpuGeometryRenderer {
     // Pack uniform data into a byte buffer using reflected offsets.
     _hostBuffer.reset();
     final uniformData = _packUniformData(
-      width: allocatedWidth.toDouble(),
-      height: allocatedHeight.toDouble(),
       offsetX: offsetX,
       offsetY: offsetY,
+      textureWidth: allocatedWidth.toDouble(),
+      textureHeight: allocatedHeight.toDouble(),
       refractiveIndex: refractiveIndex,
-      chromaticAberration: chromaticAberration,
       thickness: thickness,
       numShapes: numShapes.toDouble(),
       shapeData: shapeData,
@@ -183,12 +182,11 @@ class FlutterGpuGeometryRenderer {
   }
 
   ByteData _packUniformData({
-    required double width,
-    required double height,
     required double offsetX,
     required double offsetY,
+    required double textureWidth,
+    required double textureHeight,
     required double refractiveIndex,
-    required double chromaticAberration,
     required double thickness,
     required double numShapes,
     required List<double> shapeData,
@@ -196,26 +194,24 @@ class FlutterGpuGeometryRenderer {
     final data = ByteData(_uniformSize);
     final floatData = data.buffer.asFloat32List();
 
-    // uSize (vec2)
-    final uSizeIndex = _offsetUSize ~/ 4;
-    floatData[uSizeIndex] = width;
-    floatData[uSizeIndex + 1] = height;
-
     // uOffset (vec2)
     final uOffsetIndex = _offsetUOffset ~/ 4;
     floatData[uOffsetIndex] = offsetX;
     floatData[uOffsetIndex + 1] = offsetY;
 
+    // uTextureSize (vec2), used to convert OpenGL's bottom-up fragment
+    // coordinates into Flutter's top-down coordinate system.
+    final textureSizeIndex = _offsetUTextureSize ~/ 4;
+    floatData[textureSizeIndex] = textureWidth;
+    floatData[textureSizeIndex + 1] = textureHeight;
+
     // uOpticalProps (vec4)
     final opticalIndex = _offsetOpticalProps ~/ 4;
     floatData[opticalIndex] = refractiveIndex;
-    floatData[opticalIndex + 1] = chromaticAberration;
+    floatData[opticalIndex + 1] =
+        defaultTargetPlatform == TargetPlatform.android ? 1 : 0;
     floatData[opticalIndex + 2] = thickness;
-    floatData[opticalIndex + 3] = 0;
-
-    // uNumShapes (float)
-    final numShapesIndex = _offsetNumShapes ~/ 4;
-    floatData[numShapesIndex] = numShapes;
+    floatData[opticalIndex + 3] = numShapes;
 
     // uShapeData (vec4 array). Packing scalar shape values into vec4s avoids
     // std140's 16-byte stride for every individual float.

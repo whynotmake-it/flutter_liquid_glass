@@ -33,9 +33,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
   final FragmentShader renderShader;
 
-  /// The size that the geometry texture should have.
-  Size get desiredMatteSize;
-
   Matrix4 get matteTransform;
 
   /// Maps local matte bounds into the coordinate space used by
@@ -54,8 +51,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   LiquidGlassSettings get settings => _settings!;
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
+    final geometryInputsChanged =
+        _settings?.effectiveThickness != value.effectiveThickness ||
+        _settings?.refractiveIndex != value.refractiveIndex;
     _settings = value;
     _updateShaderSettings();
+    if (geometryInputsChanged) needsGeometryUpdate = true;
     markNeedsPaint();
   }
 
@@ -64,6 +65,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set backdropKey(BackdropKey? value) {
     if (_backdropKey == value) return;
     _backdropKey = value;
+    markNeedsPaint();
   }
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
@@ -79,6 +81,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set devicePixelRatio(double value) {
     if (_devicePixelRatio == value) return;
     _devicePixelRatio = value;
+    needsGeometryUpdate = true;
     markNeedsPaint();
   }
 
@@ -267,10 +270,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         renderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
             value
-              // The matte is local and physical-resolution. Convert global
-              // physical fragment coordinates back into that local space so
-              // scale/rotation are not baked into the matte and composited a
-              // second time.
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
               ..setSize(_geometryMatteBounds.size * devicePixelRatio)
               ..setFloats([
@@ -504,7 +503,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         shapeData: shapeData,
         numShapes: numShapes,
         refractiveIndex: settings.refractiveIndex,
-        chromaticAberration: settings.effectiveChromaticAberration,
         thickness: settings.effectiveThickness,
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,
@@ -543,6 +541,7 @@ class GeometryRenderLink {
   void registerGeometry(
     RenderLiquidGlassGeometry renderObject,
   ) {
+    if (_shapeGeometries.contains(renderObject)) return;
     _dirty = true;
     _shapeGeometries.add(renderObject);
   }
@@ -552,7 +551,9 @@ class GeometryRenderLink {
   }
 
   void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
-    _shapeGeometries.remove(renderObject);
+    if (_shapeGeometries.remove(renderObject)) {
+      _dirty = true;
+    }
   }
 
   void dispose() {

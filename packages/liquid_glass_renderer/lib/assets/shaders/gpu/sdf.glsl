@@ -19,11 +19,6 @@ float sdfRRect( in vec2 p, in vec2 b, in float r ) {
     return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
 }
 
-float sdfRect(vec2 p, vec2 b) {
-    vec2 d = abs(p) - b;
-    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-}
-
 float sdfSquircle(vec2 p, vec2 b, float r) {
     float shortest = min(b.x, b.y);
     r = min(r, shortest);
@@ -113,16 +108,4 @@ float sceneSDF(vec2 p, int numShapes) {
         }
     }
     return min(result, groupResult);
-}
-
-// Calculate 3D normal using derivatives (shader-specific normal calculation)
-vec3 getNormal(float sd, float thickness) {
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
-    
-    // The cosine and sine between normal and the xy plane
-    float n_cos = max(thickness + sd, 0.0) / thickness;
-    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
-    
-    return normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
 }

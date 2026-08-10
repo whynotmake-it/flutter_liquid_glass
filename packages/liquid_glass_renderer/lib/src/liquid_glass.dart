@@ -62,13 +62,20 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
     bool fake = false,
+    bool useBackdropGroup = false,
+    BackdropKey? backdropKey,
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.shadows = const [],
   }) : grouped = true,
        blendGroupLink = null,
-       ownLayerConfig = (settings, fake),
+       ownLayerConfig = (
+         settings: settings,
+         fake: fake,
+         useBackdropGroup: useBackdropGroup,
+         backdropKey: backdropKey,
+       ),
        _auto = true;
 
   /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
@@ -100,12 +107,19 @@ class LiquidGlass extends StatelessWidget {
     required this.shape,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
     bool fake = false,
+    bool useBackdropGroup = false,
+    BackdropKey? backdropKey,
     super.key,
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
     this.shadows = const [],
-  }) : ownLayerConfig = (settings, fake),
+  }) : ownLayerConfig = (
+         settings: settings,
+         fake: fake,
+         useBackdropGroup: useBackdropGroup,
+         backdropKey: backdropKey,
+       ),
        grouped = false,
        _auto = false;
 
@@ -132,7 +146,7 @@ class LiquidGlass extends StatelessWidget {
 
   /// The clip behavior of this glass.
   ///
-  /// Defaults to [Clip.none], so [child] will not be clipped.
+  /// Defaults to [Clip.hardEdge], so [child] is clipped to the glass shape.
   final Clip clipBehavior;
 
   /// Whether this glass is part of a blend group.
@@ -142,7 +156,13 @@ class LiquidGlass extends StatelessWidget {
   final GlassGroupLink? blendGroupLink;
 
   /// The settings for this glass if it is supposed to create its own layer.
-  final (LiquidGlassSettings settings, bool fake)? ownLayerConfig;
+  final ({
+    LiquidGlassSettings settings,
+    bool fake,
+    bool useBackdropGroup,
+    BackdropKey? backdropKey,
+  })?
+  ownLayerConfig;
 
   /// The list of shadows to paint.
   ///
@@ -165,18 +185,24 @@ class LiquidGlass extends StatelessWidget {
     }
 
     // If we have our own layer config, we create our own layer.
-    if (ownLayerConfig case (final settings, final fake)) {
+    if (ownLayerConfig case final config?) {
+      final settings = config.settings;
+      final fake = config.fake;
       if (fake) {
         return FakeGlass(
           shape: shape,
           settings: settings,
           shadows: shadows,
+          useBackdropGroup: config.useBackdropGroup,
+          backdropKey: config.backdropKey,
           child: child,
         );
       }
 
       return LiquidGlassLayer(
         settings: settings,
+        useBackdropGroup: config.useBackdropGroup,
+        backdropKey: config.backdropKey,
         child: LiquidGlassBlendGroup(
           blend: 0,
           child: Builder(

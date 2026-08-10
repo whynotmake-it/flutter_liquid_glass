@@ -97,9 +97,8 @@ This package provides several widgets to create the glass effect:
 
 As this is a pre-release, there are a few things to keep in mind:
 
-- **Only works on Impeller**, so Web, Windows, and Linux are entirely unsupported for now
-- **SkSL/Skia shader warnings can be ignored**: Flutter may warn that these shaders are incompatible with SkSL or the Skia backend. This package intentionally uses Impeller-only shader features, so those warnings do not matter as long as your app is running with Impeller. See [flutter/flutter#183656](https://github.com/flutter/flutter/issues/183656) for the upstream warning discussion.
-- **Memory spike when animating shapes** There is a [bug in Flutter](https://github.com/flutter/flutter/issues/138627) that prevents us from disposing generated textures immediately, leading to temporary memory spikes when animating glass shapes. Read [A word on Performance](#-a-word-on-performance) for tips on minimizing this.
+- **Full refraction requires Impeller and Flutter GPU.** On Skia, or when Flutter GPU is unavailable, `LiquidGlassLayer` automatically renders its `FakeGlass` fallback and logs that decision in debug builds.
+- **Animated geometry is still expensive.** Geometry textures are retained and reused to avoid allocation spikes, but changing shape size or relative position requires another Flutter-GPU geometry pass.
 - **Maximum of 16 shapes** can be blended in a `LiquidGlassBlendGroup`, and performance will degrade significantly with the more shapes you add in the same group.
 
 
@@ -108,7 +107,7 @@ As this is a pre-release, there are a few things to keep in mind:
 The liquid glass effect is computationally intensive, especially on mobile devices. To save GPU cycles, `liquid_glass_renderer` will try to cache geometry in textures wherever possible.
 
 #### Memory Usage
-Unfortunately, due to a [Flutter bug](https://github.com/flutter/flutter/issues/138627), we cannot dispose of these textures immediately, which may lead to temporary memory spikes when animating glass shapes. Please upvote the issue to help get it fixed!
+Geometry render targets grow in 64-physical-pixel buckets and retain their high-water size for the layer's lifetime; these mattes are small, and replacing them during transforms caused large delayed native-memory spikes. Larger Impeller backdrop-filter bounds use non-retaining 64-pixel buckets so their saveLayer targets can be reused without permanently keeping the largest AABB. This is selected internally rather than exposed as a consumer mode. Use the benchmark harness in `example/tool` to validate memory on representative hardware.
 
 #### Best Practices
 To ensure the best performance when using liquid glass effects, consider the following tips:
@@ -118,9 +117,8 @@ Try to keep these areas as small as possible.
 If you have a large area with sparse glass shapes, consider splitting them into multiple smaller layers/groups.
 - **Limit the number of blended shapes**: Each additional shape in a `LiquidGlassBlendGroup` increases the computational load. 
 Try to keep the number of blended shapes low.
-- **Limit animations**: The glass effect is almost free while shapes remain in the same position onscreen.
-Moving shapes forces the package to re-render their glass effect every frame, which is expensive.
-In a `LiquidGlassBlendGroup`, moving any shape forces all shapes in the group to re-render.
+- **Limit geometry animations**: Static geometry is cached. Moving an entire `LiquidGlassLayer` as one unit reuses its matte, but moving or resizing shapes relative to their layer forces geometry to be rendered again. In a `LiquidGlassBlendGroup`, moving one shape rebuilds the group.
+- **Share backdrop captures for non-overlapping effects**: Wrap related layers in a Flutter `BackdropGroup` and set `useBackdropGroup: true`, or supply an explicit `BackdropKey`. This works for both real and fake glass and is separate from `LiquidGlassBlendGroup`.
 
 ---
 
@@ -217,7 +215,7 @@ The LiquidGlass widget supports the following shapes:
 -   `LiquidOval` - A perfect ellipse/circle
 -   `LiquidRoundedRectangle` - A rounded rectangle
 
-All shapes take a simple `double` for `borderRadius` instead of `BorderRasdius` or `Radius`, since they don't support non-uniform radii.
+All shapes take a simple `double` for `borderRadius` instead of `BorderRadius` or `Radius`, since they don't support non-uniform radii.
 
 
 ### `LiquidGlassBlendGroup`: Blending Multiple Shapes
@@ -270,7 +268,8 @@ LiquidGlassLayer(
     thickness: 10,
     glassColor: Color(0x1AFFFFFF),
     lightIntensity: 1.5,
-    outlineIntensity: 0.5,
+    edgeColor: Color(0x66000000),
+    edgeWidth: 1,
     saturation: 1.2,
   ),
   child: LiquidGlassBlendGroup(
@@ -288,7 +287,7 @@ Here's a breakdown of the key settings:
 -   `refractiveIndex`: The refractive index of the glass material (1.0 = no refraction, ~1.5 = realistic glass).
 -   `lightAngle`, `lightIntensity`: Control the direction and brightness of the virtual light source, creating highlights.
 -   `ambientStrength`: The intensity of ambient light on the glass.
--   `outlineIntensity`: The visibility of the glass outline/edge.
+-   `highlightColor`, `edgeColor`, `edgeWidth`, `edgeInset`, `specularWrap`, and `bleedStrength`: Control the lit rim and outline.
 -   `saturation`: Adjusts the color saturation of background pixels visible through the glass (1.0 = no change, <1.0 = desaturated, >1.0 = more saturated).
 
 **Note:** The `blend` parameter has been moved from `LiquidGlassSettings` to the `LiquidGlassBlendGroup` constructor, as it specifically controls shape blending behavior.
@@ -308,6 +307,39 @@ LiquidGlassLayer(
   child: // ... your glass widgets
 )
 ```
+
+### Sharing backdrop captures
+
+Backdrop capture is independent from liquid shape blending.
+`LiquidGlassBlendGroup` controls how geometry merges; Flutter's
+`BackdropGroup` controls whether non-overlapping filters can reuse one capture.
+
+```dart
+final key = BackdropKey();
+
+BackdropGroup(
+  backdropKey: key,
+  child: Stack(
+    children: [
+      LiquidGlassLayer(
+        useBackdropGroup: true,
+        child: firstGlassArea,
+      ),
+      LiquidGlassLayer(
+        fake: true,
+        useBackdropGroup: true,
+        child: secondGlassArea,
+      ),
+    ],
+  ),
+)
+```
+
+For explicit control, pass the same `backdropKey` directly to
+`LiquidGlassLayer`, `LiquidGlass.withOwnLayer`, `LiquidGlass.auto`, or
+`FakeGlass`. Do not share one key between overlapping backdrop filters:
+Flutter treats filters with the same key as one operation, so overlapping
+regions may render incorrectly.
 
 ### Child Placement
 
@@ -441,4 +473,3 @@ For more details, check out the API documentation in the source code.
 [lintervention_badge]: https://img.shields.io/badge/lints_by-lintervention-3A5A40
 
 [flutter_install_link]: https://docs.flutter.dev/get-started/install
-

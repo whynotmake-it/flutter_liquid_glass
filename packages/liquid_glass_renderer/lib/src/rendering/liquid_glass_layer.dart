@@ -9,6 +9,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
+import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
@@ -75,6 +76,7 @@ class LiquidGlassLayer extends StatefulWidget {
     this.settings = const LiquidGlassSettings(),
     this.fake = false,
     this.useBackdropGroup = false,
+    this.backdropKey,
     super.key,
   });
 
@@ -91,18 +93,26 @@ class LiquidGlassLayer extends StatefulWidget {
   /// [FakeGlass] effects.
   final bool fake;
 
-  /// Whether to look up the tree for a [BackdropGroup] to use for this layer's
-  /// blur.
+  /// Whether to share the nearest ancestor [BackdropGroup]'s capture for
+  /// backdrop effects.
   ///
   /// If you have multiple [LiquidGlassLayer]s in a subtree that use the same
   /// background blur, setting this to true can improve performance by sharing
   /// the same backdrop.
   ///
-  /// If [fake] is true, this will be ignored, as this widget will already use
-  /// a shared backdrop for the fake glass effect.
+  /// This applies consistently to real and fake glass and is independent from
+  /// [LiquidGlassBlendGroup], which only controls geometry blending.
+  /// [backdropKey] takes precedence when both are provided.
   ///
   /// Defaults to false.
   final bool useBackdropGroup;
+
+  /// An explicit backdrop capture key for blur and refraction sharing.
+  ///
+  /// Multiple non-overlapping glass effects can reuse the same key to avoid
+  /// repeated backdrop captures. Effects that overlap should use different
+  /// keys because Flutter treats a shared key as a single backdrop filter.
+  final BackdropKey? backdropKey;
 
   /// Whether there is a [LiquidGlassLayer] in the widget tree above the given
   /// [context].
@@ -122,6 +132,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
   bool _triedGpuGeometryRenderer = false;
+  bool _gpuInitializationScheduled = false;
   bool _loggedFallback = false;
 
   void _logDebugFallback(String message) {
@@ -130,20 +141,26 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     debugPrint('liquid_glass_renderer: $message');
   }
 
-  FlutterGpuGeometryRenderer? _tryCreateGpuGeometryRenderer() {
-    if (_triedGpuGeometryRenderer) return _gpuGeometryRenderer;
-    _triedGpuGeometryRenderer = true;
-    try {
-      return _gpuGeometryRenderer = FlutterGpuGeometryRenderer.fromAsset(
-        ShaderKeys.gpuGeometryShaderBundle,
-      );
-    } on Object catch (error) {
-      _logDebugFallback(
-        'Flutter GPU is unavailable; LiquidGlassLayer is using FakeGlass. '
-        'Enable Impeller and Flutter GPU for the full glass effect. $error',
-      );
-      return null;
-    }
+  void _scheduleGpuGeometryRendererInitialization() {
+    if (_triedGpuGeometryRenderer || _gpuInitializationScheduled) return;
+    _gpuInitializationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _gpuInitializationScheduled = false;
+      if (!mounted || widget.fake || _triedGpuGeometryRenderer) return;
+
+      _triedGpuGeometryRenderer = true;
+      try {
+        _gpuGeometryRenderer = FlutterGpuGeometryRenderer.fromAsset(
+          ShaderKeys.gpuGeometryShaderBundle,
+        );
+      } on Object catch (error) {
+        _logDebugFallback(
+          'Flutter GPU is unavailable; LiquidGlassLayer is using FakeGlass. '
+          'Enable Impeller and Flutter GPU for the full glass effect. $error',
+        );
+      }
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -155,10 +172,19 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   @override
   Widget build(BuildContext context) {
+    final backdropKey =
+        widget.backdropKey ??
+        (widget.useBackdropGroup
+            ? BackdropGroup.of(context)?.backdropKey
+            : null);
     final shaderFiltersSupported = ImageFilter.isShaderFilterSupported;
-    final gpuRenderer = widget.fake || !shaderFiltersSupported
-        ? null
-        : _tryCreateGpuGeometryRenderer();
+    if (!widget.fake && shaderFiltersSupported) {
+      // Android's Impeller context is not available until its first surface
+      // frame has been established. Creating flutter_gpu resources directly
+      // from build can therefore block the UI isolate before the first frame.
+      _scheduleGpuGeometryRendererInitialization();
+    }
+    final gpuRenderer = _gpuGeometryRenderer;
     final useFake =
         widget.fake || !shaderFiltersSupported || gpuRenderer == null;
     if (useFake) {
@@ -172,9 +198,10 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
       return LiquidGlassRenderScope(
         settings: widget.settings,
         useFake: true,
+        backdropKey: backdropKey,
         child: InheritedGeometryRenderLink(
           link: _link,
-          child: BackdropGroup(child: widget.child),
+          child: widget.child,
         ),
       );
     }
@@ -182,6 +209,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     return RepaintBoundary(
       child: LiquidGlassRenderScope(
         settings: widget.settings,
+        backdropKey: backdropKey,
         child: InheritedGeometryRenderLink(
           link: _link,
           child: MultiShaderBuilder(
@@ -191,9 +219,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             (context, shaders, child) {
               return _RawShapes(
                 renderShader: shaders[0],
-                backdropKey: widget.useBackdropGroup
-                    ? BackdropGroup.of(context)?.backdropKey
-                    : null,
+                backdropKey: backdropKey,
                 settings: widget.settings,
                 link: _link,
                 gpuGeometryRenderer: gpuRenderer,
@@ -266,12 +292,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   final _clipPathLayerHandle = LayerHandle<ClipPathLayer>();
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
-  @override
-  Size get desiredMatteSize => switch (owner?.rootNode) {
-    final RenderView rv => rv.size,
-    final RenderBox rb => rb.size,
-    _ => Size.zero,
-  };
+  @visibleForTesting
+  BackdropFilterLayer? get debugBackdropFilterLayer => _shaderHandle.layer;
 
   @override
   // Geometry is encoded in this layer's local coordinate space. Ancestor
@@ -285,7 +307,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void onTransformChanged() {
-    needsGeometryUpdate = true;
+    // The matte is layer-local. A transform above the complete layer only
+    // changes final-pass coordinate mapping and must not resubmit geometry.
     markNeedsPaint();
   }
 
@@ -304,6 +327,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             sigmaY: settings.effectiveBlur,
           )
         : null;
+    final filterBounds = boundingBox.expandToPixelBuckets(devicePixelRatio);
 
     final shaderFilter = switch (blurFilter) {
       final blur? => ImageFilter.compose(
@@ -314,7 +338,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     };
 
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
-      ..filter = shaderFilter;
+      ..filter = shaderFilter
+      ..backdropKey = backdropKey;
 
     final clipPath = Path();
     for (final geometry in shapes) {
@@ -347,7 +372,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,
-      boundingBox,
+      filterBounds,
       (context, offset) {
         context.pushLayer(
           shaderLayer,
