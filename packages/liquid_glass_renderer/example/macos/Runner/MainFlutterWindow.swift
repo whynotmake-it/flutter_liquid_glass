@@ -3,11 +3,39 @@ import FlutterMacOS
 import os.signpost
 
 private final class BenchmarkMetrics {
-  private let log = OSLog(subsystem: "com.example.liquidGlassRenderer", category: "benchmark")
+  private let log = OSLog(
+    subsystem: "com.example.liquidGlassRenderer",
+    category: "PointsOfInterest"
+  )
   private var intervals: [String: OSSignpostID] = [:]
+  private let samplingQueue = DispatchQueue(
+    label: "com.example.liquidGlassRenderer.memorySampling",
+    qos: .utility
+  )
+  private var samplingTimer: DispatchSourceTimer?
+  private var memorySamples: [[String: Any]] = []
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "configuration":
+      let environment = ProcessInfo.processInfo.environment
+      let scenario = environment["LIQUID_GLASS_BENCHMARK_SCENARIO"] ?? "staticSingle"
+      let warmupSeconds = Int(environment["LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS"] ?? "3") ?? 3
+      let measureSeconds = Int(environment["LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS"] ?? "8") ?? 8
+      let repetition = Int(environment["LIQUID_GLASS_BENCHMARK_REPETITION"] ?? "1") ?? 1
+      let traceGraceSeconds = Int(environment["LIQUID_GLASS_BENCHMARK_TRACE_GRACE_SECONDS"] ?? "40") ?? 40
+      let traceRun = environment["LIQUID_GLASS_BENCHMARK_TRACE_RUN"] == "1"
+      let traceStartGate = environment["LIQUID_GLASS_BENCHMARK_TRACE_START_GATE"] ?? ""
+      let configuration: [String: Any] = [
+        "scenario": scenario,
+        "warmupSeconds": warmupSeconds,
+        "measureSeconds": measureSeconds,
+        "repetition": repetition,
+        "traceGraceSeconds": traceGraceSeconds,
+        "traceRun": traceRun,
+        "traceStartGate": traceStartGate,
+      ]
+      result(configuration)
     case "beginInterval":
       guard let name = call.arguments as? String else {
         result(FlutterError(code: "bad_arguments", message: "Expected interval name", details: nil))
@@ -26,8 +54,38 @@ private final class BenchmarkMetrics {
       result(nil)
     case "sampleMemory":
       result(memorySnapshot())
+    case "startMemorySampling":
+      startMemorySampling()
+      result(nil)
+    case "stopMemorySampling":
+      result(stopMemorySampling())
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func startMemorySampling() {
+    samplingQueue.sync {
+      samplingTimer?.cancel()
+      memorySamples = [memorySnapshot()]
+      let timer = DispatchSource.makeTimerSource(queue: samplingQueue)
+      timer.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
+      timer.setEventHandler { [weak self] in
+        guard let self else { return }
+        self.memorySamples.append(self.memorySnapshot())
+      }
+      samplingTimer = timer
+      timer.resume()
+    }
+  }
+
+  private func stopMemorySampling() -> [[String: Any]] {
+    samplingQueue.sync {
+      samplingTimer?.cancel()
+      samplingTimer = nil
+      let samples = memorySamples
+      memorySamples = []
+      return samples
     }
   }
 

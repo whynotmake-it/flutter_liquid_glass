@@ -17,7 +17,7 @@ jobs:
   benchmark:
     name: Run Performance Benchmarks
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       pull-requests: write
       contents: read
@@ -49,6 +49,8 @@ jobs:
 
       - name: 🏃‍♂️ Run benchmark tests
         working-directory: packages/liquid_glass_renderer/example
+        env:
+          LIQUID_GLASS_BENCHMARK_ENFORCE: 'true'
         run: |
           chmod +x tool/benchmark.sh
           ./tool/benchmark.sh
@@ -61,6 +63,7 @@ jobs:
             --input build/benchmark \
             --markdown build/benchmark/summary.md \
             --json build/benchmark/summary.json \
+            --minimum-repetitions 3 \
             --enforce true
 
       - name: 📝 Find existing comment

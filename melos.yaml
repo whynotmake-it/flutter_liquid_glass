@@ -31,7 +31,10 @@ scripts:
     run: melos version --no-git-tag-version --yes
 
   test:select:
-    run: flutter test --enable-impeller --enable-flutter-gpu
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
       concurrency: 6
@@ -44,8 +47,10 @@ scripts:
     description: Run all tests in this project.
 
   coverage:select:
-    run: |
+    run: >-
       flutter test --coverage --enable-impeller --enable-flutter-gpu
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
       concurrency: 6
@@ -58,7 +63,10 @@ scripts:
     description: Generate coverage for all packages.
 
   test-without-goldens:select:
-    run: flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
       concurrency: 6
@@ -71,7 +79,11 @@ scripts:
     description: Run all tests in this project without golden tests.
 
   update-goldens:select:
-    run: flutter test --enable-impeller --enable-flutter-gpu --tags=golden --update-goldens
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu --tags=golden
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
+      --update-goldens
     exec:
       failFast: true
       concurrency: 6
