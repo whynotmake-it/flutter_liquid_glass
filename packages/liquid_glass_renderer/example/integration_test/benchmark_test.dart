@@ -33,6 +33,8 @@ Future<void> main() async {
       nativeConfiguration['warmupSeconds'] as int? ?? _defaultWarmupSeconds;
   final measureSeconds =
       nativeConfiguration['measureSeconds'] as int? ?? _defaultMeasureSeconds;
+  final traceMeasureMilliseconds =
+      nativeConfiguration['traceMeasureMilliseconds'] as int? ?? 500;
   final repetition = nativeConfiguration['repetition'] as int? ?? 1;
   final isTraceRun = nativeConfiguration['traceRun'] as bool? ?? false;
   final traceStartGate = nativeConfiguration['traceStartGate'] as String?;
@@ -50,25 +52,43 @@ Future<void> main() async {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
     }
-    // The traced process exists for exactly one post-warmup measurement. This
-    // makes its lifetime a useful attribution boundary even for the lightweight
-    // Metal System Trace template, which does not include Points of Interest.
-    await _native.invokeMethod<void>('beginInterval', scenario.name);
-    stdout.writeln(
-      'LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}:'
-      '${DateTime.now().microsecondsSinceEpoch}',
-    );
-    await Future<void>.delayed(Duration(seconds: measureSeconds));
-    await SchedulerBinding.instance.endOfFrame;
-    await _native.invokeMethod<void>('endInterval', scenario.name);
-    stdout.writeln(
-      'LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}:'
-      '${DateTime.now().microsecondsSinceEpoch}',
-    );
-    await stdout.flush();
-    // Let the final submitted frame retire before ending the target lifetime.
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    exit(0);
+    // Xcode 26 can retain less than a second from a bounded rolling Metal
+    // trace. Emit adjacent half-second windows so every retained timeline has
+    // a sufficiently large exact workload intersection. Each window also
+    // reports its rendered frame count: ProMotion varies the refresh rate
+    // under tracing, so GPU cost is only comparable across runs when
+    // normalized per frame.
+    var windowFrameCount = 0;
+    void countWindowFrames(List<FrameTiming> values) =>
+        windowFrameCount += values.length;
+
+    SchedulerBinding.instance.addTimingsCallback(countWindowFrames);
+    while (true) {
+      await _startGpuTiming();
+      await _native.invokeMethod<void>('beginInterval', scenario.name);
+      windowFrameCount = 0;
+      stdout.writeln(
+        'LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}:'
+        '${DateTime.now().microsecondsSinceEpoch}',
+      );
+      await Future<void>.delayed(
+        Duration(milliseconds: traceMeasureMilliseconds),
+      );
+      await SchedulerBinding.instance.endOfFrame;
+      await _native.invokeMethod<void>('endInterval', scenario.name);
+      final windowGpu = await _stopGpuTiming();
+      // The optional trailing field carries the in-process GPU busy time in
+      // microseconds; the window regex in the parser tolerates its absence.
+      final gpuBusyMillis = windowGpu['busyMilliseconds'];
+      final gpuSuffix = windowGpu['available'] == true && gpuBusyMillis is num
+          ? ':${(gpuBusyMillis * 1000).round()}'
+          : '';
+      stdout.writeln(
+        'LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}:'
+        '${DateTime.now().microsecondsSinceEpoch}:$windowFrameCount$gpuSuffix',
+      );
+      await stdout.flush();
+    }
   }
 
   final preMeasureStability = await _sampleUntilStable();
@@ -78,10 +98,12 @@ Future<void> main() async {
   await _native.invokeMethod<void>('startMemorySampling');
 
   SchedulerBinding.instance.addTimingsCallback(collectTimings);
+  await _startGpuTiming();
   await _native.invokeMethod<void>('beginInterval', scenario.name);
   debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}');
   await Future<void>.delayed(Duration(seconds: measureSeconds));
   await _native.invokeMethod<void>('endInterval', scenario.name);
+  final commandBufferGpu = await _stopGpuTiming();
   debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}');
   SchedulerBinding.instance.removeTimingsCallback(collectTimings);
 
@@ -90,11 +112,12 @@ Future<void> main() async {
   final cooldownMemory = cooldownStability.samples;
   final settledMemory = _representativeMemory(cooldownMemory);
   final report = <String, Object?>{
-    'schemaVersion': 4,
+    'schemaVersion': 5,
     'scenario': scenario.name,
     'repetition': repetition,
     'warmupSeconds': warmupSeconds,
     'measureSeconds': measureSeconds,
+    'commandBufferGpu': commandBufferGpu,
     'frames': timings
         .map(
           (timing) => <String, int>{
@@ -115,6 +138,33 @@ Future<void> main() async {
     'cooldownMemorySlopeMbPerSecond': cooldownStability.slopeMbPerSecond,
   };
   debugPrint('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
+}
+
+/// Starts the native in-process GPU timing session (Metal command-buffer
+/// completion timestamps). Failures degrade to an unavailable marker so the
+/// benchmark never depends on the channel existing.
+Future<Map<String, Object?>> _startGpuTiming() => _invokeGpuTiming(
+  'startGpuTiming',
+);
+
+/// Stops the session and returns the native stats map: `busyMilliseconds`
+/// (union of command-buffer GPU intervals), `windowMilliseconds`,
+/// `bufferCount`, and a 100 ms `bucketBusyMilliseconds` series — or
+/// `available: false` with a reason.
+Future<Map<String, Object?>> _stopGpuTiming() => _invokeGpuTiming(
+  'stopGpuTiming',
+);
+
+Future<Map<String, Object?>> _invokeGpuTiming(String method) async {
+  try {
+    final response = await _native.invokeMapMethod<String, Object?>(method);
+    return response ??
+        <String, Object?>{'available': false, 'reason': 'no native response'};
+  } on PlatformException catch (error) {
+    return <String, Object?>{'available': false, 'reason': '$error'};
+  } on MissingPluginException catch (error) {
+    return <String, Object?>{'available': false, 'reason': '$error'};
+  }
 }
 
 typedef _MemoryStability = ({
@@ -235,6 +285,8 @@ enum BenchmarkScenario {
   grouped4Motion,
   grouped8Motion,
   grouped16Motion,
+  independent4Motion,
+  independent8Motion,
   independent16Motion,
   independent16SharedBackdrop,
   sparse16Motion,
@@ -393,23 +445,20 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         count: 16,
         t: t,
       ),
-      BenchmarkScenario.independent16Motion => Center(
-        child: Transform.translate(
-          offset: Offset(30 * math.sin(t * math.pi * 2), 0),
-          child: Wrap(
-            alignment: WrapAlignment.center,
-            children: List.generate(
-              16,
-              (index) => LiquidGlass.withOwnLayer(
-                settings: settings,
-                shape: LiquidRoundedSuperellipse(
-                  borderRadius: 8.0 + index,
-                ),
-                child: _tile(index, size: 72),
-              ),
-            ),
-          ),
-        ),
+      BenchmarkScenario.independent4Motion => _independentGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+      ),
+      BenchmarkScenario.independent8Motion => _independentGrid(
+        settings: settings,
+        count: 8,
+        t: t,
+      ),
+      BenchmarkScenario.independent16Motion => _independentGrid(
+        settings: settings,
+        count: 16,
+        t: t,
       ),
       BenchmarkScenario.independent16SharedBackdrop => BackdropGroup(
         child: Center(
@@ -500,6 +549,31 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         child: LiquidGlass(
           shape: const LiquidRoundedSuperellipse(borderRadius: 96),
           child: _tile(0, size: size),
+        ),
+      ),
+    ),
+  );
+
+  // Constant per-layer tile size across the count ladder so the scenarios
+  // isolate the cost of each additional independent layer.
+  Widget _independentGrid({
+    required LiquidGlassSettings settings,
+    required int count,
+    required double t,
+  }) => Center(
+    child: Transform.translate(
+      offset: Offset(30 * math.sin(t * math.pi * 2), 0),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        children: List.generate(
+          count,
+          (index) => LiquidGlass.withOwnLayer(
+            settings: settings,
+            shape: LiquidRoundedSuperellipse(
+              borderRadius: 8.0 + index,
+            ),
+            child: _tile(index, size: 72),
+          ),
         ),
       ),
     ),

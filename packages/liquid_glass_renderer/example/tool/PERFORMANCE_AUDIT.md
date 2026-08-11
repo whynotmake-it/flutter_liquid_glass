@@ -6,32 +6,29 @@ visual output and native `phys_footprint` remain regression gates.
 
 ## Current measured state (2026-08-11)
 
-A three-repetition macOS profile run used a six-second warmup and eight-second
-measurement on Impeller/Metal. The complete report is in
-`../build/benchmark-current-long/summary.md`.
+A stabilized three-repetition macOS profile run used profile-mode
+Impeller/Metal and native Mach `phys_footprint` sampling. A separate rolling
+Metal System Trace validated exact, process-filtered GPU attribution.
 
-- Sixteen independent glass layers are the clearest current bottleneck:
-  raster p95 was 14.51–45.37 ms and native footprint was 654.5–667.8 MB
-  (660.8 MB median, 1.0% CV). All three repetitions exceeded or approached the
-  16.67 ms frame budget at p99.
-- Sixteen shapes in one blend group used 392.1–472.2 MB (455.3 MB median) and
-  had a 6.58 ms median raster p95. Grouping therefore saves about 205 MB of
-  peak native footprint versus sixteen independent layers in this run.
-- A static single glass used a 369.8 MB median peak footprint; animated resize
-  used 391.1 MB. Sparse sixteen-shape glass used 409.4 MB median but had one
-  454.0 MB outlier.
-- Frame p95 CV remains 49.8–88.6% across these scenarios, so absolute raster
-  medians are directional and must not gate CI yet. Footprint is much more
-  repeatable for the glass workloads (1.0–9.6% CV); the no-glass control had a
-  159.1 MB one-sample outlier and is not a reliable absolute memory baseline.
-- Native GPU attribution is still unavailable. On this local Xcode 26.4 host,
-  both `Game Performance` and `Game Performance Overview` reach their bounded
-  time limit and then hang while saving an attached trace. The harness fails
-  closed; it does not report missing GPU intervals as zero.
+- Right-sizing each Flutter GPU uniform host buffer removed about 66 MB from
+  the sixteen-independent-layer case and reduced raster p95 from roughly
+  12.05 ms to 6.82 ms in matched runs.
+- Sixteen independent animated layers still use about 588 MB peak native
+  footprint, versus about 365 MB for one static glass. Their latest raster p95
+  median is 6.57 ms, with a 19.2% CV and one 8.95 ms outlier, so this workload
+  is not yet a reliable production result.
+- Sixteen shapes in one layer remain dramatically cheaper (about 386 MB and
+  1.59 ms raster p95 in the matched run). Sharing only the backdrop capture
+  across sixteen independent layers barely changed memory, attributing the
+  remaining growth to per-layer Flutter/Metal filter state.
+- A validated static-single Metal trace used an exact 0.897 s target-process
+  window: 1,512 GPU intervals, 162.8 ms unioned busy time (18.1%), and 0.64 ms
+  interval p95. The enforced parser accepted the trace with no missing-data
+  fallback.
 
-These results support prioritizing independent-layer and per-layer texture
-cost. They do not yet distinguish geometry-pass work from backdrop/filter work;
-that causal split requires a successfully exported, PID-filtered Metal trace.
+These results support prioritizing independent-layer filter/driver state. The
+geometry matte is small after host-buffer right-sizing, and shared backdrop
+capture does not account for the remaining per-layer footprint.
 
 ## Implemented in the API audit
 
@@ -49,9 +46,9 @@ that causal split requires a successfully exported, PID-filtered Metal trace.
   Native controls showed that replacing a matte during rotation reintroduced a
   167.5 MB step, while exact saveLayer bounds churned every frame. The policy is
   differentiated internally rather than exposed in the consumer API.
-- Metal GPU intervals are PID-filtered and clipped to a complete signpost
-  interval. Repeated intervals adapt to Xcode 26's lazy Metal stream without a
-  machine-specific sleep. Allocation/free events are counted only inside that
+- Metal GPU intervals are PID-filtered and clipped to at least 450 ms of exact
+  overlap between a timestamped app workload interval and Xcode's retained
+  rolling timeline. Allocation/free events are counted only inside that
   interval; peak-live/retained labels are withheld until cross-window resource
   identities and lifetimes can be matched correctly.
 - Mach memory/frame metrics and Metal traces run in separate fresh processes;

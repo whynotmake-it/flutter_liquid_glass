@@ -8,20 +8,51 @@ RESULT_DIR="${LIQUID_GLASS_BENCHMARK_RESULT_DIR:-$EXAMPLE_DIR/build/benchmark}"
 TRACE_SECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_SECONDS:-60s}"
 TRACE_RETRY_SECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_RETRY_SECONDS:-60s}"
 TRACE_STOP_TIMEOUT="${LIQUID_GLASS_BENCHMARK_TRACE_STOP_TIMEOUT:-60}"
-TRACE_TEMPLATE="${LIQUID_GLASS_BENCHMARK_TRACE_TEMPLATE:-Game Performance}"
+# xctrace finalization is not a bounded operation: a 5 s / 3 s-window Metal
+# System Trace of the sixteen-independent-layer workload takes ~5.5 minutes to
+# finalize on an idle machine, while simpler scenarios finish in seconds. The
+# watchdog deadline must therefore be generous; killing a slow-but-healthy
+# finalization discards an otherwise valid trace.
+TRACE_FINALIZE_TIMEOUT="${LIQUID_GLASS_BENCHMARK_TRACE_FINALIZE_TIMEOUT:-600}"
+# Attaching the Metal data source routinely takes 20-40 s on an idle machine
+# before xctrace prints its start banner or posts the tracing-started
+# notification. A short start timeout followed by a force kill wedges the
+# daemon-side session and starves the next recording, so the start budget must
+# exceed the worst observed attach latency by a wide margin.
+TRACE_START_TIMEOUT="${LIQUID_GLASS_BENCHMARK_TRACE_START_TIMEOUT:-180}"
+# A failed attempt can leave the Instruments daemon tearing down its session
+# while the next recording is already starting; the new recording then
+# captures nothing. Give the daemon a moment before retrying.
+TRACE_ATTEMPT_COOLDOWN="${LIQUID_GLASS_BENCHMARK_TRACE_ATTEMPT_COOLDOWN:-30}"
+TRACE_TEMPLATE="${LIQUID_GLASS_BENCHMARK_TRACE_TEMPLATE:-Metal System Trace}"
+# Comma-separated Instruments to record instead of a template. The full Metal
+# System Trace template also samples GPU hardware counters, and that event
+# rate overwhelms the kdebug buffer on dense workloads: exported intervals
+# then silently thin out and GPU busy under-reports by a session-varying
+# factor. Recording only the two instruments the parser reads keeps capture
+# complete. Set LIQUID_GLASS_BENCHMARK_TRACE_INSTRUMENTS= (empty) to use the
+# template instead.
+TRACE_INSTRUMENTS="${LIQUID_GLASS_BENCHMARK_TRACE_INSTRUMENTS-GPU,Metal Application,Metal Resource Events}"
 REQUIRE_NATIVE_TRACE="${LIQUID_GLASS_BENCHMARK_REQUIRE_NATIVE_TRACE:-true}"
 CAPTURE_NATIVE_TRACE="${LIQUID_GLASS_BENCHMARK_CAPTURE_NATIVE_TRACE:-true}"
 WARMUP_SECONDS="${LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS:-6}"
 MEASURE_SECONDS="${LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS:-8}"
+TRACE_MEASURE_MILLISECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_MEASURE_MILLISECONDS:-500}"
 TRACE_WINDOW_SECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS:-$((MEASURE_SECONDS * 2 + 5))}"
 REPETITIONS="${LIQUID_GLASS_BENCHMARK_REPETITIONS:-3}"
 ENFORCE_THRESHOLDS="${LIQUID_GLASS_BENCHMARK_ENFORCE:-false}"
 SKIP_BUILD="${LIQUID_GLASS_BENCHMARK_SKIP_BUILD:-false}"
-SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion grouped8Motion grouped16Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
+SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion grouped8Motion grouped16Motion independent4Motion independent8Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
+# Metal tracing is opt-in for on-demand attribution: the kdebug rolling
+# buffer retains a fixed event count, not a fixed duration, so xctrace GPU
+# capture density varies per run by design and cannot gate. Default runs
+# therefore collect no traces; set LIQUID_GLASS_BENCHMARK_TRACE_SCENARIOS to
+# trace specific scenarios. The parser's uniformity check remains as trace
+# QA: rejected captures report GPU data as unavailable with the reason.
+TRACE_SCENARIOS="${LIQUID_GLASS_BENCHMARK_TRACE_SCENARIOS:-}"
 FLUTTER_BIN="${LIQUID_GLASS_FLUTTER_BIN:-flutter}"
 DART_BIN="${LIQUID_GLASS_DART_BIN:-dart}"
 APP_EXECUTABLE="${LIQUID_GLASS_BENCHMARK_EXECUTABLE:-$EXAMPLE_DIR/build/macos/Build/Products/Profile/liquid_glass_renderer_example.app/Contents/MacOS/liquid_glass_renderer_example}"
-NOTIFICATION_WAITER="$RESULT_DIR/trace_notification_waiter"
 
 command -v "$FLUTTER_BIN" >/dev/null || { echo "flutter is required" >&2; exit 1; }
 command -v "$DART_BIN" >/dev/null || { echo "dart is required" >&2; exit 1; }
@@ -29,11 +60,14 @@ command -v xcrun >/dev/null || { echo "Xcode command-line tools are required" >&
 
 rm -rf "$RESULT_DIR"
 mkdir -p "$RESULT_DIR/traces" "$RESULT_DIR/logs"
+RESULT_DIR="$(cd "$RESULT_DIR" && pwd)"
+NOTIFICATION_WAITER="$RESULT_DIR/trace_notification_waiter"
 cd "$EXAMPLE_DIR"
 
 ACTIVE_RUN_PID=""
 ACTIVE_TRACE_PID=""
 ACTIVE_NOTIFICATION_PID=""
+ACTIVE_TRACE_WATCHDOG_PID=""
 
 terminate_tree() {
   local parent_pid="$1"
@@ -45,6 +79,10 @@ terminate_tree() {
 }
 
 cleanup() {
+  if [[ -n "$ACTIVE_TRACE_WATCHDOG_PID" ]]; then
+    kill -TERM "$ACTIVE_TRACE_WATCHDOG_PID" 2>/dev/null || true
+    wait "$ACTIVE_TRACE_WATCHDOG_PID" 2>/dev/null || true
+  fi
   if [[ -n "$ACTIVE_TRACE_PID" ]]; then
     stop_trace_process "$ACTIVE_TRACE_PID"
   fi
@@ -88,9 +126,35 @@ wait_for_file() {
 
 process_is_running() {
   local pid="$1"
-  local state
-  state="$(ps -p "$pid" -o state= 2>/dev/null | tr -d '[:space:]')"
-  [[ -n "$state" && "$state" != Z* ]]
+  kill -0 "$pid" 2>/dev/null
+}
+
+start_trace_watchdog() {
+  local trace_pid="$1"
+  local deadline_seconds="$2"
+  local trace_log="$3"
+  (
+    sleep "$deadline_seconds"
+    if process_is_running "$trace_pid"; then
+      printf 'xctrace exceeded its %ss wall-clock deadline; terminating finalization.\n' \
+        "$deadline_seconds" >>"$trace_log"
+      kill -TERM "$trace_pid" 2>/dev/null || true
+      sleep 5
+      if process_is_running "$trace_pid"; then
+        kill -KILL "$trace_pid" 2>/dev/null || true
+      fi
+    fi
+  ) &
+  ACTIVE_TRACE_WATCHDOG_PID=$!
+}
+
+stop_trace_watchdog() {
+  if [[ -z "$ACTIVE_TRACE_WATCHDOG_PID" ]]; then
+    return
+  fi
+  kill -TERM "$ACTIVE_TRACE_WATCHDOG_PID" 2>/dev/null || true
+  wait "$ACTIVE_TRACE_WATCHDOG_PID" 2>/dev/null || true
+  ACTIVE_TRACE_WATCHDOG_PID=""
 }
 
 terminate_existing_benchmark_targets() {
@@ -166,17 +230,17 @@ capture_trace_attempt() {
     LIQUID_GLASS_BENCHMARK_SCENARIO="$scenario" \
     LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS="$WARMUP_SECONDS" \
     LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS="$MEASURE_SECONDS" \
+    LIQUID_GLASS_BENCHMARK_TRACE_MEASURE_MILLISECONDS="$TRACE_MEASURE_MILLISECONDS" \
     LIQUID_GLASS_BENCHMARK_REPETITION="$repetition" \
     LIQUID_GLASS_BENCHMARK_TRACE_RUN=1 \
-    LIQUID_GLASS_BENCHMARK_TRACE_START_GATE="$notification_gate" \
     "$APP_EXECUTABLE" >"$trace_drive_log" 2>&1 &
   trace_run_pid=$!
   ACTIVE_RUN_PID="$trace_run_pid"
   if ! wait_for_log \
     "$trace_drive_log" \
-    "LIQUID_GLASS_BENCHMARK_TRACE_READY:$scenario" \
+    "LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:$scenario:" \
     60; then
-    printf 'Target did not reach its post-warmup trace gate.\n' >>"$trace_log"
+    printf 'Target did not begin its post-warmup trace workload.\n' >>"$trace_log"
     terminate_existing_benchmark_targets
     return 1
   fi
@@ -191,8 +255,20 @@ capture_trace_attempt() {
     return 1
   fi
 
+  local -a trace_source_args=()
+  if [[ -n "$TRACE_INSTRUMENTS" ]]; then
+    local -a instruments=()
+    local instrument
+    IFS=',' read -ra instruments <<< "$TRACE_INSTRUMENTS"
+    for instrument in "${instruments[@]}"; do
+      trace_source_args+=(--instrument "$instrument")
+    done
+  else
+    trace_source_args=(--template "$TRACE_TEMPLATE")
+  fi
+
   xcrun xctrace record \
-    --template "$TRACE_TEMPLATE" \
+    "${trace_source_args[@]}" \
     --time-limit "$time_limit" \
     "${trace_window_args[@]}" \
     --no-prompt \
@@ -202,36 +278,38 @@ capture_trace_attempt() {
   trace_pid=$!
   ACTIVE_TRACE_PID="$trace_pid"
 
-  if ! wait_for_log "$trace_log" 'Ctrl-C to stop the recording' 20; then
-    printf 'xctrace did not report a started recording.\n' >>"$trace_log"
+  if ! wait_for_log \
+    "$trace_log" \
+    'Ctrl-C to stop the recording' \
+    "$TRACE_START_TIMEOUT"; then
+    printf 'xctrace did not report a started recording within %ss.\n' \
+      "$TRACE_START_TIMEOUT" >>"$trace_log"
     stop_trace_process "$trace_pid"
     return 1
   fi
-  if ! wait_for_file "$notification_received" 20; then
-    printf 'xctrace did not post its tracing-started notification.\n' >>"$trace_log"
+  if ! wait_for_file "$notification_received" "$TRACE_START_TIMEOUT"; then
+    printf 'xctrace did not post its tracing-started notification within %ss.\n' \
+      "$TRACE_START_TIMEOUT" >>"$trace_log"
     stop_trace_process "$trace_pid"
     return 1
   fi
-  # xctrace posts its notification just before it finishes resolving the
-  # attached process. Open the app gate only after both native readiness
-  # signals are present so a short benchmark cannot exit during that race.
-  : >"$notification_gate"
-  for _ in $(seq 1 $(((trace_duration_seconds + TRACE_STOP_TIMEOUT) * 10))); do
-    process_is_running "$trace_pid" || break
-    sleep 0.1
-  done
-  if process_is_running "$trace_pid"; then
-    printf 'xctrace did not stop after its %s time limit.\n' "$time_limit" >>"$trace_log"
-    stop_trace_process "$trace_pid"
-    return 1
-  fi
-  wait "$trace_pid" 2>/dev/null || true
+  start_trace_watchdog \
+    "$trace_pid" \
+    "$((trace_duration_seconds + TRACE_FINALIZE_TIMEOUT))" \
+    "$trace_log"
+  local trace_status=0
+  wait "$trace_pid" 2>/dev/null || trace_status=$?
+  stop_trace_watchdog
   ACTIVE_TRACE_PID=""
   terminate_existing_benchmark_targets
   wait "$trace_run_pid" 2>/dev/null || true
   ACTIVE_RUN_PID=""
   wait "$ACTIVE_NOTIFICATION_PID" 2>/dev/null || true
   ACTIVE_NOTIFICATION_PID=""
+  if ((trace_status != 0)); then
+    printf 'xctrace exited unsuccessfully with status %s.\n' "$trace_status" >>"$trace_log"
+    return 1
+  fi
 
   if [[ ! -d "$trace_path" ]]; then
     printf 'xctrace did not create a trace document.\n' >>"$trace_log"
@@ -244,7 +322,29 @@ capture_trace_attempt() {
     printf 'xctrace created an unreadable trace document.\n' >>"$trace_log"
     return 1
   fi
-  [[ -s "$toc_path" ]]
+  if [[ ! -s "$toc_path" ]]; then
+    printf 'xctrace created an empty table of contents.\n' >>"$trace_log"
+    return 1
+  fi
+  # A wedged Instruments data source (for example after a force-terminated
+  # recording) still produces a well-formed bundle and TOC, but every table is
+  # empty. Treat a trace with no Metal GPU intervals as a failed attempt so it
+  # is retried in a fresh process instead of yielding an empty export.
+  # The xpath must address the table node itself: a trace TOC only declares
+  # table schemas, so selecting .../row matches nothing even in a healthy
+  # trace, while exporting the table node streams its data rows.
+  local gpu_row_count
+  gpu_row_count="$(
+    xcrun xctrace export \
+      --input "$trace_path" \
+      --xpath '/trace-toc/run[@number="1"]/data/table[@schema="metal-gpu-intervals"]' \
+      2>>"$trace_log" | grep -c '<row>' || true
+  )"
+  if ((gpu_row_count == 0)); then
+    printf 'xctrace recorded no Metal GPU intervals; the trace contains no data.\n' \
+      >>"$trace_log"
+    return 1
+  fi
 }
 
 capture_metrics_attempt() {
@@ -282,8 +382,12 @@ capture_metrics_attempt() {
   if [[ -z "$benchmark_json" ]]; then
     return 1
   fi
+  # Memory stability flags flow through as informational metadata; an
+  # unstable run is annotated in the summary, never discarded.
   printf '%s\n' "$benchmark_json" >"$RESULT_DIR/$run_key.json"
 }
+
+SCENARIO_FAIL_REASON=""
 
 run_scenario() {
   local scenario="$1"
@@ -294,15 +398,24 @@ run_scenario() {
   local trace_drive_log="$RESULT_DIR/logs/$run_key.trace-app.log"
   local trace_path="$RESULT_DIR/traces/$run_key.trace"
   local trace_log="$RESULT_DIR/logs/$run_key.xctrace.log"
+  local capture_this_trace=false
+  for traced_scenario in $TRACE_SCENARIOS; do
+    if [[ "$traced_scenario" == "$scenario" ]]; then
+      capture_this_trace=true
+      break
+    fi
+  done
 
   rm -rf "$trace_path" \
     "$RESULT_DIR/traces/$run_key.toc.xml" \
     "$RESULT_DIR/traces/$run_key.gpu.xml" \
     "$RESULT_DIR/traces/$run_key.metal-resources.xml" \
     "$RESULT_DIR/traces/$run_key.signposts.xml"
+  SCENARIO_FAIL_REASON=""
   if ! capture_metrics_attempt "$scenario" "$drive_log" "$run_key" "$repetition"; then
     printf 'Initial frame/memory pass failed; retrying in a fresh process.\n' >&2
     if ! capture_metrics_attempt "$scenario" "$retry_drive_log" "$run_key" "$repetition"; then
+      SCENARIO_FAIL_REASON="frame/memory pass failed in two fresh processes"
       tail -100 "$drive_log" >&2
       tail -100 "$retry_drive_log" >&2
       return 1
@@ -313,7 +426,7 @@ run_scenario() {
   # workload. Record GPU activity in a fresh, identical profile process so the
   # JSON above remains an uninstrumented memory and frame-timing measurement.
   local trace_valid=false
-  if [[ "$CAPTURE_NATIVE_TRACE" == true ]]; then
+  if [[ "$CAPTURE_NATIVE_TRACE" == true && "$capture_this_trace" == true ]]; then
     : >"$trace_log"
     if capture_trace_attempt \
       "$scenario" \
@@ -325,7 +438,9 @@ run_scenario() {
       "$repetition"; then
       trace_valid=true
     else
-      printf 'Initial trace was invalid; retrying with a fresh process.\n' >>"$trace_log"
+      printf 'Initial trace was invalid; retrying with a fresh process after a %ss cooldown.\n' \
+        "$TRACE_ATTEMPT_COOLDOWN" >>"$trace_log"
+      sleep "$TRACE_ATTEMPT_COOLDOWN"
       if capture_trace_attempt \
         "$scenario" \
         "$TRACE_RETRY_SECONDS" \
@@ -352,7 +467,8 @@ run_scenario() {
       --input "$trace_path" \
       --xpath '/trace-toc/run[@number="1"]/data/table[@schema="os-signpost" and @category="PointsOfInterest"]' \
       --output "$RESULT_DIR/traces/$run_key.signposts.xml" >>"$trace_log" 2>&1 || true
-  elif [[ "$CAPTURE_NATIVE_TRACE" == true && "$REQUIRE_NATIVE_TRACE" == true ]]; then
+  elif [[ "$CAPTURE_NATIVE_TRACE" == true && "$capture_this_trace" == true && "$REQUIRE_NATIVE_TRACE" == true ]]; then
+    SCENARIO_FAIL_REASON="native trace capture failed in two fresh processes"
     tail -100 "$trace_log" >&2
     return 1
   fi
@@ -371,10 +487,19 @@ fi
 xcrun clang "$SCRIPT_DIR/trace_notification_waiter.c" \
   -o "$NOTIFICATION_WAITER"
 
+# A failing scenario (including the known-flaky native-memory cooldown path
+# on the sixteen-independent-layer workload) is recorded and reported in the
+# summary; it must never abort the remaining scenarios or suppress it.
+mkdir -p "$RESULT_DIR/failures"
 for repetition in $(seq 1 "$REPETITIONS"); do
   for scenario in $SCENARIOS; do
     echo "Benchmarking $scenario (repetition $repetition/$REPETITIONS)"
-    run_scenario "$scenario" "$repetition"
+    if ! run_scenario "$scenario" "$repetition"; then
+      printf 'Scenario %s (repetition %s) failed; continuing.\n' \
+        "$scenario" "$repetition" >&2
+      printf '%s\n' "${SCENARIO_FAIL_REASON:-unknown failure; see logs}" \
+        >"$RESULT_DIR/failures/$scenario.r$repetition.txt"
+    fi
   done
 done
 
