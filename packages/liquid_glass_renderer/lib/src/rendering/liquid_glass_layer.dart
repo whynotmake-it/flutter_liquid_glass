@@ -312,6 +312,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     markNeedsPaint();
   }
 
+  ImageFilter? _cachedFilter;
+  Object? _cachedFilterSnapshot;
+
   @override
   void paintLiquidGlass(
     PaintingContext context,
@@ -320,22 +323,33 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     Rect boundingBox,
   ) {
     if (!attached) return;
-    final blurFilter = settings.effectiveBlur > 0
-        ? ImageFilter.blur(
-            tileMode: TileMode.mirror,
-            sigmaX: settings.effectiveBlur,
-            sigmaY: settings.effectiveBlur,
-          )
-        : null;
     final filterBounds = boundingBox.expandToPixelBuckets(devicePixelRatio);
 
-    final shaderFilter = switch (blurFilter) {
-      final blur? => ImageFilter.compose(
-        inner: blur,
-        outer: ImageFilter.shader(renderShader),
-      ),
-      null => ImageFilter.shader(renderShader),
-    };
+    // The engine snapshots this shader's uniforms into the native image
+    // filter at creation, so the composed filter can only be reused while
+    // every snapshotted input is unchanged. Repaints with identical shader
+    // inputs (for example a static layer invalidated by foreground content)
+    // skip all Dart and native filter allocation.
+    final snapshot = shaderInputSnapshot;
+    var shaderFilter = _cachedFilter;
+    if (shaderFilter == null || _cachedFilterSnapshot != snapshot) {
+      final blurFilter = settings.effectiveBlur > 0
+          ? ImageFilter.blur(
+              tileMode: TileMode.mirror,
+              sigmaX: settings.effectiveBlur,
+              sigmaY: settings.effectiveBlur,
+            )
+          : null;
+      shaderFilter = switch (blurFilter) {
+        final blur? => ImageFilter.compose(
+          inner: blur,
+          outer: ImageFilter.shader(renderShader),
+        ),
+        null => ImageFilter.shader(renderShader),
+      };
+      _cachedFilter = shaderFilter;
+      _cachedFilterSnapshot = snapshot;
+    }
 
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
       ..filter = shaderFilter
@@ -396,6 +410,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _shaderHandle.layer = null;
     _clipPathLayerHandle.layer = null;
     _clipRectLayerHandle.layer = null;
+    _cachedFilter = null;
+    _cachedFilterSnapshot = null;
     super.dispose();
   }
 }

@@ -127,7 +127,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     super.layout(constraints, parentUsesSize: parentUsesSize);
   }
 
+  int _shaderSettingsRevision = 0;
+
   void _updateShaderSettings() {
+    _shaderSettingsRevision++;
     renderShader.setFloatUniforms(initialIndex: 12, (value) {
       value
         ..setColor(settings.effectiveGlassColor)
@@ -281,6 +284,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
               ..setOffset(inverseOrigin * devicePixelRatio);
           })
           ..setImageSampler(1, geometryImage);
+        _shaderInputSnapshot = _ShaderInputSnapshot(
+          geometryImage: geometryImage,
+          matteBounds: _geometryMatteBounds,
+          devicePixelRatio: devicePixelRatio,
+          inverseOrigin: inverseOrigin,
+          inverseAxisX: inverseAxisX,
+          inverseAxisY: inverseAxisY,
+          settingsRevision: _shaderSettingsRevision,
+        );
         paintLiquidGlass(
           context,
           offset,
@@ -305,6 +317,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
   );
+
+  /// Value identity of everything [renderShader] has captured for the current
+  /// paint: float uniforms and the geometry sampler.
+  ///
+  /// The engine copies a shader's uniforms into the native image filter when
+  /// that filter is first converted (see
+  /// `ReusableFragmentShader::as_image_filter`), so a filter wrapping this
+  /// shader may only be reused across paints while this snapshot compares
+  /// equal.
+  @protected
+  Object get shaderInputSnapshot => _shaderInputSnapshot;
+  late Object _shaderInputSnapshot;
 
   @protected
   void paintShapeContents(
@@ -520,6 +544,64 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     } catch (e) {
       throw StateError('Flutter GPU geometry render failed: $e');
     }
+  }
+}
+
+/// Value key describing the uniform and sampler state a [FragmentShader]
+/// image filter snapshots at creation time.
+///
+/// The geometry image wrapper is stable while the persistent geometry texture
+/// is reused, so identity comparison is sufficient there; every other input
+/// is compared by value.
+@immutable
+class _ShaderInputSnapshot {
+  const _ShaderInputSnapshot({
+    required this.geometryImage,
+    required this.matteBounds,
+    required this.devicePixelRatio,
+    required this.inverseOrigin,
+    required this.inverseAxisX,
+    required this.inverseAxisY,
+    required this.settingsRevision,
+  });
+
+  final ui.Image geometryImage;
+  final Rect matteBounds;
+  final double devicePixelRatio;
+  final Offset inverseOrigin;
+  final Offset inverseAxisX;
+  final Offset inverseAxisY;
+  final int settingsRevision;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ShaderInputSnapshot &&
+        other.geometryImage == geometryImage &&
+        other.matteBounds == matteBounds &&
+        other.devicePixelRatio == devicePixelRatio &&
+        other.inverseOrigin == inverseOrigin &&
+        other.inverseAxisX == inverseAxisX &&
+        other.inverseAxisY == inverseAxisY &&
+        other.settingsRevision == settingsRevision;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    geometryImage,
+    matteBounds,
+    devicePixelRatio,
+    inverseOrigin,
+    inverseAxisX,
+    inverseAxisY,
+    settingsRevision,
+  );
+
+  @override
+  String toString() {
+    return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
+        'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
+        'origin: $inverseOrigin, axisX: $inverseAxisX, axisY: $inverseAxisY, '
+        'settingsRevision: $settingsRevision)';
   }
 }
 
