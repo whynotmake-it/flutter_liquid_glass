@@ -53,6 +53,8 @@ local counter profiles.
 - `grouped4Motion`, `grouped8Motion`, and `grouped16Motion`: a constant-total-
   area ladder for blend-group shader scaling.
 - `independent16Motion`: sixteen own layers for grouped-versus-independent cost.
+- `independent16SharedBackdrop`: the same sixteen own layers sharing one
+  backdrop capture, isolating per-layer geometry from repeated backdrop cost.
 - `sparse16Motion`: sixteen equal shapes spread across the viewport.
 - `relativeBlendMotion`: relative translation and non-uniform stretch inside a
   blend group, covering the transform regression seen in the example.

@@ -89,6 +89,7 @@ Map<String, String> _options(List<String> args) {
 
 _Report _readReport(File file, Directory input) {
   final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+  final schemaVersion = (json['schemaVersion'] as num?)?.toInt() ?? 0;
   final runKey = file.uri.pathSegments.last.replaceFirst('.json', '');
   final scenario = json['scenario'] as String;
   final measureSeconds = (json['measureSeconds'] as num).toDouble();
@@ -139,6 +140,10 @@ _Report _readReport(File file, Directory input) {
       preMeasureMemory,
       'physicalFootprintBytes',
     ),
+    preMeasureMemoryStable:
+        json['preMeasureMemoryStable'] as bool? ?? schemaVersion < 4,
+    preMeasureMemorySlopeMbPerSecond:
+        (json['preMeasureMemorySlopeMbPerSecond'] as num?)?.toDouble(),
     settledFootprintMb:
         _settledMemoryMb(cooldownMemory) ??
         _memoryMb(settledMemory, 'physicalFootprintBytes'),
@@ -150,6 +155,10 @@ _Report _readReport(File file, Directory input) {
         .where((m) => m['physicalFootprintBytes'] is num)
         .map((m) => ((m['timestampMicros'] as num?) ?? 0) / 1000000)
         .toList(),
+    cooldownMemoryStable:
+        json['cooldownMemoryStable'] as bool? ?? schemaVersion < 4,
+    reportedCooldownSlopeMbPerSecond:
+        (json['cooldownMemorySlopeMbPerSecond'] as num?)?.toDouble(),
     gpu: _readGpuIntervals(
       File('${input.path}/traces/$runKey.gpu.xml'),
       measureSeconds: measureSeconds,
@@ -640,6 +649,16 @@ List<String> _violations(
         '${report.scenario} is missing required native Mach memory samples.',
       );
     }
+    if (!report.preMeasureMemoryStable) {
+      violations.add(
+        '${report.scenario} native footprint was not stable before measurement (${_signedMb(report.preMeasureMemorySlopeMbPerSecond ?? double.nan)}/s).',
+      );
+    }
+    if (!report.cooldownMemoryStable) {
+      violations.add(
+        '${report.scenario} native footprint did not settle before the cooldown deadline (${_signedMb(report.cooldownSlopeMbPerSecond)}/s).',
+      );
+    }
     if (report.gpu == null) {
       violations.add(
         '${report.scenario} is missing process-filtered Metal GPU intervals.',
@@ -661,7 +680,8 @@ List<String> _violations(
         '${report.scenario} is missing the Metal resource allocation table.',
       );
     }
-    if (report.cooldownSlopeMbPerSecond.abs() > 2) {
+    if (report.cooldownMemoryStable &&
+        report.cooldownSlopeMbPerSecond.abs() > 2) {
       violations.add(
         '${report.scenario} native footprint did not settle during cooldown (${_signedMb(report.cooldownSlopeMbPerSecond)}/s).',
       );
@@ -705,9 +725,13 @@ class _Report {
     required this.footprintMb,
     required this.residentMb,
     required this.preMeasureFootprintMb,
+    required this.preMeasureMemoryStable,
+    required this.preMeasureMemorySlopeMbPerSecond,
     required this.settledFootprintMb,
     required this.cooldownFootprintMb,
     required this.cooldownTimestampSeconds,
+    required this.cooldownMemoryStable,
+    required this.reportedCooldownSlopeMbPerSecond,
     required this.gpu,
     required this.metal,
   });
@@ -722,9 +746,13 @@ class _Report {
   final List<double> footprintMb;
   final List<double> residentMb;
   final double? preMeasureFootprintMb;
+  final bool preMeasureMemoryStable;
+  final double? preMeasureMemorySlopeMbPerSecond;
   final double? settledFootprintMb;
   final List<double> cooldownFootprintMb;
   final List<double> cooldownTimestampSeconds;
+  final bool cooldownMemoryStable;
+  final double? reportedCooldownSlopeMbPerSecond;
   final _GpuMetrics? gpu;
   final _MetalMetrics? metal;
 
@@ -767,6 +795,7 @@ class _Report {
   }
 
   double get cooldownSlopeMbPerSecond {
+    if (reportedCooldownSlopeMbPerSecond case final slope?) return slope;
     if (cooldownFootprintMb.length < 4 || cooldownTimestampSeconds.length < 4) {
       return 0;
     }
@@ -802,10 +831,14 @@ class _Report {
     'nativeFootprintPeakAboveMedianMb': peakAboveMedian,
     'nativeFootprintPeakAbovePreMeasureMb': peakAbovePreMeasure,
     'nativeFootprintPreMeasureMb': preMeasureFootprintMb,
+    'nativeFootprintPreMeasureStable': preMeasureMemoryStable,
+    'nativeFootprintPreMeasureSlopeMbPerSecond':
+        preMeasureMemorySlopeMbPerSecond,
     'nativeFootprintSettledMb': settledFootprintMb,
     'nativeFootprintRetainedDeltaMb': retainedFootprintDelta,
     'nativeFootprintMaxSampleStepMb': maxFootprintStep,
     'nativeFootprintCooldownSlopeMbPerSecond': cooldownSlopeMbPerSecond,
+    'nativeFootprintCooldownStable': cooldownMemoryStable,
     'gpu': gpu?.toJson(),
     'metal': metal?.toJson(),
     if (baseline != null && baseline != this)

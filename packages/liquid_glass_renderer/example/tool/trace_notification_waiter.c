@@ -13,7 +13,7 @@ static int touch_file(const char *path) {
 
 int main(int argc, char **argv) {
   if (argc != 4) {
-    fprintf(stderr, "usage: trace_notification_waiter <name> <ready-file> <gate-file>\n");
+    fprintf(stderr, "usage: trace_notification_waiter <name> <ready-file> <received-file>\n");
     return 64;
   }
   int token = 0;

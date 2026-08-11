@@ -13,10 +13,11 @@ REQUIRE_NATIVE_TRACE="${LIQUID_GLASS_BENCHMARK_REQUIRE_NATIVE_TRACE:-true}"
 CAPTURE_NATIVE_TRACE="${LIQUID_GLASS_BENCHMARK_CAPTURE_NATIVE_TRACE:-true}"
 WARMUP_SECONDS="${LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS:-6}"
 MEASURE_SECONDS="${LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS:-8}"
+TRACE_WINDOW_SECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS:-$((MEASURE_SECONDS * 2 + 5))}"
 REPETITIONS="${LIQUID_GLASS_BENCHMARK_REPETITIONS:-3}"
 ENFORCE_THRESHOLDS="${LIQUID_GLASS_BENCHMARK_ENFORCE:-false}"
 SKIP_BUILD="${LIQUID_GLASS_BENCHMARK_SKIP_BUILD:-false}"
-SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion grouped8Motion grouped16Motion independent16Motion sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
+SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion grouped8Motion grouped16Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
 FLUTTER_BIN="${LIQUID_GLASS_FLUTTER_BIN:-flutter}"
 DART_BIN="${LIQUID_GLASS_DART_BIN:-dart}"
 APP_EXECUTABLE="${LIQUID_GLASS_BENCHMARK_EXECUTABLE:-$EXAMPLE_DIR/build/macos/Build/Products/Profile/liquid_glass_renderer_example.app/Contents/MacOS/liquid_glass_renderer_example}"
@@ -141,10 +142,14 @@ capture_trace_attempt() {
   local toc_path="$RESULT_DIR/traces/$run_key.toc.xml"
   local notification_name="com.example.liquidGlassRenderer.xctrace.$$.${repetition}"
   local notification_ready="$RESULT_DIR/logs/$run_key.notification-ready"
+  local notification_received="$RESULT_DIR/logs/$run_key.notification-received"
   local notification_gate="$RESULT_DIR/logs/$run_key.notification-gate"
   local trace_pid trace_run_pid
   local trace_duration_seconds="${time_limit%s}"
-  local retained_window_seconds=$((MEASURE_SECONDS * 2 + 5))
+  local -a trace_window_args=()
+  if ((TRACE_WINDOW_SECONDS > 0)); then
+    trace_window_args=(--window "${TRACE_WINDOW_SECONDS}s")
+  fi
   if [[ ! "$trace_duration_seconds" =~ ^[0-9]+$ ]]; then
     printf 'Trace duration must use whole seconds, for example 60s.\n' >&2
     return 1
@@ -152,7 +157,7 @@ capture_trace_attempt() {
 
   terminate_existing_benchmark_targets
   rm -rf "$trace_path" "$toc_path"
-  rm -f "$trace_drive_log" "$notification_ready" "$notification_gate"
+  rm -f "$trace_drive_log" "$notification_ready" "$notification_received" "$notification_gate"
   env \
     FLUTTER_ENGINE_SWITCHES=3 \
     FLUTTER_ENGINE_SWITCH_1=enable-dart-profiling=true \
@@ -179,7 +184,7 @@ capture_trace_attempt() {
   "$NOTIFICATION_WAITER" \
     "$notification_name" \
     "$notification_ready" \
-    "$notification_gate" >>"$trace_log" 2>&1 &
+    "$notification_received" >>"$trace_log" 2>&1 &
   ACTIVE_NOTIFICATION_PID=$!
   if ! wait_for_file "$notification_ready" 5; then
     printf 'Could not register for xctrace readiness notification.\n' >>"$trace_log"
@@ -189,7 +194,7 @@ capture_trace_attempt() {
   xcrun xctrace record \
     --template "$TRACE_TEMPLATE" \
     --time-limit "$time_limit" \
-    --window "${retained_window_seconds}s" \
+    "${trace_window_args[@]}" \
     --no-prompt \
     --notify-tracing-started "$notification_name" \
     --output "$trace_path" \
@@ -202,11 +207,15 @@ capture_trace_attempt() {
     stop_trace_process "$trace_pid"
     return 1
   fi
-  if ! wait_for_file "$notification_gate" 20; then
+  if ! wait_for_file "$notification_received" 20; then
     printf 'xctrace did not post its tracing-started notification.\n' >>"$trace_log"
     stop_trace_process "$trace_pid"
     return 1
   fi
+  # xctrace posts its notification just before it finishes resolving the
+  # attached process. Open the app gate only after both native readiness
+  # signals are present so a short benchmark cannot exit during that race.
+  : >"$notification_gate"
   for _ in $(seq 1 $(((trace_duration_seconds + TRACE_STOP_TIMEOUT) * 10))); do
     process_is_running "$trace_pid" || break
     sleep 0.1

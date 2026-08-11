@@ -50,21 +50,30 @@ Future<void> main() async {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
     }
-    // Game Performance initializes some Metal streams lazily. Emit repeated,
-    // exact intervals for the bounded trace lifetime; the parser accepts only
-    // a full-duration interval with overlapping target-process GPU work.
-    while (true) {
-      await _native.invokeMethod<void>('beginInterval', scenario.name);
-      debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}');
-      await Future<void>.delayed(Duration(seconds: measureSeconds));
-      await _native.invokeMethod<void>('endInterval', scenario.name);
-      debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}');
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-    }
+    // The traced process exists for exactly one post-warmup measurement. This
+    // makes its lifetime a useful attribution boundary even for the lightweight
+    // Metal System Trace template, which does not include Points of Interest.
+    await _native.invokeMethod<void>('beginInterval', scenario.name);
+    stdout.writeln(
+      'LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}:'
+      '${DateTime.now().microsecondsSinceEpoch}',
+    );
+    await Future<void>.delayed(Duration(seconds: measureSeconds));
+    await SchedulerBinding.instance.endOfFrame;
+    await _native.invokeMethod<void>('endInterval', scenario.name);
+    stdout.writeln(
+      'LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}:'
+      '${DateTime.now().microsecondsSinceEpoch}',
+    );
+    await stdout.flush();
+    // Let the final submitted frame retire before ending the target lifetime.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    exit(0);
   }
 
-  final preMeasureMemory = await _native.invokeMapMethod<String, Object?>(
-    'sampleMemory',
+  final preMeasureStability = await _sampleUntilStable();
+  final preMeasureMemory = _representativeMemory(
+    preMeasureStability.samples,
   );
   await _native.invokeMethod<void>('startMemorySampling');
 
@@ -77,13 +86,11 @@ Future<void> main() async {
   SchedulerBinding.instance.removeTimingsCallback(collectTimings);
 
   final memory = await _stopMemorySampling();
-  var cooldownMemory = const <Map<String, Object?>>[];
-  await _native.invokeMethod<void>('startMemorySampling');
-  await Future<void>.delayed(const Duration(seconds: 5));
-  cooldownMemory = await _stopMemorySampling();
-  final settledMemory = cooldownMemory.lastOrNull;
+  final cooldownStability = await _sampleUntilStable();
+  final cooldownMemory = cooldownStability.samples;
+  final settledMemory = _representativeMemory(cooldownMemory);
   final report = <String, Object?>{
-    'schemaVersion': 3,
+    'schemaVersion': 4,
     'scenario': scenario.name,
     'repetition': repetition,
     'warmupSeconds': warmupSeconds,
@@ -99,10 +106,111 @@ Future<void> main() async {
         .toList(),
     'nativeMemory': memory,
     'preMeasureNativeMemory': preMeasureMemory,
+    'preMeasureNativeMemorySamples': preMeasureStability.samples,
+    'preMeasureMemoryStable': preMeasureStability.stable,
+    'preMeasureMemorySlopeMbPerSecond': preMeasureStability.slopeMbPerSecond,
     'settledNativeMemory': settledMemory,
     'cooldownNativeMemory': cooldownMemory,
+    'cooldownMemoryStable': cooldownStability.stable,
+    'cooldownMemorySlopeMbPerSecond': cooldownStability.slopeMbPerSecond,
   };
   debugPrint('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
+}
+
+typedef _MemoryStability = ({
+  List<Map<String, Object?>> samples,
+  bool stable,
+  double slopeMbPerSecond,
+});
+
+Future<_MemoryStability> _sampleUntilStable() async {
+  final samples = <Map<String, Object?>>[];
+  var slope = double.infinity;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    await _native.invokeMethod<void>('startMemorySampling');
+    await Future<void>.delayed(const Duration(seconds: 5));
+    samples.addAll(await _stopMemorySampling());
+    slope = _memorySlope(samples);
+    final tail = samples.length <= 20
+        ? samples
+        : samples.sublist(samples.length - 20);
+    final footprints = tail
+        .map((sample) => sample['physicalFootprintBytes'])
+        .whereType<num>()
+        .map((bytes) => bytes / 1048576)
+        .toList();
+    final range = footprints.isEmpty
+        ? double.infinity
+        : footprints.reduce(math.max) - footprints.reduce(math.min);
+    if (slope.abs() <= 2 && range <= 16) {
+      return (samples: samples, stable: true, slopeMbPerSecond: slope);
+    }
+  }
+  return (samples: samples, stable: false, slopeMbPerSecond: slope);
+}
+
+double _memorySlope(List<Map<String, Object?>> samples) {
+  final valid = samples
+      .where(
+        (sample) =>
+            sample['physicalFootprintBytes'] is num &&
+            sample['timestampMicros'] is num,
+      )
+      .toList();
+  if (valid.length < 10) return double.infinity;
+  final tail = valid.length <= 20 ? valid : valid.sublist(valid.length - 20);
+  final window = math.min(5, tail.length ~/ 2);
+  double median(List<double> values) {
+    values.sort();
+    final middle = values.length ~/ 2;
+    return values.length.isOdd
+        ? values[middle]
+        : (values[middle - 1] + values[middle]) / 2;
+  }
+
+  final first = tail.take(window).toList();
+  final last = tail.skip(tail.length - window).toList();
+  final firstMb = median(
+    first
+        .map((sample) => (sample['physicalFootprintBytes'] as num) / 1048576)
+        .toList(),
+  );
+  final lastMb = median(
+    last
+        .map((sample) => (sample['physicalFootprintBytes'] as num) / 1048576)
+        .toList(),
+  );
+  final firstSeconds = median(
+    first
+        .map((sample) => (sample['timestampMicros'] as num) / 1000000)
+        .toList(),
+  );
+  final lastSeconds = median(
+    last.map((sample) => (sample['timestampMicros'] as num) / 1000000).toList(),
+  );
+  return lastSeconds == firstSeconds
+      ? double.infinity
+      : (lastMb - firstMb) / (lastSeconds - firstSeconds);
+}
+
+Map<String, Object?>? _representativeMemory(
+  List<Map<String, Object?>> samples,
+) {
+  if (samples.isEmpty) return null;
+  final tail = samples.length <= 10
+      ? samples
+      : samples.sublist(samples.length - 10);
+  final result = <String, Object?>{};
+  for (final key in tail.expand((sample) => sample.keys).toSet()) {
+    final values = tail.map((sample) => sample[key]).whereType<num>().toList()
+      ..sort((a, b) => a.compareTo(b));
+    if (values.isEmpty) continue;
+    final middle = values.length ~/ 2;
+    result[key] = values.length.isOdd
+        ? values[middle]
+        : ((values[middle - 1] + values[middle]) / 2).round();
+  }
+  return result;
 }
 
 Future<List<Map<String, Object?>>> _stopMemorySampling() async {
@@ -128,6 +236,7 @@ enum BenchmarkScenario {
   grouped8Motion,
   grouped16Motion,
   independent16Motion,
+  independent16SharedBackdrop,
   sparse16Motion,
   relativeBlendMotion,
   dynamicBlend16,
@@ -297,6 +406,27 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
                   borderRadius: 8.0 + index,
                 ),
                 child: _tile(index, size: 72),
+              ),
+            ),
+          ),
+        ),
+      ),
+      BenchmarkScenario.independent16SharedBackdrop => BackdropGroup(
+        child: Center(
+          child: Transform.translate(
+            offset: Offset(30 * math.sin(t * math.pi * 2), 0),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: List.generate(
+                16,
+                (index) => LiquidGlass.withOwnLayer(
+                  settings: settings,
+                  useBackdropGroup: true,
+                  shape: LiquidRoundedSuperellipse(
+                    borderRadius: 8.0 + index,
+                  ),
+                  child: _tile(index, size: 72),
+                ),
               ),
             ),
           ),
