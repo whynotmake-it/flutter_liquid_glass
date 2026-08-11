@@ -23,8 +23,6 @@ class FlutterGpuGeometryRenderer {
       vertexShader,
       fragmentShader,
     );
-    _hostBuffer = gpu.gpuContext.createHostBuffer();
-
     // Cache uniform slot reflection info.
     _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
     _uniformSize = _uniformSlot.sizeInBytes ?? 0;
@@ -34,28 +32,61 @@ class FlutterGpuGeometryRenderer {
     _offsetOpticalProps =
         _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
     _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
+    _hostBuffer = _createUniformHostBuffer(_uniformSize);
 
     // Create the static full-screen quad vertex buffer.
     _createVertexBuffer();
   }
 
   factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
-    final library = gpu.ShaderLibrary.fromAsset(assetKey);
-    final vertexShader = library?['GeometryVertex'];
-    final fragmentShader = library?['GeometryFragment'];
-    if (vertexShader == null || fragmentShader == null) {
-      throw StateError(
-        'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer and '
-        'enable Flutter GPU for the target platform.',
+    final resources = _assetResources.putIfAbsent(assetKey, () {
+      final library = gpu.ShaderLibrary.fromAsset(assetKey);
+      final vertexShader = library?['GeometryVertex'];
+      final fragmentShader = library?['GeometryFragment'];
+      if (vertexShader == null || fragmentShader == null) {
+        throw StateError(
+          'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer and '
+          'enable Flutter GPU for the target platform.',
+        );
+      }
+      return _SharedGeometryResources(
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
       );
-    }
-    return FlutterGpuGeometryRenderer(
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
+    });
+    return FlutterGpuGeometryRenderer._fromShared(resources);
+  }
+
+  FlutterGpuGeometryRenderer._fromShared(_SharedGeometryResources resources) {
+    _pipeline = resources.pipeline;
+    _hostBuffer = _createUniformHostBuffer(resources.uniformSize);
+    _uniformSlot = resources.uniformSlot;
+    _uniformSize = resources.uniformSize;
+    _offsetUOffset = resources.offsetUOffset;
+    _offsetUTextureSize = resources.offsetUTextureSize;
+    _offsetOpticalProps = resources.offsetOpticalProps;
+    _offsetShapeData = resources.offsetShapeData;
+    _vertexBuffer = resources.vertexBuffer;
+  }
+
+  static final Map<String, _SharedGeometryResources> _assetResources = {};
+
+  static gpu.HostBuffer _createUniformHostBuffer(int uniformSize) {
+    final alignment = gpu.gpuContext.minimumUniformByteAlignment;
+    final alignedSize =
+        ((uniformSize + alignment - 1) ~/ alignment) * alignment;
+    return gpu.gpuContext.createHostBuffer(
+      blockLengthInBytes: alignedSize,
     );
   }
 
   late final gpu.RenderPipeline _pipeline;
+
+  @visibleForTesting
+  Object get debugPipelineIdentity => _pipeline;
+
+  @visibleForTesting
+  int get debugHostBufferBlockLength => _hostBuffer.blockLengthInBytes;
 
   /// Number of geometry command buffers submitted by this renderer.
   @visibleForTesting
@@ -230,4 +261,54 @@ class FlutterGpuGeometryRenderer {
     _texture = null;
     _image = null;
   }
+}
+
+class _SharedGeometryResources {
+  _SharedGeometryResources({
+    required gpu.Shader vertexShader,
+    required gpu.Shader fragmentShader,
+  }) {
+    pipeline = gpu.gpuContext.createRenderPipeline(
+      vertexShader,
+      fragmentShader,
+    );
+    uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
+    uniformSize = uniformSlot.sizeInBytes ?? 0;
+    offsetUOffset = uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
+    offsetUTextureSize =
+        uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
+    offsetOpticalProps =
+        uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
+    offsetShapeData = uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
+    final vertices = Float32List.fromList([
+      -1.0,
+      -1.0,
+      0.0,
+      0.0,
+      1.0,
+      -1.0,
+      1.0,
+      0.0,
+      -1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+    ]);
+    vertexBuffer = gpu.gpuContext.createDeviceBufferWithCopy(
+      ByteData.sublistView(vertices),
+    );
+  }
+
+  late final gpu.RenderPipeline pipeline;
+  late final gpu.UniformSlot uniformSlot;
+  late final int uniformSize;
+  late final int offsetUOffset;
+  late final int offsetUTextureSize;
+  late final int offsetOpticalProps;
+  late final int offsetShapeData;
+  late final gpu.DeviceBuffer vertexBuffer;
 }

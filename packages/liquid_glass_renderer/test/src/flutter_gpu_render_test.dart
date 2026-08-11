@@ -74,6 +74,27 @@ void main() {
   );
 
   test(
+    'asset renderers share immutable pipeline resources',
+    () {
+      final first = FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      final second = FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      addTearDown(first.dispose);
+      addTearDown(second.dispose);
+
+      expect(
+        identical(first.debugPipelineIdentity, second.debugPipelineIdentity),
+        isTrue,
+      );
+      expect(first.debugHostBufferBlockLength, lessThan(4096));
+    },
+    skip: expectFallback,
+  );
+
+  test(
     'geometry renderer buckets and reuses its native render target',
     () {
       final library = gpu.ShaderLibrary.fromAsset(
