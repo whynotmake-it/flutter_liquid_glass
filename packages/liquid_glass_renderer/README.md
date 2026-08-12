@@ -111,14 +111,13 @@ Geometry render targets grow in 64-physical-pixel buckets and retain their high-
 
 #### Best Practices
 To ensure the best performance when using liquid glass effects, consider the following tips:
-- **Use `LiquidGlassLayer` for shapes that share the same settings.** Creating many individual layers is expensive.
-- **Minimize the amount of pixels covered by `LiquidGlassLayer` and `LiquidGlassBlendGroup`**: Both `LiquidGlassLayer` and `LiquidGlassBlendGroup` will create textures that cover their entire area. 
-Try to keep these areas as small as possible.
-If you have a large area with sparse glass shapes, consider splitting them into multiple smaller layers/groups.
-- **Limit the number of blended shapes**: Each additional shape in a `LiquidGlassBlendGroup` increases the computational load. 
-Try to keep the number of blended shapes low.
+- **Put sibling glass in one `LiquidGlassLayer`.** That is one backdrop sample. `LiquidGlass.withOwnLayer` is for glass that sits on other glass, or that needs different settings.
+- **Place a layer around chrome.** `LiquidGlass.auto` joins a parent layer when one exists. A tab bar or toolbar should wrap its items in one `LiquidGlassLayer` so they share that sample. Without a parent, each `auto` widget creates its own layer.
+- **Use `LiquidGlassBlendGroup` only when shapes should morph into each other.** Standalone shapes on the same layer do not blend and do not allocate extra filters.
+- **Do not split sparse shapes into many layers.** Sparse shapes in one layer cost about the same as a tight group. Extra layers each allocate their own filter state.
+- **Limit the number of blended shapes**: Each additional shape in a `LiquidGlassBlendGroup` increases the computational load. Try to keep the number of blended shapes low (maximum 16).
 - **Limit geometry animations**: Static geometry is cached. Moving an entire `LiquidGlassLayer` as one unit reuses its matte, but moving or resizing shapes relative to their layer forces geometry to be rendered again. In a `LiquidGlassBlendGroup`, moving one shape rebuilds the group.
-- **Share backdrop captures for non-overlapping effects**: Wrap related layers in a Flutter `BackdropGroup` and set `useBackdropGroup: true`, or supply an explicit `BackdropKey`. This works for both real and fake glass and is separate from `LiquidGlassBlendGroup`.
+- **Share backdrop captures for non-overlapping independent layers**: Wrap related layers in a Flutter `BackdropGroup` and set `useBackdropGroup: true`, or supply an explicit `BackdropKey`. This shares the capture, not per-layer filter state, and is separate from `LiquidGlassBlendGroup`.
 
 ---
 

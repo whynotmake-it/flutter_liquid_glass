@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
@@ -301,7 +300,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
   }
 
   ShapeGeometry _computeShapeInfo(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape,
     bool glassContainsChild,
   ) {
@@ -346,16 +345,25 @@ class GlassGroupLink with ChangeNotifier {
   GlassGroupLink();
 
   /// Information about a shape registered with this link.
-  final Map<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
+  final Map<
+    LiquidGlassShapeRenderObject,
+    (LiquidShape shape, bool glassContainsChild)
+  >
   _shapes = {};
 
   List<
-    MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
+    MapEntry<
+      LiquidGlassShapeRenderObject,
+      (LiquidShape shape, bool glassContainsChild)
+    >
   >?
   _shapeEntriesCache;
 
   List<
-    MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
+    MapEntry<
+      LiquidGlassShapeRenderObject,
+      (LiquidShape shape, bool glassContainsChild)
+    >
   >
   get shapeEntries =>
       _shapeEntriesCache ??= _shapes.entries.toList(growable: false);
@@ -365,7 +373,7 @@ class GlassGroupLink with ChangeNotifier {
 
   /// Register a shape with this link.
   void registerShape(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape, {
     required bool glassContainsChild,
   }) {
@@ -375,7 +383,7 @@ class GlassGroupLink with ChangeNotifier {
   }
 
   /// Unregister a shape from this link.
-  void unregisterShape(RenderLiquidGlass renderObject) {
+  void unregisterShape(LiquidGlassShapeRenderObject renderObject) {
     _shapes.remove(renderObject);
     _shapeEntriesCache = null;
     notifyListeners();
@@ -383,7 +391,7 @@ class GlassGroupLink with ChangeNotifier {
 
   /// Update the shape properties for a registered render object.
   void updateShape(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape, {
     required bool glassContainsChild,
   }) {

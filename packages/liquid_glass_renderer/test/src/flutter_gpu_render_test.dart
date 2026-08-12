@@ -90,7 +90,7 @@ void main() {
         isTrue,
       );
 
-      const unusedShape = [
+      const unusedShape = <double>[
         1, 8, 8, 0, //
         1, 0, 0, 1, //
         8, 8, 1, -1, //

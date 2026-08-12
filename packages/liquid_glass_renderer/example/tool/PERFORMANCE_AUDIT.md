@@ -80,25 +80,21 @@ capture does not account for the remaining per-layer footprint.
 
 ## Next measurements
 
-Compare `independent16Motion` and `ancestorTranslatedLayer` against the
-2026-08-11 medians on the same runner. Skipping paint and filter rebuilds on
-ancestor motion should drop raster time and peak footprint if native filter
-churn was the remaining cost.
-If those scenarios are still far from `grouped16Motion` / `staticSingle`:
+Hosted `macos-26` raster p99/CV is noise; use it for smoke and footprint.
+Compare `grouped16Motion` / `staticSingle` / `ancestorTranslatedLayer` on a
+self-hosted Mac. `independent16Motion` is a stress test, not a product target.
 
-1. **Cull sparse shape layers.** Compare dense and window-spanning layouts at
-   1/2/4/8/16 shapes. Add conservative AABB rejection or spatial bins only if
-   the spread/dense delta confirms SDF evaluation is the bottleneck.
-2. **Share the blurred backdrop.** Each independent layer still runs its own
-   `ImageFilter.compose(blur, shader)` even when `BackdropKey` shares the
-   capture. A single downsample/blur sampled by every glass is how Apple
-   amortizes `CABackdropLayer`. Flutter cannot bind an arbitrary GPU texture
-   as the ImageFilter input, so this needs an engine-level or layer-tree
-   structure change.
-3. **Evaluate singular-shape specialization last.** A one-shape pipeline removes
-   loop and group-marker overhead, but static geometry is already cached and the
-   final backdrop/refraction pass may dominate. Measure dynamic oval, rounded
-   rectangle, and superellipse cases separately before adding shader variants.
+Do not chase:
+
+1. **Sparse SDF culling.** `sparse16` already matches `grouped16`.
+2. **Shared blur across ungrouped layers.** Flutter cannot bind an arbitrary
+   texture as the `ImageFilter` input. Apple amortizes one sample per visual
+   group, which is `LiquidGlassLayer`, not N independent filters.
+3. **Extra shader variants** until a one-shape path beats the existing
+   `numShapes == 1` early-out.
+
+Remaining product work is grouping (one layer per chrome region) and idle
+filter release, not more GPU tricks.
 
 ## Required comparisons
 

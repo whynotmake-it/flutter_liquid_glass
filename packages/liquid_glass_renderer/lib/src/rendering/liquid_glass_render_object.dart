@@ -50,9 +50,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     final geometryInputsChanged =
         _settings?.effectiveThickness != value.effectiveThickness ||
         _settings?.refractiveIndex != value.refractiveIndex;
+    final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
+    final isIdle = value.effectiveThickness <= 0;
     _settings = value;
     _updateShaderSettings();
     if (geometryInputsChanged) needsGeometryUpdate = true;
+    if (wasIdle != isIdle) markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -82,7 +85,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   }
 
   @override
-  bool get alwaysNeedsCompositing => _geometryImage != null;
+  bool get alwaysNeedsCompositing =>
+      _geometryImage != null && settings.effectiveThickness > 0;
 
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
@@ -213,7 +217,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     if (boundingBox == null) {
       _clearGeometryImage();
-
+      releaseCompositorFilter();
       super.paint(context, offset);
       return;
     }
@@ -221,7 +225,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     _paintBounds = boundingBox;
 
     if (settings.effectiveThickness <= 0) {
-      _clearGeometryImage();
+      // Keep any existing matte so ancestor motion stays compositor-only.
+      // Skip the backdrop filter so idle glass does not sample.
+      releaseCompositorFilter();
       paintShapeContents(
         context,
         offset,
@@ -312,6 +318,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// compositor without crossing this layer's repaint boundary.
   @protected
   bool get hasReusableGeometry => _geometryImage != null;
+
+  /// Drops native backdrop-filter state while this sample is idle.
+  @protected
+  void releaseCompositorFilter() {}
+
+  /// Layer-local bounds of the geometry matte. Ancestor transforms must not
+  /// change this: they are applied by the compositor, not the shader.
+  @visibleForTesting
+  Rect get debugGeometryMatteBounds => _geometryMatteBounds;
 
   /// Value identity of everything [renderShader] has captured for the current
   /// paint: float uniforms and the geometry sampler.

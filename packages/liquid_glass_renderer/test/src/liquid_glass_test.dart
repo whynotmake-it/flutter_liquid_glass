@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
@@ -11,6 +10,54 @@ import 'shared.dart';
 
 void main() {
   group('LiquidGlass', () {
+    testWidgets(
+      'standalone shapes share a layer without a dummy blend group',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: LiquidGlassLayer(
+              child: Row(
+                children: [
+                  LiquidGlass(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                  LiquidGlass(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+        expect(find.byType(LiquidGlassBlendGroup), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'withOwnLayer does not wrap a blend group',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: LiquidGlass.withOwnLayer(
+              shape: LiquidOval(),
+              child: SizedBox.square(dimension: 80),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+        expect(find.byType(LiquidGlassBlendGroup), findsNothing);
+      },
+    );
+
     test('can be used', () async {
       expect(
         const LiquidGlass(shape: LiquidOval(), child: SizedBox()),
@@ -437,10 +484,10 @@ void main() {
           final renderer = renderObject.gpuGeometryRenderer!;
           final initialRenderCount = renderer.debugRenderCount;
           final initialPaintCount = renderObject.debugPaintCount;
-          final blendGroup = tester.allRenderObjects
-              .whereType<RenderLiquidGlassBlendGroup>()
+          final geometry = tester.allRenderObjects
+              .whereType<RenderLiquidGlassGeometry>()
               .last;
-          expect(blendGroup.geometryState, LiquidGlassGeometryState.updated);
+          expect(geometry.geometryState, LiquidGlassGeometryState.updated);
 
           offset.value = const Offset(80, 45);
           await tester.pump();
@@ -448,7 +495,7 @@ void main() {
 
           expect(renderer.debugRenderCount, initialRenderCount);
           expect(renderObject.debugPaintCount, initialPaintCount);
-          expect(blendGroup.geometryState, LiquidGlassGeometryState.updated);
+          expect(geometry.geometryState, LiquidGlassGeometryState.updated);
         },
         skip: expectFlutterGpuFallback,
       );

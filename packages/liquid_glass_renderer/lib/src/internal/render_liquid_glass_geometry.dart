@@ -2,8 +2,6 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
@@ -27,16 +25,33 @@ enum LiquidGlassGeometryState {
   needsUpdate,
 }
 
+/// A render object that contributes one glass shape to a geometry pass.
+@internal
+mixin LiquidGlassShapeRenderObject on RenderBox {
+  /// The shape's path in its own local coordinates.
+  Path shapePath();
+
+  /// Whether this shape's child is painted inside the glass.
+  bool get glassContainsChild;
+
+  /// Paints this shape's child from the layer's paint context.
+  void paintFromLayer(
+    PaintingContext context,
+    Matrix4 transform,
+    Offset offset,
+  );
+}
+
 /// A base class for any render object that represents liquid glass geometry.
 ///
-/// This will paint to the screen normally, but use a [GlassGroupLink] to gather
-/// shape information for the Flutter GPU geometry pass.
+/// Standalone shapes and blend groups both register with a
+/// [GeometryRenderLink] so the parent layer can pack them into one sample.
 @internal
 abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   RenderLiquidGlassGeometry({
-    required GeometryRenderLink this._renderLink,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
+    this._renderLink,
   }) {
     _settings = settings;
     _devicePixelRatio = devicePixelRatio;
@@ -196,7 +211,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     final path = Path();
     for (final shape in geometries) {
       path.addPath(
-        shape.renderObject.getPath(),
+        shape.renderObject.shapePath(),
         Offset.zero,
         matrix4: shape.shapeToGeometry?.storage,
       );
@@ -326,7 +341,7 @@ class ShapeGeometry extends Equatable {
     }
   }
 
-  final RenderLiquidGlass renderObject;
+  final LiquidGlassShapeRenderObject renderObject;
 
   final LiquidShape shape;
 

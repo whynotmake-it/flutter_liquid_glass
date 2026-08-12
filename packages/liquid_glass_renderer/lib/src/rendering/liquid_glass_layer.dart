@@ -426,6 +426,15 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   @override
+  void releaseCompositorFilter() {
+    _shaderHandle.layer = null;
+    _clipPathLayerHandle.layer = null;
+    _clipRectLayerHandle.layer = null;
+    _cachedFilter = null;
+    _cachedFilterSnapshot = null;
+  }
+
+  @override
   void dispose() {
     _shaderHandle.layer = null;
     _clipPathLayerHandle.layer = null;

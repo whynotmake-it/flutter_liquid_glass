@@ -142,5 +142,58 @@ void main() {
       );
       expect(layer.settings, equals(parentSettings));
     });
+
+    testWidgets(
+      'sibling autos under one layer share that sample without a blend group',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: LiquidGlassLayer(
+              child: Row(
+                children: [
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+        expect(find.byType(LiquidGlassBlendGroup), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'sibling autos without a layer each create their own sample',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: Row(
+              children: [
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
+      },
+    );
   });
 }

@@ -98,4 +98,74 @@ void main() {
     },
     skip: skipProperGlassTests,
   );
+
+  testWidgets(
+    'drops the backdrop filter while the sample is idle',
+    (tester) async {
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+
+      final renderObject = findLayer(tester);
+      expect(renderObject.debugBackdropFilterLayer, isNotNull);
+      final initialRenders =
+          renderObject.gpuGeometryRenderer!.debugRenderCount;
+
+      await tester.pumpWidget(
+        glass(settings: const LiquidGlassSettings(visibility: 0)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(renderObject.debugBackdropFilterLayer, isNull);
+      expect(
+        renderObject.gpuGeometryRenderer!.debugRenderCount,
+        initialRenders,
+      );
+
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+
+      expect(renderObject.debugBackdropFilterLayer, isNotNull);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'keeps geometry matte bounds in layer space across ancestor motion',
+    (tester) async {
+      Widget movedGlass(Offset offset) => CupertinoApp(
+        home: Transform.translate(
+          offset: offset,
+          child: glass(),
+        ),
+      );
+
+      await tester.pumpWidget(movedGlass(Offset.zero));
+      await tester.pumpAndSettle();
+
+      final renderObject = findLayer(tester);
+      final matteBounds = renderObject.debugGeometryMatteBounds;
+      expect(matteBounds, isNot(Rect.zero));
+      expect(
+        MatrixUtils.matrixEquals(
+          renderObject.matteTransform,
+          Matrix4.identity(),
+        ),
+        isTrue,
+      );
+
+      await tester.pumpWidget(movedGlass(const Offset(40, -18)));
+      tester.binding.scheduleFrame();
+      await tester.pump();
+
+      expect(renderObject.debugGeometryMatteBounds, matteBounds);
+      expect(
+        MatrixUtils.matrixEquals(
+          renderObject.matteTransform,
+          Matrix4.identity(),
+        ),
+        isTrue,
+      );
+    },
+    skip: skipProperGlassTests,
+  );
 }
