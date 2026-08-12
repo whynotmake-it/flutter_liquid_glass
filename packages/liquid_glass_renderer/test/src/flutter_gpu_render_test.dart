@@ -90,7 +90,10 @@ void main() {
         isTrue,
       );
       expect(
-        identical(first.debugHostBufferIdentity, second.debugHostBufferIdentity),
+        identical(
+          first.debugHostBufferIdentity,
+          second.debugHostBufferIdentity,
+        ),
         isTrue,
       );
       expect(first.debugHostBufferBlockLength, greaterThan(0));

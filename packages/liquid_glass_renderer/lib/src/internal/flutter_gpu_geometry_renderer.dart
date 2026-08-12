@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -45,8 +44,8 @@ class FlutterGpuGeometryRenderer {
       final fragmentShader = library?['GeometryFragment'];
       if (vertexShader == null || fragmentShader == null) {
         throw StateError(
-          'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer and '
-          'enable Flutter GPU for the target platform.',
+          'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer '
+          'and enable Flutter GPU for the target platform.',
         );
       }
       return _SharedGeometryResources(
@@ -232,11 +231,10 @@ class FlutterGpuGeometryRenderer {
       2,
       1,
       format: gpu.PixelFormat.r32g32b32a32Float,
-      enableRenderTargetUsage: false,
       enableShaderReadUsage: true,
       coordinateSystem: gpu.TextureCoordinateSystem.uploadFromHost,
     );
-    if (texture == null || !texture.isValid) {
+    if (!texture.isValid) {
       throw StateError(
         'LiquidGlass requires a host-visible RGBA32F texture for live '
         'filter coordinates.',

@@ -80,7 +80,7 @@ class FakeGlass extends StatelessWidget {
               (useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null);
-    Widget clipped = OptimizedClip(
+    final clipped = OptimizedClip(
       shape: shape,
       child: ShaderBuilder(
         assetKey: ShaderKeys.fakeGlassColor,

@@ -297,7 +297,7 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    Widget content = _RawLiquidGlass(
+    final content = _RawLiquidGlass(
       blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
       shape: shape,
       glassContainsChild: glassContainsChild,
