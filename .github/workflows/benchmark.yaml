@@ -34,7 +34,9 @@ jobs:
           cache: true
 
       - name: Enable macOS desktop support
-        run: flutter config --enable-macos-desktop
+        run: |
+          flutter config --enable-macos-desktop
+          flutter config --no-enable-swift-package-manager
 
       - name: 🔧 Get dependencies
         working-directory: packages/liquid_glass_renderer/example

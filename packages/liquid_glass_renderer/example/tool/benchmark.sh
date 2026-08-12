@@ -476,6 +476,7 @@ run_scenario() {
 
 if [[ "$SKIP_BUILD" != true ]]; then
   echo "Building profile benchmark executable"
+  "$FLUTTER_BIN" config --no-enable-swift-package-manager >/dev/null
   "$FLUTTER_BIN" build macos \
     --profile \
     --target=integration_test/benchmark_test.dart
