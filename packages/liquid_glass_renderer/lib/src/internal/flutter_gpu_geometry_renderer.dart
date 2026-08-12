@@ -231,10 +231,12 @@ class FlutterGpuGeometryRenderer {
       2,
       1,
       format: gpu.PixelFormat.r32g32b32a32Float,
-      enableShaderReadUsage: true,
+      // Some Flutter GPU versions default this to false, others to true.
+      // ignore: avoid_redundant_argument_values
+      enableRenderTargetUsage: false,
       coordinateSystem: gpu.TextureCoordinateSystem.uploadFromHost,
     );
-    if (!texture.isValid) {
+    if (texture == null || texture.isValid != true) {
       throw StateError(
         'LiquidGlass requires a host-visible RGBA32F texture for live '
         'filter coordinates.',
