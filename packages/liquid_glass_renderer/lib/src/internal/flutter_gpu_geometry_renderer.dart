@@ -236,7 +236,7 @@ class FlutterGpuGeometryRenderer {
       enableRenderTargetUsage: false,
       coordinateSystem: gpu.TextureCoordinateSystem.uploadFromHost,
     );
-    if (texture == null || texture.isValid != true) {
+    if (texture.isValid != true) {
       throw StateError(
         'LiquidGlass requires a host-visible RGBA32F texture for live '
         'filter coordinates.',
