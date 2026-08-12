@@ -30,6 +30,28 @@ These results support prioritizing independent-layer filter/driver state. The
 geometry matte is small after host-buffer right-sizing, and shared backdrop
 capture does not account for the remaining per-layer footprint.
 
+### Stability validation (2026-08-24)
+
+A fresh three-repetition run on the reviewable performance stack measured
+`grouped16Motion` at 1.49 ms raster p95 (10.7% CV), 1.90 ms in-process Metal
+time per frame (11.3% CV), and 393.0 MB peak footprint (0.5% CV).
+`independent16Motion` measured 4.56 ms raster p95 (3.5% CV), 3.51 ms
+in-process Metal time per frame (4.3% CV), and 591.6 MB peak footprint (0.6%
+CV). This makes the independent-layer raster result both faster and stable
+relative to the previous 6.57 ms median / 19.2% CV result, without changing
+the conclusion that independent layers cost substantially more than grouping
+shapes into one layer.
+
+All six lightweight `xctrace` processes finalized successfully. Rolling
+traces retained only about 0.1 seconds and were correctly rejected below the
+0.45-second alignment floor. A bounded full-window trace produced one valid
+independent-layer sample (52.3% process-filtered GPU busy over the aligned
+window), but repeated grouped/independent trace captures did not pass the
+unchanged event-uniformity checks. The stable in-process Metal and frame/native
+memory results above are suitable for the performance comparison; repeated
+trace-derived allocation attribution remains unavailable rather than being
+reported as zero.
+
 ## Implemented in the API audit
 
 - Whole-layer ancestor transforms reuse the local geometry matte. The

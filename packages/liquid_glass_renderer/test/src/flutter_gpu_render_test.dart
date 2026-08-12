@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   const expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
   test(
     'flutter_gpu renders to a persistent texture and produces a valid image',
@@ -205,6 +207,48 @@ void main() {
         greaterThan(0),
         reason: 'bottom row must be wide',
       );
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'shared host buffer handles more than 32 layer submissions per frame',
+    () async {
+      const shape = <double>[
+        1, 12, 8, 0,
+        1, 0, 0, 1,
+        8, 8, 1, -1,
+      ];
+      final renderers = List.generate(
+        40,
+        (_) => FlutterGpuGeometryRenderer.fromAsset(
+          'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+        ),
+      );
+      addTearDown(() {
+        for (final renderer in renderers) {
+          renderer.dispose();
+        }
+      });
+
+      ui.Image? finalImage;
+      for (var i = 0; i < renderers.length; i++) {
+        final result = renderers[i].render(
+          width: 16,
+          height: 16,
+          shapeData: shape,
+          numShapes: 1,
+          refractiveIndex: 1.2,
+          thickness: 4,
+          offsetX: i.isEven ? 0 : 1,
+          offsetY: 0,
+        );
+        finalImage = result.image;
+      }
+
+      final bytes = await finalImage!.toByteData();
+      expect(bytes, isNotNull);
+      expect(bytes!.lengthInBytes, greaterThan(0));
     },
     skip: expectFallback,
   );

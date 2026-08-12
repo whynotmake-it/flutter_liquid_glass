@@ -84,7 +84,10 @@ class FlutterGpuGeometryRenderer {
       );
       _sharedHostBufferBlockLength = blockLength;
     }
-    final timestamp = SchedulerBinding.instance.currentFrameTimeStamp;
+    // This is also defined for direct renderer callers outside
+    // handleDrawFrame while still advancing once per engine frame in
+    // production.
+    final timestamp = SchedulerBinding.instance.currentSystemFrameTimeStamp;
     if (_sharedHostBufferFrame != timestamp) {
       _sharedHostBuffer!.reset();
       _sharedHostBufferFrame = timestamp;
