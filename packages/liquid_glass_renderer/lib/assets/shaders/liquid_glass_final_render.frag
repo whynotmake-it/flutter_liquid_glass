@@ -16,8 +16,6 @@ precision mediump float;
 uniform vec2 uSize;
 uniform vec2 uGeometryOffset;
 uniform vec2 uGeometrySize;
-uniform vec4 uFilterToMatteBasis;
-uniform vec2 uFilterToMatteOffset;
 
 uniform vec4 uGlassColor;
 uniform vec3 uOpticalProps;
@@ -40,6 +38,7 @@ float uSpecularWrap = uSpecularConfig.w;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
+uniform sampler2D uCoordinateTexture;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -178,10 +177,13 @@ void main() {
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
+    // Texel centers of a 2×1 texture with nearest filtering.
+    vec4 filterToMatteBasis = texture(uCoordinateTexture, vec2(0.25, 0.5));
+    vec2 filterToMatteOffset = texture(uCoordinateTexture, vec2(0.75, 0.5)).xy;
     vec2 matteCoord = vec2(
-        dot(uFilterToMatteBasis.xy, fragCoord),
-        dot(uFilterToMatteBasis.zw, fragCoord)
-    ) + uFilterToMatteOffset;
+        dot(filterToMatteBasis.xy, fragCoord),
+        dot(filterToMatteBasis.zw, fragCoord)
+    ) + filterToMatteOffset;
     vec2 geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize;
     #ifdef IMPELLER_TARGET_OPENGLES
         // Runtime-effect image samplers use bottom-up UVs on OpenGLES even

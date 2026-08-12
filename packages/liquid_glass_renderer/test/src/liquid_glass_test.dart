@@ -2,6 +2,8 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
@@ -434,12 +436,68 @@ void main() {
               .last;
           final renderer = renderObject.gpuGeometryRenderer!;
           final initialRenderCount = renderer.debugRenderCount;
+          final initialPaintCount = renderObject.debugPaintCount;
+          final initialUploads = renderer.debugCoordinateUploadCount;
+          final blendGroup = tester.allRenderObjects
+              .whereType<RenderLiquidGlassBlendGroup>()
+              .last;
+          expect(blendGroup.geometryState, LiquidGlassGeometryState.updated);
 
           offset.value = const Offset(80, 45);
           await tester.pump();
           await tester.pump();
 
           expect(renderer.debugRenderCount, initialRenderCount);
+          expect(renderObject.debugPaintCount, initialPaintCount);
+          expect(blendGroup.geometryState, LiquidGlassGeometryState.updated);
+          expect(
+            renderer.debugCoordinateUploadCount,
+            greaterThan(initialUploads),
+          );
+        },
+        skip: expectFlutterGpuFallback,
+      );
+
+      testWidgets(
+        'rebuilds geometry when a shape moves inside the layer',
+        (tester) async {
+          final offset = ValueNotifier(Offset.zero);
+          addTearDown(offset.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: ValueListenableBuilder<Offset>(
+                valueListenable: offset,
+                builder: (_, value, __) => LiquidGlassLayer(
+                  settings: settingsWithoutLighting.copyWith(
+                    thickness: 18,
+                    glassColor: Colors.cyan.withValues(alpha: .25),
+                  ),
+                  child: Transform.translate(
+                    offset: value,
+                    child: const LiquidGlass(
+                      shape: LiquidRoundedRectangle(borderRadius: 28),
+                      child: SizedBox(width: 240, height: 150),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          final renderObject = tester.allRenderObjects
+              .whereType<RenderLiquidGlassLayer>()
+              .where((renderObject) => renderObject.gpuGeometryRenderer != null)
+              .last;
+          final renderer = renderObject.gpuGeometryRenderer!;
+          final initialRenderCount = renderer.debugRenderCount;
+
+          offset.value = const Offset(80, 45);
+          await tester.pump();
+          await tester.pump();
+
+          expect(renderer.debugRenderCount, greaterThan(initialRenderCount));
         },
         skip: expectFlutterGpuFallback,
       );

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
-import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:meta/meta.dart';
@@ -297,26 +297,36 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    return GlassShadow(
-      settings: settings,
+    Widget content = _RawLiquidGlass(
+      blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
       shape: shape,
-      shadows: shadows,
-      child: _RawLiquidGlass(
-        blendGroupLink: blendGroupLink ?? LiquidGlassBlendGroup.of(context),
+      glassContainsChild: glassContainsChild,
+      child: OptimizedClip(
         shape: shape,
-        glassContainsChild: glassContainsChild,
-        child: ClipPath(
-          clipper: ShapeBorderClipper(shape: shape),
-          clipBehavior: clipBehavior,
-          child: Opacity(
-            opacity: settings.visibility.clamp(0, 1),
-            child: GlassGlowLayer(
-              child: child,
-            ),
+        clipBehavior: clipBehavior,
+        child: _maybeFade(
+          settings.visibility,
+          GlassGlowLayer(
+            child: child,
           ),
         ),
       ),
     );
+    if (shadows.isEmpty) {
+      return content;
+    }
+    return GlassShadow(
+      settings: settings,
+      shape: shape,
+      shadows: shadows,
+      child: content,
+    );
+  }
+
+  static Widget _maybeFade(double visibility, Widget child) {
+    final opacity = visibility.clamp(0.0, 1.0);
+    if (opacity >= 1) return child;
+    return Opacity(opacity: opacity, child: child);
   }
 }
 
@@ -356,8 +366,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 }
 
 @internal
-class RenderLiquidGlass extends RenderProxyBox
-    with TransformTrackingRenderObjectMixin {
+class RenderLiquidGlass extends RenderProxyBox {
   RenderLiquidGlass({
     required this._shape,
     required this._glassContainsChild,
@@ -437,14 +446,10 @@ class RenderLiquidGlass extends RenderProxyBox
   }
 
   @override
-  void onTransformChanged() {
-    _blendGroupLink?.notifyShapeLayoutChanged(this);
-  }
-
-  @override
   // ignore: must_call_super
   void paint(PaintingContext context, Offset offset) {
-    setUpLayer(offset);
+    // Contents are painted by the parent liquid glass layer via
+    // [paintFromLayer]. This node only occupies layout space.
   }
 
   void paintFromLayer(

@@ -307,9 +307,28 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void onTransformChanged() {
-    // The matte is layer-local. A transform above the complete layer only
-    // changes final-pass coordinate mapping and must not resubmit geometry.
-    markNeedsPaint();
+    // Geometry is layer-local. Ancestor motion only changes the final-pass
+    // mapping, which lives in a live sampler, so a moving ancestor must not
+    // cross this layer's repaint boundary or rebuild the native image filter.
+    if (!hasLiveCoordinateMapping) {
+      markNeedsPaint();
+      return;
+    }
+    syncCoordinateMapping();
+  }
+
+  @override
+  void onCompositing() {
+    if (!attached) return;
+    var dirty = false;
+    for (final geometry in link.shapes) {
+      if (geometry.pollRelativeTransforms(this)) {
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      markNeedsPaint();
+    }
   }
 
   ImageFilter? _cachedFilter;
@@ -355,15 +374,20 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..filter = shaderFilter
       ..backdropKey = backdropKey;
 
-    final clipPath = Path();
-    for (final geometry in shapes) {
-      if (!geometry.$1.attached) continue;
+    Path clipPath;
+    if (shapes.length == 1 && shapes.first.$3.isIdentity()) {
+      clipPath = shapes.first.$2.path;
+    } else {
+      clipPath = Path();
+      for (final geometry in shapes) {
+        if (!geometry.$1.attached) continue;
 
-      clipPath.addPath(
-        geometry.$2.path,
-        Offset.zero,
-        matrix4: geometry.$3.storage,
-      );
+        clipPath.addPath(
+          geometry.$2.path,
+          Offset.zero,
+          matrix4: geometry.$3.storage,
+        );
+      }
     }
     _clipPathLayerHandle.layer = context
         // First we push the clipped blur layer

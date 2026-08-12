@@ -35,6 +35,23 @@ capture does not account for the remaining per-layer footprint.
 - Whole-layer ancestor transforms reuse the local geometry matte. The
   `ancestorTranslatedLayer` scenario distinguishes this fast path from moving
   a shape relative to its layer.
+- Ancestor motion no longer rebuilds `ImageFilter.shader`. Flutter copies
+  float uniforms at filter creation (`ReusableFragmentShader::as_image_filter`)
+  but keeps sampler bindings live, so the filter-to-matte affine mapping is a
+  persistent 2×1 RGBA32F texture updated during compositing. That keeps the
+  layer's `RepaintBoundary` intact and avoids the delayed-disposal spike from
+  Flutter issue #138627. Apple's Liquid Glass uses the same idea: a persistent
+  `glassBackground` filter graph whose SDF/parameter inputs are live layers
+  (`CASDFLayer` / `SDFPortalLayer`), not rebuilt CAFilters.
+- Blend groups and shapes no longer push empty `alwaysNeedsAddToScene`
+  tracking layers. The layer's compositing hook polls relative transforms, so
+  ancestor motion does not cross the repaint boundary, while in-layer motion
+  still rebuilds geometry. Independent layers also skip unused glow tickers,
+  empty shadow render objects, and generic `ClipPath` in favor of Impeller's
+  specialized clip layers.
+- Geometry renderers share one frame-scoped `HostBuffer`, reuse a packed
+  uniform `ByteData`, and keep the color attachment on `LoadAction.dontCare`
+  because the full-screen quad writes every pixel.
 - Fake glass composes blur, saturation, and tint into one backdrop-filter pass
   instead of nesting blur and saturation captures.
 - Static benchmark scenarios no longer rebuild under the global animation
@@ -66,15 +83,21 @@ capture does not account for the remaining per-layer footprint.
 
 ## Next measurements
 
+Compare `independent16Motion` and `ancestorTranslatedLayer` against the
+2026-08-11 medians on the same runner. The live coordinate texture should drop
+raster time and peak footprint if native filter churn was the remaining cost.
+If those scenarios are still far from `grouped16Motion` / `staticSingle`:
+
 1. **Cull sparse shape layers.** Compare dense and window-spanning layouts at
    1/2/4/8/16 shapes. Add conservative AABB rejection or spatial bins only if
    the spread/dense delta confirms SDF evaluation is the bottleneck.
-2. **Cache real-path filters and transformed clip paths.** Benchmark a static
-   layer repainted by unrelated foreground animation, then cache by settings
-   and geometry revision if raster CPU/allocation remains material.
-3. **Reuse uniform packing buffers.** A fixed `ByteData`/`Float32List` staging
-   buffer can reduce Dart allocation during 16-shape stretch churn.
-4. **Evaluate singular-shape specialization last.** A one-shape pipeline removes
+2. **Share the blurred backdrop.** Each independent layer still runs its own
+   `ImageFilter.compose(blur, shader)` even when `BackdropKey` shares the
+   capture. A single downsample/blur sampled by every glass is how Apple
+   amortizes `CABackdropLayer`. Flutter cannot bind an arbitrary GPU texture
+   as the ImageFilter input, so this needs an engine-level or layer-tree
+   structure change.
+3. **Evaluate singular-shape specialization last.** A one-shape pipeline removes
    loop and group-marker overhead, but static geometry is already cached and the
    final backdrop/refraction pass may dominate. Measure dynamic oval, rounded
    rectangle, and superellipse cases separately before adding shader variants.
@@ -83,6 +106,7 @@ capture does not account for the remaining per-layer footprint.
 
 - `baselineMotion` versus `ancestorTranslatedLayer`
 - `translatedSingle` versus `scaledRotatedSingle`
+- `independent16Motion` versus `grouped16Motion` (filter reuse vs shared pass)
 - fake 1/4/8/16 shape ladders with blur-only, saturation-only, and combined
   filtering, both grouped and ungrouped
 - dense versus sparse 1/2/4/8/16 real shapes at constant total shape area

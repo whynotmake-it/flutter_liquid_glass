@@ -131,7 +131,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
   void _updateShaderSettings() {
     _shaderSettingsRevision++;
-    renderShader.setFloatUniforms(initialIndex: 12, (value) {
+    renderShader.setFloatUniforms(initialIndex: 6, (value) {
       value
         ..setColor(settings.effectiveGlassColor)
         ..setFloats([
@@ -164,18 +164,37 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   ui.Rect get paintBounds => _paintBounds;
 
+  /// Number of times [paint] has run. Ancestor motion should not increment
+  /// this once live coordinate mapping is active.
+  @visibleForTesting
+  int debugPaintCount = 0;
+
+  final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
+  _shapesWithGeometry = [];
+
+  void _pollRegisteredGeometryTransforms() {
+    for (final geometryRo in link.shapes) {
+      geometryRo.pollRelativeTransforms(this);
+    }
+  }
+
   // MARK: Painting
 
   @override
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
+    assert(() {
+      debugPaintCount++;
+      return true;
+    }(), 'Track layer paints in debug builds.');
     logger.finest(
       '$hashCode Painting liquid glass with '
       '${link._shapeGeometries.length} shapes.',
     );
 
-    final shapesWithGeometry =
-        <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
+    _pollRegisteredGeometryTransforms();
+
+    _shapesWithGeometry.clear();
 
     Rect? boundingBox;
 
@@ -185,7 +204,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       if (geometry == null) continue;
 
       final transform = geometryRo.getTransformTo(this);
-      shapesWithGeometry.add((geometryRo, geometry, transform));
+      _shapesWithGeometry.add((geometryRo, geometry, transform));
 
       final geoBounds = MatrixUtils.transformRect(
         transform,
@@ -210,13 +229,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       paintShapeContents(
         context,
         offset,
-        shapesWithGeometry,
+        _shapesWithGeometry,
         insideGlass: true,
       );
       paintShapeContents(
         context,
         offset,
-        shapesWithGeometry,
+        _shapesWithGeometry,
         insideGlass: false,
       );
       super.paint(context, offset);
@@ -231,7 +250,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       needsGeometryUpdate = false;
 
       final gpuResult = _buildGpuGeometryImage(
-        shapesWithGeometry,
+        _shapesWithGeometry,
         boundingBox,
       );
       _clearGeometryImage();
@@ -244,59 +263,37 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       paintShapeContents(
         context,
         offset,
-        shapesWithGeometry,
+        _shapesWithGeometry,
         insideGlass: true,
       );
       paintShapeContents(
         context,
         offset,
-        shapesWithGeometry,
+        _shapesWithGeometry,
         insideGlass: false,
       );
     } else {
       if (_geometryImage case final geometryImage?) {
-        final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
-        final inverseOrigin = MatrixUtils.transformPoint(
-          globalToMatte,
-          Offset.zero,
-        );
-        final inverseX = MatrixUtils.transformPoint(
-          globalToMatte,
-          const Offset(1, 0),
-        );
-        final inverseY = MatrixUtils.transformPoint(
-          globalToMatte,
-          const Offset(0, 1),
-        );
-        final inverseAxisX = inverseX - inverseOrigin;
-        final inverseAxisY = inverseY - inverseOrigin;
+        final coordinateImage = syncCoordinateMapping();
         renderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
             value
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
-              ..setSize(_geometryMatteBounds.size * devicePixelRatio)
-              ..setFloats([
-                inverseAxisX.dx,
-                inverseAxisY.dx,
-                inverseAxisX.dy,
-                inverseAxisY.dy,
-              ])
-              ..setOffset(inverseOrigin * devicePixelRatio);
+              ..setSize(_geometryMatteBounds.size * devicePixelRatio);
           })
-          ..setImageSampler(1, geometryImage);
+          ..setImageSampler(1, geometryImage)
+          ..setImageSampler(2, coordinateImage);
         _shaderInputSnapshot = _ShaderInputSnapshot(
           geometryImage: geometryImage,
+          coordinateImage: coordinateImage,
           matteBounds: _geometryMatteBounds,
           devicePixelRatio: devicePixelRatio,
-          inverseOrigin: inverseOrigin,
-          inverseAxisX: inverseAxisX,
-          inverseAxisY: inverseAxisY,
           settingsRevision: _shaderSettingsRevision,
         );
         paintLiquidGlass(
           context,
           offset,
-          shapesWithGeometry,
+          _shapesWithGeometry,
           _paintBounds,
         );
       }
@@ -318,14 +315,68 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     Rect boundingBox,
   );
 
+  /// Writes the live filter-to-matte mapping and returns the persistent
+  /// coordinate image.
+  ///
+  /// ImageFilter.shader copies float uniforms at creation, so this mapping
+  /// cannot live in uniforms without allocating a new native filter whenever
+  /// an ancestor moves. Sampler bindings stay live, which is why the mapping
+  /// is a 2×1 float texture. Safe to call from compositing as well as paint.
+  @protected
+  ui.Image syncCoordinateMapping() {
+    final renderer = _gpuGeometryRenderer;
+    if (renderer == null) {
+      throw StateError(
+        'Flutter GPU is required for LiquidGlass. Enable it in the platform '
+        'manifest or with --enable-flutter-gpu.',
+      );
+    }
+
+    final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
+    final inverseOrigin = MatrixUtils.transformPoint(
+      globalToMatte,
+      Offset.zero,
+    );
+    final inverseX = MatrixUtils.transformPoint(
+      globalToMatte,
+      const Offset(1, 0),
+    );
+    final inverseY = MatrixUtils.transformPoint(
+      globalToMatte,
+      const Offset(0, 1),
+    );
+    final inverseAxisX = inverseX - inverseOrigin;
+    final inverseAxisY = inverseY - inverseOrigin;
+    renderer.updateCoordinateMapping(
+      basisXX: inverseAxisX.dx,
+      basisYX: inverseAxisY.dx,
+      basisXY: inverseAxisX.dy,
+      basisYY: inverseAxisY.dy,
+      originX: inverseOrigin.dx * devicePixelRatio,
+      originY: inverseOrigin.dy * devicePixelRatio,
+    );
+    final image = renderer.coordinateImage;
+    if (image == null) {
+      throw StateError('LiquidGlass coordinate mapping texture is missing.');
+    }
+    return image;
+  }
+
+  /// True once the geometry matte and live coordinate texture both exist, so
+  /// ancestor motion can update mapping without crossing a repaint boundary.
+  @protected
+  bool get hasLiveCoordinateMapping =>
+      _geometryImage != null &&
+      _gpuGeometryRenderer?.coordinateImage != null;
+
   /// Value identity of everything [renderShader] has captured for the current
-  /// paint: float uniforms and the geometry sampler.
+  /// paint: float uniforms and the geometry/coordinate samplers.
   ///
   /// The engine copies a shader's uniforms into the native image filter when
   /// that filter is first converted (see
   /// `ReusableFragmentShader::as_image_filter`), so a filter wrapping this
   /// shader may only be reused across paints while this snapshot compares
-  /// equal.
+  /// equal. Coordinate mapping is a live sampler and is not part of this key.
   @protected
   Object get shaderInputSnapshot => _shaderInputSnapshot;
   late Object _shaderInputSnapshot;
@@ -384,6 +435,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @protected
   bool needsGeometryUpdate = true;
 
+  final List<double> _shapeData = [];
+  static final Matrix4 _identity = Matrix4.identity();
+
   (ui.Image, Rect) _buildGpuGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
     Rect bounds,
@@ -413,7 +467,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       // Gather shapes in cache order. A negative blend marker starts a new
       // group; this preserves smooth unions within a group without blending
       // unrelated standalone glass widgets together.
-      final shapeData = <double>[];
+      _shapeData.clear();
       var numShapes = 0;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
@@ -421,7 +475,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         for (final shape in geometry.shapes) {
           if (numShapes >= 16) break; // MAX_SHAPES limit
 
-          final shapeToGeometry = shape.shapeToGeometry ?? Matrix4.identity();
+          final shapeToGeometry = shape.shapeToGeometry ?? _identity;
           final shapeOriginInGeometry = MatrixUtils.transformPoint(
             shapeToGeometry,
             Offset.zero,
@@ -496,7 +550,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
               ? -(geometry.blend * devicePixelRatio + 1)
               : geometry.blend * devicePixelRatio;
 
-          shapeData
+          _shapeData
             // vec4 0: primitive parameters.
             ..add(shape.rawShapeType.shaderIndex)
             ..add(size.width * devicePixelRatio)
@@ -524,7 +578,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       final result = renderer.render(
         width: textureWidth,
         height: textureHeight,
-        shapeData: shapeData,
+        shapeData: _shapeData,
         numShapes: numShapes,
         refractiveIndex: settings.refractiveIndex,
         thickness: settings.effectiveThickness,
@@ -550,57 +604,50 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 /// Value key describing the uniform and sampler state a [FragmentShader]
 /// image filter snapshots at creation time.
 ///
-/// The geometry image wrapper is stable while the persistent geometry texture
-/// is reused, so identity comparison is sufficient there; every other input
-/// is compared by value.
+/// Geometry and coordinate images are persistent GPU textures whose wrappers
+/// stay stable while the contents are updated in place. Transform mapping is
+/// not part of this key: it lives in [coordinateImage], which ImageFilter
+/// samples live instead of copying.
 @immutable
 class _ShaderInputSnapshot {
   const _ShaderInputSnapshot({
     required this.geometryImage,
+    required this.coordinateImage,
     required this.matteBounds,
     required this.devicePixelRatio,
-    required this.inverseOrigin,
-    required this.inverseAxisX,
-    required this.inverseAxisY,
     required this.settingsRevision,
   });
 
   final ui.Image geometryImage;
+  final ui.Image coordinateImage;
   final Rect matteBounds;
   final double devicePixelRatio;
-  final Offset inverseOrigin;
-  final Offset inverseAxisX;
-  final Offset inverseAxisY;
   final int settingsRevision;
 
   @override
   bool operator ==(Object other) {
     return other is _ShaderInputSnapshot &&
         other.geometryImage == geometryImage &&
+        other.coordinateImage == coordinateImage &&
         other.matteBounds == matteBounds &&
         other.devicePixelRatio == devicePixelRatio &&
-        other.inverseOrigin == inverseOrigin &&
-        other.inverseAxisX == inverseAxisX &&
-        other.inverseAxisY == inverseAxisY &&
         other.settingsRevision == settingsRevision;
   }
 
   @override
   int get hashCode => Object.hash(
     geometryImage,
+    coordinateImage,
     matteBounds,
     devicePixelRatio,
-    inverseOrigin,
-    inverseAxisX,
-    inverseAxisY,
     settingsRevision,
   );
 
   @override
   String toString() {
     return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
+        'coordinates: ${identityHashCode(coordinateImage)}, '
         'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
-        'origin: $inverseOrigin, axisX: $inverseAxisX, axisY: $inverseAxisY, '
         'settingsRevision: $settingsRevision)';
   }
 }

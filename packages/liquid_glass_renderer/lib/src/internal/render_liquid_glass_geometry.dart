@@ -116,6 +116,39 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     };
   }
 
+  Matrix4? _lastTransformToLayer;
+
+  /// Detects motion of this geometry relative to [layer].
+  ///
+  /// Called from the layer's paint and compositing hooks so descendant glass
+  /// does not need its own always-composite tracking layers. Returns true when
+  /// geometry must be rebuilt.
+  bool pollRelativeTransforms(RenderObject layer) {
+    if (!attached || !layer.attached || !hasSize) return false;
+
+    var changed = false;
+    final toLayer = getTransformTo(layer);
+    if (_lastTransformToLayer == null) {
+      _lastTransformToLayer = toLayer;
+    } else if (!MatrixUtils.matrixEquals(toLayer, _lastTransformToLayer)) {
+      _lastTransformToLayer = toLayer;
+      changed = true;
+    }
+
+    if (pollChildShapeTransforms()) {
+      changed = true;
+    } else if (changed) {
+      markGeometryNeedsUpdate();
+    }
+    return changed;
+  }
+
+  /// Detects motion of registered shapes relative to this geometry node.
+  ///
+  /// Direct children can skip this: their offset changes go through layout.
+  @protected
+  bool pollChildShapeTransforms() => false;
+
   @override
   @mustCallSuper
   void attach(PipelineOwner owner) {

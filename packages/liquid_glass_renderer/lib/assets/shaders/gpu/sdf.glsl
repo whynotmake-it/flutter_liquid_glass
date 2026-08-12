@@ -87,8 +87,11 @@ float getShapeSDFFromArray(int index, vec2 p) {
 }
 
 float sceneSDF(vec2 p, int numShapes) {
-    if (numShapes == 0) {
+    if (numShapes <= 0) {
         return 1e9;
+    }
+    if (numShapes == 1) {
+        return getShapeSDFFromArray(0, p);
     }
     
     float result = 1e9;

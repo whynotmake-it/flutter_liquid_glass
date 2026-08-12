@@ -1,18 +1,22 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader to a persistent GPU texture
 /// using flutter_gpu.
 ///
-/// The texture is only recreated when its dimensions change, eliminating the
-/// per-frame texture allocation/disposal cycle that causes memory spikes
-/// (Flutter issue #138627).
+/// The geometry texture is only recreated when its dimensions change,
+/// eliminating the per-frame allocation/disposal cycle (Flutter issue #138627).
 ///
-/// The [gpu.Texture.asImage] call returns a lightweight non-owning wrapper —
-/// do NOT dispose it. The underlying texture is owned by this renderer and
-/// persists across frames.
+/// [gpu.Texture.asImage] returns a lightweight non-owning wrapper — do NOT
+/// dispose it. The underlying texture is owned by this renderer.
+///
+/// [coordinateImage] is a persistent 2×1 RGBA32F texture. ImageFilter.shader
+/// copies float uniforms at creation, but sampler bindings stay live, so
+/// ancestor motion is written here instead of into uniforms.
 @internal
 class FlutterGpuGeometryRenderer {
   FlutterGpuGeometryRenderer({
@@ -23,19 +27,15 @@ class FlutterGpuGeometryRenderer {
       vertexShader,
       fragmentShader,
     );
-    // Cache uniform slot reflection info.
-    _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
-    _uniformSize = _uniformSlot.sizeInBytes ?? 0;
-    _offsetUOffset = _uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
-    _offsetUTextureSize =
-        _uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
-    _offsetOpticalProps =
-        _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
-    _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
-    _hostBuffer = _createUniformHostBuffer(_uniformSize);
-
-    // Create the static full-screen quad vertex buffer.
+    _bindUniformLayout(fragmentShader);
     _createVertexBuffer();
+    _uniformData = ByteData(_uniformSize);
+    _vertexBufferView = gpu.BufferView(
+      _vertexBuffer,
+      offsetInBytes: 0,
+      lengthInBytes: _vertexBuffer.sizeInBytes,
+    );
+    _initCoordinateTexture();
   }
 
   factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
@@ -59,7 +59,6 @@ class FlutterGpuGeometryRenderer {
 
   FlutterGpuGeometryRenderer._fromShared(_SharedGeometryResources resources) {
     _pipeline = resources.pipeline;
-    _hostBuffer = _createUniformHostBuffer(resources.uniformSize);
     _uniformSlot = resources.uniformSlot;
     _uniformSize = resources.uniformSize;
     _offsetUOffset = resources.offsetUOffset;
@@ -67,17 +66,42 @@ class FlutterGpuGeometryRenderer {
     _offsetOpticalProps = resources.offsetOpticalProps;
     _offsetShapeData = resources.offsetShapeData;
     _vertexBuffer = resources.vertexBuffer;
+    _vertexBufferView = resources.vertexBufferView;
+    _uniformData = ByteData(_uniformSize);
+    _initCoordinateTexture();
   }
 
   static final Map<String, _SharedGeometryResources> _assetResources = {};
 
-  static gpu.HostBuffer _createUniformHostBuffer(int uniformSize) {
+  /// One bump allocator for every geometry pass in the current frame.
+  ///
+  /// HostBuffer retains four device-buffer blocks. Sizing each renderer to a
+  /// single uniform used to be 1 MB × 4 × N layers; a shared scratch sized for
+  /// a frame of layers keeps that off the native heap.
+  static gpu.HostBuffer? _sharedHostBuffer;
+  static int _sharedHostBufferBlockLength = 0;
+  static Duration? _sharedHostBufferFrame;
+
+  static const int _hostBufferSlotsPerFrame = 32;
+
+  static gpu.HostBuffer _hostBufferForUniformSize(int uniformSize) {
     final alignment = gpu.gpuContext.minimumUniformByteAlignment;
     final alignedSize =
         ((uniformSize + alignment - 1) ~/ alignment) * alignment;
-    return gpu.gpuContext.createHostBuffer(
-      blockLengthInBytes: alignedSize,
-    );
+    final blockLength = alignedSize * _hostBufferSlotsPerFrame;
+    if (_sharedHostBuffer == null ||
+        _sharedHostBufferBlockLength < blockLength) {
+      _sharedHostBuffer = gpu.gpuContext.createHostBuffer(
+        blockLengthInBytes: blockLength,
+      );
+      _sharedHostBufferBlockLength = blockLength;
+    }
+    final timestamp = SchedulerBinding.instance.currentFrameTimeStamp;
+    if (_sharedHostBufferFrame != timestamp) {
+      _sharedHostBuffer!.reset();
+      _sharedHostBufferFrame = timestamp;
+    }
+    return _sharedHostBuffer!;
   }
 
   late final gpu.RenderPipeline _pipeline;
@@ -86,12 +110,17 @@ class FlutterGpuGeometryRenderer {
   Object get debugPipelineIdentity => _pipeline;
 
   @visibleForTesting
-  int get debugHostBufferBlockLength => _hostBuffer.blockLengthInBytes;
+  int get debugHostBufferBlockLength => _sharedHostBufferBlockLength;
+
+  @visibleForTesting
+  Object? get debugHostBufferIdentity => _sharedHostBuffer;
 
   /// Number of geometry command buffers submitted by this renderer.
   @visibleForTesting
   int debugRenderCount = 0;
-  late final gpu.HostBuffer _hostBuffer;
+
+  @visibleForTesting
+  int debugCoordinateUploadCount = 0;
 
   // Uniform slot reflection.
   late final gpu.UniformSlot _uniformSlot;
@@ -100,15 +129,34 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetUTextureSize;
   late final int _offsetOpticalProps;
   late final int _offsetShapeData;
+  late final ByteData _uniformData;
+  int _writtenShapeFloats = 0;
 
   // Persistent render target texture — reused across frames.
   gpu.Texture? _texture;
   ui.Image? _image;
+  gpu.RenderTarget? _renderTarget;
   int _textureWidth = 0;
   int _textureHeight = 0;
 
-  // Static full-screen quad vertex buffer (position.xy, texCoord.xy).
+  // Live 2×1 RGBA32F parameter texture sampled by the final image filter.
+  gpu.Texture? _coordinateTexture;
+  ui.Image? _coordinateImage;
+  final ByteData _coordinateData = ByteData(32);
+
   late final gpu.DeviceBuffer _vertexBuffer;
+  late final gpu.BufferView _vertexBufferView;
+
+  void _bindUniformLayout(gpu.Shader fragmentShader) {
+    _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
+    _uniformSize = _uniformSlot.sizeInBytes ?? 0;
+    _offsetUOffset = _uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
+    _offsetUTextureSize =
+        _uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
+    _offsetOpticalProps =
+        _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
+    _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
+  }
 
   void _createVertexBuffer() {
     final vertices = Float32List.fromList([
@@ -120,14 +168,87 @@ class FlutterGpuGeometryRenderer {
     _vertexBuffer = gpu.gpuContext.createDeviceBufferWithCopy(
       ByteData.sublistView(vertices),
     );
+    _vertexBufferView = gpu.BufferView(
+      _vertexBuffer,
+      offsetInBytes: 0,
+      lengthInBytes: _vertexBuffer.sizeInBytes,
+    );
+  }
+
+  /// Non-owning view of the persistent filter-to-matte mapping texture.
+  ///
+  /// Created on first [updateCoordinateMapping] call. Do NOT dispose it.
+  ui.Image? get coordinateImage => _coordinateImage;
+
+  /// Writes the affine mapping that takes image-filter fragment coordinates
+  /// into layer-local matte pixels.
+  ///
+  /// Safe to call from compositing (`addToScene`) as well as paint: the
+  /// texture is host-visible, so the same-frame backdrop filter samples the
+  /// new values without a follow-up repaint.
+  void updateCoordinateMapping({
+    required double basisXX,
+    required double basisYX,
+    required double basisXY,
+    required double basisYY,
+    required double originX,
+    required double originY,
+  }) {
+    final floats = _coordinateData.buffer.asFloat32List();
+    if (_coordinateTexture != null &&
+        floats[0] == basisXX &&
+        floats[1] == basisYX &&
+        floats[2] == basisXY &&
+        floats[3] == basisYY &&
+        floats[4] == originX &&
+        floats[5] == originY) {
+      return;
+    }
+    _initCoordinateTexture();
+    floats[0] = basisXX;
+    floats[1] = basisYX;
+    floats[2] = basisXY;
+    floats[3] = basisYY;
+    floats[4] = originX;
+    floats[5] = originY;
+    floats[6] = 0;
+    floats[7] = 0;
+    _coordinateTexture!.overwrite(_coordinateData);
+    assert(() {
+      debugCoordinateUploadCount++;
+      return true;
+    }(), 'Track live coordinate uploads in debug builds.');
+  }
+
+  void _initCoordinateTexture() {
+    if (_coordinateTexture != null) return;
+    _coordinateTexture = _createCoordinateTexture();
+    _coordinateImage = _coordinateTexture!.asImage();
+  }
+
+  static gpu.Texture _createCoordinateTexture() {
+    final texture = gpu.gpuContext.createTexture(
+      gpu.StorageMode.hostVisible,
+      2,
+      1,
+      format: gpu.PixelFormat.r32g32b32a32Float,
+      enableRenderTargetUsage: false,
+      enableShaderReadUsage: true,
+      coordinateSystem: gpu.TextureCoordinateSystem.uploadFromHost,
+    );
+    if (texture == null || !texture.isValid) {
+      throw StateError(
+        'LiquidGlass requires a host-visible RGBA32F texture for live '
+        'filter coordinates.',
+      );
+    }
+    return texture;
   }
 
   /// Renders geometry to the persistent texture and returns it as a [ui.Image].
   ///
   /// The returned image is a non-owning wrapper — do NOT dispose it.
   /// The underlying texture persists across frames.
-  ///
-  /// Returns the image view backed by the persistent render target.
   ({ui.Image image, int width, int height}) render({
     required int width,
     required int height,
@@ -162,16 +283,17 @@ class FlutterGpuGeometryRenderer {
       _image = _texture!.asImage();
       _textureWidth = allocatedWidth;
       _textureHeight = allocatedHeight;
+      // The shader writes every pixel of the full-screen quad, so a clear is
+      // wasted bandwidth on a persistent target.
+      _renderTarget = gpu.RenderTarget.singleColor(
+        gpu.ColorAttachment(
+          texture: _texture!,
+          loadAction: gpu.LoadAction.dontCare,
+        ),
+      );
     }
 
-    final texture = _texture!;
-    final renderTarget = gpu.RenderTarget.singleColor(
-      gpu.ColorAttachment(texture: texture),
-    );
-
-    // Pack uniform data into a byte buffer using reflected offsets.
-    _hostBuffer.reset();
-    final uniformData = _packUniformData(
+    _packUniformData(
       offsetX: offsetX,
       offsetY: offsetY,
       textureWidth: allocatedWidth.toDouble(),
@@ -182,21 +304,16 @@ class FlutterGpuGeometryRenderer {
       shapeData: shapeData,
     );
 
-    final uniformView = _hostBuffer.emplace(uniformData);
+    final uniformView = _hostBufferForUniformSize(
+      _uniformSize,
+    ).emplace(_uniformData);
 
     final commandBuffer = gpu.gpuContext.createCommandBuffer();
-    commandBuffer.createRenderPass(renderTarget)
+    commandBuffer.createRenderPass(_renderTarget!)
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(
-        gpu.BufferView(
-          _vertexBuffer,
-          offsetInBytes: 0,
-          lengthInBytes: _vertexBuffer.sizeInBytes,
-        ),
-        4,
-      )
+      ..bindVertexBuffer(_vertexBufferView, 4)
       ..draw();
     commandBuffer.submit();
 
@@ -212,7 +329,7 @@ class FlutterGpuGeometryRenderer {
     return requested > geometricGrowth ? requested : geometricGrowth;
   }
 
-  ByteData _packUniformData({
+  void _packUniformData({
     required double offsetX,
     required double offsetY,
     required double textureWidth,
@@ -222,21 +339,16 @@ class FlutterGpuGeometryRenderer {
     required double numShapes,
     required List<double> shapeData,
   }) {
-    final data = ByteData(_uniformSize);
-    final floatData = data.buffer.asFloat32List();
+    final floatData = _uniformData.buffer.asFloat32List();
 
-    // uOffset (vec2)
     final uOffsetIndex = _offsetUOffset ~/ 4;
     floatData[uOffsetIndex] = offsetX;
     floatData[uOffsetIndex + 1] = offsetY;
 
-    // uTextureSize (vec2), used to convert OpenGL's bottom-up fragment
-    // coordinates into Flutter's top-down coordinate system.
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
     floatData[textureSizeIndex] = textureWidth;
     floatData[textureSizeIndex + 1] = textureHeight;
 
-    // uOpticalProps (vec4)
     final opticalIndex = _offsetOpticalProps ~/ 4;
     floatData[opticalIndex] = refractiveIndex;
     floatData[opticalIndex + 1] =
@@ -244,22 +356,24 @@ class FlutterGpuGeometryRenderer {
     floatData[opticalIndex + 2] = thickness;
     floatData[opticalIndex + 3] = numShapes;
 
-    // uShapeData (vec4 array). Packing scalar shape values into vec4s avoids
-    // std140's 16-byte stride for every individual float.
     final shapeDataStartIndex = _offsetShapeData ~/ 4;
-    for (var i = 0; i < shapeData.length && i < 192; i++) {
+    final shapeFloats = shapeData.length < 192 ? shapeData.length : 192;
+    for (var i = 0; i < shapeFloats; i++) {
       floatData[shapeDataStartIndex + i] = shapeData[i];
     }
-
-    return data;
+    for (var i = shapeFloats; i < _writtenShapeFloats; i++) {
+      floatData[shapeDataStartIndex + i] = 0;
+    }
+    _writtenShapeFloats = shapeFloats;
   }
 
-  /// Releases the persistent texture.
+  /// Releases the persistent textures.
   void dispose() {
-    // gpu.Texture does not have an explicit dispose method.
-    // The texture is garbage collected when no longer referenced.
     _texture = null;
     _image = null;
+    _renderTarget = null;
+    _coordinateTexture = null;
+    _coordinateImage = null;
   }
 }
 
@@ -281,25 +395,18 @@ class _SharedGeometryResources {
         uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
     offsetShapeData = uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
     final vertices = Float32List.fromList([
-      -1.0,
-      -1.0,
-      0.0,
-      0.0,
-      1.0,
-      -1.0,
-      1.0,
-      0.0,
-      -1.0,
-      1.0,
-      0.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
+      -1.0, -1.0, 0.0, 0.0, //
+      1.0, -1.0, 1.0, 0.0, //
+      -1.0, 1.0, 0.0, 1.0, //
+      1.0, 1.0, 1.0, 1.0, //
     ]);
     vertexBuffer = gpu.gpuContext.createDeviceBufferWithCopy(
       ByteData.sublistView(vertices),
+    );
+    vertexBufferView = gpu.BufferView(
+      vertexBuffer,
+      offsetInBytes: 0,
+      lengthInBytes: vertexBuffer.sizeInBytes,
     );
   }
 
@@ -311,4 +418,5 @@ class _SharedGeometryResources {
   late final int offsetOpticalProps;
   late final int offsetShapeData;
   late final gpu.DeviceBuffer vertexBuffer;
+  late final gpu.BufferView vertexBufferView;
 }

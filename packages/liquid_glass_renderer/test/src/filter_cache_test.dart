@@ -69,7 +69,7 @@ void main() {
   );
 
   testWidgets(
-    'rebuilds the filter when an ancestor transform moves the layer',
+    'reuses the composed filter when an ancestor transform moves the layer',
     (tester) async {
       Widget movedGlass(Offset offset) => CupertinoApp(
         home: Transform.translate(
@@ -84,20 +84,25 @@ void main() {
       final renderObject = findLayer(tester);
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
       expect(firstFilter, isNotNull);
+      final renderer = renderObject.gpuGeometryRenderer!;
+      final initialUploads = renderer.debugCoordinateUploadCount;
+      expect(initialUploads, greaterThan(0));
 
       await tester.pumpWidget(movedGlass(const Offset(12, 8)));
       // The transform change is detected by the tracking layer during
-      // compositing, which marks the layer for repaint. Compositing runs in
-      // the persistent-callbacks scheduler phase, where ensureVisualUpdate
-      // does not schedule a follow-up frame (in a real app, the animation
-      // or scroll driving the transform keeps frames flowing), so schedule
-      // one explicitly.
+      // compositing. Mapping is written into the live coordinate texture
+      // there, so this must not wait on a follow-up paint.
       tester.binding.scheduleFrame();
       await tester.pump();
 
-      final rebuilt = renderObject.debugBackdropFilterLayer?.filter;
-      expect(rebuilt, isNotNull);
-      expect(rebuilt, isNot(same(firstFilter)));
+      expect(
+        renderObject.debugBackdropFilterLayer?.filter,
+        same(firstFilter),
+      );
+      expect(
+        renderer.debugCoordinateUploadCount,
+        greaterThan(initialUploads),
+      );
     },
     skip: skipProperGlassTests,
   );

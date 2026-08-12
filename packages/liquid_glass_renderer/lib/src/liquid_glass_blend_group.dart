@@ -1,7 +1,7 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
@@ -147,8 +147,7 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
 
 @visibleForTesting
 @internal
-class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
-    with TransformTrackingRenderObjectMixin {
+class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
   RenderLiquidGlassBlendGroup({
     required super.renderLink,
     required super.devicePixelRatio,
@@ -190,10 +189,36 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     markNeedsPaint();
   }
 
+  List<Matrix4?> _lastShapeTransforms = const [];
+
   @override
-  void onTransformChanged() {
-    markGeometryNeedsUpdate();
-    markNeedsPaint();
+  bool pollChildShapeTransforms() {
+    final entries = link.shapeEntries;
+    if (_lastShapeTransforms.length != entries.length) {
+      _lastShapeTransforms = List<Matrix4?>.filled(entries.length, null);
+      for (var i = 0; i < entries.length; i++) {
+        final shape = entries[i].key;
+        if (shape.attached && shape.parent != this) {
+          _lastShapeTransforms[i] = shape.getTransformTo(this);
+        }
+      }
+      return false;
+    }
+
+    var changed = false;
+    for (var i = 0; i < entries.length; i++) {
+      final shape = entries[i].key;
+      if (!shape.attached || shape.parent == this) continue;
+      final transform = shape.getTransformTo(this);
+      if (!MatrixUtils.matrixEquals(transform, _lastShapeTransforms[i])) {
+        _lastShapeTransforms[i] = transform;
+        changed = true;
+      }
+    }
+    if (changed) {
+      markGeometryNeedsUpdate();
+    }
+    return changed;
   }
 
   @override
@@ -327,8 +352,14 @@ class GlassGroupLink with ChangeNotifier {
 
   List<
     MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
+  >?
+  _shapeEntriesCache;
+
+  List<
+    MapEntry<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
   >
-  get shapeEntries => _shapes.entries.toList();
+  get shapeEntries =>
+      _shapeEntriesCache ??= _shapes.entries.toList(growable: false);
 
   /// Check if any shapes are registered.
   bool get hasShapes => _shapes.isNotEmpty;
@@ -340,12 +371,14 @@ class GlassGroupLink with ChangeNotifier {
     required bool glassContainsChild,
   }) {
     _shapes[renderObject] = (shape, glassContainsChild);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
   /// Unregister a shape from this link.
   void unregisterShape(RenderLiquidGlass renderObject) {
     _shapes.remove(renderObject);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
@@ -356,6 +389,7 @@ class GlassGroupLink with ChangeNotifier {
     required bool glassContainsChild,
   }) {
     _shapes[renderObject] = (shape, glassContainsChild);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
@@ -369,6 +403,7 @@ class GlassGroupLink with ChangeNotifier {
   @override
   void dispose() {
     _shapes.clear();
+    _shapeEntriesCache = null;
     super.dispose();
   }
 }

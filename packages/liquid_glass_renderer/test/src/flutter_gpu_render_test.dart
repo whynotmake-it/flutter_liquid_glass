@@ -89,7 +89,12 @@ void main() {
         identical(first.debugPipelineIdentity, second.debugPipelineIdentity),
         isTrue,
       );
-      expect(first.debugHostBufferBlockLength, lessThan(4096));
+      expect(
+        identical(first.debugHostBufferIdentity, second.debugHostBufferIdentity),
+        isTrue,
+      );
+      expect(first.debugHostBufferBlockLength, greaterThan(0));
+      expect(first.debugHostBufferBlockLength, lessThan(64 * 1024));
     },
     skip: expectFallback,
   );
@@ -133,6 +138,61 @@ void main() {
       expect(identical(first.image, larger.image), isFalse);
       expect((smallerAgain.width, smallerAgain.height), (128, 128));
       expect(identical(larger.image, smallerAgain.image), isTrue);
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'coordinate mapping reuses a persistent float texture',
+    () {
+      final library = gpu.ShaderLibrary.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      )!;
+      final renderer = FlutterGpuGeometryRenderer(
+        vertexShader: library['GeometryVertex']!,
+        fragmentShader: library['GeometryFragment']!,
+      );
+      addTearDown(renderer.dispose);
+
+      expect(renderer.coordinateImage, isNotNull);
+      expect(renderer.coordinateImage!.width, 2);
+      expect(renderer.coordinateImage!.height, 1);
+      expect(renderer.debugCoordinateUploadCount, 0);
+
+      renderer.updateCoordinateMapping(
+        basisXX: 1,
+        basisYX: 0,
+        basisXY: 0,
+        basisYY: 1,
+        originX: 12,
+        originY: -8,
+      );
+      final first = renderer.coordinateImage;
+      expect(first, isNotNull);
+      expect(first!.width, 2);
+      expect(first.height, 1);
+      expect(renderer.debugCoordinateUploadCount, 1);
+
+      renderer.updateCoordinateMapping(
+        basisXX: 1,
+        basisYX: 0,
+        basisXY: 0,
+        basisYY: 1,
+        originX: 40,
+        originY: 6,
+      );
+      expect(identical(renderer.coordinateImage, first), isTrue);
+      expect(renderer.debugCoordinateUploadCount, 2);
+
+      renderer.updateCoordinateMapping(
+        basisXX: 1,
+        basisYX: 0,
+        basisXY: 0,
+        basisYY: 1,
+        originX: 40,
+        originY: 6,
+      );
+      expect(renderer.debugCoordinateUploadCount, 2);
     },
     skip: expectFallback,
   );

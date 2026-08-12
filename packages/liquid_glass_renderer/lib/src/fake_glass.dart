@@ -80,30 +80,40 @@ class FakeGlass extends StatelessWidget {
               (useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null);
-    return GlassShadow(
+    Widget clipped = OptimizedClip(
       shape: shape,
-      shadows: shadows,
-      settings: settings,
-      child: OptimizedClip(
-        shape: shape,
-        child: ShaderBuilder(
-          assetKey: ShaderKeys.fakeGlassColor,
-          (context, shader, child) => RawFakeGlass(
-            shape: shape,
-            settings: settings,
-            backdropKey: backdropKey,
-            colorShader: shader,
+      child: ShaderBuilder(
+        assetKey: ShaderKeys.fakeGlassColor,
+        (context, shader, child) => RawFakeGlass(
+          shape: shape,
+          settings: settings,
+          backdropKey: backdropKey,
+          colorShader: shader,
+          child: child,
+        ),
+        child: _maybeFade(
+          settings.visibility,
+          GlassGlowLayer(
             child: child,
-          ),
-          child: Opacity(
-            opacity: settings.visibility.clamp(0, 1),
-            child: GlassGlowLayer(
-              child: child,
-            ),
           ),
         ),
       ),
     );
+    if (shadows.isEmpty) {
+      return clipped;
+    }
+    return GlassShadow(
+      shape: shape,
+      shadows: shadows,
+      settings: settings,
+      child: clipped,
+    );
+  }
+
+  static Widget _maybeFade(double visibility, Widget child) {
+    final opacity = visibility.clamp(0.0, 1.0);
+    if (opacity >= 1) return child;
+    return Opacity(opacity: opacity, child: child);
   }
 }
 
