@@ -1,123 +1,158 @@
-# Apple liquid glass matching
+# Apple liquid-glass matching
 
-Deterministic scorecard for getting Flutter glass close to Apple without
-LLM vibe-checks. This is not a pixel-perfect clone. The contract is a numeric
-closeness score against pinned iOS 27 captures.
+This directory is an executable, deterministic scorecard for matching
+`liquid_glass_renderer` to a pinned official iOS 27 SwiftUI control. It does
+not use screenshot “vibe checks,” private `_UIViewGlass`, private uniforms, or
+Apple's Liquid Glass transparency slider.
 
-The harness that will live in this directory is not built yet. This document
-is the plan: scene JSON, a SwiftUI capture app, a Flutter capture of the same
-JSON, OpenCV/NumPy compare (flow/MTF), then `scorecard.json` plus diagnostic
-PNGs.
+The training profile is `toolbar_capsule`. Its Apple reference is an actual
+SwiftUI `Button` using the public `.buttonStyle(.glass)` API. The API signature
+was verified in the installed SwiftUI SDK interface:
 
-Do not let the LLM judge closeness. The LLM only patches shaders and settings.
-Success is JSON thresholds.
-
-## Source of truth
-
-Pinned **iOS 27** simulator. iOS 26 Clear/Tinted is obsolete. macOS
-WindowServer glass is a later cross-check, not the reference.
-
-First honesty check: one probe on the simulator versus a real iOS 27 device.
-If they disagree, freeze Apple references from the device and only re-capture
-Flutter overnight.
-
-Pin device, orientation, and Reduce Motion for every capture.
-
-## Capture protocol
-
-Subtractive probes, one scene at a time. Compare:
-
-| Probe | Background | Isolates |
-| --- | --- | --- |
-| A | Grid or photo | Combined look |
-| B | Mid-gray | Subtract from A → refraction / warp |
-| C | Black | Specular / highlight |
-| D | White or solid color | Tint / face color |
-
-Median of N frames. Apple specular jitters, and a physical device can shift
-pose between shots.
-
-Tell **radial flow sign** on A−B, not just magnitude:
-
-- Convex lens: interior ~0, rim flow inward.
-- Lip / switch: center minifies (flow reverses).
-- Same shape after scaling = just bezel width, not a different profile.
-
-## iOS 27 transparency slider
-
-Settings → Appearance → Liquid Glass. Sweep
-`{0, 0.25, 0.5, 0.75, 1.0}` (0 = ultra clear, 1 = most tinted). Midpoint is
-the default. Reduce Transparency is a separate endpoint, not `t=1`.
-
-Hypothesis: a tint + blur overlay fading in. Do **not** map this slider to
-`LiquidGlassSettings.visibility` until the sweep plot exists. `visibility`
-also scales thickness and refraction.
-
-No public `simctl` key yet. Dump defaults or XCUITest-drag Settings.
-
-## Per-control catalog
-
-One lens does not describe every control. Score per profile, not one pill:
-
-- `profile_toolbar_capsule`
-- `profile_switch` (off and on; crop the thumb)
-- `profile_slider_track` / `profile_slider_thumb`
-- generic grid capsule + transparency sweep
-- tab bar as a **holdout** (acceptance, not loss)
-
-## What our shader does today
-
-`packages/liquid_glass_renderer/lib/assets/shaders/render.glsl` builds a
-quarter-circle convex height from the SDF:
-
-```glsl
-getHeight(sd, thickness) = sqrt(thickness^2 - (thickness+sd)^2)
+```swift
+@available(iOS 26.0, *)
+extension PrimitiveButtonStyle where Self == GlassButtonStyle {
+  public static var glass: GlassButtonStyle { get }
+  public static func glass(_ glass: Glass) -> Self
+}
 ```
 
-`thickness` and `refractiveIndex` cannot become a lip profile. If Apple's
-switch differs, the agent must change `getHeight` or add a per-shape profile
-enum. Do not keep turning the existing knobs and hoping.
+An iOS 27 SDK/runtime is still required for the official capture. A capture
+from iOS 26 or older must never be placed in `references/`.
 
-## First slice
+## Layout
 
-Four static probes + transparency sweep + tab-bar holdout. Prove the
-scorecard moves when `thickness`, `lightAngle`, and `blur` change. Then the
-overnight loop is allowed to patch.
+- `scenes/`: shared JSON schema and deterministic A/B/C/D scene.
+- `apple/`: dependency-free native SwiftUI app, direct `swiftc` build, and
+  pinned-simulator capture driver.
+- `flutter/`: standalone Flutter capture target using
+  `liquid_glass_renderer`, Impeller/Metal, and Flutter GPU.
+- `compare/`: OpenCV/NumPy alignment, residual, signed radial-flow,
+  gradient-sharpness, specular, tint metrics, and tests.
+- `settings/`: baseline and bounded deterministic search space.
+- `references/`: immutable, named Apple capture sets. Replacement requires
+  `FORCE_REFERENCE=1`.
+- `out/`: ignored candidates, diagnostics, and scorecards.
 
-## Overnight loop
+## Reproducible setup
 
-Better dump than LLM screenshots: per-control `_UIViewGlass` +
-`glassBackground` uniforms on the iOS 27 simulator (slider vs tab pill vs
-toggle).
+Requirements:
 
-Published reverse engineering (no `metallib` dump):
+- Xcode with the iOS 27 SDK and accepted Xcode license.
+- Flutter 3.44.1.
+- `agent-device >= 0.14.0`.
+- Python 3 with packages pinned by `compare/requirements.txt`.
 
-- [Lrdcq](https://lrdcq.com/me/read.php/165.htm) — `_UIViewGlass`,
-  `CABackdropLayer` + `glassBackground`, `CASDFLayer`. Warp is a **1D
-  SDF-distance remap**, not Snell on a 3D bezel. Modes: shrink, magnify, and
-  **reflect** (most used). Knobs: `inputInnerRefractionHeight`,
-  `inputInnerRefractionAmount`. Flags: `contentLensing`,
-  `excludingControlLensing`, `excludingControlDisplacement`.
-- CAFilterBuiltins: inner **and** outer refraction; 5-stop blur ramp
-  (`blurOpacity0–4` / `blurDistance0–4`); face tint matrix; bleed; shadow;
-  separate `glassForeground` with aberration.
-- [ShatteredGlass](https://github.com/AlexStrNik/ShatteredGlass) — “Liquid
-  Lens” for slider/toggle still in progress; dual opposite-angle
-  `CASDFGlassHighlightEffect`.
-- [GlassExplorer](https://github.com/ktiays/GlassExplorer)
-- [sspai](https://sspai.com/post/100983)
-- decant: icon CoreUI only, not chrome.
-- kube.io CSS article is a reconstruction, not a leak.
-
-## Layout (planned)
-
+```bash
+cd packages/liquid_glass_renderer/example/tool/apple_match
+export DEVELOPER_DIR=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer
+export FLUTTER_BIN="$HOME/fvm/versions/3.44.1/bin/flutter"
+python3 -m venv compare/.venv
+compare/.venv/bin/pip install -r compare/requirements.txt
+export IOS_27_UDID="$(compare/.venv/bin/python pin_simulator.py)"
+agent-device devices --platform ios
 ```
-tool/apple_match/
-  README.md          ← this plan
-  scenes/*.json      ← shared scene graph
-  apple/             ← SwiftUI capture app
-  flutter/           ← Flutter capture of the same JSON
-  compare/           ← OpenCV/NumPy flow + MTF
-  out/scorecard.json
-  out/*.png
+
+The simulator name is pinned to `AppleMatch-iPhone17Pro-iOS27`; the script
+prints its exact UDID. Captures are portrait, 402×874 logical points at 3×,
+light appearance, Reduce Motion enabled, and Reduce Transparency off. The
+scene JSON records the remaining geometry and transparency metadata.
+
+## Tests
+
+Run comparator/schema tests before trusting any optimization:
+
+```bash
+cd compare
+PYTHONPATH=. python3 -m unittest discover -s tests -v
+cd ../flutter
+"$FLUTTER_BIN" pub get
+"$(dirname "$FLUTTER_BIN")/dart" format --output=none --set-exit-if-changed lib test
+"$FLUTTER_BIN" analyze
+"$FLUTTER_BIN" test
+cd ..
 ```
+
+The tests prove that an exact synthetic match beats blur/light/tint
+perturbations and that each parameter family changes its intended decomposed
+metric. Once iOS 27 is installed and licensed, type-check/build the native app:
+
+```bash
+bash apple/test.sh
+bash apple/build.sh
+```
+
+## One-command capture and bounded search
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python run.py
+```
+
+This validates the scene, freezes Apple A/B/C/D references if absent, captures
+the baseline Flutter candidate, evaluates at most 24 deterministic combinations
+of thickness, blur, light angle, and light intensity, and writes:
+
+- `out/baseline/scorecard.json`
+- `out/best/scorecard.json`
+- `out/best/settings.json`
+- `out/summary.json`
+- `out/best/signed_diff_x4.png`
+- `out/best/signed_radial_flow.png`
+- `out/best/gradient_profile.png`
+
+Every scorecard exposes component errors, weights, normalization thresholds,
+alignment, inputs, and exact settings. The tab bar is not optimized in this
+slice; if added, it must remain a holdout.
+
+## Verified iOS 27 result
+
+The checked reference set was captured from:
+
+- Xcode 27.0 beta 5 (`27A5237l`)
+- iOS 27.0 simulator runtime `24A5408d`
+- runtime identifier `com.apple.CoreSimulator.SimRuntime.iOS-27-0`
+- iPhone 17 Pro simulator `DB4F41F3-1C36-476D-B775-AFDC3686C75B`
+- portrait, light appearance, large content size, Reduce Motion enabled,
+  Reduce Transparency disabled
+
+The baseline scored **52.2076**. The best of the 24 fixed candidates scored
+**85.8822**, an absolute gain of **33.6746** and a relative gain of
+**64.5013% ± 0.0000%** across three identical captured frames. Best settings:
+
+```json
+{
+  "thickness": 28.0,
+  "blur": 6.0,
+  "lightAngle": 1.5707963267948966,
+  "lightIntensity": 0.25,
+  "ambientStrength": 0.0,
+  "glassAlpha": 0.53,
+  "refractiveIndex": 1.2,
+  "saturation": 1.5
+}
+```
+
+`agent-device 0.17.5` was verified and its workflow/settings/debugging/macOS
+guidance was followed. Its Xcode 27 runner selected a physical-device
+provisioning path on this host, so the noninteractive capture driver uses the
+documented public `xcrun simctl` launch and screenshot commands instead. No
+private glass API or private uniforms are used.
+
+## Interpretation and limitations
+
+`score = 100 × (1 − weighted normalized error)`. The components are combined
+appearance (30%), signed radial-flow residual (25%), edge/gradient sharpness
+(15%), black-probe specular residual (15%), and white-probe tint residual
+(15%). Higher is better. This is a deterministic engineering score, not a
+claim of perceptual identity.
+
+Simulator-to-physical-device equivalence is **pending** until the same probe is
+captured on a real iOS 27 device. Do not claim device equivalence from these
+simulator references. Three-frame temporal uncertainty is emitted in each
+scorecard; this run produced identical frames and therefore a measured interval
+of zero, which does not cover simulator-to-device variation.
+
+Generated build products, virtual environments, caches, and candidate output
+are ignored. Only small, deliberately reviewed reference/evidence PNGs should
+be versioned. No production renderer or shader changes are required by the
+harness itself.

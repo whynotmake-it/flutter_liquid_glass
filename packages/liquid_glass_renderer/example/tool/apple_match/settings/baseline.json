@@ -1,0 +1,20 @@
+{
+  "shapeWidth": 225.333,
+  "shapeHeight": 101.0,
+  "shapeOffsetX": 0.0,
+  "shapeOffsetY": 0.0,
+  "cornerRadius": 50.5,
+  "shapeProfile": "roundedRectangle",
+  "thickness": 28.0,
+  "blur": 6.0,
+  "lightAngle": 1.5707963267948966,
+  "lightIntensity": 0.25,
+  "ambientStrength": 0.0,
+  "glassRed": 255,
+  "glassGreen": 255,
+  "glassBlue": 255,
+  "glassAlpha": 0.53,
+  "refractiveIndex": 1.2,
+  "saturation": 1.5,
+  "chromaticAberration": 0.01
+}

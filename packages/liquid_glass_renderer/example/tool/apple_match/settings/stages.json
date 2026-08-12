@@ -1,0 +1,57 @@
+{
+  "shape": [
+    {"shapeWidth": 222.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 1.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 3.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 2.0, "cornerRadius": 48.0, "shapeProfile": "superellipse"}
+  ],
+  "refraction": [
+    {"thickness": 8.0, "refractiveIndex": 1.1, "chromaticAberration": 0.0},
+    {"thickness": 12.0, "refractiveIndex": 1.15, "chromaticAberration": 0.0},
+    {"thickness": 16.0, "refractiveIndex": 1.2, "chromaticAberration": 0.0},
+    {"thickness": 20.0, "refractiveIndex": 1.2, "chromaticAberration": 0.01},
+    {"thickness": 24.0, "refractiveIndex": 1.2, "chromaticAberration": 0.02},
+    {"thickness": 28.0, "refractiveIndex": 1.2, "chromaticAberration": 0.01},
+    {"thickness": 32.0, "refractiveIndex": 1.25, "chromaticAberration": 0.01},
+    {"thickness": 36.0, "refractiveIndex": 1.3, "chromaticAberration": 0.02}
+  ],
+  "blurMtf": [
+    {"blur": 1.0},
+    {"blur": 2.0},
+    {"blur": 3.0},
+    {"blur": 4.0},
+    {"blur": 5.0},
+    {"blur": 6.0},
+    {"blur": 8.0},
+    {"blur": 10.0}
+  ],
+  "tintColor": [
+    {"glassAlpha": 0.48, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.50, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.54, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.52, "saturation": 0.8, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.52, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 255, "glassGreen": 248, "glassBlue": 248},
+    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 248, "glassGreen": 255, "glassBlue": 252},
+    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 250, "glassGreen": 250, "glassBlue": 255}
+  ],
+  "highlight": [
+    {"lightIntensity": 0.0, "ambientStrength": 0.0, "lightAngle": 1.5707963267948966},
+    {"lightIntensity": 0.10, "ambientStrength": 0.0, "lightAngle": 1.5707963267948966},
+    {"lightIntensity": 0.20, "ambientStrength": 0.0, "lightAngle": 1.5707963267948966},
+    {"lightIntensity": 0.30, "ambientStrength": 0.0, "lightAngle": 1.5707963267948966},
+    {"lightIntensity": 0.20, "ambientStrength": 0.03, "lightAngle": 0.7853981633974483},
+    {"lightIntensity": 0.20, "ambientStrength": 0.03, "lightAngle": 1.5707963267948966},
+    {"lightIntensity": 0.20, "ambientStrength": 0.03, "lightAngle": 2.356194490192345},
+    {"lightIntensity": 0.30, "ambientStrength": 0.06, "lightAngle": 1.5707963267948966}
+  ]
+}
