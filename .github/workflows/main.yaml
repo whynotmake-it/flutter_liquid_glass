@@ -34,7 +34,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
       
       - name: Ⓜ️ Set up Melos
@@ -59,7 +59,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos
@@ -86,7 +86,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos

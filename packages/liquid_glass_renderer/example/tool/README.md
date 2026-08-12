@@ -7,7 +7,9 @@ A failing scenario run is recorded in the summary and the harness continues
 with the remaining scenarios instead of aborting.
 
 See [PERFORMANCE_AUDIT.md](PERFORMANCE_AUDIT.md) for the prioritized,
-benchmark-driven optimization backlog.
+benchmark-driven optimization backlog. See
+[apple_match/README.md](apple_match/README.md) for the Apple-matching
+scorecard plan.
 
 Every run records three sources, none of which needs Instruments:
 
