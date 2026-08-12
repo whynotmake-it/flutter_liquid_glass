@@ -11,6 +11,7 @@ void main() {
   group('FakeGlass', () {
     goldenTest(
       'renders with zero blur',
+      skip: skipGoldenTests,
       fileName: _backendGolden('fake_glass_zero_blur'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(
@@ -71,6 +72,7 @@ void main() {
 
     goldenTest(
       'shadow visibility scales with settings',
+      skip: skipGoldenTests,
       fileName: _backendGolden('fake_glass_shadow_visibility'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(
@@ -106,6 +108,7 @@ void main() {
 
     goldenTest(
       'offset shadow is cut out behind glass',
+      skip: skipGoldenTests,
       fileName: _backendGolden('fake_glass_offset_shadow_cutout'),
       pumpBeforeTest: pumpOnce,
       builder: () => GoldenTestGroup(

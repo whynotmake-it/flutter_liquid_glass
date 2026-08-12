@@ -89,6 +89,23 @@ void main() {
         identical(first.debugPipelineIdentity, second.debugPipelineIdentity),
         isTrue,
       );
+
+      const unusedShape = [
+        1, 8, 8, 0, //
+        1, 0, 0, 1, //
+        8, 8, 1, -1, //
+      ];
+      first.render(
+        width: 16,
+        height: 16,
+        shapeData: unusedShape,
+        numShapes: 1,
+        refractiveIndex: 1.2,
+        thickness: 4,
+        offsetX: 0,
+        offsetY: 0,
+      );
+
       expect(
         identical(
           first.debugHostBufferIdentity,

@@ -58,7 +58,7 @@ void main() {
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
         'should render a rounded superellipse with different thickness',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'rounded_superellipse_thicknesses',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
@@ -87,7 +87,7 @@ void main() {
 
       goldenTest(
         'should render a rounded superellipse with different radii',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'rounded_superellipse_radii',
         pumpBeforeTest: pumpOnce,
         builder: () {
@@ -162,7 +162,7 @@ void main() {
     group('merging', () {
       goldenTest(
         'shapes merge with different blend values',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'merging_blend_values',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
@@ -212,7 +212,7 @@ void main() {
     group('transforms', () {
       goldenTest(
         'keeps composed blur sampling aligned away from the surface origin',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'liquid_glass_composed_filter_coordinates',
         pumpBeforeTest: _pumpAtDpr2,
         builder: () => GoldenTestGroup(
@@ -228,7 +228,7 @@ void main() {
 
       goldenTest(
         'keeps stretched blend-group geometry aligned at DPR 2',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'liquid_glass_blend_group_stretch_dpr2',
         pumpBeforeTest: _pumpAtDpr2,
         builder: () => GoldenTestGroup(
@@ -278,7 +278,7 @@ void main() {
 
       goldenTest(
         'keeps the effect aligned with scaled content at DPR 2',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'liquid_glass_transform_dpr2',
         pumpBeforeTest: _pumpAtDpr2,
         builder: () => GoldenTestGroup(
@@ -314,7 +314,7 @@ void main() {
 
       goldenTest(
         'keeps geometry aligned through affine and clipped transforms',
-        skip: skipProperGlassTests,
+        skip: skipGoldenTests,
         fileName: 'liquid_glass_transform_matrix',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(

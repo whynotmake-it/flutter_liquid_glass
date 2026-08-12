@@ -25,11 +25,6 @@ class FlutterGpuGeometryRenderer {
     _bindUniformLayout(fragmentShader);
     _createVertexBuffer();
     _uniformData = ByteData(_uniformSize);
-    _vertexBufferView = gpu.BufferView(
-      _vertexBuffer,
-      offsetInBytes: 0,
-      lengthInBytes: _vertexBuffer.sizeInBytes,
-    );
   }
 
   factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
