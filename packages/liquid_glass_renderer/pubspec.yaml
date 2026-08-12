@@ -16,8 +16,8 @@ topics:
   - effects
 
 environment:
-  sdk: ">=3.12.0 <4.0.0"
-  flutter: ">=3.44.0"
+  sdk: ">=3.12.0 <3.13.0"
+  flutter: ">=3.44.0 <3.45.0"
 
 # We only support Platforms that support Impeller.
 platforms:

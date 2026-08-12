@@ -123,7 +123,7 @@ LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS=20 \
 ```
 
 Set `LIQUID_GLASS_FLUTTER_BIN` and `LIQUID_GLASS_DART_BIN` to absolute SDK
-paths when the system SDK is not the repository's Flutter 3.44+ SDK. Set
+paths when the system SDK is not the repository's Flutter 3.44.x SDK. Set
 `LIQUID_GLASS_BENCHMARK_TRACE_TEMPLATE` to override the default Xcode
 `Metal System Trace` template. The native trace uses 500 ms workload
 windows by default; override this with
