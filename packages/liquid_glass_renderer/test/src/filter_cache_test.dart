@@ -84,24 +84,16 @@ void main() {
       final renderObject = findLayer(tester);
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
       expect(firstFilter, isNotNull);
-      final renderer = renderObject.gpuGeometryRenderer!;
-      final initialUploads = renderer.debugCoordinateUploadCount;
-      expect(initialUploads, greaterThan(0));
 
       await tester.pumpWidget(movedGlass(const Offset(12, 8)));
-      // The transform change is detected by the tracking layer during
-      // compositing. Mapping is written into the live coordinate texture
-      // there, so this must not wait on a follow-up paint.
+      // Ancestor translation is compositor-only. The tracking layer sees the
+      // transform change during compositing and must not rebuild the filter.
       tester.binding.scheduleFrame();
       await tester.pump();
 
       expect(
         renderObject.debugBackdropFilterLayer?.filter,
         same(firstFilter),
-      );
-      expect(
-        renderer.debugCoordinateUploadCount,
-        greaterThan(initialUploads),
       );
     },
     skip: skipProperGlassTests,

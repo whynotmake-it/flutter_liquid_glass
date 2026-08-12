@@ -437,7 +437,6 @@ void main() {
           final renderer = renderObject.gpuGeometryRenderer!;
           final initialRenderCount = renderer.debugRenderCount;
           final initialPaintCount = renderObject.debugPaintCount;
-          final initialUploads = renderer.debugCoordinateUploadCount;
           final blendGroup = tester.allRenderObjects
               .whereType<RenderLiquidGlassBlendGroup>()
               .last;
@@ -450,10 +449,6 @@ void main() {
           expect(renderer.debugRenderCount, initialRenderCount);
           expect(renderObject.debugPaintCount, initialPaintCount);
           expect(blendGroup.geometryState, LiquidGlassGeometryState.updated);
-          expect(
-            renderer.debugCoordinateUploadCount,
-            greaterThan(initialUploads),
-          );
         },
         skip: expectFlutterGpuFallback,
       );

@@ -303,18 +303,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Matrix4 get matteTransform => Matrix4.identity();
 
   @override
-  Matrix4 get shaderCoordinateTransform => getTransformTo(null);
-
-  @override
   void onTransformChanged() {
-    // Geometry is layer-local. Ancestor motion only changes the final-pass
-    // mapping, which lives in a live sampler, so a moving ancestor must not
-    // cross this layer's repaint boundary or rebuild the native image filter.
-    if (!hasLiveCoordinateMapping) {
-      markNeedsPaint();
+    // Geometry and FlutterFragCoord share this layer's clip space, so ancestor
+    // motion is compositor-only. Do not cross the repaint boundary or rebuild
+    // the native image filter after the first paint.
+    if (hasReusableGeometry) {
       return;
     }
-    syncCoordinateMapping();
+    markNeedsPaint();
   }
 
   @override

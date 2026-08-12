@@ -35,10 +35,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
   Matrix4 get matteTransform;
 
-  /// Maps local matte bounds into the coordinate space used by
-  /// `FlutterFragCoord` in the final image-filter shader.
-  Matrix4 get shaderCoordinateTransform => Matrix4.identity();
-
   late GeometryRenderLink _link;
   GeometryRenderLink get link => _link;
   set link(GeometryRenderLink value) {
@@ -165,7 +161,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   ui.Rect get paintBounds => _paintBounds;
 
   /// Number of times [paint] has run. Ancestor motion should not increment
-  /// this once live coordinate mapping is active.
+  /// this once geometry has been encoded.
   @visibleForTesting
   int debugPaintCount = 0;
 
@@ -274,18 +270,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       );
     } else {
       if (_geometryImage case final geometryImage?) {
-        final coordinateImage = syncCoordinateMapping();
         renderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
             value
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
               ..setSize(_geometryMatteBounds.size * devicePixelRatio);
           })
-          ..setImageSampler(1, geometryImage)
-          ..setImageSampler(2, coordinateImage);
+          ..setImageSampler(1, geometryImage);
         _shaderInputSnapshot = _ShaderInputSnapshot(
           geometryImage: geometryImage,
-          coordinateImage: coordinateImage,
           matteBounds: _geometryMatteBounds,
           devicePixelRatio: devicePixelRatio,
           settingsRevision: _shaderSettingsRevision,
@@ -315,68 +308,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     Rect boundingBox,
   );
 
-  /// Writes the live filter-to-matte mapping and returns the persistent
-  /// coordinate image.
-  ///
-  /// ImageFilter.shader copies float uniforms at creation, so this mapping
-  /// cannot live in uniforms without allocating a new native filter whenever
-  /// an ancestor moves. Sampler bindings stay live, which is why the mapping
-  /// is a 2×1 float texture. Safe to call from compositing as well as paint.
+  /// True once geometry has been encoded, so ancestor motion can stay on the
+  /// compositor without crossing this layer's repaint boundary.
   @protected
-  ui.Image syncCoordinateMapping() {
-    final renderer = _gpuGeometryRenderer;
-    if (renderer == null) {
-      throw StateError(
-        'Flutter GPU is required for LiquidGlass. Enable it in the platform '
-        'manifest or with --enable-flutter-gpu.',
-      );
-    }
-
-    final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
-    final inverseOrigin = MatrixUtils.transformPoint(
-      globalToMatte,
-      Offset.zero,
-    );
-    final inverseX = MatrixUtils.transformPoint(
-      globalToMatte,
-      const Offset(1, 0),
-    );
-    final inverseY = MatrixUtils.transformPoint(
-      globalToMatte,
-      const Offset(0, 1),
-    );
-    final inverseAxisX = inverseX - inverseOrigin;
-    final inverseAxisY = inverseY - inverseOrigin;
-    renderer.updateCoordinateMapping(
-      basisXX: inverseAxisX.dx,
-      basisYX: inverseAxisY.dx,
-      basisXY: inverseAxisX.dy,
-      basisYY: inverseAxisY.dy,
-      originX: inverseOrigin.dx * devicePixelRatio,
-      originY: inverseOrigin.dy * devicePixelRatio,
-    );
-    final image = renderer.coordinateImage;
-    if (image == null) {
-      throw StateError('LiquidGlass coordinate mapping texture is missing.');
-    }
-    return image;
-  }
-
-  /// True once the geometry matte and live coordinate texture both exist, so
-  /// ancestor motion can update mapping without crossing a repaint boundary.
-  @protected
-  bool get hasLiveCoordinateMapping =>
-      _geometryImage != null &&
-      _gpuGeometryRenderer?.coordinateImage != null;
+  bool get hasReusableGeometry => _geometryImage != null;
 
   /// Value identity of everything [renderShader] has captured for the current
-  /// paint: float uniforms and the geometry/coordinate samplers.
+  /// paint: float uniforms and the geometry sampler.
   ///
   /// The engine copies a shader's uniforms into the native image filter when
   /// that filter is first converted (see
   /// `ReusableFragmentShader::as_image_filter`), so a filter wrapping this
   /// shader may only be reused across paints while this snapshot compares
-  /// equal. Coordinate mapping is a live sampler and is not part of this key.
+  /// equal.
   @protected
   Object get shaderInputSnapshot => _shaderInputSnapshot;
   late Object _shaderInputSnapshot;
@@ -604,22 +548,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 /// Value key describing the uniform and sampler state a [FragmentShader]
 /// image filter snapshots at creation time.
 ///
-/// Geometry and coordinate images are persistent GPU textures whose wrappers
-/// stay stable while the contents are updated in place. Transform mapping is
-/// not part of this key: it lives in [coordinateImage], which ImageFilter
-/// samples live instead of copying.
+/// Geometry images are persistent GPU textures whose wrappers stay stable
+/// while the contents are updated in place. Ancestor transforms are not part
+/// of this key: they are applied by the compositor, not the shader.
 @immutable
 class _ShaderInputSnapshot {
   const _ShaderInputSnapshot({
     required this.geometryImage,
-    required this.coordinateImage,
     required this.matteBounds,
     required this.devicePixelRatio,
     required this.settingsRevision,
   });
 
   final ui.Image geometryImage;
-  final ui.Image coordinateImage;
   final Rect matteBounds;
   final double devicePixelRatio;
   final int settingsRevision;
@@ -628,7 +569,6 @@ class _ShaderInputSnapshot {
   bool operator ==(Object other) {
     return other is _ShaderInputSnapshot &&
         other.geometryImage == geometryImage &&
-        other.coordinateImage == coordinateImage &&
         other.matteBounds == matteBounds &&
         other.devicePixelRatio == devicePixelRatio &&
         other.settingsRevision == settingsRevision;
@@ -637,7 +577,6 @@ class _ShaderInputSnapshot {
   @override
   int get hashCode => Object.hash(
     geometryImage,
-    coordinateImage,
     matteBounds,
     devicePixelRatio,
     settingsRevision,
@@ -646,7 +585,6 @@ class _ShaderInputSnapshot {
   @override
   String toString() {
     return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
-        'coordinates: ${identityHashCode(coordinateImage)}, '
         'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
         'settingsRevision: $settingsRevision)';
   }

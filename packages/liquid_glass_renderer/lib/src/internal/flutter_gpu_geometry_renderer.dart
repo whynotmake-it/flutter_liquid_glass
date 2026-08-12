@@ -12,10 +12,6 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 ///
 /// [gpu.Texture.asImage] returns a lightweight non-owning wrapper — do NOT
 /// dispose it. The underlying texture is owned by this renderer.
-///
-/// [coordinateImage] is a persistent 2×1 RGBA32F texture. ImageFilter.shader
-/// copies float uniforms at creation, but sampler bindings stay live, so
-/// ancestor motion is written here instead of into uniforms.
 @internal
 class FlutterGpuGeometryRenderer {
   FlutterGpuGeometryRenderer({
@@ -34,7 +30,6 @@ class FlutterGpuGeometryRenderer {
       offsetInBytes: 0,
       lengthInBytes: _vertexBuffer.sizeInBytes,
     );
-    _initCoordinateTexture();
   }
 
   factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
@@ -67,7 +62,6 @@ class FlutterGpuGeometryRenderer {
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
-    _initCoordinateTexture();
   }
 
   static final Map<String, _SharedGeometryResources> _assetResources = {};
@@ -118,9 +112,6 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   int debugRenderCount = 0;
 
-  @visibleForTesting
-  int debugCoordinateUploadCount = 0;
-
   // Uniform slot reflection.
   late final gpu.UniformSlot _uniformSlot;
   late final int _uniformSize;
@@ -137,11 +128,6 @@ class FlutterGpuGeometryRenderer {
   gpu.RenderTarget? _renderTarget;
   int _textureWidth = 0;
   int _textureHeight = 0;
-
-  // Live 2×1 RGBA32F parameter texture sampled by the final image filter.
-  gpu.Texture? _coordinateTexture;
-  ui.Image? _coordinateImage;
-  final ByteData _coordinateData = ByteData(32);
 
   late final gpu.DeviceBuffer _vertexBuffer;
   late final gpu.BufferView _vertexBufferView;
@@ -172,77 +158,6 @@ class FlutterGpuGeometryRenderer {
       offsetInBytes: 0,
       lengthInBytes: _vertexBuffer.sizeInBytes,
     );
-  }
-
-  /// Non-owning view of the persistent filter-to-matte mapping texture.
-  ///
-  /// Created on first [updateCoordinateMapping] call. Do NOT dispose it.
-  ui.Image? get coordinateImage => _coordinateImage;
-
-  /// Writes the affine mapping that takes image-filter fragment coordinates
-  /// into layer-local matte pixels.
-  ///
-  /// Safe to call from compositing (`addToScene`) as well as paint: the
-  /// texture is host-visible, so the same-frame backdrop filter samples the
-  /// new values without a follow-up repaint.
-  void updateCoordinateMapping({
-    required double basisXX,
-    required double basisYX,
-    required double basisXY,
-    required double basisYY,
-    required double originX,
-    required double originY,
-  }) {
-    final floats = _coordinateData.buffer.asFloat32List();
-    if (_coordinateTexture != null &&
-        floats[0] == basisXX &&
-        floats[1] == basisYX &&
-        floats[2] == basisXY &&
-        floats[3] == basisYY &&
-        floats[4] == originX &&
-        floats[5] == originY) {
-      return;
-    }
-    _initCoordinateTexture();
-    floats[0] = basisXX;
-    floats[1] = basisYX;
-    floats[2] = basisXY;
-    floats[3] = basisYY;
-    floats[4] = originX;
-    floats[5] = originY;
-    floats[6] = 0;
-    floats[7] = 0;
-    _coordinateTexture!.overwrite(_coordinateData);
-    assert(() {
-      debugCoordinateUploadCount++;
-      return true;
-    }(), 'Track live coordinate uploads in debug builds.');
-  }
-
-  void _initCoordinateTexture() {
-    if (_coordinateTexture != null) return;
-    _coordinateTexture = _createCoordinateTexture();
-    _coordinateImage = _coordinateTexture!.asImage();
-  }
-
-  static gpu.Texture _createCoordinateTexture() {
-    final texture = gpu.gpuContext.createTexture(
-      gpu.StorageMode.hostVisible,
-      2,
-      1,
-      format: gpu.PixelFormat.r32g32b32a32Float,
-      // Some Flutter GPU versions default this to false, others to true.
-      // ignore: avoid_redundant_argument_values
-      enableRenderTargetUsage: false,
-      coordinateSystem: gpu.TextureCoordinateSystem.uploadFromHost,
-    );
-    if (texture.isValid != true) {
-      throw StateError(
-        'LiquidGlass requires a host-visible RGBA32F texture for live '
-        'filter coordinates.',
-      );
-    }
-    return texture;
   }
 
   /// Renders geometry to the persistent texture and returns it as a [ui.Image].
@@ -372,8 +287,6 @@ class FlutterGpuGeometryRenderer {
     _texture = null;
     _image = null;
     _renderTarget = null;
-    _coordinateTexture = null;
-    _coordinateImage = null;
   }
 }
 

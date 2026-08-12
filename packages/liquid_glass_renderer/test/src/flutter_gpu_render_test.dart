@@ -146,61 +146,6 @@ void main() {
   );
 
   test(
-    'coordinate mapping reuses a persistent float texture',
-    () {
-      final library = gpu.ShaderLibrary.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      )!;
-      final renderer = FlutterGpuGeometryRenderer(
-        vertexShader: library['GeometryVertex']!,
-        fragmentShader: library['GeometryFragment']!,
-      );
-      addTearDown(renderer.dispose);
-
-      expect(renderer.coordinateImage, isNotNull);
-      expect(renderer.coordinateImage!.width, 2);
-      expect(renderer.coordinateImage!.height, 1);
-      expect(renderer.debugCoordinateUploadCount, 0);
-
-      renderer.updateCoordinateMapping(
-        basisXX: 1,
-        basisYX: 0,
-        basisXY: 0,
-        basisYY: 1,
-        originX: 12,
-        originY: -8,
-      );
-      final first = renderer.coordinateImage;
-      expect(first, isNotNull);
-      expect(first!.width, 2);
-      expect(first.height, 1);
-      expect(renderer.debugCoordinateUploadCount, 1);
-
-      renderer.updateCoordinateMapping(
-        basisXX: 1,
-        basisYX: 0,
-        basisXY: 0,
-        basisYY: 1,
-        originX: 40,
-        originY: 6,
-      );
-      expect(identical(renderer.coordinateImage, first), isTrue);
-      expect(renderer.debugCoordinateUploadCount, 2);
-
-      renderer.updateCoordinateMapping(
-        basisXX: 1,
-        basisYX: 0,
-        basisXY: 0,
-        basisYY: 1,
-        originX: 40,
-        originY: 6,
-      );
-      expect(renderer.debugCoordinateUploadCount, 2);
-    },
-    skip: expectFallback,
-  );
-
-  test(
     'geometry image keeps asymmetric rows in top-down order',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;

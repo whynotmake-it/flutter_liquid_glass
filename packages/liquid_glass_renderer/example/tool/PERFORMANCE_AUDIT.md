@@ -35,14 +35,11 @@ capture does not account for the remaining per-layer footprint.
 - Whole-layer ancestor transforms reuse the local geometry matte. The
   `ancestorTranslatedLayer` scenario distinguishes this fast path from moving
   a shape relative to its layer.
-- Ancestor motion no longer rebuilds `ImageFilter.shader`. Flutter copies
-  float uniforms at filter creation (`ReusableFragmentShader::as_image_filter`)
-  but keeps sampler bindings live, so the filter-to-matte affine mapping is a
-  persistent 2×1 RGBA32F texture updated during compositing. That keeps the
-  layer's `RepaintBoundary` intact and avoids the delayed-disposal spike from
-  Flutter issue #138627. Apple's Liquid Glass uses the same idea: a persistent
-  `glassBackground` filter graph whose SDF/parameter inputs are live layers
-  (`CASDFLayer` / `SDFPortalLayer`), not rebuilt CAFilters.
+- Ancestor motion no longer rebuilds `ImageFilter.shader`. Geometry is encoded
+  in layer-local space, and `FlutterFragCoord` in the image filter is the same
+  clip space, so the shader only subtracts the matte origin. A moving ancestor
+  is compositor-only: it must not cross the layer's `RepaintBoundary` or
+  allocate a new native filter (Flutter issue #138627).
 - Blend groups and shapes no longer push empty `alwaysNeedsAddToScene`
   tracking layers. The layer's compositing hook polls relative transforms, so
   ancestor motion does not cross the repaint boundary, while in-layer motion
@@ -84,8 +81,9 @@ capture does not account for the remaining per-layer footprint.
 ## Next measurements
 
 Compare `independent16Motion` and `ancestorTranslatedLayer` against the
-2026-08-11 medians on the same runner. The live coordinate texture should drop
-raster time and peak footprint if native filter churn was the remaining cost.
+2026-08-11 medians on the same runner. Skipping paint and filter rebuilds on
+ancestor motion should drop raster time and peak footprint if native filter
+churn was the remaining cost.
 If those scenarios are still far from `grouped16Motion` / `staticSingle`:
 
 1. **Cull sparse shape layers.** Compare dense and window-spanning layouts at

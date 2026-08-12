@@ -38,7 +38,6 @@ float uSpecularWrap = uSpecularConfig.w;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
-uniform sampler2D uCoordinateTexture;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -168,23 +167,16 @@ vec3 applySpecularHighlights(
 }
 
 void main() {
-    // Normalize the image-filter shader coordinate for backdrop sampling, and
-    // map the same coordinate through the layer-provided affine transform for
-    // matte sampling.
+    // FlutterFragCoord is the BackdropFilter's clip-local space. Geometry is
+    // encoded in the same layer-local space, so ancestor transforms are
+    // compositor-only and this pass only subtracts the matte origin.
     vec2 fragCoord = FlutterFragCoord().xy;
     vec2 screenUV = fragCoord / uSize;
     #ifdef IMPELLER_TARGET_OPENGLES
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
-    // Texel centers of a 2×1 texture with nearest filtering.
-    vec4 filterToMatteBasis = texture(uCoordinateTexture, vec2(0.25, 0.5));
-    vec2 filterToMatteOffset = texture(uCoordinateTexture, vec2(0.75, 0.5)).xy;
-    vec2 matteCoord = vec2(
-        dot(filterToMatteBasis.xy, fragCoord),
-        dot(filterToMatteBasis.zw, fragCoord)
-    ) + filterToMatteOffset;
-    vec2 geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize;
+    vec2 geometryUV = (fragCoord - uGeometryOffset) / uGeometrySize;
     #ifdef IMPELLER_TARGET_OPENGLES
         // Runtime-effect image samplers use bottom-up UVs on OpenGLES even
         // after the geometry pass has canonicalized its fragment coordinates.
