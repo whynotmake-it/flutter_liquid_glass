@@ -17,7 +17,14 @@
   "properties": {
     "schemaVersion": {"const": 1},
     "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
-    "profile": {"enum": ["toolbar_capsule", "tab_bar_holdout"]},
+    "profile": {
+      "enum": [
+        "toolbar_capsule",
+        "small_capsule",
+        "large_capsule",
+        "tab_bar_holdout"
+      ]
+    },
     "canvas": {
       "type": "object",
       "additionalProperties": false,

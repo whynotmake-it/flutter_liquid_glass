@@ -10,7 +10,8 @@ struct AppleMatchApp: App {
         if let path = Arguments.value(after: "--scene") {
             sceneURL = URL(fileURLWithPath: path)
         } else {
-            sceneURL = Bundle.main.url(forResource: "toolbar_capsule", withExtension: "json")!
+            let sceneID = Arguments.value(after: "--scene-id") ?? "toolbar_capsule"
+            sceneURL = Bundle.main.url(forResource: sceneID, withExtension: "json")!
         }
         let data = try! Data(contentsOf: sceneURL)
         scene = try! JSONDecoder().decode(Scene.self, from: data)
@@ -42,7 +43,24 @@ struct MatchView: View {
                     height: scene.canvas.logicalHeight
                 )
 
-            if #available(iOS 26.0, *) {
+            if scene.profile == "tab_bar_holdout" {
+                TabView {
+                    ProbeBackground(spec: probe.background)
+                        .ignoresSafeArea()
+                        .tabItem { Label("First", systemImage: "circle.fill") }
+                    ProbeBackground(spec: probe.background)
+                        .ignoresSafeArea()
+                        .tabItem { Label("Second", systemImage: "square.fill") }
+                    ProbeBackground(spec: probe.background)
+                        .ignoresSafeArea()
+                        .tabItem { Label("Third", systemImage: "triangle.fill") }
+                }
+                .frame(
+                    width: scene.canvas.logicalWidth,
+                    height: scene.canvas.logicalHeight
+                )
+                .accessibilityIdentifier("official-glass-tab-bar")
+            } else if #available(iOS 26.0, *) {
                 Button(action: {}) {
                     Color.clear
                         .frame(

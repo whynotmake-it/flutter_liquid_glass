@@ -28,7 +28,36 @@ launch_flutter() {
     --enable-impeller --enable-flutter-gpu \
     --probe "$probe" --settings-b64 "$SETTINGS_B64")"
   pid="${launch_output##*: }"
-  sleep 1.5
+  sleep 2
+}
+
+screenshot_frame() {
+  local probe="$1"
+  local destination="$2"
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    xcrun simctl io "$IOS_27_UDID" screenshot "$destination"
+    if python3 - "$probe" "$destination" <<'PY'
+import cv2
+import sys
+
+expected = {
+    "A": (0, 0, 255),
+    "B": (0, 0, 255),
+    "C": (0, 0, 0),
+    "D": (255, 255, 255),
+}[sys.argv[1]]
+image = cv2.imread(sys.argv[2], cv2.IMREAD_COLOR)
+pixel = tuple(int(value) for value in image[5, 5])
+raise SystemExit(0 if pixel == expected else 1)
+PY
+    then
+      return
+    fi
+    sleep 1
+  done
+  echo "Flutter frame never reached the expected $probe background." >&2
+  return 5
 }
 
 if [[ "$PREPARE_APP" == "1" ]]; then
@@ -54,8 +83,7 @@ for probe in A B C D; do
       launch_flutter "$probe"
       kill -0 "$pid"
     fi
-    xcrun simctl io "$IOS_27_UDID" screenshot \
-      "$CANDIDATE_OUT/frames/${probe}_$frame.png"
+    screenshot_frame "$probe" "$CANDIDATE_OUT/frames/${probe}_$frame.png"
     sleep 0.1
   done
   xcrun simctl terminate "$IOS_27_UDID" \

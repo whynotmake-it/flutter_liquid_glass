@@ -1,27 +1,27 @@
 {
   "shape": [
-    {"shapeWidth": 222.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 224.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 226.0, "shapeHeight": 92.0, "shapeOffsetY": 2.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": -1.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
     {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 1.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 3.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
-    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
-    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
-    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 2.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
-    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 2.0, "cornerRadius": 48.0, "shapeProfile": "superellipse"}
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 0.0, "cornerRadius": 48.0, "shapeProfile": "superellipse"}
   ],
   "refraction": [
+    {"thickness": 4.0, "refractiveIndex": 1.05, "chromaticAberration": 0.0},
+    {"thickness": 6.0, "refractiveIndex": 1.08, "chromaticAberration": 0.0},
     {"thickness": 8.0, "refractiveIndex": 1.1, "chromaticAberration": 0.0},
+    {"thickness": 10.0, "refractiveIndex": 1.1, "chromaticAberration": 0.0},
     {"thickness": 12.0, "refractiveIndex": 1.15, "chromaticAberration": 0.0},
-    {"thickness": 16.0, "refractiveIndex": 1.2, "chromaticAberration": 0.0},
+    {"thickness": 16.0, "refractiveIndex": 1.15, "chromaticAberration": 0.01},
     {"thickness": 20.0, "refractiveIndex": 1.2, "chromaticAberration": 0.01},
-    {"thickness": 24.0, "refractiveIndex": 1.2, "chromaticAberration": 0.02},
-    {"thickness": 28.0, "refractiveIndex": 1.2, "chromaticAberration": 0.01},
-    {"thickness": 32.0, "refractiveIndex": 1.25, "chromaticAberration": 0.01},
-    {"thickness": 36.0, "refractiveIndex": 1.3, "chromaticAberration": 0.02}
+    {"thickness": 24.0, "refractiveIndex": 1.2, "chromaticAberration": 0.01}
   ],
   "blurMtf": [
     {"blur": 1.0},
@@ -34,15 +34,15 @@
     {"blur": 10.0}
   ],
   "tintColor": [
-    {"glassAlpha": 0.48, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
-    {"glassAlpha": 0.50, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
-    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
     {"glassAlpha": 0.54, "saturation": 1.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
-    {"glassAlpha": 0.52, "saturation": 0.8, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
-    {"glassAlpha": 0.52, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
-    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 255, "glassGreen": 248, "glassBlue": 248},
-    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 248, "glassGreen": 255, "glassBlue": 252},
-    {"glassAlpha": 0.52, "saturation": 1.0, "glassRed": 250, "glassGreen": 250, "glassBlue": 255}
+    {"glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.58, "saturation": 1.4, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.60, "saturation": 1.6, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.62, "saturation": 1.8, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.64, "saturation": 2.0, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"glassAlpha": 0.60, "saturation": 1.8, "glassRed": 255, "glassGreen": 250, "glassBlue": 250},
+    {"glassAlpha": 0.60, "saturation": 1.8, "glassRed": 250, "glassGreen": 255, "glassBlue": 252},
+    {"glassAlpha": 0.60, "saturation": 1.8, "glassRed": 250, "glassGreen": 250, "glassBlue": 255}
   ],
   "highlight": [
     {"lightIntensity": 0.0, "ambientStrength": 0.0, "lightAngle": 1.5707963267948966},
@@ -53,5 +53,21 @@
     {"lightIntensity": 0.20, "ambientStrength": 0.03, "lightAngle": 1.5707963267948966},
     {"lightIntensity": 0.20, "ambientStrength": 0.03, "lightAngle": 2.356194490192345},
     {"lightIntensity": 0.30, "ambientStrength": 0.06, "lightAngle": 1.5707963267948966}
+  ],
+  "refinement": [
+    {"thickness": 4.0, "refractiveIndex": 1.05, "blur": 6.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 4.0, "refractiveIndex": 1.05, "blur": 8.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 6.0, "refractiveIndex": 1.08, "blur": 6.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 6.0, "refractiveIndex": 1.08, "blur": 8.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 8.0, "refractiveIndex": 1.10, "blur": 6.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 8.0, "refractiveIndex": 1.10, "blur": 8.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 10.0, "refractiveIndex": 1.10, "blur": 6.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 10.0, "refractiveIndex": 1.10, "blur": 8.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 12.0, "refractiveIndex": 1.15, "blur": 6.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 12.0, "refractiveIndex": 1.15, "blur": 8.0, "glassAlpha": 0.56, "saturation": 1.2, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 6.0, "refractiveIndex": 1.08, "blur": 7.0, "glassAlpha": 0.58, "saturation": 1.4, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 8.0, "refractiveIndex": 1.10, "blur": 7.0, "glassAlpha": 0.58, "saturation": 1.4, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 10.0, "refractiveIndex": 1.10, "blur": 7.0, "glassAlpha": 0.58, "saturation": 1.4, "glassRed": 255, "glassGreen": 255, "glassBlue": 255},
+    {"thickness": 8.0, "refractiveIndex": 1.10, "blur": 9.0, "glassAlpha": 0.58, "saturation": 1.4, "glassRed": 255, "glassGreen": 255, "glassBlue": 255}
   ]
 }

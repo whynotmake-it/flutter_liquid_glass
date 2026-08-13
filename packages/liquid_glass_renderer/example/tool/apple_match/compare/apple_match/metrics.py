@@ -55,6 +55,8 @@ def verify_background_registration(
     residual = np.abs(reference - candidate)[mask > 0]
     channel_mean = np.mean(residual, axis=0)
     percentile_99 = float(np.percentile(residual, 99))
+    maximum = float(np.max(residual))
+    mismatched_fraction = float(np.mean(np.max(residual, axis=1) > 2.0 / 255.0))
     details = {
         "shiftPixels": {"x": float(shift[0]), "y": float(shift[1])},
         "phaseCorrelationResponse": float(response),
@@ -64,10 +66,12 @@ def verify_background_registration(
             "blue": float(channel_mean[2]),
         },
         "outsideResidualP99": percentile_99,
+        "outsideResidualMaximum": maximum,
+        "outsideMismatchedPixelFraction": mismatched_fraction,
         "passed": bool(
             abs(shift[0]) <= 0.51
             and abs(shift[1]) <= 0.51
-            and percentile_99 <= 2.0 / 255.0
+            and maximum <= 2.0 / 255.0
         ),
     }
     if not details["passed"]:
@@ -77,6 +81,18 @@ def verify_background_registration(
 
 def luminance(image: np.ndarray) -> np.ndarray:
     return image[..., 0] * 0.2126 + image[..., 1] * 0.7152 + image[..., 2] * 0.0722
+
+
+def fixed_blur_mix(
+    image: np.ndarray,
+    *,
+    sigma: float,
+    mix: float,
+) -> np.ndarray:
+    """Reference model for fixed-sigma blur mixed over the sharp input."""
+    blurred = cv2.GaussianBlur(image, (0, 0), sigma)
+    amount = float(np.clip(mix, 0.0, 1.0))
+    return image * (1.0 - amount) + blurred * amount
 
 
 def align(reference: np.ndarray, candidate: np.ndarray) -> Tuple[np.ndarray, Tuple[float, float]]:
@@ -129,15 +145,13 @@ def signed_optical_flow(
         return np.zeros(reference_a.shape[:2], dtype=np.float32)
     reference_delta = luminance(reference_a - reference_b)
     candidate_delta = luminance(candidate_a - candidate_b)
-    minimum = float(min(reference_delta.min(), candidate_delta.min()))
-    maximum = float(max(reference_delta.max(), candidate_delta.max()))
-    scale = max(maximum - minimum, 1e-6)
-    reference_u8 = np.clip((reference_delta - minimum) / scale * 255, 0, 255).astype(
-        np.uint8
-    )
-    candidate_u8 = np.clip((candidate_delta - minimum) / scale * 255, 0, 255).astype(
-        np.uint8
-    )
+    def normalize(image: np.ndarray) -> np.ndarray:
+        minimum = float(image.min())
+        scale = max(float(image.max()) - minimum, 1e-6)
+        return np.clip((image - minimum) / scale * 255, 0, 255).astype(np.uint8)
+
+    reference_u8 = normalize(reference_delta)
+    candidate_u8 = normalize(candidate_delta)
     flow = cv2.calcOpticalFlowFarneback(
         reference_u8,
         candidate_u8,
@@ -201,6 +215,17 @@ def shape_comparison(
 ) -> Tuple[float, Dict[str, object], np.ndarray, np.ndarray]:
     ref_mask = silhouette(reference_black)
     can_mask = silhouette(candidate_black)
+    if not np.any(ref_mask) or not np.any(can_mask):
+        details = {
+            "iou": 0.0,
+            "meanEdgeDistancePixels": float("inf"),
+            "sizeError": 1.0,
+            "cornerRadiusError": 1.0,
+            "bezelWidthError": 1.0,
+            "reference": _mask_measurements(ref_mask, ref_mask),
+            "candidate": _mask_measurements(can_mask, can_mask),
+        }
+        return 1.0, details, ref_mask, can_mask
     intersection = float(np.logical_and(ref_mask, can_mask).sum())
     union = float(np.logical_or(ref_mask, can_mask).sum())
     iou = intersection / max(union, 1.0)
@@ -253,8 +278,11 @@ def component_errors(
     eps = 1e-6
     ref_a = reference["A"]
     can_a = candidate["A"]
-    combined = float(np.mean(np.abs(ref_a - can_a)))
-    holdout = float(np.mean(np.abs(reference["B"] - candidate["B"])))
+    mask = silhouette(reference["C"]).astype(bool)
+    combined = float(np.mean(np.abs(ref_a[mask] - can_a[mask])))
+    holdout = float(
+        np.mean(np.abs(reference["B"][mask] - candidate["B"][mask]))
+    )
 
     zeros = np.zeros_like(ref_a)
     optical_flow = signed_optical_flow(
@@ -263,30 +291,67 @@ def component_errors(
         candidate["A"],
         zeros,
     )
-    flow = float(np.mean(np.abs(optical_flow)) / 4.0)
+    flow = float(np.mean(np.abs(optical_flow[mask])) / 4.0)
 
     _, _, ref_gradient = _gradient(reference["A"])
     _, _, can_gradient = _gradient(candidate["A"])
-    height, width = ref_gradient.shape
-    region = np.s_[height // 4 : 3 * height // 4, width // 6 : 5 * width // 6]
-    ref_edge = float(np.mean(ref_gradient[region]))
-    can_edge = float(np.mean(can_gradient[region]))
-    sharpness = float(
-        abs(ref_edge - can_edge)
-        / (ref_edge + eps)
-    )
+    ref_edge = float(np.mean(ref_gradient[mask]))
+    can_edge = float(np.mean(can_gradient[mask]))
+    sharpness = float(abs(ref_edge - can_edge) / (ref_edge + eps))
 
     ref_c = luminance(reference["C"])
     can_c = luminance(candidate["C"])
-    specular = float(np.mean(np.abs(ref_c - can_c)))
+    black_specular = float(np.mean(np.abs(ref_c[mask] - can_c[mask])))
+    eroded = cv2.erode(mask.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
+    rim_band = np.logical_and(mask, np.logical_not(eroded))
+    rgbw_rim = float(np.mean(np.abs(ref_a[rim_band] - can_a[rim_band])))
+    specular = 0.65 * black_specular + 0.35 * rgbw_rim
 
-    channel_residuals = np.mean(np.abs(ref_a - can_a), axis=(0, 1))
+    channel_residuals = np.mean(np.abs(ref_a[mask] - can_a[mask]), axis=0)
+    mean_response_error = float(
+        np.mean(
+            np.abs(
+                np.mean(ref_a[mask], axis=0)
+                - np.mean(can_a[mask], axis=0)
+            )
+        )
+    )
+    contrast_response_error = float(
+        np.mean(
+            np.abs(
+                np.std(ref_a[mask], axis=0)
+                - np.std(can_a[mask], axis=0)
+            )
+        )
+    )
+    ref_saturation = np.max(ref_a[mask], axis=1) - np.min(ref_a[mask], axis=1)
+    can_saturation = np.max(can_a[mask], axis=1) - np.min(can_a[mask], axis=1)
+    saturation_response_error = float(
+        abs(np.mean(ref_saturation) - np.mean(can_saturation))
+    )
     ref_d = reference["D"]
     can_d = candidate["D"]
     ref_chroma = ref_d - np.mean(ref_d, axis=2, keepdims=True)
     can_chroma = can_d - np.mean(can_d, axis=2, keepdims=True)
-    white_balance = float(np.mean(np.abs(ref_chroma - can_chroma)))
-    channel = float(np.mean(channel_residuals) + white_balance)
+    white_balance = float(
+        np.mean(np.abs(ref_chroma[mask] - can_chroma[mask]))
+    )
+    black_response_error = float(
+        abs(np.mean(ref_c[mask]) - np.mean(can_c[mask]))
+    )
+    white_response_error = float(
+        abs(
+            np.mean(luminance(ref_d)[mask])
+            - np.mean(luminance(can_d)[mask])
+        )
+    )
+    channel = float(
+        0.45 * np.mean(channel_residuals)
+        + 0.15 * mean_response_error
+        + 0.15 * contrast_response_error
+        + 0.15 * saturation_response_error
+        + 0.10 * white_balance
+    )
     shape, shape_details, _, _ = shape_comparison(reference["C"], candidate["C"])
     errors = {
         "shape": shape,
@@ -305,17 +370,47 @@ def component_errors(
             "blue": float(channel_residuals[2]),
         },
         "neutralWhiteBalanceError": white_balance,
+        "meanResponseError": mean_response_error,
+        "contrastResponseError": contrast_response_error,
+        "saturationResponseError": saturation_response_error,
+        "blackResponseError": black_response_error,
+        "whiteResponseError": white_response_error,
+        "blackSpecularError": black_specular,
+        "rgbwRimError": rgbw_rim,
+        "highlightColorResiduals": {
+            "red": float(
+                np.mean(
+                    np.abs(
+                        reference["C"][..., 0][mask]
+                        - candidate["C"][..., 0][mask]
+                    )
+                )
+            ),
+            "green": float(
+                np.mean(
+                    np.abs(
+                        reference["C"][..., 1][mask]
+                        - candidate["C"][..., 1][mask]
+                    )
+                )
+            ),
+            "blue": float(
+                np.mean(
+                    np.abs(
+                        reference["C"][..., 2][mask]
+                        - candidate["C"][..., 2][mask]
+                    )
+                )
+            ),
+        },
     }
     return errors, details
 
 
 def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarray]) -> MetricResult:
-    aligned = {}
-    shifts = []
-    for probe in ("A", "B", "C", "D"):
-        aligned[probe], shift = align(reference[probe], candidate[probe])
-        shifts.append(shift)
-    errors, details = component_errors(reference, aligned)
+    # Registration is verified on untouched RGBW control pixels before scoring.
+    # Per-probe alignment would hide real silhouette and solid-probe errors.
+    errors, details = component_errors(reference, candidate)
     normalized = {
         "shape": min(errors["shape"] / 0.20, 1.0),
         "combined": min(errors["combined"] / 0.25, 1.0),
@@ -330,16 +425,24 @@ def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarr
         "shape": 100.0 * (1.0 - normalized["shape"]),
         "refraction": 100.0 * (1.0 - normalized["flow"]),
         "blurMtf": 100.0 * (1.0 - normalized["sharpness"]),
-        "tintColor": 100.0
-        * (1.0 - 0.65 * normalized["channel"] - 0.35 * normalized["holdout"]),
+        "tintColor": 100.0 * (1.0 - normalized["channel"]),
         "highlight": 100.0 * (1.0 - normalized["specular"]),
         "holdout": 100.0 * (1.0 - normalized["holdout"]),
+        "refinement": 100.0
+        * (
+            1.0
+            - 0.20 * normalized["shape"]
+            - 0.20 * normalized["combined"]
+            - 0.20 * normalized["flow"]
+            - 0.15 * normalized["sharpness"]
+            - 0.15 * normalized["channel"]
+            - 0.10 * normalized["specular"]
+        ),
     }
-    mean_shift = tuple(float(np.mean([shift[i] for shift in shifts])) for i in range(2))
     return MetricResult(
         errors=errors,
         score=max(0.0, score),
-        shift=mean_shift,
+        shift=(0.0, 0.0),
         details=details,
     )
 

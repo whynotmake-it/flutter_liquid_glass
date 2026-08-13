@@ -16,6 +16,7 @@ COMPARE = ROOT / "compare"
 sys.path.insert(0, str(COMPARE))
 
 from apple_match.schema import validate_scene  # noqa: E402
+from apple_match.hotloop import PINNED_DEVICE_UDID  # noqa: E402
 
 
 def run(command, *, env=None, cwd=ROOT):
@@ -86,6 +87,11 @@ def main():
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
+    if args.udid != PINNED_DEVICE_UDID:
+        parser.error(
+            f"references and candidates must use pinned simulator "
+            f"{PINNED_DEVICE_UDID}"
+        )
 
     validate_scene(ROOT / "scenes/toolbar_capsule.json", ROOT / "scenes/schema.json")
     reference = ROOT / "references" / args.reference_set / "toolbar_capsule"
@@ -119,11 +125,11 @@ def main():
     current = dict(baseline)
     current.update(
         {
-            "thickness": 0.0,
+            "thickness": 28.0,
             "blur": 0.0,
             "lightIntensity": 0.0,
             "ambientStrength": 0.0,
-            "refractiveIndex": 1.0,
+            "refractiveIndex": 1.2,
             "saturation": 1.0,
             "chromaticAberration": 0.0,
         }
@@ -131,7 +137,14 @@ def main():
     current_capture = None
     stages_config = json.loads((ROOT / "settings/stages.json").read_text())
     stage_summaries = {}
-    for stage_name in ("shape", "refraction", "blurMtf", "tintColor", "highlight"):
+    for stage_name in (
+        "shape",
+        "refraction",
+        "blurMtf",
+        "tintColor",
+        "highlight",
+        "refinement",
+    ):
         stage_root = staged / stage_name
         neutral_settings = stage_root / "baseline/settings.json"
         neutral_settings.parent.mkdir(parents=True, exist_ok=True)
@@ -171,12 +184,27 @@ def main():
                     capture,
                     prepare_app=False,
                 )
-            card = compare(
-                reference,
-                capture,
-                stage_root / "candidates" / f"{index:03d}",
-                settings_path,
-            )
+            try:
+                card = compare(
+                    reference,
+                    capture,
+                    stage_root / "candidates" / f"{index:03d}",
+                    settings_path,
+                )
+            except subprocess.CalledProcessError:
+                shutil.rmtree(capture, ignore_errors=True)
+                capture_flutter(
+                    args.udid,
+                    settings_path,
+                    capture,
+                    prepare_app=False,
+                )
+                card = compare(
+                    reference,
+                    capture,
+                    stage_root / "candidates" / f"{index:03d}",
+                    settings_path,
+                )
             candidate_score = card["measurements"]["stageScores"][stage_key]
             best_score = best_card["measurements"]["stageScores"][stage_key]
             if candidate_score > best_score:
@@ -218,7 +246,22 @@ def main():
         prepare_app=False,
         frames=3,
     )
-    final_card = compare(reference, final_capture, staged / "final", final_settings)
+    try:
+        final_card = compare(
+            reference, final_capture, staged / "final", final_settings
+        )
+    except subprocess.CalledProcessError:
+        shutil.rmtree(final_capture, ignore_errors=True)
+        capture_flutter(
+            args.udid,
+            final_settings,
+            final_capture,
+            prepare_app=False,
+            frames=3,
+        )
+        final_card = compare(
+            reference, final_capture, staged / "final", final_settings
+        )
 
     (out / "best").mkdir(parents=True, exist_ok=True)
     shutil.copy2(final_settings, out / "best/settings.json")

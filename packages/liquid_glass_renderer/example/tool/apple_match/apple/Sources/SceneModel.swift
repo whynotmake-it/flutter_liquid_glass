@@ -37,6 +37,8 @@ struct Scene: Decodable {
 
     let canvas: CanvasSpec
     let shape: ShapeSpec
+    let id: String
+    let profile: String
     let appearance: String
     let probes: [Probe]
 }

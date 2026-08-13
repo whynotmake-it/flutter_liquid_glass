@@ -1,5 +1,7 @@
 /out/
 /apple/build/
+/apple/.slider_driver/
 /compare/.venv/
+/references/**/frames/
 **/__pycache__/
 *.pyc

@@ -7,7 +7,11 @@ import cv2
 import jsonschema
 import numpy as np
 
-from apple_match.metrics import score_images, verify_background_registration
+from apple_match.metrics import (
+    fixed_blur_mix,
+    score_images,
+    verify_background_registration,
+)
 from apple_match.schema import validate_scene
 
 
@@ -40,9 +44,14 @@ def synthetic(
 
 
 class SchemaTests(unittest.TestCase):
-    def test_checked_in_scene_is_valid(self):
-        scene = validate_scene(ROOT / "scenes/toolbar_capsule.json", ROOT / "scenes/schema.json")
-        self.assertEqual([p["id"] for p in scene["probes"]], list("ABCD"))
+    def test_checked_in_scenes_are_valid(self):
+        paths = sorted((ROOT / "scenes").glob("*.json"))
+        scene_paths = [path for path in paths if path.name != "schema.json"]
+        self.assertGreaterEqual(len(scene_paths), 4)
+        for path in scene_paths:
+            with self.subTest(scene=path.stem):
+                scene = validate_scene(path, ROOT / "scenes/schema.json")
+                self.assertEqual([p["id"] for p in scene["probes"]], list("ABCD"))
 
     def test_rejects_missing_probe(self):
         scene_path = ROOT / "scenes/toolbar_capsule.json"
@@ -56,6 +65,22 @@ class SchemaTests(unittest.TestCase):
 
 
 class MetricTests(unittest.TestCase):
+    def test_fixed_blur_mix_has_linear_endpoints(self):
+        image = synthetic()["A"]
+        blurred = cv2.GaussianBlur(image, (0, 0), 3.0)
+        np.testing.assert_allclose(
+            fixed_blur_mix(image, sigma=3.0, mix=0.0),
+            image,
+        )
+        np.testing.assert_allclose(
+            fixed_blur_mix(image, sigma=3.0, mix=1.0),
+            blurred,
+        )
+        np.testing.assert_allclose(
+            fixed_blur_mix(image, sigma=3.0, mix=0.25),
+            image * 0.75 + blurred * 0.25,
+        )
+
     def test_exact_match_scores_higher_than_perturbation(self):
         reference = synthetic(blur=1.5)
         exact = score_images(reference, reference)

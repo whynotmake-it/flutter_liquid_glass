@@ -12,7 +12,7 @@ APP="$ROOT/apple/build/AppleMatch.app"
 rm -rf "$APP"
 mkdir -p "$APP"
 cp "$ROOT/apple/Info.plist" "$APP/Info.plist"
-cp "$ROOT/scenes/toolbar_capsule.json" "$APP/toolbar_capsule.json"
+cp "$ROOT"/scenes/*.json "$APP/"
 
 xcrun --sdk iphonesimulator swiftc \
   -parse-as-library \
