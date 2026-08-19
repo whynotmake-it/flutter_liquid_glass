@@ -10,9 +10,12 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
-// Compute Y coordinate reversing it for OpenGL backend
+// Compute Y coordinate, reversing it for OpenGL backends that predate
+// Flutter 3.44's OpenGLES texture coordinate normalization (the engine flips
+// it for us from that version on).
+// See https://groups.google.com/g/flutter-announce/c/WQHn5LvciKk
 float computeY(float coordY, vec2 size) {
-    #ifdef IMPELLER_TARGET_OPENGLES
+    #if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
         return 1.0 - (coordY / size.y);
     #else
         return coordY / size.y;

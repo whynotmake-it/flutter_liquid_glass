@@ -198,8 +198,11 @@ void main() {
     vec4 blurred = texture(uForegroundBlurredTexture, layerUV);
     float sd = approximateSDF(blurred.a, uThickness);
     
-#ifdef IMPELLER_TARGET_OPENGLES
-    // Convert flipped layerUV back to layer-local coordinates for normal calculation
+#if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
+    // Convert flipped layerUV back to layer-local coordinates for normal calculation.
+    // Only applies on engines that predate Flutter 3.44's OpenGLES coordinate
+    // normalization, matching the condition in computeY() (shared.glsl) that
+    // produced this flipped layerUV in the first place.
     transformedCoord.xy = layerUV * uForegroundSize;
 #endif
     vec3 normal = getNormal(transformedCoord.xy, uThickness);
