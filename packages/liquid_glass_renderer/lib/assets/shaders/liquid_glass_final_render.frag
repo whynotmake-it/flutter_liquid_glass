@@ -39,14 +39,18 @@ void main() {
     // So we need to scale by devicePixelRatio to work in physical pixel space
     vec2 fragCoord = FlutterFragCoord().xy;
     
-    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);        
-        
-    #ifdef IMPELLER_TARGET_OPENGLES
+    vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
+
+    // Flutter 3.44+ normalizes the OpenGLES texture coordinate system to match
+    // other backends (the engine flips it for us), so the extra flip below is
+    // only still needed on engines that predate that change.
+    // See https://groups.google.com/g/flutter-announce/c/WQHn5LvciKk
+    #if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
         screenUV.y = 1.0 - screenUV.y;
     #endif
 
     vec2 geometryUV = (fragCoord - uGeometryOffset) / uGeometrySize;
-    #ifdef IMPELLER_TARGET_OPENGLES
+    #if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
         geometryUV.y = 1.0 - geometryUV.y;
     #endif
 

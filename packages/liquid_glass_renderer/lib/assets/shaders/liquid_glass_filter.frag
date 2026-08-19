@@ -45,7 +45,12 @@ void main() {
      
     // We invert screenUV Y on OpenGL to sample the textures correctly
     // fragCoord stays the same so shape positions are correct.
-    #ifdef IMPELLER_TARGET_OPENGLES
+    //
+    // Flutter 3.44+ normalizes the OpenGLES texture coordinate system to match
+    // other backends (the engine flips it for us), so the extra flip below is
+    // only still needed on engines that predate that change.
+    // See https://groups.google.com/g/flutter-announce/c/WQHn5LvciKk
+    #if defined(IMPELLER_TARGET_OPENGLES) && !defined(IMPELLER_OPENGLES_UNFLIPPED_DEPRECATED)
         vec2 screenUV = vec2(fragCoord.x / uSize.x, 1.0 - (fragCoord.y / uSize.y));
     #else
         vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
