@@ -11,8 +11,8 @@ void main() {
   const expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
   test(
     'flutter_gpu renders to a persistent texture and produces a valid image',
-    () {
-      final library = gpu.ShaderLibrary.fromAsset(
+    () async {
+      final library = await gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
       );
       expect(library, isNotNull);
@@ -63,9 +63,8 @@ void main() {
             offsetInBytes: 0,
             lengthInBytes: vertices.lengthInBytes,
           ),
-          4,
         )
-        ..draw();
+        ..draw(4);
       commandBuffer.submit();
 
       final image = texture.asImage();
@@ -77,11 +76,11 @@ void main() {
 
   test(
     'asset renderers share immutable pipeline resources',
-    () {
-      final first = FlutterGpuGeometryRenderer.fromAsset(
+    () async {
+      final first = await FlutterGpuGeometryRenderer.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
       );
-      final second = FlutterGpuGeometryRenderer.fromAsset(
+      final second = await FlutterGpuGeometryRenderer.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
       );
       addTearDown(first.dispose);
@@ -123,10 +122,10 @@ void main() {
 
   test(
     'geometry renderer buckets and reuses its native render target',
-    () {
-      final library = gpu.ShaderLibrary.fromAsset(
+    () async {
+      final library = (await gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      )!;
+      ))!;
       final renderer = FlutterGpuGeometryRenderer(
         vertexShader: library['GeometryVertex']!,
         fragmentShader: library['GeometryFragment']!,
@@ -169,9 +168,9 @@ void main() {
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final library = gpu.ShaderLibrary.fromAsset(
+      final library = (await gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      )!;
+      ))!;
       final renderer = FlutterGpuGeometryRenderer(
         vertexShader: library['GeometryVertex']!,
         fragmentShader: library['GeometryFragment']!,
@@ -215,14 +214,25 @@ void main() {
     'shared host buffer handles more than 32 layer submissions per frame',
     () async {
       const shape = <double>[
-        1, 12, 8, 0,
-        1, 0, 0, 1,
-        8, 8, 1, -1,
+        1,
+        12,
+        8,
+        0,
+        1,
+        0,
+        0,
+        1,
+        8,
+        8,
+        1,
+        -1,
       ];
-      final renderers = List.generate(
-        40,
-        (_) => FlutterGpuGeometryRenderer.fromAsset(
-          'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      final renderers = await Future.wait(
+        List.generate(
+          40,
+          (_) => FlutterGpuGeometryRenderer.fromAsset(
+            'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+          ),
         ),
       );
       addTearDown(() {

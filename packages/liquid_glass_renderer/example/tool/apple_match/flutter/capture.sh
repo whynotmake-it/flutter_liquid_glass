@@ -6,11 +6,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${SETTINGS_FILE:=$ROOT/settings/baseline.json}"
 : "${CANDIDATE_OUT:=$ROOT/out/candidates/baseline}"
 : "${CAPTURE_FRAMES:=3}"
-: "${FLUTTER_BIN:=$HOME/fvm/versions/3.44.1/bin/flutter}"
+: "${FLUTTER_BIN:=$HOME/fvm/versions/3.47.1/bin/flutter}"
 : "${PREPARE_APP:=1}"
 
 if [[ ! -x "$FLUTTER_BIN" ]]; then
-  echo "Flutter 3.44.1 not found at $FLUTTER_BIN; set FLUTTER_BIN explicitly." >&2
+  echo "Flutter 3.47.1 not found at $FLUTTER_BIN; set FLUTTER_BIN explicitly." >&2
   exit 4
 fi
 export PATH="$ROOT/compat/bin:$PATH"
@@ -63,8 +63,19 @@ PY
 if [[ "$PREPARE_APP" == "1" ]]; then
   (
     cd "$ROOT/flutter"
+    build_defines=("--dart-define=SCENE_B64=$SCENE_B64")
+    if [[ -n "${LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH:-}" ]]; then
+      build_defines+=(
+        "--dart-define=LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH=$LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH"
+      )
+    fi
+    if [[ "${LIQUID_GLASS_DISABLE_CANVAS_CONTOUR:-0}" == "1" ]]; then
+      build_defines+=(
+        "--dart-define=LIQUID_GLASS_DISABLE_CANVAS_CONTOUR=true"
+      )
+    fi
     "$FLUTTER_BIN" build ios --simulator --debug \
-      --dart-define="SCENE_B64=$SCENE_B64"
+      "${build_defines[@]}"
   )
   xcrun simctl shutdown "$IOS_27_UDID" 2>/dev/null || true
   xcrun simctl boot "$IOS_27_UDID"

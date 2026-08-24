@@ -10,16 +10,6 @@ mat2 rotate2d(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
-// Compute Y coordinate reversing it for OpenGL backend
-float computeY(float coordY, vec2 size) {
-    #ifdef IMPELLER_TARGET_OPENGLES
-        return 1.0 - (coordY / size.y);
-    #else
-        return coordY / size.y;
-    #endif
-}
-
-
 // Optimized highlight color - ~60% fewer operations than original
 vec3 getHighlightColor(vec3 backgroundColor, float targetBrightness) {
     float luminance = dot(backgroundColor, LUMA_WEIGHTS);

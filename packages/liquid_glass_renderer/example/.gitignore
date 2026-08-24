@@ -46,6 +46,8 @@ app.*.map.json
 
 # Platform Directories
 ios/
+!tool/apple_match/flutter/ios/
+!tool/apple_match/flutter/ios/**
 android/
 windows/
 linux/

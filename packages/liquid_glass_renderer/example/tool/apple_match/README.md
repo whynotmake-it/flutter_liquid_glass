@@ -29,7 +29,8 @@ from iOS 26 or older must never be placed in `references/`.
 - `flutter/`: standalone Flutter capture target using
   `liquid_glass_renderer`, Impeller/Metal, and Flutter GPU.
 - `compare/`: OpenCV/NumPy alignment, residual, signed radial-flow,
-  gradient-sharpness, specular, tint metrics, and tests.
+  directional 2–20 px exterior-shadow annulus, gradient-sharpness, specular,
+  tint metrics, and tests.
 - `settings/`: baseline and bounded deterministic search space.
 - `references/`: immutable, named Apple capture sets. Replacement requires
   `FORCE_REFERENCE=1`.
@@ -40,14 +41,14 @@ from iOS 26 or older must never be placed in `references/`.
 Requirements:
 
 - Xcode with the iOS 27 SDK and accepted Xcode license.
-- Flutter 3.44.1.
+- Flutter 3.47.1.
 - `agent-device >= 0.14.0`.
 - Python 3 with packages pinned by `compare/requirements.txt`.
 
 ```bash
 cd packages/liquid_glass_renderer/example/tool/apple_match
 export DEVELOPER_DIR=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer
-export FLUTTER_BIN="$HOME/fvm/versions/3.44.1/bin/flutter"
+export FLUTTER_BIN="$HOME/fvm/versions/3.47.1/bin/flutter"
 python3 -m venv compare/.venv
 compare/.venv/bin/pip install -r compare/requirements.txt
 export IOS_27_UDID="$(compare/.venv/bin/python pin_simulator.py)"
@@ -304,6 +305,27 @@ captured on a real iOS 27 device. Do not claim device equivalence from these
 simulator references. Three-frame temporal uncertainty is emitted in each
 scorecard; this run produced identical frames and therefore a measured interval
 of zero, which does not cover simulator-to-device variation.
+
+### Geometry AA diagnostic
+
+The geometry pass keeps Flutter's centered half-pixel coverage by default. For
+the contour-registration experiment only, rebuild the capture target with the
+compile-time value expressed in thousandths:
+
+```sh
+flutter run --dart-define=LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH=375
+```
+
+Sweep `250`, `375`, and `500` with shape, lighting, and shadows frozen. This is
+an internal rasterization probe, not a public material setting; accept a
+change only if it improves the black/white outside-boundary samples and the
+global shape/direct metrics across held-out sizes and both Metal/GLES.
+
+The toolbar-capsule sweep on the pinned iOS 27 simulator (canonical settings,
+three-frame medians) measured scores **94.0696** (0.25), **94.1121** (0.375),
+and **94.0862** (0.5). The differences are not material, and the default
+Flutter-parity 0.5 remains selected; 0.375 is retained only as a diagnostic
+variant, not as a renderer behavior change.
 
 Generated build products, virtual environments, caches, and candidate output
 are ignored. Only small, deliberately reviewed reference/evidence PNGs should

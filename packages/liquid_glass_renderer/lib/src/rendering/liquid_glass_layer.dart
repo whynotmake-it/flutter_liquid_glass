@@ -16,6 +16,13 @@ import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
+// The Apple-match harness can ablate the legacy Canvas contour while fitting
+// the shader's material contour. This is deliberately compile-time and
+// private: production callers do not get a second public outline switch.
+const _disableCanvasContour = bool.fromEnvironment(
+  'LIQUID_GLASS_DISABLE_CANVAS_CONTOUR',
+);
+
 /// Represents a layer of multiple [LiquidGlass] shapes or
 /// [LiquidGlassBlendGroup]s that have shared [LiquidGlassSettings] and will be
 /// rendered together.
@@ -144,16 +151,22 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   void _scheduleGpuGeometryRendererInitialization() {
     if (_triedGpuGeometryRenderer || _gpuInitializationScheduled) return;
     _gpuInitializationScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _gpuInitializationScheduled = false;
       if (!mounted || widget.fake || _triedGpuGeometryRenderer) return;
 
       _triedGpuGeometryRenderer = true;
       try {
-        _gpuGeometryRenderer = FlutterGpuGeometryRenderer.fromAsset(
+        final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );
+        if (!mounted) {
+          renderer.dispose();
+          return;
+        }
+        _gpuGeometryRenderer = renderer;
       } on Object catch (error) {
+        if (!mounted) return;
         _logDebugFallback(
           'Flutter GPU is unavailable; LiquidGlassLayer is using FakeGlass. '
           'Enable Impeller and Flutter GPU for the full glass effect. $error',
@@ -303,17 +316,20 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Matrix4 get matteTransform => Matrix4.identity();
 
   @override
+  Matrix4 get shaderCoordinateTransform => getTransformTo(null);
+
+  @override
   void onTransformChanged() {
     // Geometry and FlutterFragCoord share this layer's clip space, so ancestor
     // motion is compositor-only. Do not cross the repaint boundary or rebuild
     // the native image filter after the first paint.
     if (hasReusableGeometry) {
-      return;
+      syncCoordinateMapping();
+    } else {
+      markNeedsPaint();
     }
-    markNeedsPaint();
   }
 
-  @override
   void onCompositing() {
     if (!attached) return;
     var dirty = false;
@@ -403,6 +419,32 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           },
           oldLayer: _clipPathLayerHandle.layer,
         );
+
+    // Keep the material contour independent from the fractional coverage in
+    // the GPU matte. The shader's rim is intentionally coverage-weighted for
+    // antialiasing, but that makes a dark outline disappear against a light
+    // background at the exact silhouette. Painting the configured contour on
+    // the canonical Flutter shape path preserves a visible outside edge while
+    // leaving the shader's directional highlights free to shape the inner rim.
+    if (!_disableCanvasContour &&
+        // An explicit outerContourColor is rendered by the final material
+        // shader so the specular highlight can eclipse it naturally. Keep the
+        // canvas stroke only as the legacy fallback for existing settings.
+        settings.outerContourColor == null &&
+        settings.effectiveOuterContourWidth > 0 &&
+        settings.effectiveOuterContourColor.a > 0) {
+      final contourColor = settings.effectiveOuterContourColor;
+      final contourPaint = Paint()
+        ..color = contourColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = settings.effectiveOuterContourWidth;
+      context.canvas
+        ..save()
+        ..translate(offset.dx, offset.dy)
+        ..drawPath(clipPath, contourPaint)
+        ..restore();
+    }
+
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
       offset,

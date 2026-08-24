@@ -39,6 +39,15 @@ def position_id(position: float) -> str:
     return f"slider-{round(position * 100):03d}"
 
 
+def parse_positions(value: str) -> tuple[float, ...]:
+    positions = tuple(sorted({round(float(item), 6) for item in value.split(",")}))
+    if not positions or any(position < 0.0 or position > 1.0 for position in positions):
+        raise argparse.ArgumentTypeError(
+            "positions must be comma-separated values in the range 0..1"
+        )
+    return positions
+
+
 def reference_dir(position: float) -> Path:
     return (
         ROOT
@@ -85,6 +94,10 @@ def capture_references(args) -> None:
 
 def materialize(virtual: dict) -> dict:
     settings = dict(virtual)
+    # Blur is intentionally out of scope for this sweep. Keep accepting the
+    # historical virtual key in old baselines, but never send it to the live
+    # renderer or optimize it as if it were a refraction parameter.
+    settings.pop("blurMix", None)
     tint_level = round(float(settings.pop("tintLevel")))
     settings.update(
         {
@@ -99,9 +112,8 @@ def materialize(virtual: dict) -> dict:
 def fit_objective(evaluator: Evaluator) -> float:
     scores = evaluator.last_result.details["stageScores"]
     return (
-        0.45 * (100.0 - scores["blurMtf"])
-        + 0.45 * (100.0 - scores["tintColor"])
-        + 0.10 * (100.0 - scores["holdout"])
+        0.80 * (100.0 - scores["refraction"])
+        + 0.20 * (100.0 - scores["tintColor"])
     )
 
 
@@ -145,7 +157,7 @@ def save_fit(
         "weights": WEIGHTS,
         "fixedBlurSigma": settings["blur"],
         "fitted": {
-            "blurMix": settings["blurMix"],
+            "blurMix": virtual.get("blurMix", 0.0),
             "glassAlpha": settings["glassAlpha"],
             "tintLevel": virtual["tintLevel"],
             "glassColor": [
@@ -248,7 +260,6 @@ def write_curve_plot(path: Path, rows: list[dict]) -> None:
         )
 
     series = (
-        ("blurMix", [row["blurMix"] for row in rows], (220, 80, 30)),
         ("glassAlpha", [row["glassAlpha"] for row in rows], (40, 150, 40)),
         ("tintLevel / 255", [row["tintLevel"] / 255.0 for row in rows], (40, 40, 210)),
     )
@@ -268,7 +279,7 @@ def write_curve_plot(path: Path, rows: list[dict]) -> None:
             cv2.circle(image, tuple(point), 7, color, -1, cv2.LINE_AA)
     cv2.putText(
         image,
-        "iOS 27 Liquid Glass Tint Amount fit",
+        "iOS 27 Liquid Glass transparency/tint fit",
         (left, 48),
         cv2.FONT_HERSHEY_SIMPLEX,
         1.0,
@@ -317,6 +328,7 @@ def fit_sweep(args) -> dict:
     baseline = load_baseline(args.baseline.resolve())
     baseline_virtual = {
         **baseline,
+        "blurMix": 0.0,
         "tintLevel": float(
             np.mean(
                 [
@@ -327,9 +339,10 @@ def fit_sweep(args) -> dict:
             )
         ),
     }
+    positions = args.positions
     references = {
         position: load_reference_probes(reference_dir(position), crop)
-        for position in POSITIONS
+        for position in positions
     }
     out = args.out.resolve()
     shutil.rmtree(out, ignore_errors=True)
@@ -339,7 +352,7 @@ def fit_sweep(args) -> dict:
     cards = []
     print(
         "TRANSPARENCY_FIT_SESSION_STARTING "
-        f"udid={args.udid} positions={list(POSITIONS)}",
+        f"udid={args.udid} positions={list(positions)}",
         flush=True,
     )
     with CaptureSession(
@@ -356,7 +369,7 @@ def fit_sweep(args) -> dict:
             crop=crop,
             capture_dir=out / "live",
         )
-        for position in POSITIONS:
+        for position in positions:
             evaluator.reference = references[position]
             evaluation_rows = []
 
@@ -378,11 +391,10 @@ def fit_sweep(args) -> dict:
                 evaluate,
                 baseline_virtual,
                 {
-                    "blurMix": [0.0, 0.25, 0.5, 0.75, 1.0],
                     "glassAlpha": [0.18, 0.38, 0.58, 0.72, 0.86],
                     "tintLevel": [215.0, 235.0, 255.0],
                 },
-                max_iters=10,
+                max_iters=args.max_iters,
                 min_improvement=0.01,
             )
             coarse_best = coarse["bestParams"]
@@ -390,9 +402,6 @@ def fit_sweep(args) -> dict:
                 evaluate,
                 coarse_best,
                 {
-                    "blurMix": fine_values(
-                        coarse_best["blurMix"], 0.25, 0.05, 0.0, 1.0
-                    ),
                     "glassAlpha": fine_values(
                         coarse_best["glassAlpha"], 0.20, 0.04, 0.02, 0.98
                     ),
@@ -400,7 +409,7 @@ def fit_sweep(args) -> dict:
                         coarse_best["tintLevel"], 24.0, 8.0, 191.0, 255.0
                     ),
                 },
-                max_iters=16,
+                max_iters=args.fine_max_iters,
                 min_improvement=0.005,
             )
             best = fine["bestParams"]
@@ -438,7 +447,13 @@ def fit_sweep(args) -> dict:
         }
         for card in cards
     ]
-    interpretation = interpret_curve([row["blurMix"] for row in rows])
+    interpretation = {
+        "status": "skipped",
+        "reason": "Blur was deliberately excluded; only transparency/tint response was fitted.",
+        "monotonic": None,
+        "spread": 0.0,
+        "flatAtOne": False,
+    }
     plot = out / "blur_mix_mapping.png"
     write_curve_plot(plot, rows)
     summary = {
@@ -449,6 +464,7 @@ def fit_sweep(args) -> dict:
         "sliderControlMethod": CONTROL_METHOD,
         "medianFrameCount": args.frames,
         "fixedBlurSigma": baseline["blur"],
+        "positions": list(positions),
         "curve": rows,
         "interpretation": interpretation,
         "plot": str(plot.resolve()),
@@ -457,11 +473,9 @@ def fit_sweep(args) -> dict:
             "the sweep interpretation supersedes any mechanism-wide rejection."
         ),
         "visualInspection": (
-            "The signed diffs support a rising, saturating blur mix, but the "
-            "upper endpoint remains underfit: Apple's position-1 glass is "
-            "nearly opaque while the candidate retains visible RGB grid "
-            "structure. The blur-mix mechanism is supported; the fitted "
-            "overlay/color response is not a complete model of the slider."
+            "The signed diffs measure the transparent-slider transmission and "
+            "tint response only. Blur is intentionally held out of this fit; "
+            "the endpoint captures are retained for later visual review."
         ),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -492,10 +506,24 @@ def main() -> None:
     parser.add_argument(
         "--flutter-bin",
         default=os.environ.get(
-            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.44.1/bin/flutter")
+            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")
         ),
     )
     parser.add_argument("--frames", type=int, default=3)
+    parser.add_argument(
+        "--positions",
+        type=parse_positions,
+        default=POSITIONS,
+        help="Comma-separated slider positions to fit (default: all five)",
+    )
+    parser.add_argument(
+        "--max-iters", type=int, default=10,
+        help="Coarse coordinate-descent iterations per position",
+    )
+    parser.add_argument(
+        "--fine-max-iters", type=int, default=16,
+        help="Fine coordinate-descent iterations per position",
+    )
     parser.add_argument("--force-reference", action="store_true")
     parser.add_argument("--capture-only", action="store_true")
     parser.add_argument("--fit-only", action="store_true")

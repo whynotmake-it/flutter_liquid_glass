@@ -20,9 +20,18 @@ class LiquidGlassSettings with Equatable {
     this.highlightColor = const Color.fromARGB(255, 255, 255, 255),
     this.edgeColor = const Color.fromARGB(0, 255, 255, 255),
     this.edgeWidth = 0,
+    this.outerContourColor,
+    this.outerContourWidth,
     this.edgeInset = 0.5,
     this.specularWrap = 0.35,
     this.bleedStrength = 0.5,
+    this.transmissionGamma = 1.0,
+    this.vibrancy = 0.0,
+    this.faceShadingStrength = 0.0,
+    this.faceShadingDepth = 20.0,
+    this.innerShadowStrength = 0.0,
+    this.innerShadowDepth = 12.0,
+    this.innerShadowDirectionality = 0.0,
     this.refractiveIndex = 1.2,
     this.saturation = 1.5,
   });
@@ -164,6 +173,39 @@ class LiquidGlassSettings with Equatable {
   /// The effective edge width taking visibility into account.
   double get effectiveEdgeWidth => edgeWidth * visibility;
 
+  /// Optional material contour painted on the silhouette outside the GPU rim.
+  ///
+  /// When omitted, the legacy [edgeColor] is used for compatibility. Set an
+  /// explicit color to tune Apple's dark dielectric outline independently of
+  /// the directional specular rim.
+  final Color? outerContourColor;
+
+  /// Optional width of the independent outer material contour.
+  ///
+  /// When omitted, [edgeWidth] is used. This contour is a single canvas stroke
+  /// and does not add another backdrop capture or shader pass.
+  final double? outerContourWidth;
+
+  /// Effective independent outer contour color.
+  Color get effectiveOuterContourColor =>
+      (outerContourColor ?? edgeColor).withValues(
+        alpha: (outerContourColor ?? edgeColor).a * visibility,
+      );
+
+  /// Effective contour color consumed by the final material shader. A null
+  /// override keeps the legacy edge path unchanged.
+  Color get effectiveOuterMaterialContourColor =>
+      outerContourColor?.withValues(alpha: outerContourColor!.a * visibility) ??
+      const Color.fromARGB(0, 0, 0, 0);
+
+  /// Effective independent outer contour width.
+  double get effectiveOuterContourWidth =>
+      (outerContourWidth ?? edgeWidth) * visibility;
+
+  /// Effective width for the independent shader contour. Zero means disabled.
+  double get effectiveOuterMaterialContourWidth =>
+      (outerContourWidth ?? 0.0) * visibility;
+
   /// How far the specular highlight is inset into the edge width.
   ///
   /// `0` means the highlight starts at the outer edge. `0.5` means it starts
@@ -194,6 +236,70 @@ class LiquidGlassSettings with Equatable {
   /// The effective bleed strength taking visibility into account.
   double get effectiveBleedStrength => bleedStrength * visibility;
 
+  /// Display-referred transfer applied to light transmitted through the glass.
+  ///
+  /// `1.0` preserves the sampled backdrop. Values below `1.0` lift midtones
+  /// without moving black or white, matching glass compositors that combine
+  /// the backdrop and material in a nonlinear display color space.
+  final double transmissionGamma;
+
+  /// The effective transmission transfer taking visibility into account.
+  double get effectiveTransmissionGamma =>
+      1 + (transmissionGamma - 1) * visibility;
+
+  /// Backdrop-aware luminance lift proportional to transmitted chroma.
+  ///
+  /// This models the vibrancy pass used by translucent system materials: a
+  /// neutral backdrop is unchanged, while colorful content contributes a
+  /// subtle diffuse lift through the glass.
+  final double vibrancy;
+
+  /// The effective vibrancy taking visibility into account.
+  double get effectiveVibrancy => vibrancy * visibility;
+
+  /// Strength of the broad directional occlusion lobe beneath the lit rim.
+  ///
+  /// This shades the otherwise-flat face as light passes beneath the raised
+  /// rim. A value of `0` disables the effect.
+  final double faceShadingStrength;
+
+  /// Effective face shading strength taking visibility into account.
+  double get effectiveFaceShadingStrength => faceShadingStrength * visibility;
+
+  /// Distance in logical pixels over which face shading fades into the glass.
+  final double faceShadingDepth;
+
+  /// Effective face shading depth taking visibility into account.
+  double get effectiveFaceShadingDepth => faceShadingDepth * visibility;
+
+  /// Strength of the ambient occlusion beneath the raised inner bevel.
+  ///
+  /// This is independent of light direction and gives bright materials their
+  /// characteristic inset, three-dimensional edge. A value of `0` disables
+  /// the effect.
+  final double innerShadowStrength;
+
+  /// Effective inner-shadow strength taking visibility into account.
+  double get effectiveInnerShadowStrength => innerShadowStrength * visibility;
+
+  /// Distance in logical pixels over which the inner bevel shadow fades.
+  final double innerShadowDepth;
+
+  /// Effective inner-shadow depth taking visibility into account.
+  double get effectiveInnerShadowDepth => innerShadowDepth * visibility;
+
+  /// Redistributes the inner shadow toward the side facing away from the
+  /// configured light direction, without changing its symmetric baseline.
+  ///
+  /// `0` keeps the ambient inner shadow symmetric. `1` gives the shadow its
+  /// full directional range. The default is `0` so existing materials keep
+  /// their previous appearance.
+  final double innerShadowDirectionality;
+
+  /// Effective inner-shadow directionality taking visibility into account.
+  double get effectiveInnerShadowDirectionality =>
+      innerShadowDirectionality * visibility;
+
   /// The strength of the refraction.
   ///
   /// Higher values create more pronounced refraction.
@@ -223,9 +329,18 @@ class LiquidGlassSettings with Equatable {
     Color? highlightColor,
     Color? edgeColor,
     double? edgeWidth,
+    Color? outerContourColor,
+    double? outerContourWidth,
     double? edgeInset,
     double? specularWrap,
     double? bleedStrength,
+    double? transmissionGamma,
+    double? vibrancy,
+    double? faceShadingStrength,
+    double? faceShadingDepth,
+    double? innerShadowStrength,
+    double? innerShadowDepth,
+    double? innerShadowDirectionality,
     double? refractiveIndex,
     double? saturation,
   }) => LiquidGlassSettings(
@@ -240,9 +355,19 @@ class LiquidGlassSettings with Equatable {
     highlightColor: highlightColor ?? this.highlightColor,
     edgeColor: edgeColor ?? this.edgeColor,
     edgeWidth: edgeWidth ?? this.edgeWidth,
+    outerContourColor: outerContourColor ?? this.outerContourColor,
+    outerContourWidth: outerContourWidth ?? this.outerContourWidth,
     edgeInset: edgeInset ?? this.edgeInset,
     specularWrap: specularWrap ?? this.specularWrap,
     bleedStrength: bleedStrength ?? this.bleedStrength,
+    transmissionGamma: transmissionGamma ?? this.transmissionGamma,
+    vibrancy: vibrancy ?? this.vibrancy,
+    faceShadingStrength: faceShadingStrength ?? this.faceShadingStrength,
+    faceShadingDepth: faceShadingDepth ?? this.faceShadingDepth,
+    innerShadowStrength: innerShadowStrength ?? this.innerShadowStrength,
+    innerShadowDepth: innerShadowDepth ?? this.innerShadowDepth,
+    innerShadowDirectionality:
+        innerShadowDirectionality ?? this.innerShadowDirectionality,
     refractiveIndex: refractiveIndex ?? this.refractiveIndex,
     saturation: saturation ?? this.saturation,
   );
@@ -260,9 +385,18 @@ class LiquidGlassSettings with Equatable {
     highlightColor,
     edgeColor,
     edgeWidth,
+    outerContourColor,
+    outerContourWidth,
     edgeInset,
     specularWrap,
     bleedStrength,
+    transmissionGamma,
+    vibrancy,
+    faceShadingStrength,
+    faceShadingDepth,
+    innerShadowStrength,
+    innerShadowDepth,
+    innerShadowDirectionality,
     refractiveIndex,
     saturation,
   ];

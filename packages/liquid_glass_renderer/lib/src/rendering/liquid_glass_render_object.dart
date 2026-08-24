@@ -35,6 +35,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
   Matrix4 get matteTransform;
 
+  Matrix4 get shaderCoordinateTransform => Matrix4.identity();
+
   late GeometryRenderLink _link;
   GeometryRenderLink get link => _link;
   set link(GeometryRenderLink value) {
@@ -80,6 +82,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   set devicePixelRatio(double value) {
     if (_devicePixelRatio == value) return;
     _devicePixelRatio = value;
+    if (_settings != null) _updateShaderSettings();
     needsGeometryUpdate = true;
     markNeedsPaint();
   }
@@ -150,11 +153,29 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         )
         ..setColor(settings.effectiveHighlightColor)
         ..setColor(settings.effectiveEdgeColor)
+        ..setColor(settings.effectiveOuterMaterialContourColor)
+        ..setFloats([
+          settings.effectiveOuterMaterialContourWidth,
+          0.0,
+        ])
         ..setFloats([
           settings.effectiveEdgeWidth,
           settings.edgeInset,
           settings.effectiveBleedStrength,
           settings.specularWrap,
+        ])
+        ..setFloats([
+          settings.effectiveTransmissionGamma,
+          settings.effectiveVibrancy,
+        ])
+        ..setFloats([
+          settings.effectiveFaceShadingStrength,
+          settings.effectiveFaceShadingDepth,
+        ])
+        ..setFloats([
+          settings.effectiveInnerShadowStrength,
+          settings.effectiveInnerShadowDepth,
+          settings.effectiveInnerShadowDirectionality,
         ]);
     });
   }
@@ -276,15 +297,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       );
     } else {
       if (_geometryImage case final geometryImage?) {
+        final coordinateImage = syncCoordinateMapping();
         renderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
             value
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
               ..setSize(_geometryMatteBounds.size * devicePixelRatio);
           })
-          ..setImageSampler(1, geometryImage);
+          ..setImageSampler(1, geometryImage)
+          ..setImageSampler(2, coordinateImage);
         _shaderInputSnapshot = _ShaderInputSnapshot(
           geometryImage: geometryImage,
+          coordinateImage: coordinateImage,
           matteBounds: _geometryMatteBounds,
           devicePixelRatio: devicePixelRatio,
           settingsRevision: _shaderSettingsRevision,
@@ -314,10 +338,32 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     Rect boundingBox,
   );
 
+  @protected
+  ui.Image syncCoordinateMapping() {
+    final renderer = _gpuGeometryRenderer;
+    if (renderer == null) {
+      throw StateError('Flutter GPU coordinate renderer is unavailable.');
+    }
+    final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
+    final origin = MatrixUtils.transformPoint(globalToMatte, Offset.zero);
+    final axisX = MatrixUtils.transformPoint(globalToMatte, const Offset(1, 0));
+    final axisY = MatrixUtils.transformPoint(globalToMatte, const Offset(0, 1));
+    renderer.updateCoordinateMapping(
+      basisXX: axisX.dx - origin.dx,
+      basisYX: axisY.dx - origin.dx,
+      basisXY: axisX.dy - origin.dy,
+      basisYY: axisY.dy - origin.dy,
+      originX: origin.dx * devicePixelRatio,
+      originY: origin.dy * devicePixelRatio,
+    );
+    return renderer.coordinateImage!;
+  }
+
   /// True once geometry has been encoded, so ancestor motion can stay on the
   /// compositor without crossing this layer's repaint boundary.
   @protected
-  bool get hasReusableGeometry => _geometryImage != null;
+  bool get hasReusableGeometry =>
+      _geometryImage != null && _gpuGeometryRenderer?.coordinateImage != null;
 
   /// Drops native backdrop-filter state while this sample is idle.
   @protected
@@ -395,7 +441,118 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   bool needsGeometryUpdate = true;
 
   final List<double> _shapeData = [];
+  final List<double> _rseData = [];
   static final Matrix4 _identity = Matrix4.identity();
+
+  // Flutter 3.47 computes these RSE parameters when its geometry changes and
+  // uploads them to the symmetric RSE shader. Mirror that construction here
+  // so lookup-table interpolation and circle fitting are not repeated per
+  // fragment.
+  static (double, double) _rseNAndXj(double ratio) {
+    const table = <(double, double)>[
+      (2.00000000, 1.13276676),
+      (2.18349805, 1.20311921),
+      (2.33888662, 1.28698796),
+      (2.48660575, 1.36351941),
+      (2.62226596, 1.44717976),
+      (2.75148990, 1.53385819),
+      (3.36298265, 1.98288283),
+      (4.08649929, 2.23811846),
+      (4.85481134, 2.47563463),
+      (5.62945551, 2.72948597),
+      (6.43023796, 2.98020421),
+    ];
+    if (ratio > 5.0) {
+      final n = 1.559599389 * (ratio - 5.0) + table.last.$1;
+      final kXj = 0.522807185 * (ratio - 5.0) + table.last.$2;
+      return (n, 1.0 - 1.0 / kXj);
+    }
+    final clampedRatio = ratio.clamp(2.0, 5.0);
+    final steps = clampedRatio < 2.5
+        ? (clampedRatio - 2.0) * 10.0
+        : (clampedRatio - 2.5) * 2.0 + 5.0;
+    final left = steps.floor().clamp(0, table.length - 2);
+    final fraction = steps - left;
+    final a = table[left];
+    final b = table[left + 1];
+    final n = a.$1 + (b.$1 - a.$1) * fraction;
+    final kXj = a.$2 + (b.$2 - a.$2) * fraction;
+    return (n, 1.0 - 1.0 / kXj);
+  }
+
+  static (double, double, Offset, double) _rseOctant(
+    double axis,
+    double radius,
+  ) {
+    if (radius <= 1e-3) return (0.0, 0.0, Offset.zero, 0.0);
+    final (n, xJOverA) = _rseNAndXj(2.0 * axis / radius);
+    final xJ = xJOverA * axis;
+    final yJ =
+        pow(
+          max(1.0 - pow(xJOverA, n).toDouble(), 0.0),
+          1.0 / n,
+        ).toDouble() *
+        axis;
+    final tanPhi = pow(xJ / max(yJ, 1e-6), n - 1.0).toDouble();
+    final d = (xJ - tanPhi * yJ) / (1.0 - tanPhi);
+    final gap = (1.0 - cos(pi / 4.0)) * radius;
+    final circleRadius = (axis - d - gap) * sqrt2;
+    final pointJ = Offset(xJ, yJ);
+    final pointM = Offset(axis - gap, axis - gap);
+    final chord = pointM - pointJ;
+    final midpoint = (pointJ + pointM) / 2.0;
+    final perpendicular = Offset(-chord.dy, chord.dx);
+    final perpendicularLength = perpendicular.distance;
+    final halfChord = chord.distance / 2.0;
+    final centerDistance = sqrt(
+      max(circleRadius * circleRadius - halfChord * halfChord, 0.0),
+    );
+    final circleCenter = perpendicularLength <= 1e-6
+        ? midpoint
+        : midpoint - perpendicular * (centerDistance / perpendicularLength);
+    final fromM = pointM - circleCenter;
+    final fromJ = pointJ - circleCenter;
+    final span = atan2(
+      fromM.dx * fromJ.dy - fromM.dy * fromJ.dx,
+      fromM.dx * fromJ.dx + fromM.dy * fromJ.dy,
+    ).abs();
+    return (n, span, circleCenter, circleRadius);
+  }
+
+  static List<double> _rseParameters(
+    Size size,
+    double rawCornerRadius,
+    double devicePixelRatio,
+  ) {
+    final halfWidth = size.width * devicePixelRatio / 2.0;
+    final halfHeight = size.height * devicePixelRatio / 2.0;
+    final radius = min(
+      rawCornerRadius * devicePixelRatio,
+      min(halfWidth, halfHeight),
+    );
+    final (topN, topSpan, topCenter, topRadius) = _rseOctant(
+      halfWidth,
+      radius,
+    );
+    final (rightN, rightSpan, rightCenter, rightRadius) = _rseOctant(
+      halfHeight,
+      radius,
+    );
+    return <double>[
+      topN,
+      rightN,
+      topSpan,
+      rightSpan,
+      topCenter.dx,
+      topCenter.dy,
+      rightCenter.dx,
+      rightCenter.dy,
+      halfWidth,
+      halfHeight,
+      topRadius,
+      rightRadius,
+    ];
+  }
 
   (ui.Image, Rect) _buildGpuGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
@@ -410,9 +567,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     }
 
     try {
+      // Centered SDF antialiasing needs half a physical pixel outside the
+      // mathematical shape. Keep that margin in the persistent geometry
+      // texture so the positive side of the fade is not clipped at the matte
+      // edge.
+      final aaPadding = 0.5 / devicePixelRatio;
       final boundsInMatteSpace = MatrixUtils.transformRect(
         matteTransform,
-        bounds,
+        bounds.inflate(aaPadding),
       ).snapToPixels(devicePixelRatio);
 
       final textureWidth = (boundsInMatteSpace.width * devicePixelRatio).ceil();
@@ -427,6 +589,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       // group; this preserves smooth unions within a group without blending
       // unrelated standalone glass widgets together.
       _shapeData.clear();
+      _rseData.clear();
       var numShapes = 0;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
@@ -505,6 +668,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           // oversized primitives), which is especially visible for stretched
           // shapes in a blend group.
           final size = shape.renderObject.size;
+          _rseData.addAll(
+            _rseParameters(size, shape.rawCornerRadius, devicePixelRatio),
+          );
           final blendMarker = firstInGroup
               ? -(geometry.blend * devicePixelRatio + 1)
               : geometry.blend * devicePixelRatio;
@@ -538,6 +704,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         width: textureWidth,
         height: textureHeight,
         shapeData: _shapeData,
+        rseData: _rseData,
         numShapes: numShapes,
         refractiveIndex: settings.refractiveIndex,
         thickness: settings.effectiveThickness,
@@ -570,12 +737,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 class _ShaderInputSnapshot {
   const _ShaderInputSnapshot({
     required this.geometryImage,
+    required this.coordinateImage,
     required this.matteBounds,
     required this.devicePixelRatio,
     required this.settingsRevision,
   });
 
   final ui.Image geometryImage;
+  final ui.Image coordinateImage;
   final Rect matteBounds;
   final double devicePixelRatio;
   final int settingsRevision;
@@ -584,6 +753,7 @@ class _ShaderInputSnapshot {
   bool operator ==(Object other) {
     return other is _ShaderInputSnapshot &&
         other.geometryImage == geometryImage &&
+        other.coordinateImage == coordinateImage &&
         other.matteBounds == matteBounds &&
         other.devicePixelRatio == devicePixelRatio &&
         other.settingsRevision == settingsRevision;
@@ -592,6 +762,7 @@ class _ShaderInputSnapshot {
   @override
   int get hashCode => Object.hash(
     geometryImage,
+    coordinateImage,
     matteBounds,
     devicePixelRatio,
     settingsRevision,
@@ -600,6 +771,7 @@ class _ShaderInputSnapshot {
   @override
   String toString() {
     return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
+        'coordinates: ${identityHashCode(coordinateImage)}, '
         'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
         'settingsRevision: $settingsRevision)';
   }

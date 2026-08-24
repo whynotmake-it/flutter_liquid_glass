@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from ..metrics import read_rgb, score_images
-from .session import FlutterRunSession, SignalReloadTrigger
+from .session import FlutterRunSession, SessionError, SignalReloadTrigger
 
 BUNDLE_ID = "dev.liquidglass.appleMatchFlutter"
 PINNED_DEVICE_NAME = "AppleMatch-iPhone17Pro-iOS27"
@@ -24,6 +24,74 @@ PINNED_DEVICE_UDID = "DB4F41F3-1C36-476D-B775-AFDC3686C75B"
 PROBES = ("A", "B", "C", "D")
 CANDIDATE_FILE_NAME = "apple_match_candidate.json"
 STATUS_FILE_NAME = "apple_match_status.json"
+
+# Keep this list in lock-step with matchGlassSettings/matchGlassShape and the
+# geometry overrides in flutter/lib/scene_view.dart. An optimizer parameter
+# that never reaches the renderer makes a flat search axis look like evidence.
+SUPPORTED_SETTINGS = frozenset(
+    {
+        "shapeWidth",
+        "shapeHeight",
+        "shapeOffsetX",
+        "shapeOffsetY",
+        "cornerRadius",
+        "shapeProfile",
+        "glassRed",
+        "glassGreen",
+        "glassBlue",
+        "glassAlpha",
+        "thickness",
+        "blur",
+        "lightAngle",
+        "lightIntensity",
+        "ambientStrength",
+        "highlightLuminance",
+        "highlightAlpha",
+        "edgeLuminance",
+        "edgeAlpha",
+        "edgeWidth",
+        "edgeInset",
+        "outerContourLuminance",
+        "outerContourAlpha",
+        "outerContourWidth",
+        "specularWrap",
+        "bleedStrength",
+        "transmissionGamma",
+        "vibrancy",
+        "faceShadingStrength",
+        "faceShadingDepth",
+        "innerShadowStrength",
+        "innerShadowDepth",
+        "innerShadowDirectionality",
+        "refractiveIndex",
+        "saturation",
+        "chromaticAberration",
+        "shadowLuminance",
+        "shadowAlpha",
+        "shadowOffsetX",
+        "shadowOffsetY",
+        "shadowBlur",
+        "shadowSpread",
+        "contactShadowLuminance",
+        "contactShadowAlpha",
+        "contactShadowOffsetX",
+        "contactShadowOffsetY",
+        "contactShadowBlur",
+        "contactShadowSpread",
+    }
+)
+
+
+def validate_settings(settings: dict) -> None:
+    unknown = sorted(set(settings) - SUPPORTED_SETTINGS)
+    if unknown:
+        raise ValueError(
+            "Apple-match settings are not wired to the live renderer: "
+            f"{unknown}"
+        )
+    profile = settings.get("shapeProfile", "roundedRectangle")
+    if profile not in ("roundedRectangle", "superellipse"):
+        raise ValueError(f"Unsupported shapeProfile: {profile!r}")
 
 
 def simctl(*arguments: str) -> str:
@@ -144,6 +212,7 @@ class CaptureSession:
         self.candidate_path: Path = None
         self.status_path: Path = None
         self.startup_seconds = 0.0
+        self.runtime_capabilities = {}
 
     def __enter__(self) -> "CaptureSession":
         started = time.monotonic()
@@ -160,12 +229,30 @@ class CaptureSession:
             "--enable-flutter-gpu",
             f"--dart-define=SCENE_B64={scene_b64}",
             f"--pid-file={self.work_dir / 'flutter.pid'}",
-            "--device-timeout=120",
+            "--device-timeout=15",
         ]
+        aa_width = self.env.get("LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH")
+        if aa_width:
+            command.append(
+                f"--dart-define=LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH={aa_width}"
+            )
+        if self.env.get("LIQUID_GLASS_DISABLE_CANVAS_CONTOUR") == "1":
+            command.append(
+                "--dart-define=LIQUID_GLASS_DISABLE_CANVAS_CONTOUR=true"
+            )
         self.session = FlutterRunSession.start(
             command, cwd=self.flutter_project, env=self.env
         )
         ready = self.session.wait_ready(timeout=self.readiness_timeout)
+        self.runtime_capabilities = {
+            "shaderFiltersSupported": ready.get("shaderFiltersSupported"),
+        }
+        if self.runtime_capabilities["shaderFiltersSupported"] is not True:
+            self.session.terminate()
+            raise SessionError(
+                "Apple-match capture requires Impeller runtime shader filters; "
+                f"runtime reported {self.runtime_capabilities}"
+            )
         # The tool registers its SIGUSR1/SIGUSR2 handlers only once the VM
         # service is attached; signaling earlier kills the process.
         self.session.wait_for_output(
@@ -206,6 +293,9 @@ class CaptureSession:
 
     def __exit__(self, exc_type, exc, traceback) -> None:
         if self.session is not None:
+            (self.work_dir / "flutter-run.log").write_text(
+                self.session.transport.tail_text()
+            )
             self.session.terminate()
         subprocess.run(
             ["xcrun", "simctl", "terminate", self.udid, BUNDLE_ID], check=False
@@ -247,6 +337,7 @@ class Evaluator:
         self.last_modes: dict = {}
 
     def evaluate(self, params: dict) -> float:
+        validate_settings(params)
         started = time.monotonic()
         self.evaluations += 1
         self.capture_dir.mkdir(parents=True, exist_ok=True)

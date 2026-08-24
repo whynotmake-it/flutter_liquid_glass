@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -25,25 +26,7 @@ class FlutterGpuGeometryRenderer {
     _bindUniformLayout(fragmentShader);
     _createVertexBuffer();
     _uniformData = ByteData(_uniformSize);
-  }
-
-  factory FlutterGpuGeometryRenderer.fromAsset(String assetKey) {
-    final resources = _assetResources.putIfAbsent(assetKey, () {
-      final library = gpu.ShaderLibrary.fromAsset(assetKey);
-      final vertexShader = library?['GeometryVertex'];
-      final fragmentShader = library?['GeometryFragment'];
-      if (vertexShader == null || fragmentShader == null) {
-        throw StateError(
-          'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 or newer '
-          'and enable Flutter GPU for the target platform.',
-        );
-      }
-      return _SharedGeometryResources(
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-      );
-    });
-    return FlutterGpuGeometryRenderer._fromShared(resources);
+    _initCoordinateTexture();
   }
 
   FlutterGpuGeometryRenderer._fromShared(_SharedGeometryResources resources) {
@@ -54,12 +37,53 @@ class FlutterGpuGeometryRenderer {
     _offsetUTextureSize = resources.offsetUTextureSize;
     _offsetOpticalProps = resources.offsetOpticalProps;
     _offsetShapeData = resources.offsetShapeData;
+    _offsetRseData = resources.offsetRseData;
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
+    _initCoordinateTexture();
   }
 
-  static final Map<String, _SharedGeometryResources> _assetResources = {};
+  // Harness-only rasterization probe. The default exactly matches Flutter's
+  // centered half-pixel coverage; this is deliberately not a public material
+  // parameter.
+  static const double _geometryAaHalfWidth =
+      int.fromEnvironment(
+        'LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH',
+        defaultValue: 500,
+      ) /
+      1000.0;
+
+  static Future<FlutterGpuGeometryRenderer> fromAsset(String assetKey) async {
+    final resourcesFuture = _assetResources[assetKey] ??= () async {
+      final library = await gpu.ShaderLibrary.fromAsset(assetKey);
+      final vertexShader = library?['GeometryVertex'];
+      final fragmentShader = library?['GeometryFragment'];
+      if (vertexShader == null || fragmentShader == null) {
+        throw StateError(
+          'LiquidGlass requires Flutter GPU. Run with Flutter 3.47 or newer '
+          'and enable Flutter GPU for the target platform.',
+        );
+      }
+      return _SharedGeometryResources(
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+      );
+    }();
+    try {
+      return FlutterGpuGeometryRenderer._fromShared(await resourcesFuture);
+    } on Object {
+      // A transiently unavailable GPU context must not poison all later layer
+      // initialization attempts with the same cached failed Future.
+      if (identical(_assetResources[assetKey], resourcesFuture)) {
+        unawaited(_assetResources.remove(assetKey));
+      }
+      rethrow;
+    }
+  }
+
+  static final Map<String, Future<_SharedGeometryResources>> _assetResources =
+      {};
 
   /// One bump allocator for every geometry pass in the current frame.
   ///
@@ -117,8 +141,10 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetUTextureSize;
   late final int _offsetOpticalProps;
   late final int _offsetShapeData;
+  late final int _offsetRseData;
   late final ByteData _uniformData;
   int _writtenShapeFloats = 0;
+  int _writtenRseFloats = 0;
 
   // Persistent render target texture — reused across frames.
   gpu.Texture? _texture;
@@ -127,8 +153,59 @@ class FlutterGpuGeometryRenderer {
   int _textureWidth = 0;
   int _textureHeight = 0;
 
+  gpu.Texture? _coordinateTexture;
+  ui.Image? _coordinateImage;
+  final ByteData _coordinateData = ByteData(32);
+
   late final gpu.DeviceBuffer _vertexBuffer;
   late final gpu.BufferView _vertexBufferView;
+
+  ui.Image? get coordinateImage => _coordinateImage;
+
+  void updateCoordinateMapping({
+    required double basisXX,
+    required double basisYX,
+    required double basisXY,
+    required double basisYY,
+    required double originX,
+    required double originY,
+  }) {
+    _initCoordinateTexture();
+    final floats = _coordinateData.buffer.asFloat32List();
+    if (floats[0] == basisXX &&
+        floats[1] == basisYX &&
+        floats[2] == basisXY &&
+        floats[3] == basisYY &&
+        floats[4] == originX &&
+        floats[5] == originY) {
+      return;
+    }
+    floats
+      ..[0] = basisXX
+      ..[1] = basisYX
+      ..[2] = basisXY
+      ..[3] = basisYY
+      ..[4] = originX
+      ..[5] = originY
+      ..[6] = 0
+      ..[7] = 0;
+    _coordinateTexture!.overwrite(_coordinateData);
+  }
+
+  void _initCoordinateTexture() {
+    if (_coordinateTexture != null) return;
+    _coordinateTexture = gpu.gpuContext.createTexture(
+      gpu.StorageMode.hostVisible,
+      2,
+      1,
+      format: gpu.PixelFormat.r32g32b32a32Float,
+      enableRenderTargetUsage: false,
+    );
+    if (_coordinateTexture!.isValid != true) {
+      throw StateError('LiquidGlass coordinate mapping texture is invalid.');
+    }
+    _coordinateImage = _coordinateTexture!.asImage();
+  }
 
   void _bindUniformLayout(gpu.Shader fragmentShader) {
     _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
@@ -139,6 +216,7 @@ class FlutterGpuGeometryRenderer {
     _offsetOpticalProps =
         _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
     _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
+    _offsetRseData = _uniformSlot.getMemberOffsetInBytes('uRseData') ?? 0;
   }
 
   void _createVertexBuffer() {
@@ -171,6 +249,7 @@ class FlutterGpuGeometryRenderer {
     required double thickness,
     required double offsetX,
     required double offsetY,
+    List<double> rseData = const <double>[],
   }) {
     assert(() {
       debugRenderCount++;
@@ -213,8 +292,10 @@ class FlutterGpuGeometryRenderer {
       textureHeight: allocatedHeight.toDouble(),
       refractiveIndex: refractiveIndex,
       thickness: thickness,
+      geometryAaHalfWidth: _geometryAaHalfWidth,
       numShapes: numShapes.toDouble(),
       shapeData: shapeData,
+      rseData: rseData,
     );
 
     final uniformView = _hostBufferForUniformSize(
@@ -226,8 +307,8 @@ class FlutterGpuGeometryRenderer {
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(_vertexBufferView, 4)
-      ..draw();
+      ..bindVertexBuffer(_vertexBufferView)
+      ..draw(4);
     commandBuffer.submit();
 
     return (image: _image!, width: allocatedWidth, height: allocatedHeight);
@@ -249,8 +330,10 @@ class FlutterGpuGeometryRenderer {
     required double textureHeight,
     required double refractiveIndex,
     required double thickness,
+    required double geometryAaHalfWidth,
     required double numShapes,
     required List<double> shapeData,
+    required List<double> rseData,
   }) {
     final floatData = _uniformData.buffer.asFloat32List();
 
@@ -264,8 +347,10 @@ class FlutterGpuGeometryRenderer {
 
     final opticalIndex = _offsetOpticalProps ~/ 4;
     floatData[opticalIndex] = refractiveIndex;
-    floatData[opticalIndex + 1] =
-        defaultTargetPlatform == TargetPlatform.android ? 1 : 0;
+    // The Y slot is a harness-only centered-AA half-width. It defaults to
+    // 0.5, matching Flutter's one-pixel transition; keeping it in the
+    // existing reserved slot avoids changing the uniform ABI.
+    floatData[opticalIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
     floatData[opticalIndex + 2] = thickness;
     floatData[opticalIndex + 3] = numShapes;
 
@@ -278,6 +363,16 @@ class FlutterGpuGeometryRenderer {
       floatData[shapeDataStartIndex + i] = 0;
     }
     _writtenShapeFloats = shapeFloats;
+
+    final rseDataStartIndex = _offsetRseData ~/ 4;
+    final rseFloats = rseData.length < 192 ? rseData.length : 192;
+    for (var i = 0; i < rseFloats; i++) {
+      floatData[rseDataStartIndex + i] = rseData[i];
+    }
+    for (var i = rseFloats; i < _writtenRseFloats; i++) {
+      floatData[rseDataStartIndex + i] = 0;
+    }
+    _writtenRseFloats = rseFloats;
   }
 
   /// Releases the persistent textures.
@@ -285,6 +380,8 @@ class FlutterGpuGeometryRenderer {
     _texture = null;
     _image = null;
     _renderTarget = null;
+    _coordinateTexture = null;
+    _coordinateImage = null;
   }
 }
 
@@ -305,6 +402,7 @@ class _SharedGeometryResources {
     offsetOpticalProps =
         uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
     offsetShapeData = uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
+    offsetRseData = uniformSlot.getMemberOffsetInBytes('uRseData') ?? 0;
     final vertices = Float32List.fromList([
       -1.0, -1.0, 0.0, 0.0, //
       1.0, -1.0, 1.0, 0.0, //
@@ -328,6 +426,7 @@ class _SharedGeometryResources {
   late final int offsetUTextureSize;
   late final int offsetOpticalProps;
   late final int offsetShapeData;
+  late final int offsetRseData;
   late final gpu.DeviceBuffer vertexBuffer;
   late final gpu.BufferView vertexBufferView;
 }

@@ -17,8 +17,9 @@ vec4 encodeDisplacementData(
     vec2 normalizedDisp = (displacement / maxDisplacement) * 0.5 + 0.5;
     normalizedDisp = clamp(normalizedDisp, 0.0, 1.0);
     
-    float normalizedEdgeDistance =
-        thickness > 0.0 ? clamp(edgeDistance / thickness, 0.0, 1.0) : 0.0;
+    float normalizedEdgeDistance = thickness > 0.0
+        ? clamp(edgeDistance / (thickness * 4.0), 0.0, 1.0)
+        : 0.0;
     
     return vec4(normalizedDisp.x, normalizedDisp.y, normalizedEdgeDistance, alpha);
 }
@@ -32,5 +33,5 @@ vec2 decodeDisplacement(vec4 encoded, float maxDisplacement) {
 
 // Decode inward edge distance from B channel
 float decodeEdgeDistance(vec4 encoded, float thickness) {
-    return encoded.b * thickness;
+    return encoded.b * thickness * 4.0;
 }

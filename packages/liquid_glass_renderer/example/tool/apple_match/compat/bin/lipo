@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Flutter 3.44.1 passes multiple architectures to `lipo -verify_arch`.
+# Flutter's macOS build passes multiple architectures to `lipo -verify_arch`.
 # Xcode 27's lipo accepts one architecture per invocation, so verify each
 # architecture separately and pass every other operation through unchanged.
 set -euo pipefail

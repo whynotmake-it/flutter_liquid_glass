@@ -24,10 +24,6 @@ void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
     vec2 uv = fragCoord / uSize;
 
-    #ifdef IMPELLER_TARGET_OPENGLES
-        uv.y = 1.0 - uv.y;
-    #endif
-
     vec4 bg = texture(uBackgroundTexture, uv);
 
     vec3 color = mix(bg.rgb, uGlassColor.rgb, uGlassColor.a);

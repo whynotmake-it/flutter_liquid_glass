@@ -17,11 +17,9 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(
-              File('${fixture.path}/summary.json').readAsStringSync(),
-            )
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -52,9 +50,9 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -78,9 +76,9 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -108,9 +106,9 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -120,27 +118,29 @@ void main() {
     expect(gpu['observedSpanMs'], closeTo(2000, .001));
   });
 
-  test('missing native Instruments tables are informational, not enforced',
-      () async {
-    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
-    addTearDown(() => fixture.deleteSync(recursive: true));
-    _writeScenario(fixture, scenario: 'staticSingle');
+  test(
+    'missing native Instruments tables are informational, not enforced',
+    () async {
+      final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+      addTearDown(() => fixture.deleteSync(recursive: true));
+      _writeScenario(fixture, scenario: 'staticSingle');
 
-    final result = await _runParser(fixture, enforce: true);
+      final result = await _runParser(fixture, enforce: true);
 
-    // GPU and Metal metrics are attribution-only: their absence is reported
-    // as unavailable in the summary, never as a gate failure.
-    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
-    final scenario =
-        (summary['scenarioRuns'] as List<dynamic>).single
-            as Map<String, dynamic>;
-    expect(scenario['gpu'], isNull);
-    expect(scenario['metal'], isNull);
-    expect(summary['regressionViolations'], isEmpty);
-  });
+      // GPU and Metal metrics are attribution-only: their absence is reported
+      // as unavailable in the summary, never as a gate failure.
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final scenario =
+          (summary['scenarioRuns'] as List<dynamic>).single
+              as Map<String, dynamic>;
+      expect(scenario['gpu'], isNull);
+      expect(scenario['metal'], isNull);
+      expect(summary['regressionViolations'], isEmpty);
+    },
+  );
 
   test('passes enforcement for scenarios without any trace', () async {
     final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
@@ -171,9 +171,9 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -205,9 +205,9 @@ void main() {
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final scenario =
           (summary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -241,9 +241,9 @@ void main() {
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final scenario =
           (summary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -272,9 +272,9 @@ void main() {
         0,
         reason: '${degenerateResult.stdout}\n${degenerateResult.stderr}',
       );
-      final degenerateSummary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final degenerateSummary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final degenerateScenario =
           (degenerateSummary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -297,14 +297,17 @@ void main() {
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
     expect(scenario['gpu'], isNull);
-    expect(scenario['gpuUnavailableReason'], isNull);
+    expect(
+      scenario['gpuUnavailableReason'],
+      contains('no validated measurement window'),
+    );
     expect(summary['regressionViolations'], isEmpty);
   });
 
@@ -323,9 +326,9 @@ void main() {
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final scenario =
           (summary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -353,9 +356,9 @@ void main() {
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final scenario =
           (summary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -382,9 +385,9 @@ void main() {
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final scenario =
           (summary['scenarioRuns'] as List<dynamic>).single
               as Map<String, dynamic>;
@@ -412,9 +415,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801000000
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -449,9 +452,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -492,9 +495,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -537,9 +540,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -576,9 +579,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801000000:30
     final result = await _runParser(fixture, enforce: true);
 
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final scenario =
         (summary['scenarioRuns'] as List<dynamic>).single
             as Map<String, dynamic>;
@@ -629,9 +632,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       final violations = (summary['regressionViolations'] as List<dynamic>)
           .cast<String>();
       expect(violations, isEmpty, reason: violations.join('\n'));
@@ -640,13 +643,11 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
 
       // The raster CV gate still evaluates for the same rejected captures.
       for (var repetition = 1; repetition <= 3; repetition++) {
-        final report =
-            jsonDecode(
-                  File(
-                    '${fixture.path}/staticSingle.r$repetition.json',
-                  ).readAsStringSync(),
-                )
-                as Map<String, dynamic>;
+        final report = jsonDecode(
+          File(
+            '${fixture.path}/staticSingle.r$repetition.json',
+          ).readAsStringSync(),
+        ) as Map<String, dynamic>;
         final frames = (report['frames'] as List<dynamic>)
             .cast<Map<String, dynamic>>();
         for (final frame in frames) {
@@ -688,17 +689,16 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
       final result = await _runParser(fixture, enforce: true);
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-      final summary =
-          jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-              as Map<String, dynamic>;
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
       // Both scenarios are summarized: an unstable run does not abort or
       // suppress the remaining scenarios.
       expect(summary['scenarioRuns'], hasLength(2));
       expect(summary['regressionViolations'], isEmpty);
-      final scenario =
-          (summary['scenarioRuns'] as List<dynamic>)
-                  .cast<Map<String, dynamic>>()
-                  .firstWhere((run) => run['scenario'] == 'staticSingle');
+      final scenario = (summary['scenarioRuns'] as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((run) => run['scenario'] == 'staticSingle');
       expect(scenario['nativeFootprintPreMeasureStable'], isFalse);
       expect(scenario['nativeFootprintCooldownStable'], isFalse);
       final markdown = File('${fixture.path}/summary.md').readAsStringSync();
@@ -721,9 +721,9 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
 
     expect(result.exitCode, 1);
     expect(result.stderr, contains('independent16Motion r2 failed'));
-    final summary =
-        jsonDecode(File('${fixture.path}/summary.json').readAsStringSync())
-            as Map<String, dynamic>;
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
     final failedRuns = (summary['failedRuns'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
     expect(failedRuns, hasLength(1));

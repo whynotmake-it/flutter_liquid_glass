@@ -19,11 +19,17 @@ from .metrics import (
 
 
 def load_probes(directory: Path, crop=None):
-    images = {probe: read_rgb(directory / f"{probe}.png") for probe in ("A", "B", "C", "D")}
+    images = {
+        probe: read_rgb(directory / f"{probe}.png")
+        for probe in ("A", "B", "C", "D")
+    }
     if crop is None:
         return images
     x, y, width, height = crop
-    return {probe: image[y : y + height, x : x + width] for probe, image in images.items()}
+    return {
+        probe: image[y : y + height, x : x + width]
+        for probe, image in images.items()
+    }
 
 
 def load_frame_probes(directory: Path, index: str, crop=None):
@@ -35,7 +41,10 @@ def load_frame_probes(directory: Path, index: str, crop=None):
     if crop is None:
         return images
     x, y, width, height = crop
-    return {probe: image[y : y + height, x : x + width] for probe, image in images.items()}
+    return {
+        probe: image[y : y + height, x : x + width]
+        for probe, image in images.items()
+    }
 
 
 def main() -> None:
@@ -72,10 +81,12 @@ def main() -> None:
     candidate = load_probes(args.candidate, crop)
     result = score_images(reference, candidate)
     reference_indices = {
-        path.stem.split("_")[-1] for path in (args.reference / "frames").glob("A_*.png")
+        path.stem.split("_")[-1]
+        for path in (args.reference / "frames").glob("A_*.png")
     }
     candidate_indices = {
-        path.stem.split("_")[-1] for path in (args.candidate / "frames").glob("A_*.png")
+        path.stem.split("_")[-1]
+        for path in (args.candidate / "frames").glob("A_*.png")
     }
     temporal_scores = [
         score_images(
@@ -86,13 +97,19 @@ def main() -> None:
     ]
     temporal = None
     if temporal_scores:
-        standard_deviation = float(np.std(temporal_scores, ddof=1)) if len(temporal_scores) > 1 else 0.0
+        standard_deviation = (
+            float(np.std(temporal_scores, ddof=1))
+            if len(temporal_scores) > 1
+            else 0.0
+        )
         t95 = 4.303 if len(temporal_scores) == 3 else 1.96
         temporal = {
             "samples": temporal_scores,
             "mean": float(np.mean(temporal_scores)),
             "standardDeviation": standard_deviation,
-            "confidence95HalfWidth": t95 * standard_deviation / np.sqrt(len(temporal_scores)),
+            "confidence95HalfWidth": (
+                t95 * standard_deviation / np.sqrt(len(temporal_scores))
+            ),
         }
     args.output.mkdir(parents=True, exist_ok=True)
     write_diagnostics(args.output, reference, candidate)
@@ -120,7 +137,9 @@ def main() -> None:
         "temporalScore": temporal,
         "settings": json.loads(args.settings.read_text()) if args.settings else None,
     }
-    (args.output / "scorecard.json").write_text(json.dumps(scorecard, indent=2) + "\n")
+    (args.output / "scorecard.json").write_text(
+        json.dumps(scorecard, indent=2) + "\n"
+    )
     print(json.dumps({"score": result.score, "errors": result.errors}, indent=2))
 
 

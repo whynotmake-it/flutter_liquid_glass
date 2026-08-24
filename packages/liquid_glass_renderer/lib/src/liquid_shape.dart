@@ -51,9 +51,9 @@ class LiquidRoundedSuperellipse extends LiquidShape {
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-        side: side,
-      );
+    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
+    side: side,
+  );
 
   @override
   LiquidRoundedSuperellipse copyWith({
@@ -121,9 +121,9 @@ class LiquidRoundedRectangle extends LiquidShape {
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-        side: side,
-      );
+    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
+    side: side,
+  );
 
   @override
   LiquidRoundedRectangle copyWith({

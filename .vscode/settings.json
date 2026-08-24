@@ -6,5 +6,5 @@
   "dart.flutterRunAdditionalArgs": [
     "--enable-impeller"
   ],
-  "dart.flutterSdkPath": ".fvm/versions/3.44.1"
+  "dart.flutterSdkPath": ".fvm/versions/3.47.1"
 }

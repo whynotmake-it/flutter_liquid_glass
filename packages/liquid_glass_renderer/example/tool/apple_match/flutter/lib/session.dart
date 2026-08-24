@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -133,7 +134,7 @@ class SessionAppState extends State<SessionApp> {
     super.initState();
     _writeStatus(const <String, Object?>{'state': 'waiting'});
     debugPrint(
-      '$kReadySentinel ${jsonEncode(<String, Object?>{'candidatePath': _candidateFile.path, 'statusPath': _statusFile.path})}',
+      '$kReadySentinel ${jsonEncode(<String, Object?>{'candidatePath': _candidateFile.path, 'statusPath': _statusFile.path, 'shaderFiltersSupported': ui.ImageFilter.isShaderFilterSupported})}',
     );
     final initial = CandidateSpec.tryRead(_candidateFile);
     if (initial != null) {

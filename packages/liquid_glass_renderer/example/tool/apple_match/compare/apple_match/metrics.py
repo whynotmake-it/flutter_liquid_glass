@@ -83,6 +83,102 @@ def luminance(image: np.ndarray) -> np.ndarray:
     return image[..., 0] * 0.2126 + image[..., 1] * 0.7152 + image[..., 2] * 0.0722
 
 
+def transmission_boundary_profile(
+    black: np.ndarray,
+    white: np.ndarray,
+    *,
+    threshold: float = 0.75,
+) -> Dict[str, np.ndarray]:
+    """Subpixel top boundary and curvature from white-minus-black transfer.
+
+    The transfer image largely cancels tint and specular lighting. Its outer
+    field is one and its glass interior is lower, so a fixed isocontour gives a
+    substantially cleaner geometry signal than thresholding either lit probe.
+    """
+    transfer = luminance(white - black)
+    height, width = transfer.shape
+    boundary = np.full(width, np.nan, dtype=np.float32)
+    for x in range(width):
+        column = transfer[:, x]
+        below = np.flatnonzero(column < threshold)
+        if below.size == 0:
+            continue
+        y1 = int(below[0])
+        if y1 == 0:
+            boundary[x] = 0.0
+            continue
+        y0 = y1 - 1
+        v0 = float(column[y0])
+        v1 = float(column[y1])
+        fraction = (v0 - threshold) / max(v0 - v1, 1e-6)
+        boundary[x] = y0 + np.clip(fraction, 0.0, 1.0)
+
+    valid = np.isfinite(boundary)
+    if np.count_nonzero(valid) < width * 0.25:
+        return {
+            "x": np.empty(0, dtype=np.float32),
+            "boundary": np.empty(0, dtype=np.float32),
+            "smoothBoundary": np.empty(0, dtype=np.float32),
+            "slope": np.empty(0, dtype=np.float32),
+            "curvature": np.empty(0, dtype=np.float32),
+        }
+    xs = np.flatnonzero(valid).astype(np.float32)
+    ys = boundary[valid]
+    smooth = cv2.GaussianBlur(ys[:, None], (1, 9), 0)[:, 0]
+    slope = np.gradient(smooth, xs)
+    curvature = np.gradient(slope, xs) / np.power(1.0 + slope * slope, 1.5)
+    return {
+        "x": xs,
+        "boundary": ys,
+        "smoothBoundary": smooth,
+        "slope": slope,
+        "curvature": curvature,
+    }
+
+
+def boundary_profile_error(
+    reference: Dict[str, np.ndarray],
+    candidate: Dict[str, np.ndarray],
+) -> Dict[str, float]:
+    ref = transmission_boundary_profile(reference["C"], reference["D"])
+    can = transmission_boundary_profile(candidate["C"], candidate["D"])
+    # A deliberately extreme material mismatch can remove the fixed
+    # transmission isocontour entirely. That is a valid poor candidate, not a
+    # malformed capture; keep the scorecard total and report a finite failure
+    # metric instead of aborting the comparison.
+    if ref["x"].size == 0 or can["x"].size == 0:
+        width = float(reference["C"].shape[1])
+        return {
+            "positionMeanAbsoluteErrorPixels": width,
+            "positionMaximumAbsoluteErrorPixels": width,
+            "tangentMeanAbsoluteErrorRadians": float(np.pi / 2.0),
+            "curvatureMeanAbsoluteErrorPerPixel": 1.0,
+            "curvatureP99AbsoluteErrorPerPixel": 1.0,
+        }
+    common = np.intersect1d(ref["x"], can["x"])
+    ref_indices = np.searchsorted(ref["x"], common)
+    can_indices = np.searchsorted(can["x"], common)
+    boundary_delta = can["smoothBoundary"][can_indices] - ref["smoothBoundary"][ref_indices]
+    tangent_delta = (
+        np.arctan(can["slope"][can_indices])
+        - np.arctan(ref["slope"][ref_indices])
+    )
+    curvature_delta = can["curvature"][can_indices] - ref["curvature"][ref_indices]
+    return {
+        "positionMeanAbsoluteErrorPixels": float(np.mean(np.abs(boundary_delta))),
+        "positionMaximumAbsoluteErrorPixels": float(np.max(np.abs(boundary_delta))),
+        "tangentMeanAbsoluteErrorRadians": float(
+            np.mean(np.abs(tangent_delta))
+        ),
+        "curvatureMeanAbsoluteErrorPerPixel": float(
+            np.mean(np.abs(curvature_delta))
+        ),
+        "curvatureP99AbsoluteErrorPerPixel": float(
+            np.percentile(np.abs(curvature_delta), 99)
+        ),
+    }
+
+
 def fixed_blur_mix(
     image: np.ndarray,
     *,
@@ -403,14 +499,318 @@ def component_errors(
                 )
             ),
         },
+        "pixelResiduals": pixel_residuals(reference, candidate, mask),
     }
     return errors, details
+
+
+def _residual_statistics(residual: np.ndarray) -> Dict[str, object]:
+    """Absolute RGB residuals in normalized linear capture values.
+
+    These statistics deliberately do not participate in the historical weighted
+    score. They are the hard fidelity gate: an exact match is all zeroes, while
+    percentiles expose whether a low mean is hiding a bad rim or highlight.
+    """
+    if residual.size == 0:
+        return {
+            "meanAbsoluteError": 0.0,
+            "rootMeanSquareError": 0.0,
+            "p95AbsoluteError": 0.0,
+            "p99AbsoluteError": 0.0,
+            "maximumAbsoluteError": 0.0,
+            "meanAbsoluteError8Bit": 0.0,
+            "p99AbsoluteError8Bit": 0.0,
+            "mismatchedPixelFraction1Of255": 0.0,
+            "mismatchedPixelFraction2Of255": 0.0,
+            "meanSignedLuminanceError8Bit": 0.0,
+            "brighterPixelFraction": 0.0,
+            "darkerPixelFraction": 0.0,
+            "meanBrighterLuminanceError8Bit": 0.0,
+            "meanDarkerLuminanceError8Bit": 0.0,
+        }
+    per_channel = np.abs(residual).reshape(-1, 3)
+    per_pixel = np.max(per_channel, axis=1)
+    signed_luminance = luminance(residual)
+    brighter = signed_luminance[signed_luminance > 0.0]
+    darker = signed_luminance[signed_luminance < 0.0]
+    mae = float(np.mean(per_channel))
+    p99 = float(np.percentile(per_channel, 99))
+    return {
+        "meanAbsoluteError": mae,
+        "rootMeanSquareError": float(np.sqrt(np.mean(np.square(per_channel)))),
+        "p95AbsoluteError": float(np.percentile(per_channel, 95)),
+        "p99AbsoluteError": p99,
+        "maximumAbsoluteError": float(np.max(per_channel)),
+        "meanAbsoluteError8Bit": mae * 255.0,
+        "p99AbsoluteError8Bit": p99 * 255.0,
+        "mismatchedPixelFraction1Of255": float(np.mean(per_pixel > 1.0 / 255.0)),
+        "mismatchedPixelFraction2Of255": float(np.mean(per_pixel > 2.0 / 255.0)),
+        # Positive means Flutter is brighter than Apple. Keeping the sign is
+        # essential for lighting work: equal absolute errors can otherwise
+        # hide an inverted highlight or shadow.
+        "meanSignedLuminanceError8Bit": float(np.mean(signed_luminance) * 255.0),
+        "brighterPixelFraction": float(np.mean(signed_luminance > 0.0)),
+        "darkerPixelFraction": float(np.mean(signed_luminance < 0.0)),
+        "meanBrighterLuminanceError8Bit": (
+            float(np.mean(brighter) * 255.0) if brighter.size else 0.0
+        ),
+        "meanDarkerLuminanceError8Bit": (
+            float(np.mean(darker) * 255.0) if darker.size else 0.0
+        ),
+    }
+
+
+def pixel_residuals(
+    reference: Dict[str, np.ndarray],
+    candidate: Dict[str, np.ndarray],
+    glass_mask: np.ndarray,
+) -> Dict[str, object]:
+    """Report direct residuals for every probe and glass sub-region."""
+    mask_u8 = glass_mask.astype(np.uint8)
+    core_mask = cv2.erode(mask_u8, np.ones((15, 15), np.uint8)) > 0
+    rim_mask = np.logical_and(glass_mask, np.logical_not(core_mask))
+    inward_distance = cv2.distanceTransform(mask_u8, cv2.DIST_L2, 5)
+    outward_distance = cv2.distanceTransform(1 - mask_u8, cv2.DIST_L2, 5)
+    silhouette_line_mask = np.logical_and(
+        glass_mask,
+        inward_distance <= 2.0,
+    )
+    exterior_contour_mask = np.logical_and(
+        np.logical_not(glass_mask),
+        outward_distance <= 2.0,
+    )
+    inner_rim_mask = np.logical_and(
+        inward_distance > 2.0,
+        inward_distance <= 5.0,
+    )
+    outer_contour_mask = np.logical_and(
+        cv2.dilate(mask_u8, np.ones((5, 5), np.uint8)) > 0,
+        cv2.erode(mask_u8, np.ones((5, 5), np.uint8)) == 0,
+    )
+    inner_bevel_mask = np.logical_and(
+        inward_distance > 5.0,
+        inward_distance <= 12.0,
+    )
+    inner_mask = cv2.erode(mask_u8, np.ones((7, 7), np.uint8)) > 0
+    ys, xs = np.where(glass_mask)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    lip_depth = max(int(round((y1 - y0) * 0.20)), 1)
+    rows = np.arange(glass_mask.shape[0])[:, None]
+    columns = np.arange(glass_mask.shape[1])[None, :]
+    center_y = (y0 + y1) / 2.0
+    center_x = (x0 + x1) / 2.0
+    top_half = rows < center_y
+    bottom_half = rows >= center_y
+    left_half = columns < center_x
+    right_half = columns >= center_x
+    # Classify each interior pixel by its nearest-facing side. Unlike a simple
+    # top/bottom half split, the distance-field gradient keeps the curved
+    # corners with the surface normal they actually belong to.
+    distance_dx = cv2.Sobel(inward_distance, cv2.CV_32F, 1, 0, ksize=3)
+    distance_dy = cv2.Sobel(inward_distance, cv2.CV_32F, 0, 1, ksize=3)
+    vertical_facing = np.abs(distance_dy) >= np.abs(distance_dx)
+    facing_masks = {
+        "top": np.logical_and(vertical_facing, distance_dy >= 0.0),
+        "bottom": np.logical_and(vertical_facing, distance_dy < 0.0),
+        "left": np.logical_and(np.logical_not(vertical_facing), distance_dx >= 0.0),
+        "right": np.logical_and(np.logical_not(vertical_facing), distance_dx < 0.0),
+    }
+    distance_bands = {
+        "contour0To1": np.logical_and(glass_mask, inward_distance <= 1.0),
+        "contour1To2": np.logical_and(inward_distance > 1.0, inward_distance <= 2.0),
+        "bevel2To4": np.logical_and(inward_distance > 2.0, inward_distance <= 4.0),
+        "bevel4To8": np.logical_and(inward_distance > 4.0, inward_distance <= 8.0),
+        "bevel8To16": np.logical_and(inward_distance > 8.0, inward_distance <= 16.0),
+        "bevel16To32": np.logical_and(inward_distance > 16.0, inward_distance <= 32.0),
+    }
+    exterior_bands = {
+        "exterior0To1": np.logical_and(
+            np.logical_not(glass_mask), outward_distance <= 1.0
+        ),
+        "exterior1To2": np.logical_and(
+            outward_distance > 1.0, outward_distance <= 2.0
+        ),
+        "exterior2To4": np.logical_and(
+            outward_distance > 2.0, outward_distance <= 4.0
+        ),
+        "exterior4To8": np.logical_and(
+            outward_distance > 4.0, outward_distance <= 8.0
+        ),
+        # The cast-shadow fit is intentionally separated from the immediate
+        # contour.  Pixels in this annulus are outside the silhouette, at
+        # least two pixels away from the edge and no more than twenty pixels
+        # away, so a broad BoxShadow can be evaluated without rewarding a
+        # darker one-pixel outline.
+        "exterior8To16": np.logical_and(
+            outward_distance > 8.0, outward_distance <= 16.0
+        ),
+        "exterior16To20": np.logical_and(
+            outward_distance > 16.0, outward_distance <= 20.0
+        ),
+    }
+    exterior_shadow_annulus = np.logical_and(
+        np.logical_not(glass_mask),
+        np.logical_and(outward_distance > 2.0, outward_distance <= 20.0),
+    )
+    exterior_facing_masks = {
+        "top": top_half,
+        "bottom": bottom_half,
+        "left": left_half,
+        "right": right_half,
+    }
+    center_inset = int(round((x1 - x0) * 0.20))
+    center_columns = np.logical_and(
+        columns >= x0 + center_inset,
+        columns < x1 - center_inset,
+    )
+    top_lip_mask = np.logical_and(inner_mask, rows < y0 + lip_depth)
+    bottom_lip_mask = np.logical_and(inner_mask, rows >= y1 - lip_depth)
+    top_center_lip_mask = np.logical_and(top_lip_mask, center_columns)
+    bottom_center_lip_mask = np.logical_and(bottom_lip_mask, center_columns)
+    face_start = max(int(round((y1 - y0) * 0.03)), 1)
+    face_end = max(int(round((y1 - y0) * 0.22)), face_start + 1)
+    top_face_mask = np.logical_and(inner_mask, rows >= y0 + face_start)
+    top_face_mask = np.logical_and(top_face_mask, rows < y0 + face_end)
+    top_face_mask = np.logical_and(top_face_mask, center_columns)
+    bottom_face_mask = np.logical_and(inner_mask, rows >= y1 - face_end)
+    bottom_face_mask = np.logical_and(bottom_face_mask, rows < y1 - face_start)
+    bottom_face_mask = np.logical_and(bottom_face_mask, center_columns)
+    exterior_mask = np.logical_and(
+        cv2.dilate(mask_u8, np.ones((61, 61), np.uint8)) > 0,
+        np.logical_not(glass_mask),
+    )
+    result: Dict[str, object] = {}
+    for probe in ("A", "B", "C", "D"):
+        residual = candidate[probe] - reference[probe]
+        result[probe] = {
+            "crop": _residual_statistics(residual),
+            "glass": _residual_statistics(residual[glass_mask]),
+            "core": _residual_statistics(residual[core_mask]),
+            "rim": _residual_statistics(residual[rim_mask]),
+            "outerContour": _residual_statistics(residual[outer_contour_mask]),
+            "silhouetteLine": _residual_statistics(
+                residual[silhouette_line_mask]
+            ),
+            "topSilhouetteLine": _residual_statistics(
+                residual[np.logical_and(silhouette_line_mask, top_half)]
+            ),
+            "bottomSilhouetteLine": _residual_statistics(
+                residual[np.logical_and(silhouette_line_mask, bottom_half)]
+            ),
+            "leftSilhouetteLine": _residual_statistics(
+                residual[np.logical_and(silhouette_line_mask, left_half)]
+            ),
+            "rightSilhouetteLine": _residual_statistics(
+                residual[np.logical_and(silhouette_line_mask, right_half)]
+            ),
+            "exteriorContour": _residual_statistics(
+                residual[exterior_contour_mask]
+            ),
+            "innerRim": _residual_statistics(residual[inner_rim_mask]),
+            "innerBevel": _residual_statistics(residual[inner_bevel_mask]),
+            "topOuterContour": _residual_statistics(
+                residual[np.logical_and(outer_contour_mask, top_half)]
+            ),
+            "bottomOuterContour": _residual_statistics(
+                residual[np.logical_and(outer_contour_mask, bottom_half)]
+            ),
+            "leftOuterContour": _residual_statistics(
+                residual[np.logical_and(outer_contour_mask, left_half)]
+            ),
+            "rightOuterContour": _residual_statistics(
+                residual[np.logical_and(outer_contour_mask, right_half)]
+            ),
+            "topLip": _residual_statistics(residual[top_lip_mask]),
+            "bottomLip": _residual_statistics(residual[bottom_lip_mask]),
+            "topCenterLip": _residual_statistics(residual[top_center_lip_mask]),
+            "bottomCenterLip": _residual_statistics(
+                residual[bottom_center_lip_mask]
+            ),
+            "topFace": _residual_statistics(residual[top_face_mask]),
+            "bottomFace": _residual_statistics(residual[bottom_face_mask]),
+            "exterior": _residual_statistics(residual[exterior_mask]),
+            "exteriorShadowAnnulus2To20": _residual_statistics(
+                residual[exterior_shadow_annulus]
+            ),
+        }
+        result[probe]["directionalDistanceBands"] = {
+            f"{side}{band[0].upper()}{band[1:]}": _residual_statistics(
+                residual[np.logical_and(side_mask, band_mask)]
+            )
+            for side, side_mask in facing_masks.items()
+            for band, band_mask in distance_bands.items()
+        }
+        result[probe]["directionalExteriorBands"] = {
+            f"{side}{band[0].upper()}{band[1:]}": _residual_statistics(
+                residual[np.logical_and(side_mask, band_mask)]
+            )
+            for side, side_mask in exterior_facing_masks.items()
+            for band, band_mask in exterior_bands.items()
+        }
+        result[probe]["directionalExteriorShadowAnnulus2To20"] = {
+            side: _residual_statistics(
+                residual[np.logical_and(side_mask, exterior_shadow_annulus)]
+            )
+            for side, side_mask in exterior_facing_masks.items()
+        }
+    emission_residual = candidate["C"] - reference["C"]
+    transmission_residual = (
+        candidate["D"] - candidate["C"]
+    ) - (
+        reference["D"] - reference["C"]
+    )
+    transfer_regions = {
+        "crop": np.ones_like(glass_mask, dtype=bool),
+        "glass": glass_mask,
+        "rim": rim_mask,
+        "outerContour": outer_contour_mask,
+        "innerRim": inner_rim_mask,
+        "innerBevel": inner_bevel_mask,
+        "core": core_mask,
+    }
+    result["solidTransfer"] = {
+        "emission": {
+            name: _residual_statistics(
+                emission_residual if name == "crop" else emission_residual[mask]
+            )
+            for name, mask in transfer_regions.items()
+        },
+        "transmission": {
+            name: _residual_statistics(
+                transmission_residual
+                if name == "crop"
+                else transmission_residual[mask]
+            )
+            for name, mask in transfer_regions.items()
+        },
+    }
+    return result
 
 
 def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarray]) -> MetricResult:
     # Registration is verified on untouched RGBW control pixels before scoring.
     # Per-probe alignment would hide real silhouette and solid-probe errors.
+    if not np.any(silhouette(candidate["C"])):
+        raise ValueError(
+            "Candidate black probe contains no measurable glass silhouette; "
+            "the renderer is blank or the capture is invalid."
+        )
     errors, details = component_errors(reference, candidate)
+    crop_mae = float(
+        np.mean(
+            [
+                details["pixelResiduals"][probe]["crop"]["meanAbsoluteError"]
+                for probe in ("A", "B", "C", "D")
+            ]
+        )
+    )
+    details["directPixelMeanAbsoluteError"] = crop_mae
+    details["directPixelMeanAbsoluteError8Bit"] = crop_mae * 255.0
+    details["transmissionBoundaryProfile"] = boundary_profile_error(
+        reference, candidate
+    )
+    details["directPixelScore"] = 100.0 * (1.0 - crop_mae)
     normalized = {
         "shape": min(errors["shape"] / 0.20, 1.0),
         "combined": min(errors["combined"] / 0.25, 1.0),
@@ -458,6 +858,109 @@ def write_diagnostics(
         str(output / "signed_diff_x4.png"),
         cv2.cvtColor((signed * 255).astype(np.uint8), cv2.COLOR_RGB2BGR),
     )
+
+    # Solid probes reveal the lighting model without patterned-background
+    # refraction noise. Show signed luminance instead of absolute error so a
+    # bright highlight and an over-dark shadow cannot cancel in an average.
+    lighting_panels = []
+    for probe, background_name in (("C", "black"), ("D", "white")):
+        signed_luma = luminance(candidate[probe] - reference[probe])
+        magnitude = np.clip(np.abs(signed_luma) * 8.0, 0.0, 1.0)
+        panel = np.full((*signed_luma.shape, 3), 48, dtype=np.uint8)
+        # RGB red = Flutter too bright; blue = Flutter too dark.
+        panel[..., 0] = np.where(
+            signed_luma > 0.0, 48 + magnitude * 207, 48
+        ).astype(np.uint8)
+        panel[..., 2] = np.where(
+            signed_luma < 0.0, 48 + magnitude * 207, 48
+        ).astype(np.uint8)
+        cv2.putText(
+            panel,
+            f"{background_name}: red=too bright blue=too dark (x8)",
+            (12, 28),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        lighting_panels.append(panel)
+    cv2.imwrite(
+        str(output / "solid_lighting_signed_residuals_x8.png"),
+        cv2.cvtColor(np.concatenate(lighting_panels, axis=0), cv2.COLOR_RGB2BGR),
+    )
+
+    def gray_panel(values: np.ndarray, label: str) -> np.ndarray:
+        gray = np.clip(luminance(values), 0.0, 1.0)
+        panel = np.repeat((gray * 255).astype(np.uint8)[..., None], 3, axis=2)
+        cv2.putText(
+            panel, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65,
+            (255, 64, 64), 2, cv2.LINE_AA,
+        )
+        return panel
+
+    def transfer_diff(candidate_values: np.ndarray, reference_values: np.ndarray, label: str) -> np.ndarray:
+        delta = luminance(candidate_values - reference_values)
+        magnitude = np.clip(np.abs(delta) * 8.0, 0.0, 1.0)
+        panel = np.full((*delta.shape, 3), 48, dtype=np.uint8)
+        panel[..., 0] = np.where(delta > 0.0, 48 + magnitude * 207, 48).astype(np.uint8)
+        panel[..., 2] = np.where(delta < 0.0, 48 + magnitude * 207, 48).astype(np.uint8)
+        cv2.putText(
+            panel, label, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65,
+            (255, 255, 255), 2, cv2.LINE_AA,
+        )
+        return panel
+
+    ref_emission = reference["C"]
+    can_emission = candidate["C"]
+    ref_transmission = reference["D"] - reference["C"]
+    can_transmission = candidate["D"] - candidate["C"]
+    transfer_rows = [
+        np.concatenate([
+            gray_panel(ref_emission, "Apple additive"),
+            gray_panel(can_emission, "Flutter additive"),
+            transfer_diff(can_emission, ref_emission, "additive residual x8"),
+        ], axis=1),
+        np.concatenate([
+            gray_panel(ref_transmission, "Apple transmission"),
+            gray_panel(can_transmission, "Flutter transmission"),
+            transfer_diff(
+                can_transmission, ref_transmission, "transmission residual x8"
+            ),
+        ], axis=1),
+    ]
+    cv2.imwrite(
+        str(output / "solid_transfer_comparison.png"),
+        cv2.cvtColor(np.concatenate(transfer_rows, axis=0), cv2.COLOR_RGB2BGR),
+    )
+
+    ref_profile = transmission_boundary_profile(reference["C"], reference["D"])
+    can_profile = transmission_boundary_profile(candidate["C"], candidate["D"])
+    profile_canvas = np.full((700, 1200, 3), 255, dtype=np.uint8)
+    x_min = min(float(ref_profile["x"].min()), float(can_profile["x"].min()))
+    x_max = max(float(ref_profile["x"].max()), float(can_profile["x"].max()))
+
+    def draw_profile(values: Dict[str, np.ndarray], key: str, top: int, scale: float, color: tuple) -> None:
+        px = 50 + ((values["x"] - x_min) / max(x_max - x_min, 1.0) * 1100)
+        centered = values[key] - np.median(values[key])
+        py = top - centered * scale
+        points = np.column_stack((px, py)).astype(np.int32)
+        cv2.polylines(profile_canvas, [points], False, color, 2, cv2.LINE_AA)
+
+    cv2.putText(
+        profile_canvas, "transmission isocontour: Apple black, Flutter orange",
+        (40, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2, cv2.LINE_AA,
+    )
+    draw_profile(ref_profile, "smoothBoundary", 250, 2.5, (0, 0, 0))
+    draw_profile(can_profile, "smoothBoundary", 250, 2.5, (0, 100, 255))
+    cv2.putText(
+        profile_canvas, "curvature through straight-to-corner transition",
+        (40, 390), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2, cv2.LINE_AA,
+    )
+    draw_profile(ref_profile, "curvature", 560, 900.0, (0, 0, 0))
+    draw_profile(can_profile, "curvature", 560, 900.0, (0, 100, 255))
+    cv2.line(profile_canvas, (40, 560), (1160, 560), (180, 180, 180), 1)
+    cv2.imwrite(str(output / "transmission_boundary_curvature.png"), profile_canvas)
 
     zeros = np.zeros_like(reference["A"])
     flow = signed_optical_flow(reference["A"], zeros, candidate["A"], zeros)
@@ -580,4 +1083,32 @@ def write_diagnostics(
     cv2.imwrite(
         str(output / "holdout_comparison.png"),
         cv2.cvtColor((holdout * 255).astype(np.uint8), cv2.COLOR_RGB2BGR),
+    )
+
+    solid_rows = []
+    for probe, label in (("C", "black"), ("D", "white")):
+        amplified_diff = np.clip(
+            (candidate[probe] - reference[probe]) * 3.0 * 0.5 + 0.5,
+            0,
+            1,
+        )
+        row = np.concatenate(
+            (reference[probe], candidate[probe], amplified_diff),
+            axis=1,
+        )
+        cv2.putText(
+            row,
+            f"{label}: Apple | Flutter | signed diff x3",
+            (12, 28),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (1.0, 0.0, 0.0),
+            2,
+            cv2.LINE_AA,
+        )
+        solid_rows.append(row)
+    solids = np.concatenate(solid_rows, axis=0)
+    cv2.imwrite(
+        str(output / "solid_lighting_comparison.png"),
+        cv2.cvtColor((solids * 255).astype(np.uint8), cv2.COLOR_RGB2BGR),
     )

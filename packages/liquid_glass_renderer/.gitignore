@@ -27,3 +27,6 @@ pubspec.lock
 pubspec_overrides.yaml
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Alchemist writes diagnostic images here when a golden comparison fails.
+test/src/failures/

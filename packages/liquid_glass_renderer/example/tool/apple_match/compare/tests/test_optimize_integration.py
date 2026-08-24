@@ -52,7 +52,7 @@ class OnlineLoopSmokeTests(unittest.TestCase):
             "chromaticAberration": 0.0,
         }
         flutter_bin = os.environ.get(
-            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.44.1/bin/flutter")
+            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")
         )
         env = os.environ.copy()
         env["PATH"] = f"{ROOT / 'compat/bin'}:{env['PATH']}"

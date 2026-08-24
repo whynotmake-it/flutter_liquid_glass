@@ -354,6 +354,10 @@ capture_metrics_attempt() {
   local repetition="$4"
   local run_pid benchmark_json
 
+  # An interrupted caller or a previous failed attempt can leave a target
+  # alive long enough to emit a late JSON report into the next run's log.
+  # Always establish a single fresh target before collecting frame timings.
+  terminate_existing_benchmark_targets
   : >"$drive_log"
   env \
     FLUTTER_ENGINE_SWITCHES=3 \
@@ -380,6 +384,15 @@ capture_metrics_attempt() {
   wait "$run_pid" 2>/dev/null || true
   ACTIVE_RUN_PID=""
   if [[ -z "$benchmark_json" ]]; then
+    return 1
+  fi
+  # A target can finish its native-memory channel without ever delivering a
+  # frame (for example while a stale window is being torn down).  Such a JSON
+  # envelope is not a measurement and must be retried, never included as a
+  # zero-valued repetition in the summary.
+  if [[ "$benchmark_json" == *'"frames":[]'* ]]; then
+    printf 'Target produced zero frames; treating the measurement as failed.\n' \
+      >>"$drive_log"
     return 1
   fi
   # Memory stability flags flow through as informational metadata; an
@@ -476,7 +489,6 @@ run_scenario() {
 
 if [[ "$SKIP_BUILD" != true ]]; then
   echo "Building profile benchmark executable"
-  "$FLUTTER_BIN" config --no-enable-swift-package-manager >/dev/null
   "$FLUTTER_BIN" build macos \
     --profile \
     --target=integration_test/benchmark_test.dart

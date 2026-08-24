@@ -66,7 +66,7 @@ void main() {
     });
 
     testWidgets(
-      'initializes Flutter GPU after the first surface frame',
+      'initializes Flutter GPU asynchronously after the first surface frame',
       (tester) async {
         await tester.pumpWidget(
           const MaterialApp(
@@ -88,6 +88,7 @@ void main() {
           isTrue,
         );
 
+        await tester.pump();
         await tester.pump();
 
         expect(

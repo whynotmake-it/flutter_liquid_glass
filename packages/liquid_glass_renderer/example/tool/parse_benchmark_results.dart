@@ -131,9 +131,7 @@ List<_FailedRun> _readFailedRuns(Directory input) {
   }
   runs.sort((a, b) {
     final byScenario = a.scenario.compareTo(b.scenario);
-    return byScenario != 0
-        ? byScenario
-        : a.repetition.compareTo(b.repetition);
+    return byScenario != 0 ? byScenario : a.repetition.compareTo(b.repetition);
   });
   return runs;
 }
@@ -282,10 +280,11 @@ _InProcessGpuResult _readInProcessGpu(Object? json, {required int frameCount}) {
       windowMs: windowMs,
       bufferCount: (json['bufferCount'] as num?)?.toInt() ?? 0,
       frameCount: frameCount,
-      bucketBusyMs: (json['bucketBusyMilliseconds'] as List<dynamic>? ?? const [])
-          .whereType<num>()
-          .map((value) => value.toDouble())
-          .toList(),
+      bucketBusyMs:
+          (json['bucketBusyMilliseconds'] as List<dynamic>? ?? const [])
+              .whereType<num>()
+              .map((value) => value.toDouble())
+              .toList(),
     ),
     unavailableReason: null,
   );
@@ -319,14 +318,29 @@ _GpuReadResult _readGpuIntervals(
   File file, {
   required List<_MeasurementWindow> measurementWindows,
 }) {
-  const empty = (metrics: null, unavailableReason: null);
-  if (!file.existsSync() || measurementWindows.isEmpty) return empty;
+  if (!file.existsSync()) {
+    return (
+      metrics: null,
+      unavailableReason: 'trace GPU table is missing',
+    );
+  }
+  if (measurementWindows.isEmpty) {
+    return (
+      metrics: null,
+      unavailableReason: 'capture unavailable: no validated measurement window overlapped the retained trace',
+    );
+  }
   final xml = file.readAsStringSync();
   final targetPid = measurementWindows.first.processPid;
   final processMatch = RegExp(
     '<process id="(\\d+)" fmt="[^"]+ \\($targetPid\\)">',
   ).firstMatch(xml);
-  if (processMatch == null) return empty;
+  if (processMatch == null) {
+    return (
+      metrics: null,
+      unavailableReason: 'trace GPU table has no attached benchmark process',
+    );
+  }
   final processId = processMatch.group(1)!;
 
   final durations = <String, int>{
@@ -359,7 +373,12 @@ _GpuReadResult _readGpuIntervals(
       intervals.add((start, start + duration));
     }
   }
-  if (intervals.isEmpty) return empty;
+  if (intervals.isEmpty) {
+    return (
+      metrics: null,
+      unavailableReason: 'trace GPU table has no benchmark-process intervals',
+    );
+  }
   intervals.sort((a, b) => a.$1.compareTo(b.$1));
   final windows = _mergeWindows(measurementWindows);
   final measuredIntervals = <(int, int)>[
@@ -371,7 +390,12 @@ _GpuReadResult _readGpuIntervals(
             math.min(interval.$2, window.$2),
           ),
   ]..sort((a, b) => a.$1.compareTo(b.$1));
-  if (measuredIntervals.isEmpty) return empty;
+  if (measuredIntervals.isEmpty) {
+    return (
+      metrics: null,
+      unavailableReason: 'capture unavailable: no GPU intervals overlapped the validated measurement windows',
+    );
+  }
   final rejection = _captureUniformityRejection(intervals, measurementWindows);
   if (rejection != null) {
     return (metrics: null, unavailableReason: rejection);
@@ -580,8 +604,7 @@ List<_MeasurementWindow> _readSignpostMeasurementWindows(
   // Degenerate intervals synthesized while the Metal stream lazily
   // initializes are noise; keep only plausible workload windows.
   windows.removeWhere((window) {
-    final durationSeconds =
-        (window.endNanos - window.startNanos) / 1000000000;
+    final durationSeconds = (window.endNanos - window.startNanos) / 1000000000;
     return durationSeconds < .45 || durationSeconds > expectedSeconds * 1.1;
   });
   windows.sort((a, b) => a.startNanos.compareTo(b.startNanos));
@@ -887,8 +910,7 @@ String _markdown(
         .length;
     final tracedRuns = entry.value
         .where(
-          (report) =>
-              report.gpu != null || report.gpuUnavailableReason != null,
+          (report) => report.gpu != null || report.gpuUnavailableReason != null,
         )
         .length;
     final gpuSummary = rejectedRuns == 0
@@ -903,8 +925,7 @@ String _markdown(
       .toList();
   final tracedCount = reports
       .where(
-        (report) =>
-            report.gpu != null || report.gpuUnavailableReason != null,
+        (report) => report.gpu != null || report.gpuUnavailableReason != null,
       )
       .length;
   if (tracedCount > 0) {
@@ -938,7 +959,8 @@ String _markdown(
   }
   final unstable = reports
       .where(
-        (report) => !report.preMeasureMemoryStable || !report.cooldownMemoryStable,
+        (report) =>
+            !report.preMeasureMemoryStable || !report.cooldownMemoryStable,
       )
       .toList();
   if (unstable.isNotEmpty) {

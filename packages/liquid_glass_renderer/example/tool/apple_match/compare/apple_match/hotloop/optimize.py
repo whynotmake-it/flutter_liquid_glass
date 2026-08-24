@@ -65,7 +65,7 @@ def coordinate_descent(
     if on_step:
         on_step(history[-1])
     for iteration in range(1, max_iters + 1):
-        best_candidate, best_loss = None, current_loss
+        best_candidate, best_loss, best_row = None, current_loss, None
         for axis, values in axes.items():
             if axis not in current:
                 continue
@@ -82,9 +82,9 @@ def coordinate_descent(
                 if on_step:
                     on_step(row)
                 if loss < best_loss - min_improvement:
-                    best_candidate, best_loss = candidate, loss
+                    best_candidate, best_loss, best_row = candidate, loss, row
         if best_candidate is None:
             break
         current, current_loss = best_candidate, best_loss
-        history[-1]["isBest"] = True
+        best_row["isBest"] = True
     return {"bestParams": current, "bestLoss": current_loss, "history": history}

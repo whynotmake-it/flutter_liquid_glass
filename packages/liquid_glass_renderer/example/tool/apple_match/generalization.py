@@ -186,13 +186,19 @@ def main():
     parser.add_argument(
         "--flutter-bin",
         default=os.environ.get(
-            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.44.1/bin/flutter")
+            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")
         ),
     )
     parser.add_argument(
         "--settings",
         type=Path,
         default=ROOT / "out/approved-highlight/final/settings.json",
+    )
+    parser.add_argument(
+        "--toolbar-card",
+        type=Path,
+        default=ROOT / "out/exterior-shadow-fit/final/scorecard.json",
+        help="Toolbar scorecard used only for the relative comparability gate.",
     )
     parser.add_argument("--out", type=Path, default=ROOT / "out/generalization")
     parser.add_argument("--holdout-card", type=Path)
@@ -208,7 +214,6 @@ def main():
             "refractiveIndex",
             "shapeProfile",
             "blur",
-            "blurMix",
             "glassAlpha",
             "saturation",
             "lightAngle",
@@ -242,9 +247,7 @@ def main():
             fit=False,
         )
 
-    toolbar_card = json.loads(
-        (ROOT / "out/approved-highlight/final/scorecard.json").read_text()
-    )
+    toolbar_card = json.loads(args.toolbar_card.resolve().read_text())
     points = [
         (94.0, 6.0),
         *[

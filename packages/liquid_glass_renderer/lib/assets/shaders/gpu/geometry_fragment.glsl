@@ -1,4 +1,7 @@
 // Geometry matte generation implemented directly with Flutter GPU.
+// Geometry encoding revision 2: widened edge-distance field and
+// continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
+// shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
 // - Removed #include <flutter/runtime_effect.glsl>
 // - Replaced FlutterFragCoord().xy with gl_FragCoord.xy
@@ -12,6 +15,7 @@ layout(std140) uniform GeometryUniforms {
     vec2 uTextureSize;
     vec4 uOpticalProps;
     vec4 uShapeData[MAX_SHAPES * 3];
+    vec4 uRseData[MAX_SHAPES * 3];
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
@@ -19,6 +23,7 @@ layout(std140) uniform GeometryUniforms {
 #define uOpticalProps geometryUniforms.uOpticalProps
 #define uNumShapes (uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
+#define uRseData geometryUniforms.uRseData
 
 #include "displacement_encoding.glsl"
 
@@ -30,38 +35,46 @@ float uRefractiveIndex = uOpticalProps.x;
 out vec4 fragColor;
 
 void main() {
-    // Keep raster coordinates explicit here; the renderer supplies the
-    // backend-origin correction through uOpticalProps.y.
-    vec2 localFragCoord = gl_FragCoord.xy;
-    if (uOpticalProps.y > 0.5) {
-        localFragCoord.y = uTextureSize.y - localFragCoord.y;
-    }
-    vec2 fragCoord = localFragCoord + uOffset;
+    // Flutter 3.47's Impeller backends expose the same render-target
+    // orientation, including Flutter GPU passes on GLES.
+    vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
     float sd = sceneSDF(fragCoord, int(uNumShapes));
 
-    float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
+    // Match Flutter 3.47's centered signed-distance antialiasing: the
+    // coverage transition is half a physical pixel on either side of the
+    // mathematical boundary, rather than a fixed two-pixel fade entirely
+    // inside the shape. This keeps the contour position independent of scale.
+    float pixelSize = length(vec2(dFdx(sd), dFdy(sd)));
+    float fade = clamp(uOpticalProps.y, 0.0, 1.0) * max(pixelSize, 1e-4);
+    float foregroundAlpha = 1.0 - smoothstep(-fade, fade, sd);
     if (foregroundAlpha < 0.01) {
         fragColor = vec4(0.0);
         return;
     }
 
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
-
-    float n_cos = max(uThickness + sd, 0.0) / uThickness;
-    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
-
-    vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
-
-    if (sd >= 0.0 || uThickness <= 0.0) {
+    // Keep the centered coverage on both sides of the mathematical edge, but
+    // clamp optical depth to the filled side. The exterior half of the AA
+    // ramp carries zero displacement and only supplies the correct silhouette
+    // coverage; rejecting sd >= 0 here would silently turn centered AA back
+    // into an inside-only fade.
+    if (uThickness <= 0.0) {
         fragColor = vec4(0.0);
         return;
     }
 
-    float x = uThickness + sd;
+    float surfaceSd = min(sd, 0.0);
+    float dx = dFdx(sd);
+    float dy = dFdy(sd);
+
+    float n_cos = max(uThickness + surfaceSd, 0.0) / uThickness;
+    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
+
+    vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
+
+    float x = uThickness + surfaceSd;
     float sqrtTerm = sqrt(max(0.0, uThickness * uThickness - x * x));
-    float height = mix(sqrtTerm, uThickness, float(sd < -uThickness));
+    float height = mix(sqrtTerm, uThickness, float(surfaceSd < -uThickness));
 
     float baseHeight = uThickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
@@ -72,7 +85,7 @@ void main() {
     vec2 displacement = baseRefract.xy * baseRefractLength;
 
     float maxDisplacement = uThickness * 10.0;
-    float edgeDistance = -sd;
+    float edgeDistance = max(-sd, 0.0);
 
     fragColor = encodeDisplacementData(
         displacement,

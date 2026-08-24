@@ -16,6 +16,26 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     number('${prefix}Blue', fallback.b * 255).round(),
     number('${prefix}Alpha', fallback.a),
   );
+  Color neutralColor(String prefix, Color fallback) {
+    final luminance = number(
+      '${prefix}Luminance',
+      (fallback.r + fallback.g + fallback.b) * 255 / 3,
+    ).round();
+    return Color.fromRGBO(
+      luminance,
+      luminance,
+      luminance,
+      number('${prefix}Alpha', fallback.a),
+    );
+  }
+
+  Color? optionalNeutralColor(String prefix) {
+    if (!settings.containsKey('${prefix}Alpha') &&
+        !settings.containsKey('${prefix}Luminance')) {
+      return null;
+    }
+    return neutralColor(prefix, Colors.transparent);
+  }
 
   const defaults = LiquidGlassSettings();
   return LiquidGlassSettings(
@@ -25,6 +45,32 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     lightAngle: number('lightAngle', defaults.lightAngle),
     lightIntensity: number('lightIntensity', defaults.lightIntensity),
     ambientStrength: number('ambientStrength', defaults.ambientStrength),
+    highlightColor: neutralColor('highlight', defaults.highlightColor),
+    edgeColor: neutralColor('edge', defaults.edgeColor),
+    edgeWidth: number('edgeWidth', defaults.edgeWidth),
+    outerContourColor: optionalNeutralColor('outerContour'),
+    outerContourWidth: settings.containsKey('outerContourWidth')
+        ? number('outerContourWidth', defaults.edgeWidth)
+        : null,
+    edgeInset: number('edgeInset', defaults.edgeInset),
+    specularWrap: number('specularWrap', defaults.specularWrap),
+    bleedStrength: number('bleedStrength', defaults.bleedStrength),
+    transmissionGamma: number('transmissionGamma', defaults.transmissionGamma),
+    vibrancy: number('vibrancy', defaults.vibrancy),
+    faceShadingStrength: number(
+      'faceShadingStrength',
+      defaults.faceShadingStrength,
+    ),
+    faceShadingDepth: number('faceShadingDepth', defaults.faceShadingDepth),
+    innerShadowStrength: number(
+      'innerShadowStrength',
+      defaults.innerShadowStrength,
+    ),
+    innerShadowDepth: number('innerShadowDepth', defaults.innerShadowDepth),
+    innerShadowDirectionality: number(
+      'innerShadowDirectionality',
+      defaults.innerShadowDirectionality,
+    ),
     refractiveIndex: number('refractiveIndex', defaults.refractiveIndex),
     saturation: number('saturation', defaults.saturation),
     chromaticAberration: number(
@@ -32,6 +78,30 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       defaults.chromaticAberration,
     ),
   );
+}
+
+List<BoxShadow> matchGlassShadows(Map<String, Object?> settings) {
+  double number(String key, double fallback) =>
+      (settings[key] as num?)?.toDouble() ?? fallback;
+  BoxShadow? shadow(String prefix) {
+    final alpha = number('${prefix}Alpha', 0.0);
+    if (alpha <= 0.0) return null;
+    final luminance = number('${prefix}Luminance', 0.0).round();
+    return BoxShadow(
+      color: Color.fromRGBO(luminance, luminance, luminance, alpha),
+      offset: Offset(
+        number('${prefix}OffsetX', 0.0),
+        number('${prefix}OffsetY', 0.0),
+      ),
+      blurRadius: number('${prefix}Blur', 0.0),
+      spreadRadius: number('${prefix}Spread', 0.0),
+    );
+  }
+
+  return [
+    if (shadow('contactShadow') case final contact?) contact,
+    if (shadow('shadow') case final cast?) cast,
+  ];
 }
 
 /// Maps the `shapeProfile` settings key onto a concrete [LiquidShape].
@@ -85,6 +155,7 @@ class MatchSceneView extends StatelessWidget {
             child: LiquidGlass.withOwnLayer(
               settings: matchGlassSettings(settings),
               shape: matchGlassShape(settings, cornerRadius),
+              shadows: matchGlassShadows(settings),
               child: const SizedBox.expand(),
             ),
           ),

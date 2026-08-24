@@ -15,7 +15,16 @@ void main() {
       highlightColor: Color.fromARGB(128, 255, 255, 255),
       edgeColor: Color.fromARGB(128, 0, 0, 0),
       edgeWidth: 4,
+      outerContourColor: Color.fromARGB(200, 0, 0, 0),
+      outerContourWidth: 3,
       bleedStrength: .6,
+      transmissionGamma: .8,
+      vibrancy: .4,
+      faceShadingStrength: .3,
+      faceShadingDepth: 16,
+      innerShadowStrength: .2,
+      innerShadowDepth: 12,
+      innerShadowDirectionality: .6,
       saturation: 2,
     );
 
@@ -28,7 +37,24 @@ void main() {
     expect(settings.effectiveHighlightColor.a, closeTo(128 / 255 * .5, .001));
     expect(settings.effectiveEdgeColor.a, closeTo(128 / 255 * .5, .001));
     expect(settings.effectiveEdgeWidth, 2);
+    expect(
+      settings.effectiveOuterContourColor.a,
+      closeTo(200 / 255 * .5, .001),
+    );
+    expect(settings.effectiveOuterContourWidth, 1.5);
+    expect(
+      settings.effectiveOuterMaterialContourColor.a,
+      closeTo(200 / 255 * .5, .001),
+    );
+    expect(settings.effectiveOuterMaterialContourWidth, 1.5);
     expect(settings.effectiveBleedStrength, .3);
+    expect(settings.effectiveTransmissionGamma, .9);
+    expect(settings.effectiveVibrancy, .2);
+    expect(settings.effectiveFaceShadingStrength, .15);
+    expect(settings.effectiveFaceShadingDepth, 8);
+    expect(settings.effectiveInnerShadowStrength, .1);
+    expect(settings.effectiveInnerShadowDepth, 6);
+    expect(settings.effectiveInnerShadowDirectionality, .3);
     expect(settings.effectiveSaturation, 1.5);
   });
 
@@ -49,6 +75,13 @@ void main() {
       edgeInset: .4,
       specularWrap: .6,
       bleedStrength: .7,
+      transmissionGamma: .9,
+      vibrancy: .5,
+      faceShadingStrength: .15,
+      faceShadingDepth: 40,
+      innerShadowStrength: .2,
+      innerShadowDepth: 12,
+      innerShadowDirectionality: .6,
       refractiveIndex: 1.4,
       saturation: 1.1,
     );
@@ -68,9 +101,18 @@ void main() {
         const Color(0x778899AA),
         const Color(0xBBCCDDEE),
         2,
+        null,
+        null,
         .4,
         .6,
         .7,
+        .9,
+        .5,
+        .15,
+        40,
+        .2,
+        12,
+        .6,
         1.4,
         1.1,
       ],

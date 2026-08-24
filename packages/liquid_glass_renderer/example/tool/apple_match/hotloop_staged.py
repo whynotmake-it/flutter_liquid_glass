@@ -34,50 +34,164 @@ RECORDED_BASELINE = ROOT / "out/stages/refinement/candidates/003"
 
 STAGES = {
     "shape": {
-        "shapeWidth": [222.0, 223.0, 224.0, 225.0, 226.0],
-        "shapeHeight": [92.0, 93.0, 94.0, 95.0, 96.0],
-        "shapeOffsetY": [-1.0, 0.0, 1.0],
-        "cornerRadius": [45.0, 46.0, 47.0, 48.0],
+        "shapeWidth": [223.0, 223.5, 224.0, 224.5, 225.0],
+        "shapeHeight": [93.5, 94.0, 94.5],
+        "shapeOffsetX": [-0.5, 0.0, 0.5],
+        "shapeOffsetY": [-0.5, 0.0, 0.5],
+        "cornerRadius": [49.0, 49.5, 50.0, 50.5, 51.0],
         "shapeProfile": ["roundedRectangle", "superellipse"],
     },
+    "shapeProfile": {
+        "shapeProfile": ["roundedRectangle", "superellipse"],
+    },
+    "subpixelRegistration": {
+        "shapeWidth": [224.1667, 224.3333, 224.5, 224.6667, 224.8333],
+        "shapeHeight": [93.6667, 93.8333, 94.0, 94.1667, 94.3333],
+        "shapeOffsetX": [-0.3333, -0.1667, 0.0, 0.1667, 0.3333],
+        "shapeOffsetY": [-0.3333, -0.1667, 0.0, 0.1667, 0.3333],
+    },
+    "subpixelVerticalRegistration": {
+        "shapeOffsetY": [-0.3333, -0.1667, 0.0, 0.1667, 0.3333],
+    },
     "refraction": {
-        "thickness": [2.0, 4.0, 6.0, 8.0, 10.0, 12.0],
-        "refractiveIndex": [1.03, 1.05, 1.08, 1.10, 1.15],
-        "chromaticAberration": [0.0, 0.005, 0.01],
+        "thickness": [8.0, 10.0, 12.0, 14.0, 16.0],
+        "refractiveIndex": [1.03, 1.04, 1.05, 1.06, 1.08],
+        "chromaticAberration": [0.0, 0.0025, 0.005, 0.0075, 0.01],
     },
     "blurMtf": {
-        "blur": [4.0, 6.0, 8.0, 10.0, 12.0],
-        "blurMix": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "blur": [5.0, 6.0, 7.0, 8.0, 9.0],
     },
     "tintColor": {
-        "glassAlpha": [0.44, 0.48, 0.52, 0.56, 0.60],
-        "saturation": [0.8, 1.0, 1.2, 1.4, 1.6],
-        "glassRed": [232, 240, 248, 255],
-        "glassGreen": [232, 240, 248, 255],
-        "glassBlue": [232, 240, 248, 255],
+        "glassAlpha": [0.52, 0.525, 0.53, 0.535, 0.54],
+        "glassRed": [251, 252, 253, 254],
+        "glassGreen": [251, 252, 253, 254],
+        "glassBlue": [251, 252, 253, 254],
+    },
+    "toneResponse": {
+        "transmissionGamma": [0.85, 0.875, 0.90, 0.925, 0.95],
+    },
+    "vibrancy": {
+        "vibrancy": [0.10, 0.125, 0.15, 0.175, 0.20],
+        "saturation": [0.9, 0.95, 1.0, 1.05, 1.1],
     },
     "highlight": {
-        "lightIntensity": [0.0, 0.1, 0.2, 0.3],
-        "ambientStrength": [0.0, 0.02, 0.04],
+        "lightIntensity": [0.0, 0.2, 0.4, 0.6, 0.8],
+        "ambientStrength": [0.0, 0.03, 0.08],
         "lightAngle": [
             0.7853981633974483,
             1.5707963267948966,
             2.356194490192345,
         ],
-        "faceWhite": [0.80, 0.88, 0.92, 0.96, 1.0],
-        "faceBlack": [0.40, 0.55, 0.62, 0.75],
-        "faceFill": [0.0, 0.02, 0.05],
-        "innerShadowOpacity": [0.0, 0.12, 0.22, 0.32, 0.45],
-        "brightRimWidth": [0.5, 1.0, 1.5, 2.0, 3.0],
-        "brightRimIntensity": [0.0, 0.2, 0.4, 0.6, 0.8],
-        "brightRimRed": [220, 240, 255],
-        "brightRimGreen": [220, 240, 255],
-        "brightRimBlue": [220, 240, 255],
-        "darkRimWidth": [0.5, 1.0, 1.5, 2.0, 3.0],
-        "darkRimIntensity": [0.0, 0.2, 0.4, 0.6, 0.8],
-        "darkRimRed": [0, 16, 32, 64],
-        "darkRimGreen": [0, 16, 32, 64],
-        "darkRimBlue": [0, 16, 32, 64],
+        "highlightAlpha": [0.25, 0.5, 0.75, 1.0],
+        "specularWrap": [0.15, 0.35, 0.55, 0.75],
+        "bleedStrength": [0.0, 0.25, 0.5, 0.75],
+    },
+    "ambientRim": {
+        "ambientStrength": [0.0, 0.08, 0.15, 0.25, 0.4, 0.6, 0.8, 1.0],
+    },
+    "outline": {
+        "edgeWidth": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0],
+        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "edgeLuminance": [0, 64, 128, 192, 255],
+        "edgeAlpha": [0.0, 0.1, 0.2, 0.35, 0.5],
+    },
+    "transmissionContour": {
+        "edgeLuminance": [0],
+        "edgeAlpha": [0.075, 0.1, 0.15, 0.2],
+    },
+    "darkOutline": {
+        "edgeWidth": [0.5, 1.0, 1.5, 2.0],
+        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "edgeAlpha": [0.2, 0.35, 0.5, 0.65, 0.8],
+    },
+    "materialContour": {
+        "outerContourWidth": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+        "outerContourAlpha": [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4],
+        "outerContourLuminance": [0],
+    },
+    "faceShading": {
+        "faceShadingStrength": [
+            0.0, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04
+        ],
+        "faceShadingDepth": [
+            12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0
+        ],
+    },
+    "innerShadow": {
+        "innerShadowStrength": [
+            0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.06, 0.08, 0.12
+        ],
+        "innerShadowDepth": [4.0, 6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 24.0],
+        "innerShadowDirectionality": [0.0, 0.15, 0.3, 0.5, 0.75, 1.0],
+    },
+    "exteriorShadow": {
+        "shadowLuminance": [0, 32, 64, 96],
+        "shadowAlpha": [0.0, 0.02, 0.04, 0.06, 0.08, 0.12],
+        "shadowOffsetX": [0.0],
+        "shadowOffsetY": [0.0, 1.0, 2.0, 3.0, 4.0],
+        "shadowBlur": [2.0, 4.0, 6.0, 8.0, 10.0, 12.0],
+        "shadowSpread": [-1.0, 0.0, 1.0],
+    },
+    "contactShadow": {
+        "contactShadowAlpha": [
+            0.0, 0.02, 0.04, 0.06, 0.08, 0.12, 0.16, 0.24
+        ],
+        "contactShadowBlur": [0.5, 1.0, 2.0, 3.0, 4.0],
+        "contactShadowSpread": [-1.0, -0.5, 0.0, 0.5, 1.0],
+    },
+    "contactShadowPareto": {
+        "contactShadowAlpha": [0.04],
+        "contactShadowBlur": [1.0],
+        "contactShadowSpread": [0.0],
+    },
+    "shadowLuminance": {
+        "shadowLuminance": [0, 16, 32],
+    },
+    "castShadowBalance": {
+        "shadowAlpha": [0.0, 0.02, 0.04, 0.06, 0.08, 0.12],
+        "shadowOffsetY": [0.0, 1.0, 2.0, 3.0, 4.0],
+        "shadowBlur": [4.0, 6.0, 8.0, 10.0, 12.0],
+        "shadowSpread": [-2.0, -1.0, 0.0],
+    },
+    "layeredExteriorShadow": {
+        "contactShadowAlpha": [0.02, 0.04, 0.06, 0.08, 0.12, 0.16],
+        "contactShadowBlur": [0.0, 0.25, 0.5, 1.0, 1.5],
+        "contactShadowSpread": [-1.0, -0.5, 0.0, 0.5],
+        "shadowAlpha": [0.02, 0.04, 0.06, 0.08],
+        "shadowOffsetY": [3.0, 4.0, 5.0, 6.0, 8.0],
+        "shadowBlur": [6.0, 8.0, 10.0, 12.0],
+    },
+    "fineContactContour": {
+        "contactShadowAlpha": [0.03, 0.04, 0.05, 0.06, 0.07],
+        "contactShadowBlur": [0.5, 0.75, 1.0, 1.25],
+        "contactShadowSpread": [-0.25, 0.0, 0.25],
+    },
+    "silhouetteLine": {
+        "edgeAlpha": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8],
+        "edgeWidth": [0.5, 0.75, 1.0, 1.25, 1.5],
+    },
+    "layeredContour": {
+        "edgeWidth": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+        "edgeAlpha": [0.2, 0.35, 0.5, 0.65, 0.8],
+        "lightIntensity": [0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
+        "highlightAlpha": [0.5, 0.65, 0.8, 1.0],
+        "specularWrap": [0.05, 0.15, 0.25, 0.35],
+        "bleedStrength": [0.0, 0.25, 0.5, 0.75],
+    },
+    "layeredBevel": {
+        "faceShadingStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
+        "faceShadingDepth": [12.0, 20.0, 28.0, 36.0, 40.0],
+        "innerShadowStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
+        "innerShadowDepth": [6.0, 8.0, 12.0, 16.0, 20.0, 24.0],
+    },
+    "coupledRim": {
+        "edgeWidth": [0.25, 0.5, 0.75, 1.0, 1.25],
+        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "edgeLuminance": [0, 32, 64, 96, 128],
+        "edgeAlpha": [0.05, 0.1, 0.15, 0.2, 0.3],
+        "lightIntensity": [0.4, 0.5, 0.6, 0.7, 0.8],
+        "specularWrap": [0.15, 0.25, 0.35, 0.45, 0.55],
+        "bleedStrength": [0.25, 0.5, 0.75],
     },
 }
 
@@ -86,6 +200,235 @@ WALL_EXIT_CODE = 42
 
 class OptimizationWall(RuntimeError):
     pass
+
+
+def diagnostic_stage_name(stage_name):
+    return {
+        "outline": "highlight",
+        "toneResponse": "tintColor",
+        "vibrancy": "tintColor",
+        "faceShading": "highlight",
+        "innerShadow": "highlight",
+        "ambientRim": "highlight",
+        "darkOutline": "highlight",
+        "materialContour": "highlight",
+        "transmissionContour": "highlight",
+        "shapeProfile": "shape",
+        "subpixelRegistration": "shape",
+        "subpixelVerticalRegistration": "shape",
+        "exteriorShadow": "highlight",
+        "contactShadow": "highlight",
+        "contactShadowPareto": "highlight",
+        "shadowLuminance": "highlight",
+        "castShadowBalance": "highlight",
+        "layeredExteriorShadow": "highlight",
+        "fineContactContour": "highlight",
+        "silhouetteLine": "highlight",
+        "layeredContour": "highlight",
+        "layeredBevel": "highlight",
+        "coupledRim": "highlight",
+    }.get(stage_name, stage_name)
+
+
+def optimization_objective(stage_name, result):
+    """Return an interpretable stage-specific loss in 8-bit-like units.
+
+    Apple mixes blurred and unblurred backdrop content, which this harness does
+    not currently reproduce. A whole-image residual therefore biases unrelated
+    material parameters toward compensating for the known blur mismatch. Shape
+    and flow metrics isolate geometry/refraction; neutral solid probes isolate
+    transmission and rim lighting without backdrop-frequency ambiguity.
+    """
+    details = result.details
+    if stage_name in ("shape", "shapeProfile"):
+        return "shapeError8BitEquivalent", result.errors["shape"] * 255.0
+    if stage_name == "refraction":
+        return "flowError8BitEquivalent", result.errors["flow"] * 255.0
+    residuals = details["pixelResiduals"]
+    if stage_name in ("subpixelRegistration", "subpixelVerticalRegistration"):
+        return (
+            "solidRimRegistrationMeanAbsoluteError8Bit",
+            (
+                residuals["C"]["rim"]["meanAbsoluteError8Bit"] +
+                residuals["D"]["rim"]["meanAbsoluteError8Bit"]
+            ) / 2.0,
+        )
+    if stage_name == "tintColor":
+        loss = sum(
+            residuals[probe]["core"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        return "solidCoreMeanAbsoluteError8Bit", loss
+    if stage_name in ("highlight", "ambientRim"):
+        # A bright specular rim is observable without being washed out only
+        # on the solid-black probe.
+        return (
+            "blackBackgroundBrightRimMeanAbsoluteError8Bit",
+            residuals["C"]["outerContour"]["meanAbsoluteError8Bit"],
+        )
+    if stage_name in (
+        "outline",
+        "darkOutline",
+        "outerContour",
+        "materialContour",
+    ):
+        # Conversely, Apple's dark containment edge is isolated by white.
+        return (
+            "whiteBackgroundDarkRimMeanAbsoluteError8Bit",
+            residuals["D"]["outerContour"]["meanAbsoluteError8Bit"],
+        )
+    if stage_name == "faceShading":
+        top = sum(
+            residuals[probe]["topFace"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        bottom = sum(
+            residuals[probe]["bottomFace"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        return "directionalFaceMeanAbsoluteError8Bit", top + bottom * 0.25
+    if stage_name == "innerShadow":
+        white = residuals["D"]
+        face = (
+            white["topFace"]["meanAbsoluteError8Bit"] +
+            white["bottomFace"]["meanAbsoluteError8Bit"]
+        ) / 2.0
+        return (
+            "whiteInnerBevelMeanAbsoluteError8Bit",
+            white["innerBevel"]["meanAbsoluteError8Bit"] * 0.6 + face * 0.4,
+        )
+    if stage_name == "exteriorShadow":
+        return (
+            "whiteExteriorMeanAbsoluteError8Bit",
+            residuals["D"]["exterior"]["meanAbsoluteError8Bit"],
+        )
+    if stage_name in ("contactShadow", "contactShadowPareto"):
+        white_exterior = residuals["D"]["exteriorContour"]
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return (
+            "whiteContactShadowAndDirectMeanAbsoluteError8Bit",
+            white_exterior["meanAbsoluteError8Bit"] + direct,
+        )
+    if stage_name == "shadowLuminance":
+        exterior = sum(
+            residuals[probe]["exteriorContour"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "neutralExteriorShadowAndDirectMeanAbsoluteError8Bit", exterior + direct
+    if stage_name == "castShadowBalance":
+        silhouette = sum(
+            residuals[probe]["silhouetteLine"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        exterior = sum(
+            residuals[probe]["exteriorContour"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return (
+            "castShadowRadialBandsAndDirectMeanAbsoluteError8Bit",
+            silhouette * 0.4 + exterior * 0.4 + direct * 0.2,
+        )
+    if stage_name == "layeredExteriorShadow":
+        exterior = residuals["D"]["directionalExteriorBands"]
+        contact_names = [name for name in exterior if "Exterior0To1" in name]
+        near_names = [name for name in exterior if "Exterior1To2" in name]
+        far_names = [
+            name for name in exterior
+            if "Exterior2To4" in name or "Exterior4To8" in name
+        ]
+        contact = sum(exterior[name]["meanAbsoluteError8Bit"] for name in contact_names) / len(contact_names)
+        near = sum(exterior[name]["meanAbsoluteError8Bit"] for name in near_names) / len(near_names)
+        far = sum(exterior[name]["meanAbsoluteError8Bit"] for name in far_names) / len(far_names)
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "layeredExteriorShadowAndDirectMeanAbsoluteError8Bit", (
+            contact * 0.35 + near * 0.25 + far * 0.2 + direct * 0.2
+        )
+    if stage_name == "fineContactContour":
+        exterior = residuals["D"]["directionalExteriorBands"]
+        contact_names = [name for name in exterior if "Exterior0To1" in name]
+        near_names = [name for name in exterior if "Exterior1To2" in name]
+        contact = sum(
+            exterior[name]["meanAbsoluteError8Bit"] for name in contact_names
+        ) / len(contact_names)
+        near = sum(
+            exterior[name]["meanAbsoluteError8Bit"] for name in near_names
+        ) / len(near_names)
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "fineContactContourParetoMeanAbsoluteError8Bit", (
+            contact * 0.2 + near * 0.15 + direct * 0.65
+        )
+    if stage_name == "silhouetteLine":
+        line = sum(
+            residuals[probe]["silhouetteLine"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "silhouetteLineAndDirectMeanAbsoluteError8Bit", line + direct
+    if stage_name == "layeredContour":
+        band_names = residuals["C"]["directionalDistanceBands"].keys()
+        contour_names = [name for name in band_names if "Contour0To1" in name]
+        inner_names = [name for name in band_names if "Contour1To2" in name]
+        contour = sum(
+            residuals[probe]["directionalDistanceBands"][name][
+                "meanAbsoluteError8Bit"
+            ]
+            for probe in "CD"
+            for name in contour_names
+        ) / (2.0 * len(contour_names))
+        inner = sum(
+            residuals[probe]["directionalDistanceBands"][name][
+                "meanAbsoluteError8Bit"
+            ]
+            for probe in "CD"
+            for name in inner_names
+        ) / (2.0 * len(inner_names))
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "layeredContourAndDirectMeanAbsoluteError8Bit", (
+            contour * 0.7 + inner * 0.15 + direct * 0.15
+        )
+    if stage_name == "layeredBevel":
+        band_names = residuals["C"]["directionalDistanceBands"].keys()
+        bevel_names = [name for name in band_names if "Bevel" in name]
+        black = sum(
+            residuals["C"]["directionalDistanceBands"][name][
+                "meanAbsoluteError8Bit"
+            ]
+            for name in bevel_names
+        ) / len(bevel_names)
+        white = sum(
+            residuals["D"]["directionalDistanceBands"][name][
+                "meanAbsoluteError8Bit"
+            ]
+            for name in bevel_names
+        ) / len(bevel_names)
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "layeredBevelAndDirectMeanAbsoluteError8Bit", (
+            black * 0.2 + white * 0.6 + direct * 0.2
+        )
+    if stage_name == "transmissionContour":
+        transfer = residuals["solidTransfer"]["transmission"]
+        outer = transfer["outerContour"]
+        inner = transfer["innerRim"]
+        return "solidTransmissionContourMeanAbsoluteError8Bit", (
+            outer["meanAbsoluteError8Bit"]
+            + abs(outer["meanSignedLuminanceError8Bit"])
+            + inner["meanAbsoluteError8Bit"] * 0.25
+        )
+    if stage_name == "coupledRim":
+        outer = sum(
+            residuals[probe]["outerContour"]["meanAbsoluteError8Bit"]
+            for probe in "CD"
+        ) / 2.0
+        direct = details["directPixelMeanAbsoluteError8Bit"]
+        return "coupledBlackWhiteRimAndDirectMeanAbsoluteError8Bit", (
+            outer * 0.9 + direct * 0.1
+        )
+    return (
+        "directPixelMeanAbsoluteError8Bit",
+        details["directPixelMeanAbsoluteError8Bit"],
+    )
 
 
 def has_optimization_wall(
@@ -111,6 +454,7 @@ def result_json(result, settings, evaluator):
         "settings": settings,
         "reloadModes": evaluator.last_modes,
         "evaluationSeconds": evaluator.last_seconds,
+        "runtimeCapabilities": evaluator.session.runtime_capabilities,
     }
 
 
@@ -137,7 +481,7 @@ def main() -> None:
     parser.add_argument(
         "--flutter-bin",
         default=os.environ.get(
-            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.44.1/bin/flutter")
+            "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")
         ),
     )
     parser.add_argument("--max-iters", type=int, default=2)
@@ -148,7 +492,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--stages",
-        default="shape,refraction,blurMtf,tintColor,highlight",
+        default=(
+            "shape,refraction,tintColor,highlight,outline,"
+            "faceShading,exteriorShadow"
+        ),
         help="Comma-separated ordered stage names.",
     )
     parser.add_argument("--out", type=Path, default=ROOT / "out/hotloop")
@@ -164,27 +511,6 @@ def main() -> None:
     reference_dir = ROOT / "references" / REFERENCE_SET / scene["id"]
     reference = load_reference_probes(reference_dir, crop)
     baseline = json.loads(args.baseline.resolve().read_text())
-    baseline.update(
-        {
-            "blurMix": baseline.get("blurMix", 1.0),
-            "brightRimRed": baseline.get("brightRimRed", 255),
-            "brightRimGreen": baseline.get("brightRimGreen", 255),
-            "brightRimBlue": baseline.get("brightRimBlue", 255),
-            "brightRimAlpha": baseline.get("brightRimAlpha", 1.0),
-            "brightRimWidth": baseline.get("brightRimWidth", 1.0),
-            "brightRimIntensity": baseline.get("brightRimIntensity", 0.0),
-            "darkRimRed": baseline.get("darkRimRed", 0),
-            "darkRimGreen": baseline.get("darkRimGreen", 0),
-            "darkRimBlue": baseline.get("darkRimBlue", 0),
-            "darkRimAlpha": baseline.get("darkRimAlpha", 1.0),
-            "darkRimWidth": baseline.get("darkRimWidth", 1.0),
-            "darkRimIntensity": baseline.get("darkRimIntensity", 0.35),
-            "faceWhite": baseline.get("faceWhite", 0.993),
-            "faceBlack": baseline.get("faceBlack", 0.53),
-            "faceFill": baseline.get("faceFill", 0.0),
-            "innerShadowOpacity": baseline.get("innerShadowOpacity", 0.12),
-        }
-    )
     selected_stages = [stage for stage in args.stages.split(",") if stage]
     unknown = set(selected_stages) - set(STAGES)
     if unknown:
@@ -193,6 +519,8 @@ def main() -> None:
     shutil.rmtree(out, ignore_errors=True)
     if RECORDED_BASELINE.exists():
         shutil.copytree(RECORDED_BASELINE, out / "baseline")
+    else:
+        (out / "baseline").mkdir(parents=True, exist_ok=True)
     (out / "baseline/refinement-baseline.json").write_text(
         json.dumps(
             {
@@ -232,16 +560,36 @@ def main() -> None:
             stage_dir = out / "stages" / stage_name
             best_loss = float("inf")
             best_params = None
+            stage_evaluations = 0
             baseline_stage_score = None
+            baseline_direct_mae = None
+            baseline_objective = None
+            objective_name = None
 
             def evaluate(params):
                 nonlocal best_loss, best_params, baseline_stage_score
+                nonlocal baseline_direct_mae, baseline_objective
+                nonlocal objective_name, stage_evaluations
                 evaluator.evaluate(params)
+                stage_evaluations += 1
                 timings.append(evaluator.last_seconds)
-                stage_score = evaluator.last_result.details["stageScores"][stage_name]
+                diagnostic_stage = diagnostic_stage_name(stage_name)
+                stage_score = evaluator.last_result.details["stageScores"][
+                    diagnostic_stage
+                ]
+                direct_mae = evaluator.last_result.details[
+                    "directPixelMeanAbsoluteError8Bit"
+                ]
+                candidate_objective_name, loss = optimization_objective(
+                    stage_name, evaluator.last_result
+                )
                 if baseline_stage_score is None:
                     baseline_stage_score = stage_score
-                loss = 100.0 - stage_score
+                    baseline_direct_mae = direct_mae
+                    baseline_objective = loss
+                    objective_name = candidate_objective_name
+                elif candidate_objective_name != objective_name:
+                    raise RuntimeError("optimization objective changed within a stage")
                 candidate_dir = stage_dir / "candidates" / f"{evaluator.evaluations:04d}"
                 candidate_dir.mkdir(parents=True, exist_ok=True)
                 (candidate_dir / "scorecard.json").write_text(
@@ -251,27 +599,117 @@ def main() -> None:
                     )
                     + "\n"
                 )
-                if loss < best_loss:
+                if loss < best_loss - 0.0001:
                     best_loss = loss
                     best_params = dict(params)
                     save_best(stage_dir / "best", best_params, evaluator, reference)
                 return loss
+
+            if stage_name == "materialContour":
+                # Add explicit zero-valued axes when comparing against an old
+                # settings file. This keeps the no-material-contour baseline
+                # in the same optimization domain as the new layer.
+                initial = {
+                    **initial,
+                    "outerContourWidth": initial.get("outerContourWidth", 1.0),
+                    "outerContourAlpha": initial.get("outerContourAlpha", 0.0),
+                    "outerContourLuminance": initial.get(
+                        "outerContourLuminance", 0
+                    ),
+                }
+
+            # Edge occlusion is intentionally a product of width and opacity.
+            # Starting from the transparent default makes one-at-a-time
+            # coordinate descent see both axes as flat, so test a small set of
+            # physically plausible coupled seeds before refining each axis.
+            if stage_name == "outline":
+                transparent = dict(initial)
+                transparent_loss = evaluate(transparent)
+                seeded = []
+                for edge_width in (0.5, 1.0, 1.5):
+                    for edge_inset in (0.25, 0.5, 0.75):
+                        for edge_alpha in (0.1, 0.2):
+                            candidate = {
+                                **initial,
+                                "edgeWidth": edge_width,
+                                "edgeInset": edge_inset,
+                                "edgeLuminance": 0,
+                                "edgeAlpha": edge_alpha,
+                            }
+                            seeded.append((evaluate(candidate), candidate))
+                seed_loss, initial = min(seeded, key=lambda item: item[0])
+                # Preserve the transparent treatment when every coupled edge
+                # candidate is worse than the input image.
+                if transparent_loss <= seed_loss:
+                    initial = transparent
+
+            if stage_name == "exteriorShadow":
+                transparent = dict(initial)
+                transparent_loss = evaluate(transparent)
+                seeded = []
+                for shadow_alpha in (0.02, 0.04, 0.08):
+                    for shadow_blur in (4.0, 8.0, 12.0):
+                        candidate = {
+                            **initial,
+                            "shadowLuminance": 0,
+                            "shadowAlpha": shadow_alpha,
+                            "shadowOffsetX": 0.0,
+                            "shadowOffsetY": 2.0,
+                            "shadowBlur": shadow_blur,
+                            "shadowSpread": 0.0,
+                        }
+                        seeded.append((evaluate(candidate), candidate))
+                seed_loss, initial = min(seeded, key=lambda item: item[0])
+                if transparent_loss <= seed_loss:
+                    initial = transparent
+
+            if stage_name == "faceShading":
+                unshaded = dict(initial)
+                unshaded_loss = evaluate(unshaded)
+                seeded = []
+                for strength in (0.0075, 0.015, 0.025, 0.04):
+                    for depth in (20.0, 28.0, 36.0, 40.0):
+                        candidate = {
+                            **initial,
+                            "faceShadingStrength": strength,
+                            "faceShadingDepth": depth,
+                        }
+                        seeded.append((evaluate(candidate), candidate))
+                seed_loss, initial = min(seeded, key=lambda item: item[0])
+                if unshaded_loss <= seed_loss:
+                    initial = unshaded
 
             result = coordinate_descent(
                 evaluate,
                 initial,
                 STAGES[stage_name],
                 max_iters=args.max_iters,
-                min_improvement=0.02,
+                # Direct MAE is measured in 8-bit code values. At the final
+                # fitting scale, 0.01-level improvements are repeatable and
+                # visually material across hundreds of thousands of pixels.
+                min_improvement=0.0001,
             )
+            best_card = json.loads(
+                (stage_dir / "best" / "scorecard.json").read_text()
+            )
+            diagnostic_stage = diagnostic_stage_name(stage_name)
             summary = {
                 "baselineStageScore": baseline_stage_score,
-                "bestStageScore": 100.0 - result["bestLoss"],
-                "improvement": 100.0
-                - result["bestLoss"]
-                - baseline_stage_score,
-                "bestSettings": result["bestParams"],
-                "evaluations": len(result["history"]),
+                "bestStageScore": best_card["measurements"]["stageScores"][
+                    diagnostic_stage
+                ],
+                "baselineDirectPixelMae8Bit": baseline_direct_mae,
+                "bestDirectPixelMae8Bit": best_card["measurements"][
+                    "directPixelMeanAbsoluteError8Bit"
+                ],
+                "directPixelImprovement8Bit": baseline_direct_mae
+                - best_card["measurements"]["directPixelMeanAbsoluteError8Bit"],
+                "objectiveName": objective_name,
+                "baselineObjective": baseline_objective,
+                "bestObjective": best_loss,
+                "improvement": baseline_objective - best_loss,
+                "bestSettings": best_params,
+                "evaluations": stage_evaluations,
                 "bestEvidence": str((stage_dir / "best").resolve()),
             }
             (stage_dir / "summary.json").write_text(
@@ -280,7 +718,8 @@ def main() -> None:
             stage_summaries[stage_name] = summary
             print(
                 f"HOTLOOP_STAGE_COMPLETE stage={stage_name} "
-                f"score={summary['bestStageScore']:.4f}",
+                f"objective={objective_name} value={best_loss:.4f} "
+                f"directMae8Bit={summary['bestDirectPixelMae8Bit']:.4f}",
                 flush=True,
             )
             if has_optimization_wall(
@@ -292,7 +731,7 @@ def main() -> None:
                 best_card = json.loads((best_dir / "scorecard.json").read_text())
                 edge_parameters = {}
                 for name, values in STAGES[stage_name].items():
-                    value = result["bestParams"].get(name)
+                    value = best_params.get(name)
                     if value in (values[0], values[-1]):
                         edge_parameters[name] = {
                             "value": value,
@@ -308,7 +747,7 @@ def main() -> None:
                     "consecutiveStages": args.wall_consecutive,
                     "currentBest": {
                         "score": best_card["score"],
-                        "settings": result["bestParams"],
+                        "settings": best_params,
                     },
                     "componentResiduals": best_card["errors"],
                     "parametersAtRangeEdges": edge_parameters,
@@ -325,23 +764,11 @@ def main() -> None:
                     f"optimization wall after {stage_name}; "
                     f"see {out / 'wall_report.json'}"
                 )
-            return result["bestParams"]
+            return best_params
 
         current = dict(baseline)
         if "shape" in selected_stages:
-            neutral = {
-                **baseline,
-                "thickness": 28.0,
-                "blur": 0.0,
-                "blurMix": 0.0,
-                "lightIntensity": 0.0,
-                "ambientStrength": 0.0,
-                "glassAlpha": 0.53,
-                "refractiveIndex": 1.2,
-                "saturation": 1.0,
-                "chromaticAberration": 0.0,
-            }
-            shape_best = optimize_stage("shape", neutral)
+            shape_best = optimize_stage("shape", current)
             geometry_keys = (
                 "shapeWidth",
                 "shapeHeight",

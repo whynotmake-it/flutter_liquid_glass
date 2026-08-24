@@ -123,7 +123,7 @@ def main():
     baseline = json.loads(args.baseline.read_text())
     axes = json.loads(args.axes.read_text()) if args.axes else DEFAULT_AXES
     flutter_bin = os.environ.get(
-        "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.44.1/bin/flutter")
+        "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")
     )
     env = os.environ.copy()
     env["PATH"] = f"{ROOT / 'compat/bin'}:{env['PATH']}"

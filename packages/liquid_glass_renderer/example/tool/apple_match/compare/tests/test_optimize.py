@@ -24,7 +24,7 @@ from apple_match.hotloop.session import (
     SessionError,
     SignalReloadTrigger,
 )
-from hotloop_staged import has_optimization_wall
+from hotloop_staged import has_optimization_wall, optimization_objective
 from transparency_sweep import interpret_curve, is_monotonic
 
 
@@ -54,6 +54,9 @@ class OptimizerTests(unittest.TestCase):
         iterations = {row["iteration"] for row in result["history"]}
         self.assertEqual(iterations, {0, 1})
         self.assertLess(result["bestLoss"], self.fake_loss({"x": 5.0, "y": 0.0}))
+        accepted = [row for row in result["history"][1:] if row["isBest"]]
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(accepted[0]["loss"], result["bestLoss"])
 
     def test_stops_when_no_neighbor_improves(self):
         def flat_loss(params):
@@ -87,6 +90,51 @@ class OptimizerTests(unittest.TestCase):
                 consecutive=2,
             )
         )
+
+    def test_stage_objectives_isolate_known_blur_mismatch(self):
+        result = SimpleNamespace(
+            errors={"shape": 0.1, "flow": 0.2},
+            details={
+                "directPixelMeanAbsoluteError8Bit": 9.0,
+                "pixelResiduals": {
+                    "C": {
+                        "glass": {"meanAbsoluteError8Bit": 2.0},
+                        "core": {"meanAbsoluteError8Bit": 1.0},
+                        "rim": {"meanAbsoluteError8Bit": 3.0},
+                        "outerContour": {"meanAbsoluteError8Bit": 6.0},
+                        "innerBevel": {"meanAbsoluteError8Bit": 2.5},
+                        "topLip": {"meanAbsoluteError8Bit": 2.0},
+                        "bottomLip": {"meanAbsoluteError8Bit": 1.0},
+                        "topCenterLip": {"meanAbsoluteError8Bit": 2.0},
+                        "bottomCenterLip": {"meanAbsoluteError8Bit": 1.0},
+                        "topFace": {"meanAbsoluteError8Bit": 2.0},
+                        "bottomFace": {"meanAbsoluteError8Bit": 1.0},
+                    },
+                    "D": {
+                        "glass": {"meanAbsoluteError8Bit": 4.0},
+                        "core": {"meanAbsoluteError8Bit": 2.0},
+                        "rim": {"meanAbsoluteError8Bit": 5.0},
+                        "outerContour": {"meanAbsoluteError8Bit": 7.0},
+                        "innerBevel": {"meanAbsoluteError8Bit": 3.5},
+                        "topLip": {"meanAbsoluteError8Bit": 4.0},
+                        "bottomLip": {"meanAbsoluteError8Bit": 3.0},
+                        "topCenterLip": {"meanAbsoluteError8Bit": 4.0},
+                        "bottomCenterLip": {"meanAbsoluteError8Bit": 3.0},
+                        "topFace": {"meanAbsoluteError8Bit": 4.0},
+                        "bottomFace": {"meanAbsoluteError8Bit": 3.0},
+                    },
+                },
+            },
+        )
+        self.assertEqual(optimization_objective("shape", result)[1], 25.5)
+        self.assertEqual(optimization_objective("refraction", result)[1], 51.0)
+        self.assertEqual(optimization_objective("tintColor", result)[1], 1.5)
+        self.assertEqual(optimization_objective("highlight", result)[1], 6.0)
+        self.assertEqual(optimization_objective("outline", result)[1], 7.0)
+        self.assertEqual(
+            optimization_objective("faceShading", result)[1], 3.5
+        )
+        self.assertEqual(optimization_objective("blurMtf", result)[1], 9.0)
 
     def test_transparency_curve_interpretation(self):
         self.assertTrue(is_monotonic([0.1, 0.25, 0.5, 0.75, 0.9]))
