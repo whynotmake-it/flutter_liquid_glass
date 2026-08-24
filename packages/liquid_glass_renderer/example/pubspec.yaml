@@ -4,8 +4,7 @@ publish_to: 'none'
 version: 0.1.0
 
 environment:
-  sdk: ">=3.12.0 <3.13.0"
-  flutter: ">=3.44.0 <3.45.0"
+  sdk: ">=3.13.0 <3.14.0"
 
 dependencies:
   cupertino_icons: ^1.0.8
@@ -13,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_hooks: ^0.21.2
+  leak_tracker: any
   liquid_glass_renderer:
     path: ../
   rivership: ^0.4.0+8
