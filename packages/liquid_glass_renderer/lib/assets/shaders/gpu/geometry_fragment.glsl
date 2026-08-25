@@ -45,7 +45,7 @@ void main() {
     // The normal material has no face-spread lens. Keep its established SDF
     // path free of the loupe metadata traversal; the extra shape metadata is
     // only needed by controls that explicitly opt into refraction spread.
-    bool hasFaceSpread = spread > 0.001;
+    bool hasFaceSpread = spread > 0.0;
     SceneSample scene;
     float sd;
     if (hasFaceSpread) {
@@ -90,9 +90,14 @@ void main() {
     float inwardDistance = max(-surfaceSd, 0.0);
     float profileX = min(inwardDistance, reach);
     float normalizedProfile = profileX / max(reach, 0.001);
-    float profileHeight = sqrt(max(0.0, normalizedProfile * (2.0 - normalizedProfile)));
+    // Circular-cap profile: the height and its normal are derived from the
+    // same surface, so the transmitted displacement remains a coherent lens
+    // rather than an independently-shaped color warp.
+    float profileHeight = sqrt(
+        max(0.0, normalizedProfile * (2.0 - normalizedProfile))
+    );
     float height = uThickness * profileHeight;
-    float n_cos = 1.0 - clamp(inwardDistance / max(reach, 0.001), 0.0, 1.0);
+    float n_cos = 1.0 - normalizedProfile;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
     float slopeScale = uThickness / max(reach, 0.001);
     vec3 normal = normalize(vec3(dx * n_cos * slopeScale, dy * n_cos * slopeScale, n_sin));

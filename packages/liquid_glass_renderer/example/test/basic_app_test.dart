@@ -28,7 +28,9 @@ void main() {
   testWidgets('settings has one close action and persistent preset controls', (
     tester,
   ) async {
-    await tester.pumpWidget(const CupertinoApp(home: BasicApp()));
+    await tester.pumpWidget(
+      const CupertinoApp(home: BasicApp(backgroundOverride: 'grid')),
+    );
     await tester.pump();
 
     await tester.tap(find.text('Settings').last);

@@ -708,7 +708,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         shapeData: _shapeData,
         rseData: _rseData,
         numShapes: numShapes,
-        refractiveIndex: settings.effectiveRefractiveIndex,
+        opticalIndex: settings.effectiveOpticalIndex,
         refractionSpread: settings.effectiveRefractionSpread,
         displacementScale: settings.effectiveDisplacementScale,
         thickness: settings.effectiveThickness,

@@ -268,7 +268,7 @@ class FlutterGpuGeometryRenderer {
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double refractiveIndex,
+    required double opticalIndex,
     double refractionSpread = 0.0,
     double? displacementScale,
     required double thickness,
@@ -315,13 +315,13 @@ class FlutterGpuGeometryRenderer {
       offsetY: offsetY,
       textureWidth: allocatedWidth.toDouble(),
       textureHeight: allocatedHeight.toDouble(),
-      refractiveIndex: refractiveIndex,
+      opticalIndex: opticalIndex,
       refractionSpread: refractionSpread,
       displacementScale: displacementScale ??
           math.max(
             1e-3,
             1.05 * 8.0 * thickness *
-                math.sqrt(math.max(0.0, refractiveIndex * refractiveIndex - 1.0)),
+                math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
           ),
       thickness: thickness,
       geometryAaHalfWidth: _geometryAaHalfWidth,
@@ -360,7 +360,7 @@ class FlutterGpuGeometryRenderer {
     required double offsetY,
     required double textureWidth,
     required double textureHeight,
-    required double refractiveIndex,
+    required double opticalIndex,
     required double refractionSpread,
     required double displacementScale,
     required double thickness,
@@ -380,14 +380,14 @@ class FlutterGpuGeometryRenderer {
     floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
     floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
 
-    final opticalIndex = _offsetOpticalProps ~/ 4;
-    floatData[opticalIndex] = refractiveIndex;
+    final opticalPropsIndex = _offsetOpticalProps ~/ 4;
+    floatData[opticalPropsIndex] = opticalIndex;
     // The Y slot is a harness-only centered-AA half-width. It defaults to
     // 0.5, matching Flutter's one-pixel transition; keeping it in the
     // existing reserved slot avoids changing the uniform ABI.
-    floatData[opticalIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
-    floatData[opticalIndex + 2] = thickness;
-    floatData[opticalIndex + 3] = numShapes;
+    floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
+    floatData[opticalPropsIndex + 2] = thickness;
+    floatData[opticalPropsIndex + 3] = numShapes;
 
 
     final shapeDataStartIndex = _offsetShapeData ~/ 4;

@@ -38,14 +38,20 @@ final settingsNotifier = ValueNotifier(
 final blendNotifier = ValueNotifier(10.0);
 
 class BasicApp extends HookWidget {
-  const BasicApp({super.key});
+  const BasicApp({super.key, this.backgroundOverride});
+
+  /// Optional deterministic background used by widget tests and screenshot
+  /// harnesses without changing the normal image-first example.
+  final String? backgroundOverride;
 
   @override
   Widget build(BuildContext context) {
     final tab = useState(0);
     final fake = useState(false);
     final showSettings = useState(false);
-    final background = useState(_useTestBackground ? 'grid' : 'image');
+    final background = useState(
+      backgroundOverride ?? (_useTestBackground ? 'grid' : 'image'),
+    );
     useEffect(() {
       PresetStore().seed();
       return null;

@@ -359,11 +359,13 @@ The sidebar exposes the unified controls and image/black/white/grid
 backgrounds. Presets are scalar YAML files under the app documents directory;
 `ios27-toolbar-light.yaml` and `neutral-default.yaml` are seeded on first run.
 
-The first post-profile pinned toolbar run (shape-relative reach and canonical
-settings) scored **91.3253** overall; the refraction stage improved its flow
-objective from 9.5324 to 8.8824. Its four probe captures and diagnostics are in
-`out/redesign-refraction/stages/refraction/best/`, including
-`holdout_comparison.png` and `solid_lighting_comparison.png`.
+The current pinned toolbar run (canonical settings, after removing the
+center-relative affine lens and the unused legacy shader path) scores
+**91.3479** overall. Its four probe captures and diagnostics are in
+`out/visual-current-source/`, including the black-background `C_1.png` and
+white-background `D_1.png` lighting checks. The geometry field retains the
+validated circular-cap profile; the oval SDF now uses Flutter Impeller's
+bounded Newton solve to avoid a center pinhole.
 
 The earlier 72-seed loupe scan is retained as a pre-redesign record at
 `out/loupe-seed-scan-pre-redesign-full/`; it scored 10.1461 but used the old
@@ -375,18 +377,17 @@ loupe integration remain required before claiming the +10 loupe gate.
 The bounded post-profile loupe gate is reproducible with
 `seed_scan.py --profile-gate`; it evaluates `edgeRefraction={25,35,45,55}`
 and `refractionSpread={.75,1}` against the pinned four-probe reference. The
-shape-relative affine spread field (`edgeRefraction / halfMajor`) adds no
-pass, texture, or per-frame CPU work. The current eight-seed evidence is in
-`out/loupe-profile-gate-affine/` (best comparator score 11.5062 at E=45,
-spread=1). This is a measured improvement over the earlier 8.6626 result,
-but the complete loupe/system integration and holdout gates remain open.
+earlier affine experiment is retained only as historical evidence; the shipped
+renderer now uses the SDF/profile field directly, so the complete loupe/system
+integration and holdout gates remain open.
 
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
 vector, with only monotonic `tintAlpha` and `frost` scalars allowed to vary.
 
-Focused GPU/shader/settings tests and the example smoke/YAML test are green.
-The full melos non-golden suite still has headless layer-tree failures, and
-the macOS/Android performance audit plus tab/capsule holdout scorecards are
-not yet complete. Those remain hard gates before calling this
-production-ready.
+Focused settings, shader-source, harness, and example smoke/YAML tests are
+green. The native Flutter GPU tests require an Impeller-enabled device and
+cannot run in this headless environment. We are intentionally deferring the
+expensive macOS/Android benchmark suite until the visual settings and example
+workflow are stable; tab/capsule holdout scorecards and the final performance
+audit remain hard gates before calling this production-ready.

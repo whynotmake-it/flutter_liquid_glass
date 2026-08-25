@@ -106,18 +106,22 @@ float sdfSquircle(
 }
 
 float sdfEllipse(vec2 p, vec2 r) {
+    // Flutter's Impeller oval SDF uses a fixed five-step Newton solve. The
+    // former closed-form approximation divided by |p| near the center,
+    // producing a zero/direction-dependent pinhole for non-circular ovals.
     r = max(r, 1e-4);
-    
-    vec2 invR = 1.0 / r;
-    vec2 invR2 = invR * invR;
-    
-    vec2 pInvR = p * invR;
-    float k1 = length(pInvR);
-    
-    vec2 pInvR2 = p * invR2;
-    float k2 = length(pInvR2);
-    
-    return (k1 * (k1 - 1.0)) / max(k2, 1e-4);
+    p = abs(p);
+    vec2 q = r * (p - r);
+    float angle = q.x < q.y ? 1.570796327 : 0.0;
+    for (int i = 0; i < 5; i++) {
+        vec2 cs = vec2(cos(angle), sin(angle));
+        vec2 u = r * cs;
+        vec2 v = r * vec2(-cs.y, cs.x);
+        angle += dot(p - u, v) /
+            max(dot(p - u, u) + dot(v, v), 1e-6);
+    }
+    float distance = length(p - r * vec2(cos(angle), sin(angle)));
+    return dot(p / r, p / r) > 1.0 ? distance : -distance;
 }
 
 float smoothUnion(float d1, float d2, float k) {

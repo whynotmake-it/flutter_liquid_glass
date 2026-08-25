@@ -325,7 +325,7 @@ class SettingsSheet extends HookWidget {
                               settings.copyWith(saturation: value),
                         ),
                         _SettingsSlider(
-                          label: 'Edge refraction',
+                          label: 'Peak displacement (px)',
                           value: settings.edgeRefraction,
                           min: 0,
                           max: 160,
@@ -333,7 +333,7 @@ class SettingsSheet extends HookWidget {
                               settings.copyWith(edgeRefraction: value),
                         ),
                         _SettingsSlider(
-                          label: 'Refraction spread',
+                          label: 'Face reach',
                           value: settings.refractionSpread,
                           min: 0,
                           max: 1,

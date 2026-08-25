@@ -81,13 +81,13 @@ class LiquidGlassSettings with Equatable {
   /// Optical profile depth in logical pixels.
   final double thickness;
 
-  /// Peak edge displacement expressed as the additive optical index strength.
-  /// This is solved to the internal index only when settings change.
+  /// Peak edge displacement in logical pixels at the optical rim. The
+  /// renderer solves the internal optical index from this value.
   final double edgeRefraction;
 
-  /// Extends the SDF optical profile into the face. `0` is the normal edge
-  /// glass profile; `1` evaluates the profile across the full face. This is a
-  /// profile/refractive-field control, not a uniform backdrop zoom.
+  /// Face reach of the SDF optical profile. `0` keeps the optical slope at the
+  /// physical edge thickness; `1` carries the eased slope across the full
+  /// face. This is a profile/refractive-field control, not a backdrop zoom.
   final double refractionSpread;
 
   /// Backdrop frost/softening radius.
@@ -129,9 +129,9 @@ class LiquidGlassSettings with Equatable {
   double get effectiveContourStrength => contourStrength * visibility;
   double get effectiveContourWidth => contourWidth * visibility;
 
-  /// Internal index used by the legacy refract() field. The public value is
-  /// peak displacement, so it remains observable and comparable across sizes.
-  double get effectiveRefractiveIndex {
+  /// Internal optical index derived from the public peak displacement. The
+  /// public value remains observable and comparable across sizes.
+  double get effectiveOpticalIndex {
     final depth = effectiveThickness;
     if (depth <= 0 || effectiveEdgeRefraction <= 0) return 1.0;
     final ratio = effectiveEdgeRefraction / (8.0 * depth);

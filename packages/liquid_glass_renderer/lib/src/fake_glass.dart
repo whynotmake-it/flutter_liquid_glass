@@ -283,8 +283,8 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   ui.ImageFilter? _getColorFilter(LiquidGlassSettings settings) {
-    final glassColor = settings.effectiveTint;
-    if (settings.effectiveSaturation == 1 && glassColor.a == 0) {
+    final tintColor = settings.effectiveTint;
+    if (settings.effectiveSaturation == 1 && tintColor.a == 0) {
       return null;
     }
     if (ui.ImageFilter.isShaderFilterSupported) {
@@ -293,7 +293,7 @@ class _RenderFakeGlass extends RenderProxyBox {
         // uSize (vec2)
         value
           ..setSize(size)
-          ..setColor(glassColor)
+          ..setColor(tintColor)
           ..setFloat(settings.effectiveSaturation);
       });
       return ui.ImageFilter.shader(_colorShader);

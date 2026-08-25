@@ -195,10 +195,13 @@ def is_monotonic(values: list[float], tolerance: float = 0.051) -> bool:
     )
 
 
-def interpret_curve(values: list[float], label: str) -> dict:
+def interpret_curve(values: list[float], label: str = "curve") -> dict:
     spread = max(values) - min(values)
     monotonic = is_monotonic(values)
-    if monotonic and spread >= 0.02:
+    if spread < 0.02:
+        status = "rejected"
+        reason = f"fitted {label} does not materially respond to Tint Amount"
+    elif monotonic:
         status = "confirmed"
         reason = f"fitted {label} varies monotonically with Tint Amount"
     else:

@@ -31,7 +31,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'edgeRefraction',
       8.0 * number('thickness', defaults.thickness) *
           math.sqrt(math.max(0.0, math.pow(
-            number('refractiveIndex', defaults.effectiveRefractiveIndex),
+            number('refractiveIndex', defaults.effectiveOpticalIndex),
             2,
           ).toDouble() - 1.0)),
     ),
