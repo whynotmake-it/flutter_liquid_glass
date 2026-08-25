@@ -53,26 +53,33 @@ presets), performance non-regressing.
   shader) — prior art for the new model design
 
 ## Current renderer pipeline (as-is)
-- render.glsl: getHeight(sd,thickness) circular arc profile; calculateLighting
-  main+opposite(0.8) dual directional rim; refract() displacement; CA 3-sample path
-- liquid_glass_final_render.frag uniforms: uOpticalProps(RI,CA,thickness),
-  uLightConfig(intensity,ambient,saturation), uHighlightColor, uEdgeColor,
-  uOuterContour*, uSpecularConfig(edgeWidth,edgeInset,bleed,wrap), uMaterialConfig
-  (transmissionGamma,vibrancy), uFaceShading*, uInnerShadow* trio, uGlassColor
-- Settings has 25 knobs (see liquid_glass_settings.dart)
+- `gpu/geometry_fragment.glsl`: shared SDF geometry matte, generalized profile
+  reach, cached displacement encoding, and the existing one-pass `refract()`
+  field; the narrow profile remains the `refractionSpread == 0` special case.
+- `liquid_glass_final_render.frag`: one backdrop sample path (three channel
+  samples only when chromatic aberration is non-zero), unified tint/transmission
+  transform, paired directional highlights, and an SDF-derived dark contour.
+- `LiquidGlassSettings` exposes the evidence-gated vector: visibility, tint,
+  thickness, edgeRefraction, refractionSpread, frost, chromaticAberration,
+  saturation, transmissionGamma, vibrancy, highlight, contourStrength, and
+  contourWidth. Legacy face-shading, independent rim, and inner-shadow weights
+  are not shipped.
 
 ## Execution order
 - [x] Orientation complete
 - [~] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score pending simulator recovery
-- [ ] 2. Perf baseline (before any renderer change)
+- [x] 2. Perf baseline captured; final same-runner before/after ratio remains open
 - [x] 3. New model design doc (mapping Apple layers → our stages)
 - [x] 4. Implement: shaders + Settings + Dart pipeline + match-app mapping + optimizer stages
 - [~] 5. Re-fit toolbar/small/large/holdout + loupe + slider {0,.5,1}; generalization evidence is partial
 - [ ] 6. Perf after-audit
-- [ ] 7. Example app: sidebar, ≥4 backgrounds, YAML presets in docs dir, seed presets
-- [ ] 8. Tests (settings model, YAML round-trip), analyzer clean
-- [ ] 9. README rewrite + final scorecard commit
+- [x] 7. Example app: sidebar, ≥4 backgrounds, YAML presets in docs dir, seed presets
+- [x] 8. Tests (settings model, YAML round-trip), analyzer clean
+- [x] 9. README rewrite + current evidence ledger committed; final scorecard remains open
 - [ ] 10. Gate audit vs contract → complete_goal
 
 ## Progress log
 - 2026-08-25: goal activated; env verified; venv built; orientation reads done.
+- 2026-08-25: clear loupe example composition verified in both entry points;
+  focused example tests/analyzer pass. Simulator service remains unavailable,
+  so fresh pinned loupe and slider evidence is still pending.
