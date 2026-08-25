@@ -2,9 +2,10 @@
 
 ## Status
 
-**Active multi-hour goal; not complete.** The renderer has **not** yet been
-redesigned. Current work established the research model, added a deterministic
-iOS 27 loupe reference scene, and started measuring the pre-redesign baseline.
+**Active multi-hour goal; not complete.** The renderer has been moved onto the
+unified material vector and the example loupe now uses a clear pre-shader
+composition. The remaining work is evidence closure: pinned loupe capture,
+full performance/transparency audit, and final gate-by-gate verification.
 
 Read these companion files first:
 
@@ -174,7 +175,9 @@ now because it would silently change all previously fitted field curves.
 - `hotloop_staged.py`
   - Added `--scene-id`; default remains `toolbar_capsule`.
 
-No shipped renderer code has been changed yet.
+Shipped renderer code now contains the unified material vector and cached
+size-normalized frost mapping; the harness-only loupe composition is kept out
+of the renderer shader.
 
 ## Loupe capture evidence
 
@@ -460,6 +463,11 @@ The active renderer/example state is now:
 - `melos run analyze`, `melos run test-without-goldens`, focused harness tests,
   package GPU tests, and comparator tests pass with the pinned Flutter 3.47.1
   toolchain.
+- The example's focused basic-app/YAML/loupe tests pass (6 tests), and both
+  `flutter build apk --debug` and `flutter build macos --profile` succeed with
+  Impeller/Flutter GPU enabled. The macOS benchmark ratio gate is still open;
+  existing benchmark artifacts are historical evidence, not a fresh before /
+  after pair for this exact final state.
 
 The final loupe capture/fit must use Xcode 27.0 beta 5 and the pinned UDID. On
 the latest attempt CoreSimulatorService became unavailable; no other simulator

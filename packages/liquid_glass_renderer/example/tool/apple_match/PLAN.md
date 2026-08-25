@@ -31,7 +31,9 @@ presets), performance non-regressing.
    preset persistence
 
 ## Environment facts
-- Pinned sim BOOTED: AppleMatch-iPhone17Pro-iOS27 DB4F41F3-1C36-476D-B775-AFDC3686C75B
+- Pinned sim configured: AppleMatch-iPhone17Pro-iOS27 DB4F41F3-1C36-476D-B775-AFDC3686C75B
+  (CoreSimulatorService was unavailable during the latest capture retry; do not
+  replace it or close unrelated simulators.)
 - Xcode-27.0.0-Beta.5.app installed; DEVELOPER_DIR needed for builds
 - compare/.venv READY (numpy/opencv/jsonschema + Pillow/scipy added)
 - flutter: /Users/tim/fvm/default/bin/flutter
@@ -42,8 +44,10 @@ presets), performance non-regressing.
 - Optimizer stages: hotloop_staged.py STAGES dict (line 35+)
 - Score = 100×(1−weighted err): appearance 30% / radial-flow 25% / edge 15% /
   specular(black probe) 15% / tint(white probe) 15%
-- Current bests: toolbar 85.8822; holdout tab bar 33.4020 (unfitted); frozen-RI
-  REJECTED (small capsule flow err 1.5× toolbar)
+- Current evidence: toolbar 91.7814; small capsule 86.3452; large capsule
+  80.6343; tab-bar holdout 43.0289 after adding deterministic harness-only
+  foreground; paired A/B flow metric is now authoritative. A fresh pinned
+  loupe composition score and final performance ratio remain open.
 - preapproved_renderer_baseline.json = richer fresnel/caustics/env-light forward
   model (prior sign-off artifact, only consumed by generalization.py; NOT in shipped
   shader) — prior art for the new model design

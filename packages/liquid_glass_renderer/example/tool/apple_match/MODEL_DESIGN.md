@@ -28,7 +28,7 @@ Material knobs on `LiquidGlassSettings`:
 | Knob | Replaces | Evidence gate |
 |---|---|---|
 | `thickness` | (kept) | discrete per control size in harness fits |
-| `edgeRefraction` | `refractiveIndex` | frozen-RI rejection; amplitude fits pending |
+| `edgeRefraction` | `refractiveIndex` | shared toolbar/small/large fits now use the observable peak displacement |
 | `refractionSpread` | (new) | SDF profile reach for ordinary glass; loupe magnification is composed before the shader and never uses this as a zoom control |
 | `frost` | `blur` | size-normalized blur fit on toolbar + small capsule |
 | `tint` (Color) | `glassColor` | tintColor stage gains on ≥2 scenes |

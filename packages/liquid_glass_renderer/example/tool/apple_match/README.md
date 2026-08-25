@@ -258,7 +258,7 @@ to the toolbar, but the small capsule's flow and combined errors were more than
 rejected for the complete control set. Thickness is discrete in this sample
 (8 for the small control, 6 for medium and large), not linear with size.
 
-## Verified iOS 27 result
+## Historical verified iOS 27 result
 
 The checked reference set was captured from:
 
@@ -269,7 +269,7 @@ The checked reference set was captured from:
 - portrait, light appearance, large content size, Reduce Motion enabled,
   Reduce Transparency disabled
 
-The baseline scored **52.2076**. The best of the 24 fixed candidates scored
+The pre-redesign baseline scored **52.2076**. The best of the 24 fixed candidates scored
 **85.8822**, an absolute gain of **33.6746** and a relative gain of
 **64.5013% ± 0.0000%** across three identical captured frames. Best settings:
 
@@ -364,7 +364,8 @@ edge refraction and lighting without magnifying filtered shader pixels.
 
 The current pinned toolbar run (canonical settings, after removing the
 center-relative affine lens and the unused legacy shader path) scores
-**91.3479** overall. Its four probe captures and diagnostics are in
+**91.7814** overall under the corrected paired A/B optical-flow metric. Its
+four probe captures and diagnostics are in
 `out/visual-current-source/`, including the black-background `C_1.png` and
 white-background `D_1.png` lighting checks. The geometry field retains the
 validated circular-cap profile; the oval SDF now uses Flutter Impeller's
