@@ -241,6 +241,7 @@ class BasicApp extends HookWidget {
                     );
                   },
                   label: '',
+                  loupeMagnification: 1.1,
                 ),
                 tabs: [
                   LiquidGlassBottomBarTab(

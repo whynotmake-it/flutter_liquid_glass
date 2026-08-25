@@ -162,12 +162,20 @@ class LiquidGlassBottomBarExtraButton {
     required this.onTap,
     required this.label,
     this.size = 64,
+    this.loupeMagnification = 1.0,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String label;
   final double size;
+
+  /// Optional example-only backdrop magnification for a loupe button.
+  ///
+  /// The neutral default keeps ordinary bottom-bar buttons in the shared
+  /// grouped glass pass. Values above one opt into a separate pre-shader
+  /// magnifier and glass layer.
+  final double loupeMagnification;
 }
 
 class _BottomBarTab extends StatelessWidget {
@@ -286,28 +294,55 @@ class _ExtraButtonState extends State<_ExtraButton> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
+    final loupeMagnification = widget.config.loupeMagnification;
+    assert(loupeMagnification >= 1.0);
+    final icon = Center(
+      child: Icon(
+        widget.config.icon,
+        size: 24,
+        color: theme.textTheme.textStyle.color,
+      ),
+    );
+
+    final button = loupeMagnification > 1.0
+        ? SizedBox.square(
+            dimension: widget.config.size,
+            child: Stack(
+              children: [
+                RawMagnifier(
+                  size: Size.square(widget.config.size),
+                  magnificationScale: loupeMagnification,
+                  decoration: const MagnifierDecoration(
+                    shape: CircleBorder(),
+                  ),
+                ),
+                // A shared grouped pass cannot sample a sibling magnifier.
+                // Keep this explicit loupe composition independent, and use
+                // the bar's material settings with blur disabled so the
+                // magnifier's clipped backdrop does not bleed at the rim.
+                LiquidGlass.withOwnLayer(
+                  fake: widget.fake,
+                  settings: LiquidGlassSettings.of(
+                    context,
+                  ).copyWith(frost: 0, refractionSpread: 0),
+                  shape: const LiquidOval(),
+                  child: GlassGlow(child: icon),
+                ),
+              ],
+            ),
+          )
+        : LiquidGlass.grouped(
+            shape: const LiquidOval(),
+            child: GlassGlow(child: icon),
+          );
+
     return GestureDetector(
       onTap: widget.config.onTap,
       child: LiquidStretch(
         child: Semantics(
           button: true,
           label: widget.config.label,
-          child: LiquidGlass.grouped(
-            shape: const LiquidOval(),
-            child: GlassGlow(
-              child: Container(
-                height: widget.config.size,
-                width: widget.config.size,
-                child: Center(
-                  child: Icon(
-                    widget.config.icon,
-                    size: 24,
-                    color: theme.textTheme.textStyle.color,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: button,
         ),
       ),
     );

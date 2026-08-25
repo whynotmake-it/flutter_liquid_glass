@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer_example/basic_app.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
+import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 const _useTestBackground = bool.fromEnvironment(
@@ -39,6 +40,18 @@ void main() {
     expect(find.text('Close'), findsOneWidget);
     expect(find.text('Save current'), findsOneWidget);
     expect(find.text('Refresh'), findsOneWidget);
+    expect(find.text('REAL'), findsNothing);
+    expect(find.text('FAKE'), findsNothing);
+  });
+
+  testWidgets('loupe page uses the pre-shader magnifier composition', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const CupertinoApp(home: LoupeExamplePage()));
+    await tester.pump();
+
+    expect(find.text('Loupe composition'), findsOneWidget);
+    expect(find.byType(RawMagnifier), findsOneWidget);
   });
 
   test('all example platforms enable Impeller and Flutter GPU', () {

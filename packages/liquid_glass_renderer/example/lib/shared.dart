@@ -102,37 +102,41 @@ class ExampleLoupe extends StatelessWidget {
     this.size = const Size(116, 86),
     this.magnificationScale = 1.55,
     this.alignment = Alignment.center,
+    this.focalPointOffset = Offset.zero,
   });
 
   final LiquidGlassSettings settings;
   final Size size;
   final double magnificationScale;
   final Alignment alignment;
+  final Offset focalPointOffset;
 
   @override
   Widget build(BuildContext context) {
+    assert(magnificationScale >= 1.0);
     final radius = BorderRadius.circular(size.height / 2);
-    return Stack(
-      children: [
-        Align(
-          alignment: alignment,
-          child: RawMagnifier(
-            size: size,
-            magnificationScale: magnificationScale,
-            decoration: MagnifierDecoration(
-              shape: RoundedRectangleBorder(borderRadius: radius),
+    return Align(
+      alignment: alignment,
+      child: SizedBox.fromSize(
+        size: size,
+        child: Stack(
+          children: [
+            RawMagnifier(
+              size: size,
+              magnificationScale: magnificationScale,
+              focalPointOffset: focalPointOffset,
+              decoration: MagnifierDecoration(
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
             ),
-          ),
+            LiquidGlass.withOwnLayer(
+              settings: settings,
+              shape: LiquidRoundedRectangle(borderRadius: size.height / 2),
+              child: GlassGlow(child: const SizedBox.expand()),
+            ),
+          ],
         ),
-        Align(
-          alignment: alignment,
-          child: LiquidGlass.withOwnLayer(
-            settings: settings,
-            shape: LiquidRoundedRectangle(borderRadius: size.height / 2),
-            child: SizedBox.fromSize(size: size),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -152,7 +156,8 @@ class LoupeExamplePage extends StatelessWidget {
           const Positioned.fill(child: Grid()),
           Center(
             child: ExampleLoupe(
-              settings: const LiquidGlassSettings.ios27ToolbarLight(),
+              settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+              focalPointOffset: const Offset(0, 64),
             ),
           ),
         ],
