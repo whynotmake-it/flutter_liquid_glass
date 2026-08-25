@@ -28,9 +28,11 @@ const _clearLoupeSettings = LiquidGlassSettings(
   saturation: 1,
   transmissionGamma: 1,
   vibrancy: 0,
-  highlight: 0.5,
-  contourStrength: 0.1,
-  contourWidth: 1,
+  // Keep only a hairline dielectric rim. The lens body must remain the
+  // magnified backdrop, not a translucent white fill.
+  highlight: 0.25,
+  contourStrength: 0.08,
+  contourWidth: 0.75,
 );
 
 class VerticalStripes extends StatelessWidget {
@@ -150,7 +152,9 @@ class ExampleLoupe extends StatelessWidget {
             LiquidGlass.withOwnLayer(
               settings: settings,
               shape: LiquidRoundedRectangle(borderRadius: size.height / 2),
-              child: GlassGlow(child: const SizedBox.expand()),
+              // There is intentionally no child fill or glow here: Apple’s
+              // loupe is a clear magnified lens with only its edge optics.
+              child: const SizedBox.expand(),
             ),
           ],
         ),

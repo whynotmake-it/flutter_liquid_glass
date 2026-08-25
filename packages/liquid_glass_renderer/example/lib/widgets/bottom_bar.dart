@@ -322,16 +322,22 @@ class _ExtraButtonState extends State<_ExtraButton> {
                 // magnifier's clipped backdrop does not bleed at the rim.
                 LiquidGlass.withOwnLayer(
                   fake: widget.fake,
-                  settings: LiquidGlassSettings.of(
-                    context,
-                  ).copyWith(
-                    tint: const Color.fromARGB(0, 255, 255, 255),
-                    frost: 0,
-                    refractionSpread: 0,
-                    saturation: 1,
-                    transmissionGamma: 1,
-                    vibrancy: 0,
-                  ),
+                  settings:
+                      LiquidGlassSettings.of(
+                        context,
+                      ).copyWith(
+                        tint: const Color.fromARGB(0, 255, 255, 255),
+                        frost: 0,
+                        refractionSpread: 0,
+                        saturation: 1,
+                        transmissionGamma: 1,
+                        vibrancy: 0,
+                        // A clear loupe has no face fill; retain only a subtle
+                        // edge rim around the pre-shader magnified backdrop.
+                        highlight: 0.25,
+                        contourStrength: 0.08,
+                        contourWidth: 0.75,
+                      ),
                   shape: const LiquidOval(),
                   child: GlassGlow(child: icon),
                 ),
