@@ -111,3 +111,6 @@ presets), performance non-regressing.
   derives the actual search axes, and emits a self-describing summary and best
   scorecard. The historical shader-level S0 is explicitly retired. No seed
   scan was run while CoreSimulatorService was unavailable.
+- 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
+  with its evidence-scene scope in the shipped API documentation; `visibility`
+  is explicitly marked as a transition utility rather than a fit knob.

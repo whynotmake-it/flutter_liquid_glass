@@ -73,45 +73,75 @@ class LiquidGlassSettings with Equatable {
   }
 
   /// Transition multiplier used by the compositing layer.
+  ///
+  /// This is an API transition utility, not a material-fit axis; it has no
+  /// scene-specific looks claim.
   final double visibility;
 
   /// Unified material tint. Alpha is the material's opacity/transmission axis.
+  ///
+  /// Evidence scope: toolbar, small capsule, and tab-bar holdout.
   final Color tint;
 
   /// Optical profile depth in logical pixels.
+  ///
+  /// Evidence scope: toolbar plus small and large capsule fits.
   final double thickness;
 
   /// Peak edge displacement in logical pixels at the optical rim. The
   /// renderer solves the internal optical index from this value.
+  ///
+  /// Evidence scope: toolbar plus small and large capsule fits.
   final double edgeRefraction;
 
   /// Face reach of the SDF optical profile. `0` keeps the optical slope at the
   /// physical edge thickness; `1` carries the eased slope across the full
   /// face. This is a profile/refractive-field control, not a backdrop zoom.
+  ///
+  /// Evidence scope: toolbar, small capsule, and tab-bar holdout; it must not
+  /// be used as a loupe magnification control.
   final double refractionSpread;
 
   /// Backdrop frost/softening radius.
+  ///
+  /// Evidence scope: toolbar and small capsule, with size normalization
+  /// derived internally for smaller controls.
   final double frost;
 
   /// Wavelength separation for the edge displacement.
+  ///
+  /// Evidence scope: toolbar plus at least one capsule or holdout before this
+  /// axis is treated as a stable public control.
   final double chromaticAberration;
 
   /// Saturation applied to transmitted backdrop content.
+  ///
+  /// Evidence scope: toolbar plus capsule or holdout.
   final double saturation;
 
   /// Display-referred transfer applied to transmitted content.
+  ///
+  /// Evidence scope: toolbar plus capsule or holdout.
   final double transmissionGamma;
 
   /// Backdrop-aware chroma lift.
+  ///
+  /// Evidence scope: toolbar plus capsule or holdout.
   final double vibrancy;
 
   /// Strength of the paired directional highlight lobe.
+  ///
+  /// Evidence scope: black/white toolbar plus capsule.
   final double highlight;
 
   /// Strength of the dark dielectric contour derived from the SDF.
+  ///
+  /// Evidence scope: white-background toolbar plus capsule.
   final double contourStrength;
 
   /// Width of the dielectric contour in logical pixels.
+  ///
+  /// Evidence scope: white-background toolbar plus capsule.
   final double contourWidth;
 
   Color get effectiveTint => tint.withValues(alpha: tint.a * visibility);
