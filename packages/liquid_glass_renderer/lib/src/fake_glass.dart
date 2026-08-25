@@ -350,22 +350,22 @@ class _RenderFakeGlass extends RenderProxyBox {
     );
 
     final lightIntensity = settings.effectiveHighlight.clamp(0.0, 1.0);
-    const ambientStrength = 0.0;
-    const specularWrap = 0.25;
+    const ambientLift = 0.0;
+    const highlightWrap = 0.25;
 
     final highlightAlpha = Curves.easeOut.transform(lightIntensity) * 0.78;
-    final highlightColor = const Color.fromARGB(255, 255, 255, 255).withValues(
-      // effectiveLightIntensity already includes highlight alpha and
-      // visibility; multiplying by effectiveHighlightColor.a again would
+    final highlightPaint = const Color.fromARGB(255, 255, 255, 255).withValues(
+      // The derived highlight already includes visibility; multiplying by
+      // another tint alpha here would
       // unintentionally square both controls on the fake path.
       alpha: highlightAlpha,
     );
-    final edgeColor = const Color.fromARGB(255, 0, 0, 0).withValues(
+    final contourPaint = const Color.fromARGB(255, 0, 0, 0).withValues(
       alpha: settings.effectiveContourStrength.clamp(0.0, 1.0),
     );
 
-    final softEdgeColor = edgeColor.withValues(
-      alpha: edgeColor.a * ui.lerpDouble(0.9, 1.0, ambientStrength)!,
+    final softContourPaint = contourPaint.withValues(
+      alpha: contourPaint.a * ui.lerpDouble(0.9, 1.0, ambientLift)!,
     );
 
     const rad = math.pi / 2;
@@ -373,7 +373,7 @@ class _RenderFakeGlass extends RenderProxyBox {
     final y = math.sin(rad);
 
     // How far the light covers the glass, used to adjust the gradient stops
-    final lightCoverage = ui.lerpDouble(.12, .5, specularWrap)!;
+    final lightCoverage = ui.lerpDouble(.12, .5, highlightWrap)!;
 
     // How perpendicular we are to the shortest side of the box, 1 means the
     // light is hitting the shortest side directly, 0 means it's hitting the
@@ -405,10 +405,10 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final shader = LinearGradient(
       colors: [
-        highlightColor,
-        softEdgeColor,
-        softEdgeColor,
-        highlightColor,
+        highlightPaint,
+        softContourPaint,
+        softContourPaint,
+        highlightPaint,
       ],
       stops: [
         inset,
@@ -422,7 +422,7 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final paint = Paint()
       ..shader = shader
-      ..color = highlightColor
+      ..color = highlightPaint
       ..style = PaintingStyle.stroke
       ..strokeWidth = settings.effectiveContourWidth > 0
           ? settings.effectiveContourWidth
@@ -432,9 +432,9 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final overlay = Paint()
       ..shader = shader
-      ..color = highlightColor.withValues(
+      ..color = highlightPaint.withValues(
         alpha:
-            highlightColor.a *
+            highlightPaint.a *
             0.45 *
             0.375,
       )

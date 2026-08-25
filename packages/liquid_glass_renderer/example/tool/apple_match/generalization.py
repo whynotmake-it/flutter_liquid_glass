@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test shared refractive index/profile across differently sized controls."""
+"""Test shared canonical material fields across differently sized controls."""
 
 import argparse
 import json
@@ -63,11 +63,22 @@ def save_evidence(directory, settings, evaluator, reference):
     )
 
 
-def axes_for(scene):
+def axes_for(scene, quick=False):
     shape = scene["shape"]
     width = float(shape["width"])
     height = float(shape["height"])
     radius = float(shape["cornerRadius"])
+    if quick:
+        # A bounded smoke fit for pinned-device CI and handoff validation.
+        # It still exercises the shared-vector constraint while avoiding the
+        # full coordinate-descent neighborhood used for a final fit.
+        return {
+            "shapeWidth": [width],
+            "shapeHeight": [height],
+            "shapeOffsetX": [0.0],
+            "shapeOffsetY": [0.0],
+            "cornerRadius": [radius],
+        }
     return {
         "shapeWidth": [width - 4, width - 1.333, width, width + 2],
         "shapeHeight": [
@@ -128,7 +139,7 @@ def run_scene(*, scene_id, base, args, out, fit):
             geometry = coordinate_descent(
                 shape_loss,
                 initial,
-                axes_for(scene),
+                axes_for(scene, args.quick),
                 max_iters=args.max_iters,
                 min_improvement=0.02,
             )
@@ -152,7 +163,11 @@ def run_scene(*, scene_id, base, args, out, fit):
             optics = coordinate_descent(
                 optics_loss,
                 best_params,
-                {"thickness": [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]},
+                {
+                    "thickness": [best_params["thickness"]]
+                    if args.quick
+                    else [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]
+                },
                 max_iters=args.max_iters,
                 min_improvement=0.02,
             )
@@ -192,17 +207,22 @@ def main():
     parser.add_argument(
         "--settings",
         type=Path,
-        default=ROOT / "out/approved-highlight/final/settings.json",
+        default=ROOT / "settings/baseline.json",
     )
     parser.add_argument(
         "--toolbar-card",
         type=Path,
-        default=ROOT / "out/exterior-shadow-fit/final/scorecard.json",
+        default=ROOT / "out/redesign-refraction/stages/refraction/best/scorecard.json",
         help="Toolbar scorecard used only for the relative comparability gate.",
     )
     parser.add_argument("--out", type=Path, default=ROOT / "out/generalization")
     parser.add_argument("--holdout-card", type=Path)
     parser.add_argument("--max-iters", type=int, default=2)
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Run one pinned smoke evaluation per geometry scene.",
+    )
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
@@ -211,13 +231,21 @@ def main():
     shared = {
         key: base[key]
         for key in (
-            "refractiveIndex",
             "shapeProfile",
-            "blur",
-            "glassAlpha",
+            "edgeRefraction",
+            "refractionSpread",
+            "frost",
+            "tintRed",
+            "tintGreen",
+            "tintBlue",
+            "tintAlpha",
             "saturation",
-            "lightAngle",
-            "lightIntensity",
+            "transmissionGamma",
+            "vibrancy",
+            "chromaticAberration",
+            "highlight",
+            "contourStrength",
+            "contourWidth",
         )
     }
     out = args.out.resolve()
@@ -248,8 +276,12 @@ def main():
         )
 
     toolbar_card = json.loads(args.toolbar_card.resolve().read_text())
+    toolbar_settings = toolbar_card.get("settings", {})
     points = [
-        (94.0, 6.0),
+        (
+            float(toolbar_settings.get("shapeHeight", 94.0)),
+            float(toolbar_settings.get("thickness", 12.0)),
+        ),
         *[
             (
                 results[scene_id]["settings"]["shapeHeight"],
@@ -265,10 +297,10 @@ def main():
         np.sqrt(np.mean((thicknesses - (slope * heights + intercept)) ** 2))
     )
     comparable = all(
-        results[scene_id]["errors"]["flow"] <= toolbar_card["errors"]["flow"] * 1.5
-        and results[scene_id]["errors"]["shape"] <= toolbar_card["errors"]["shape"] * 1.5
+        results[scene_id]["errors"]["flow"] <= toolbar_card["errors"]["flow"] * 1.25
+        and results[scene_id]["errors"]["shape"] <= toolbar_card["errors"]["shape"] * 1.25
         and results[scene_id]["errors"]["combined"]
-        <= toolbar_card["errors"]["combined"] * 1.5
+        <= toolbar_card["errors"]["combined"] * 1.25
         for scene_id in TRAINING_SCENES
     )
     unique_thicknesses = sorted(set(float(value) for value in thicknesses))
@@ -282,8 +314,8 @@ def main():
         "toolbar": {
             "score": toolbar_card["score"],
             "errors": toolbar_card["errors"],
-            "height": 94.0,
-            "thickness": 6.0,
+            "height": float(toolbar_settings.get("shapeHeight", 94.0)),
+            "thickness": float(toolbar_settings.get("thickness", 12.0)),
         },
         "controls": {
             scene_id: {

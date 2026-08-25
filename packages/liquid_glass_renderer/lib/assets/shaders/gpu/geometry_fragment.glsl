@@ -41,8 +41,19 @@ void main() {
     // orientation, including Flutter GPU passes on GLES.
     vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
-    SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
-    float sd = scene.distance;
+    float spread = clamp(uRefractionSpread, 0.0, 1.0);
+    // The normal material has no face-spread lens. Keep its established SDF
+    // path free of the loupe metadata traversal; the extra shape metadata is
+    // only needed by controls that explicitly opt into refraction spread.
+    bool hasFaceSpread = spread > 0.001;
+    SceneSample scene;
+    float sd;
+    if (hasFaceSpread) {
+        scene = sceneSample(fragCoord, int(uNumShapes));
+        sd = scene.distance;
+    } else {
+        sd = sceneSDF(fragCoord, int(uNumShapes));
+    }
 
     // Match Flutter 3.47's centered signed-distance antialiasing: the
     // coverage transition is half a physical pixel on either side of the
@@ -73,8 +84,9 @@ void main() {
     // Spread extends the same circular edge profile toward the shape's
     // center. Its reach is shape-relative, so thickness cannot accidentally
     // become a proxy for coverage on large lenses.
-    float spread = clamp(uRefractionSpread, 0.0, 1.0);
-    float reach = mix(uThickness, max(uThickness, scene.halfMinor), spread);
+    float reach = hasFaceSpread
+        ? mix(uThickness, max(uThickness, scene.halfMinor), spread)
+        : uThickness;
     float inwardDistance = max(-surfaceSd, 0.0);
     float profileX = min(inwardDistance, reach);
     float normalizedProfile = profileX / max(reach, 0.001);
@@ -97,10 +109,19 @@ void main() {
     // the circular edge refraction. Blend it only with spread; spread=0 keeps
     // the established toolbar path unchanged. The field is center-relative,
     // so it generalizes across capsules without another pass or texture.
-    float edgePeak = 8.0 * uThickness * sqrt(max(uRefractiveIndex * uRefractiveIndex - 1.0, 0.0));
-    float lensGain = clamp(edgePeak / max(scene.halfMajor, 0.001), 0.0, 0.9);
-    vec2 affineLens = -(fragCoord - scene.center) * lensGain;
-    vec2 displacement = mix(refractedDisplacement, affineLens, spread);
+    vec2 displacement = refractedDisplacement;
+    if (hasFaceSpread) {
+        float edgePeak = 8.0 * uThickness * sqrt(
+            max(uRefractiveIndex * uRefractiveIndex - 1.0, 0.0)
+        );
+        float lensGain = clamp(
+            edgePeak / max(scene.halfMajor, 0.001),
+            0.0,
+            0.9
+        );
+        vec2 affineLens = -(fragCoord - scene.center) * lensGain;
+        displacement = mix(refractedDisplacement, affineLens, spread);
+    }
 
     float maxDisplacement = uThickness * 10.0;
     float edgeDistance = max(-sd, 0.0);

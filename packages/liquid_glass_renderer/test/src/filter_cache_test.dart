@@ -27,6 +27,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(glass());
       await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
 
       final renderObject = findLayer(tester);
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
@@ -51,6 +52,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(glass());
       await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
 
       final renderObject = findLayer(tester);
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
@@ -80,6 +82,7 @@ void main() {
 
       await tester.pumpWidget(movedGlass(Offset.zero));
       await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
 
       final renderObject = findLayer(tester);
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
@@ -104,6 +107,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(glass());
       await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
 
       final renderObject = findLayer(tester);
       expect(renderObject.debugBackdropFilterLayer, isNotNull);
@@ -141,6 +145,7 @@ void main() {
 
       await tester.pumpWidget(movedGlass(Offset.zero));
       await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
 
       final renderObject = findLayer(tester);
       final matteBounds = renderObject.debugGeometryMatteBounds;

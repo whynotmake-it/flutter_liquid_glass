@@ -56,6 +56,20 @@ class FlutterGpuGeometryRenderer {
       1000.0;
 
   static Future<FlutterGpuGeometryRenderer> fromAsset(String assetKey) async {
+    final cachedResources = _resolvedAssetResources[assetKey];
+    if (cachedResources != null) {
+      try {
+        return FlutterGpuGeometryRenderer._fromShared(cachedResources);
+      } on Object {
+        // A recreated Android surface can invalidate native resources that
+        // were resolved before the context loss. Let the next layer reload
+        // the immutable bundle instead of retaining a poisoned fast path.
+        if (identical(_resolvedAssetResources[assetKey], cachedResources)) {
+          _resolvedAssetResources.remove(assetKey);
+        }
+        rethrow;
+      }
+    }
     final resourcesFuture = _assetResources[assetKey] ??= () async {
       final library = await gpu.ShaderLibrary.fromAsset(assetKey);
       final vertexShader = library?['GeometryVertex'];
@@ -72,7 +86,13 @@ class FlutterGpuGeometryRenderer {
       );
     }();
     try {
-      return FlutterGpuGeometryRenderer._fromShared(await resourcesFuture);
+      final resources = await resourcesFuture;
+      final renderer = FlutterGpuGeometryRenderer._fromShared(resources);
+      _resolvedAssetResources[assetKey] = resources;
+      if (identical(_assetResources[assetKey], resourcesFuture)) {
+        _assetResources.remove(assetKey);
+      }
+      return renderer;
     } on Object {
       // A transiently unavailable GPU context must not poison all later layer
       // initialization attempts with the same cached failed Future.
@@ -84,6 +104,8 @@ class FlutterGpuGeometryRenderer {
   }
 
   static final Map<String, Future<_SharedGeometryResources>> _assetResources =
+      {};
+  static final Map<String, _SharedGeometryResources> _resolvedAssetResources =
       {};
 
   /// One bump allocator for every geometry pass in the current frame.
