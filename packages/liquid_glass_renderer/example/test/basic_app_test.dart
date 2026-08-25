@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer_example/basic_app.dart';
+import 'package:liquid_glass_renderer_example/preset_store.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 const _useTestBackground = bool.fromEnvironment(
   'LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND',
@@ -35,5 +37,11 @@ void main() {
       expect(plist, contains('<key>FLTEnableImpeller</key>'));
       expect(plist, contains('<key>FLTEnableFlutterGPU</key>'));
     }
+  });
+
+  test('scalar YAML presets round-trip the unified material vector', () {
+    const settings = LiquidGlassSettings.ios27ToolbarLight();
+    final restored = PresetStore.fromYaml(PresetStore.toYaml(settings));
+    expect(restored.toJson(), settings.toJson());
   });
 }

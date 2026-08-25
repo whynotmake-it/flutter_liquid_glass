@@ -296,7 +296,14 @@ class FlutterGpuGeometryRenderer {
       refractiveIndex: refractiveIndex,
       refractionSpread: refractionSpread,
       displacementScale: displacementScale ??
-          math.max(1e-3, math.max(10.0 * thickness, 1.05 * refractionSpread)),
+          math.max(
+            1e-3,
+            math.max(
+              10.0 * thickness,
+              1.05 * 8.0 * thickness *
+                  math.sqrt(math.max(0.0, refractiveIndex * refractiveIndex - 1.0)),
+            ),
+          ),
       thickness: thickness,
       geometryAaHalfWidth: _geometryAaHalfWidth,
       numShapes: numShapes.toDouble(),

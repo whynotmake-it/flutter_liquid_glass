@@ -18,8 +18,14 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     number('${prefix}Alpha', fallback.a),
   );
   const defaults = LiquidGlassSettings();
+  final tint = settings['tint'] is num
+      ? Color((settings['tint']! as num).toInt())
+      : color(
+          'tint',
+          color('glass', defaults.tint),
+        );
   return LiquidGlassSettings(
-    tint: color('glass', defaults.tint),
+    tint: tint,
     thickness: number('thickness', defaults.thickness),
     edgeRefraction: number(
       'edgeRefraction',

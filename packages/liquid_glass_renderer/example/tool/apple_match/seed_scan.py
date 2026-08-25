@@ -71,26 +71,37 @@ def main() -> None:
     reference_dir = ROOT / "references" / REFERENCE_SET / scene["id"]
     reference = load_reference_probes(reference_dir, crop)
     base = json.loads(args.baseline.resolve().read_text())
+    # Every scene has its own logical shape. Never reuse the toolbar geometry
+    # for the loupe: doing so compares the right material against the wrong
+    # silhouette and makes the baseline meaningless.
+    shape = scene["shape"]
+    base.update(
+        {
+            "shapeWidth": shape["width"],
+            "shapeHeight": shape["height"],
+            "shapeOffsetX": 0.0,
+            "shapeOffsetY": 0.0,
+            "cornerRadius": shape["cornerRadius"],
+            "shapeProfile": "roundedRectangle",
+        }
+    )
 
     all_seeds = []
-    for alpha, blur, thickness, ri in itertools.product(
+    for alpha, frost, thickness, ri in itertools.product(
         [0.05, 0.12, 0.25, 0.4], [0.0, 2.0, 7.0], [12.0, 20.0, 28.0], [1.08, 1.2]
     ):
         seed = dict(base)
+        edge_refraction = 8.0 * thickness * (max(0.0, ri * ri - 1.0) ** 0.5)
         seed.update(
             {
-                "glassAlpha": alpha,
-                "blur": blur,
+                "tintAlpha": alpha,
+                "frost": frost,
                 "thickness": thickness,
-                "refractiveIndex": ri,
-                "edgeAlpha": 0.35,
-                "edgeWidth": 1.0,
-                "lightIntensity": 0.5,
-                "ambientStrength": 0.0,
-                "faceShadingStrength": 0.0,
-                "innerShadowStrength": 0.0,
-                "bleedStrength": 0.25,
-                "specularWrap": 0.35,
+                "edgeRefraction": edge_refraction,
+                "refractionSpread": 1.0,
+                "contourStrength": 0.35,
+                "contourWidth": 1.0,
+                "highlight": 0.5,
             }
         )
         all_seeds.append(seed)
@@ -142,8 +153,9 @@ def main() -> None:
             )
             print(
                 f"SEED {index:02d} score={score:.4f} "
-                f"alpha={seed['glassAlpha']} blur={seed['blur']} "
-                f"thickness={seed['thickness']} ri={seed['refractiveIndex']}",
+                f"alpha={seed['tintAlpha']} frost={seed['frost']} "
+                f"thickness={seed['thickness']} edge={seed['edgeRefraction']:.2f} "
+                f"spread={seed['refractionSpread']}",
                 flush=True,
             )
 

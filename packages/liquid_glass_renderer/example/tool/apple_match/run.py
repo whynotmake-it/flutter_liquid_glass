@@ -126,10 +126,11 @@ def main():
     current.update(
         {
             "thickness": 28.0,
-            "blur": 0.0,
-            "lightIntensity": 0.0,
-            "ambientStrength": 0.0,
-            "refractiveIndex": 1.2,
+            "frost": 0.0,
+            "highlight": 0.0,
+            "contourStrength": 0.0,
+            "edgeRefraction": 106.13,
+            "refractionSpread": 0.0,
             "saturation": 1.0,
             "chromaticAberration": 0.0,
         }

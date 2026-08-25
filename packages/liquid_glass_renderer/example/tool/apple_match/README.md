@@ -359,7 +359,21 @@ The sidebar exposes the unified controls and image/black/white/grid
 backgrounds. Presets are scalar YAML files under the app documents directory;
 `ios27-toolbar-light.yaml` and `neutral-default.yaml` are seeded on first run.
 
-Focused GPU/shader/settings tests and the example smoke test are green. The
-full melos non-golden suite still has existing headless layer-tree failures,
-and post-redesign Apple scorecards/performance traces have not yet been
-re-fit. Those remain hard gates before calling this production-ready.
+The first post-profile pinned toolbar run (shape-relative reach and canonical
+settings) scored **91.3253** overall; the refraction stage improved its flow
+objective from 9.5324 to 8.8824. Its four probe captures and diagnostics are in
+`out/redesign-refraction/stages/refraction/best/`, including
+`holdout_comparison.png` and `solid_lighting_comparison.png`.
+
+The earlier 72-seed loupe scan is retained as a pre-redesign record at
+`out/loupe-seed-scan-pre-redesign-full/`; it scored 10.1461 but used the old
+toolbar geometry, so it is not a valid loupe gate. A corrected-shape post-fit
+smoke scan is in `out/loupe-seed-scan-post-redesign-8-correct-shape/` (8/72
+seeds, best 8.6626). A full fair loupe rerun and the system text-selection
+loupe integration remain required before claiming the +10 loupe gate.
+
+Focused GPU/shader/settings tests and the example smoke/YAML test are green.
+The full melos non-golden suite still has headless layer-tree failures, and
+the macOS/Android performance audit plus tab/capsule holdout scorecards are
+not yet complete. Those remain hard gates before calling this
+production-ready.

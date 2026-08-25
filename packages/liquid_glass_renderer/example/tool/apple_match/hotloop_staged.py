@@ -55,17 +55,18 @@ STAGES = {
     },
     "refraction": {
         "thickness": [8.0, 10.0, 12.0, 14.0, 16.0],
-        "refractiveIndex": [1.03, 1.04, 1.05, 1.06, 1.08],
+        "edgeRefraction": [18.3, 22.85, 27.42, 32.0, 36.6],
+        "refractionSpread": [0.0, 0.25, 0.5, 0.75, 1.0],
         "chromaticAberration": [0.0, 0.0025, 0.005, 0.0075, 0.01],
     },
     "blurMtf": {
-        "blur": [5.0, 6.0, 7.0, 8.0, 9.0],
+        "frost": [5.0, 6.0, 7.0, 8.0, 9.0],
     },
     "tintColor": {
-        "glassAlpha": [0.52, 0.525, 0.53, 0.535, 0.54],
-        "glassRed": [251, 252, 253, 254],
-        "glassGreen": [251, 252, 253, 254],
-        "glassBlue": [251, 252, 253, 254],
+        "tintAlpha": [0.52, 0.525, 0.53, 0.535, 0.54],
+        "tintRed": [251, 252, 253, 254],
+        "tintGreen": [251, 252, 253, 254],
+        "tintBlue": [251, 252, 253, 254],
     },
     "toneResponse": {
         "transmissionGamma": [0.85, 0.875, 0.90, 0.925, 0.95],
@@ -75,16 +76,9 @@ STAGES = {
         "saturation": [0.9, 0.95, 1.0, 1.05, 1.1],
     },
     "highlight": {
-        "lightIntensity": [0.0, 0.2, 0.4, 0.6, 0.8],
-        "ambientStrength": [0.0, 0.03, 0.08],
-        "lightAngle": [
-            0.7853981633974483,
-            1.5707963267948966,
-            2.356194490192345,
-        ],
-        "highlightAlpha": [0.25, 0.5, 0.75, 1.0],
-        "specularWrap": [0.15, 0.35, 0.55, 0.75],
-        "bleedStrength": [0.0, 0.25, 0.5, 0.75],
+        "highlight": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
+        "contourStrength": [0.1, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8],
+        "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5],
     },
     "ambientRim": {
         "ambientStrength": [0.0, 0.08, 0.15, 0.25, 0.4, 0.6, 0.8, 1.0],

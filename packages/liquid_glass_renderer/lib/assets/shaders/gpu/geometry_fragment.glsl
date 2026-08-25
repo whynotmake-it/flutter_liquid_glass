@@ -41,7 +41,8 @@ void main() {
     // orientation, including Flutter GPU passes on GLES.
     vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
-    float sd = sceneSDF(fragCoord, int(uNumShapes));
+    SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
+    float sd = scene.distance;
 
     // Match Flutter 3.47's centered signed-distance antialiasing: the
     // coverage transition is half a physical pixel on either side of the
@@ -69,22 +70,20 @@ void main() {
     float dx = dFdx(sd);
     float dy = dFdy(sd);
 
-    float profileReach = uThickness *
-        (1.0 + 8.0 * clamp(uRefractionSpread, 0.0, 1.0));
-    float n_cos = 1.0 - clamp(-surfaceSd / max(profileReach, 0.001), 0.0, 1.0);
-    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
-
-    vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
-
-    // The normal edge profile is a circular arc. Increasing spread extends
-    // that same profile into the face, giving loupe controls a full-lens
-    // displacement without adding a pass or a texture.
-    float reach = profileReach;
+    // Spread extends the same circular edge profile toward the shape's
+    // center. Its reach is shape-relative, so thickness cannot accidentally
+    // become a proxy for coverage on large lenses.
+    float spread = clamp(uRefractionSpread, 0.0, 1.0);
+    float reach = mix(uThickness, max(uThickness, scene.halfMinor), spread);
     float inwardDistance = max(-surfaceSd, 0.0);
     float profileX = min(inwardDistance, reach);
     float normalizedProfile = profileX / max(reach, 0.001);
     float profileHeight = sqrt(max(0.0, normalizedProfile * (2.0 - normalizedProfile)));
     float height = uThickness * profileHeight;
+    float n_cos = 1.0 - clamp(inwardDistance / max(reach, 0.001), 0.0, 1.0);
+    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
+    float slopeScale = uThickness / max(reach, 0.001);
+    vec3 normal = normalize(vec3(dx * n_cos * slopeScale, dy * n_cos * slopeScale, n_sin));
 
     float baseHeight = uThickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
