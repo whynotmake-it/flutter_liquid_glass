@@ -2,9 +2,8 @@
 """Multi-seed candidate scan for one scene in a persistent Flutter session.
 
 Evaluates hand-picked starting points (the current renderer's plausible
-material basins) and reports the best. Used to establish a fair pre-redesign
-baseline score for scenes whose material differs strongly from the toolbar
-seed, e.g. the loupe.
+material basins) and reports the best. Used to fit scene-specific material
+basins such as the loupe's ordinary glass edge/refraction settings.
 """
 
 from __future__ import annotations
@@ -62,6 +61,15 @@ def main() -> None:
         help="Evaluate an evenly spaced subset of the full grid (partial scan)",
     )
     parser.add_argument(
+        "--spread",
+        type=float,
+        default=0.0,
+        help=(
+            "Profile reach for the ordinary seed scan; defaults to 0 for a "
+            "fair pre-redesign baseline"
+        ),
+    )
+    parser.add_argument(
         "--profile-gate",
         action="store_true",
         help="Run the bounded loupe profile gate (E={25,35,45,55}, spread={.75,1})",
@@ -95,16 +103,20 @@ def main() -> None:
     if args.profile_gate:
         seed_specs = (
             (0.05, 0.0, 12.0, edge, spread)
-            for edge, spread in itertools.product([25.0, 35.0, 45.0, 55.0], [0.75, 1.0])
+            for edge, spread in itertools.product(
+                [25.0, 35.0, 45.0, 55.0], [0.75, 1.0]
+            )
         )
     else:
+        if not 0.0 <= args.spread <= 1.0:
+            parser.error("--spread must be between 0 and 1")
         seed_specs = (
             (
                 alpha,
                 frost,
                 thickness,
                 8.0 * thickness * (max(0.0, ri * ri - 1.0) ** 0.5),
-                1.0,
+                args.spread,
             )
             for alpha, frost, thickness, ri in itertools.product(
                 [0.05, 0.12, 0.25, 0.4],
@@ -159,10 +171,19 @@ def main() -> None:
             flush=True,
         )
         rows = []
+        best_score = float("-inf")
+        best_live = out / "best" / "frames"
+        best_live.mkdir(parents=True, exist_ok=True)
         for index, seed in enumerate(seeds):
             loss = float(evaluator.evaluate(seed))
             result = evaluator.last_result
             score = float(result.score)
+            if score > best_score:
+                best_score = score
+                for probe in "ABCD":
+                    live_frame = out / "live" / f"{probe}.png"
+                    if live_frame.exists():
+                        shutil.copy2(live_frame, best_live / f"{probe}.png")
             rows.append(
                 {
                     "index": index,
@@ -185,7 +206,7 @@ def main() -> None:
     rows.sort(key=lambda row: row["score"], reverse=True)
     (out / "scan.json").write_text(json.dumps(rows, indent=2) + "\n")
     best_dir = out / "best"
-    best_dir.mkdir()
+    best_dir.mkdir(exist_ok=True)
     (best_dir / "settings.json").write_text(
         json.dumps(rows[0]["settings"], indent=2) + "\n"
     )

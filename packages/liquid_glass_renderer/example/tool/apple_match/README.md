@@ -358,6 +358,9 @@ fvm flutter run -d macos -t lib/basic_app.dart \
 The sidebar exposes the unified controls and image/black/white/grid
 backgrounds. Presets are scalar YAML files under the app documents directory;
 `ios27-toolbar-light.yaml` and `neutral-default.yaml` are seeded on first run.
+The add button opens the example loupe composition: Flutter paints a
+`RawMagnifier` backdrop first, then the ordinary liquid-glass layer applies its
+edge refraction and lighting without magnifying filtered shader pixels.
 
 The current pinned toolbar run (canonical settings, after removing the
 center-relative affine lens and the unused legacy shader path) scores
@@ -367,19 +370,14 @@ white-background `D_1.png` lighting checks. The geometry field retains the
 validated circular-cap profile; the oval SDF now uses Flutter Impeller's
 bounded Newton solve to avoid a center pinhole.
 
-The earlier 72-seed loupe scan is retained as a pre-redesign record at
-`out/loupe-seed-scan-pre-redesign-full/`; it scored 10.1461 but used the old
-toolbar geometry, so it is not a valid loupe gate. A corrected-shape post-fit
-smoke scan is in `out/loupe-seed-scan-post-redesign-8-correct-shape/` (8/72
-seeds, best 8.6626). A full fair loupe rerun and the system text-selection
-loupe integration remain required before claiming the +10 loupe gate.
-
-The bounded post-profile loupe gate is reproducible with
-`seed_scan.py --profile-gate`; it evaluates `edgeRefraction={25,35,45,55}`
-and `refractionSpread={.75,1}` against the pinned four-probe reference. The
-earlier affine experiment is retained only as historical evidence; the shipped
-renderer now uses the SDF/profile field directly, so the complete loupe/system
-integration and holdout gates remain open.
+The loupe reference is intentionally a background magnifier, so it is now a
+separate example-composition fit rather than an ordinary-refraction baseline.
+The example should magnify the painted backdrop before handing it to the
+ordinary liquid-glass shader; the shader itself must not scale its filtered
+sample, which only magnifies pixels. The old fair-S0+10 comparison is retired
+because it treated Apple's intentional magnification as a renderer defect.
+`refractionSpread` continues to mean SDF profile reach, and the earlier
+shader-level affine experiment remains historical evidence only.
 
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material

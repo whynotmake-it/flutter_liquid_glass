@@ -88,6 +88,79 @@ class ImagePageView extends HookWidget {
   }
 }
 
+/// Example-only loupe composition.
+///
+/// Flutter's [RawMagnifier] paints a higher-resolution view of the already
+/// painted backdrop first. The liquid-glass layer is then composited above
+/// that result, so its ordinary edge refraction and lighting operate on the
+/// magnified pixels without introducing a shader-level zoom or another public
+/// renderer setting.
+class ExampleLoupe extends StatelessWidget {
+  const ExampleLoupe({
+    super.key,
+    required this.settings,
+    this.size = const Size(116, 86),
+    this.magnificationScale = 1.55,
+    this.alignment = Alignment.center,
+  });
+
+  final LiquidGlassSettings settings;
+  final Size size;
+  final double magnificationScale;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(size.height / 2);
+    return Stack(
+      children: [
+        Align(
+          alignment: alignment,
+          child: RawMagnifier(
+            size: size,
+            magnificationScale: magnificationScale,
+            decoration: MagnifierDecoration(
+              shape: RoundedRectangleBorder(borderRadius: radius),
+            ),
+          ),
+        ),
+        Align(
+          alignment: alignment,
+          child: LiquidGlass.withOwnLayer(
+            settings: settings,
+            shape: LiquidRoundedRectangle(borderRadius: size.height / 2),
+            child: SizedBox.fromSize(size: size),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Small interactive page used by the example app's add button.
+class LoupeExamplePage extends StatelessWidget {
+  const LoupeExamplePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar.large(
+        largeTitle: Text('Loupe composition'),
+      ),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: Grid()),
+          Center(
+            child: ExampleLoupe(
+              settings: const LiquidGlassSettings.ios27ToolbarLight(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SettingsSheet extends HookWidget {
   const SettingsSheet({
     super.key,
@@ -180,9 +253,16 @@ class SettingsSheet extends HookWidget {
                         Wrap(
                           spacing: 8,
                           children: [
-                            for (final option in ['image', 'black', 'white', 'grid'])
+                            for (final option in [
+                              'image',
+                              'black',
+                              'white',
+                              'grid',
+                            ])
                               CupertinoButton.tinted(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 onPressed: backgroundNotifier == null
                                     ? null
                                     : () => backgroundNotifier!.value = option,
@@ -196,17 +276,16 @@ class SettingsSheet extends HookWidget {
                             Expanded(
                               child: CupertinoButton.tinted(
                                 onPressed: () {
-                                  settingsNotifier.value =
-                                      LiquidGlassSettings(
-                                        thickness: 30,
-                                        frost: 1,
-                                        saturation: 1.2,
-                                        tint: CupertinoTheme.of(context)
-                                            .barBackgroundColor
-                                            .withValues(alpha: .1),
-                                        contourStrength: .3,
-                                        contourWidth: 1,
-                                      );
+                                  settingsNotifier.value = LiquidGlassSettings(
+                                    thickness: 30,
+                                    frost: 1,
+                                    saturation: 1.2,
+                                    tint: CupertinoTheme.of(context)
+                                        .barBackgroundColor
+                                        .withValues(alpha: .1),
+                                    contourStrength: .3,
+                                    contourWidth: 1,
+                                  );
                                   blendNotifier.value = 10;
                                 },
                                 child: const Text('Previous demo'),
@@ -217,8 +296,7 @@ class SettingsSheet extends HookWidget {
                               child: CupertinoButton.tinted(
                                 onPressed: () {
                                   settingsNotifier.value =
-                                      const LiquidGlassSettings
-                                          .ios27ToolbarLight();
+                                      const LiquidGlassSettings.ios27ToolbarLight();
                                   blendNotifier.value = 10;
                                 },
                                 child: const Text('Matched toolbar'),
@@ -437,8 +515,8 @@ class _SettingsSlider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
             Expanded(
               child: Text(label, overflow: TextOverflow.ellipsis),
             ),

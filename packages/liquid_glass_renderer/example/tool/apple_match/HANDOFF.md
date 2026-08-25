@@ -108,23 +108,24 @@ The final shader already has main and opposite-direction highlights.
 
 ### Critical loupe discovery
 
-The iOS 27 text-selection loupe is not merely stronger edge refraction. It is a
-**full lens**: the grid is magnified across the entire interior by roughly
-1.55×, while normal glass controls mostly refract in an edge band.
+The iOS 27 text-selection loupe is intentionally a **background magnifier**:
+the grid is enlarged across the interior by roughly 1.55× because that is the
+purpose of the interaction. That observation must not be used as evidence that
+ordinary glass should zoom its backdrop or that the refraction field is broken.
 
-The current renderer mathematically cannot reproduce this because the profile
-reach is hardwired to `thickness`; the interior becomes flat and has zero
-displacement.
+The renderer must not implement that magnification by scaling the final shader
+sample: doing so magnifies already filtered pixels and produces pixelation.
+Ordinary glass keeps only its SDF/profile refraction controls. An example-only
+loupe should magnify the painted backdrop first (Flutter's `Magnifier`/painted
+subtree technique), then pass that higher-resolution result through the normal
+liquid-glass shader for edge refraction, tint, and lighting.
 
-The planned model change is therefore:
+The loupe fit is therefore a composition/example concern, not a new shipped
+material knob. Ordinary toolbar, tab, and capsule gates remain unchanged and
+cannot be hidden by a shader-level zoom axis.
 
-- Generalize profile **reach** independently from optical depth.
-- Current behavior remains the exact special case `reach == thickness`.
-- Narrow reach produces normal pill/chrome glass.
-- Reach approaching the shape's half-size produces a full loupe lens.
-- A normalized public `refractionSpread` is the likely control.
-
-This is the genuine model change and should remain one shader pass.
+The refraction model remains one shader pass; the loupe's pre-shader painted
+magnification is an example composition layered before that pass.
 
 ### Refraction strength reparameterization
 
@@ -328,7 +329,7 @@ height = thickness once inwardDistance >= reach
 3. Compute normal from the same generalized profile.
 4. Keep the existing `refract()` field for backwards-compatible narrow reach.
 5. Pass/derive a safe displacement-encoding scale shared by geometry and final
-   decode; do not let lens displacement clip.
+   decode; do not let edge displacement clip.
 
 Likely affected shipped files:
 
@@ -411,7 +412,10 @@ The goal is complete only when all of these hold:
    - toolbar ≥ `85.88`
    - tab-bar holdout > `33.40`
    - small/large capsules ≥ historical bests
-   - loupe ≥ fair pre-redesign S0 + `10`
+   - loupe is evaluated as an example composition: pre-shader painted-backdrop
+     magnification plus the ordinary glass shader's edge refraction; the old
+     fair-S0+10 gate is retired because it conflated intentional magnification
+     with ordinary refraction quality
    - pinned iOS 27 runtime and UDID metadata
 5. Slider positions `0/.5/1` use one shared vector except ≤2 documented scalars.
 6. Frozen-parameter generalization: small-capsule combined error ≤1.25× toolbar
@@ -424,9 +428,11 @@ The goal is complete only when all of these hold:
 ## Immediate next steps
 
 1. Repair `seed_scan.py`'s typed `MetricResult` access.
-2. Run the loupe seed scan and refine its winner; record honest S0.
+2. Build the example loupe from a pre-shader magnified painted subtree and
+   record its pinned composition score separately from ordinary-glass gates.
 3. Run the existing macOS performance benchmark for the pre-change baseline.
-4. Implement `refractionSpread` + displacement-amplitude parameterization.
+4. Implement `refractionSpread` + displacement-amplitude parameterization; do
+   not add a shader-level loupe scale.
 5. Collapse the public settings surface and update match-app JSON mapping.
 6. Run tests/analyzer before fitting.
 7. Re-fit toolbar, capsules, holdout, loupe, and slider axis.

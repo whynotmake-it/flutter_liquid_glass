@@ -97,10 +97,16 @@ void main() {
         max(0.0, normalizedProfile * (2.0 - normalizedProfile))
     );
     float height = uThickness * profileHeight;
-    float n_cos = 1.0 - normalizedProfile;
-    float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
+    // Keep the homogeneous normal form. It is the stable form of the
+    // derivative-derived cap normal: dividing by profileHeight would create a
+    // false finite slope at the exact rim and can reduce the requested peak
+    // displacement for large reaches.
     float slopeScale = uThickness / max(reach, 0.001);
-    vec3 normal = normalize(vec3(dx * n_cos * slopeScale, dy * n_cos * slopeScale, n_sin));
+    vec3 normal = normalize(vec3(
+        dx * slopeScale * (1.0 - normalizedProfile),
+        dy * slopeScale * (1.0 - normalizedProfile),
+        profileHeight
+    ));
 
     float baseHeight = uThickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);

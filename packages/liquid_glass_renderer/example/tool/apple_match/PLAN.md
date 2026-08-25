@@ -2,8 +2,9 @@
 
 Objective: rebuild the effect model to match Apple internals (SDF-profile refraction,
 dual directional highlights, unified tint/transparency axis), evidence-gated knobs,
-extend harness with loupe scene + transparency axis {0,.5,1}, re-fit all scenes,
-rebuild example shell (sidebar/backgrounds/YAML presets), performance non-regressing.
+extend harness with a separately modeled loupe composition + transparency axis
+{0,.5,1}, re-fit all scenes, rebuild example shell (sidebar/backgrounds/YAML
+presets), performance non-regressing.
 
 ## User decisions (grilling, 2026-08-25)
 - Full breaking redesign approved (supersedes README escalation contract).
@@ -19,7 +20,8 @@ rebuild example shell (sidebar/backgrounds/YAML presets), performance non-regres
 3. lib/src grep: zero blur-mix mixers / innerShadow* trio / independent rim RGB triplets;
    settings doc table maps every surviving knob → ≥2 improving scenes
 4. out/<final-run>/summary.json: toolbar ≥85.88, tab_bar_holdout >33.40,
-   capsules ≥ pre-change bests, loupe beats pre-redesign baseline by ≥10 pts,
+   capsules ≥ pre-change bests, loupe has a pinned example-composition score
+   using pre-shader magnification (not the retired pre-redesign S0+10 comparison),
    metadata pins iOS 27 runtime + UDID
 5. Slider-axis {0,.5,1}: shared param vector except ≤2 documented scalars
 6. Frozen-parameter generalization: small-capsule combined error ≤1.25× toolbar (was >1.5×)

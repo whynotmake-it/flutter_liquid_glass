@@ -52,8 +52,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     final geometryInputsChanged =
         _settings?.effectiveThickness != value.effectiveThickness ||
         _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
-        _settings?.effectiveRefractionSpread !=
-            value.effectiveRefractionSpread;
+        _settings?.effectiveRefractionSpread != value.effectiveRefractionSpread;
     final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
     final isIdle = value.effectiveThickness <= 0;
     _settings = value;
@@ -153,8 +152,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         ..setColor(const Color.fromARGB(255, 255, 255, 255))
         ..setColor(
           Color.fromARGB(
-            (settings.effectiveContourStrength.clamp(0.0, 1.0) * 255)
-                .round(),
+            (settings.effectiveContourStrength.clamp(0.0, 1.0) * 255).round(),
             0,
             0,
             0,

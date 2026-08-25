@@ -317,10 +317,13 @@ class FlutterGpuGeometryRenderer {
       textureHeight: allocatedHeight.toDouble(),
       opticalIndex: opticalIndex,
       refractionSpread: refractionSpread,
-      displacementScale: displacementScale ??
+      displacementScale:
+          displacementScale ??
           math.max(
             1e-3,
-            1.05 * 8.0 * thickness *
+            1.05 *
+                8.0 *
+                thickness *
                 math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
           ),
       thickness: thickness,
@@ -388,7 +391,6 @@ class FlutterGpuGeometryRenderer {
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
     floatData[opticalPropsIndex + 2] = thickness;
     floatData[opticalPropsIndex + 3] = numShapes;
-
 
     final shapeDataStartIndex = _offsetShapeData ~/ 4;
     final shapeFloats = shapeData.length < 192 ? shapeData.length : 192;

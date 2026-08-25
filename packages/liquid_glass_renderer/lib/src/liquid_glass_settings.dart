@@ -119,8 +119,7 @@ class LiquidGlassSettings with Equatable {
   double get effectiveEdgeRefraction => edgeRefraction * visibility;
   double get effectiveRefractionSpread => refractionSpread * visibility;
   double get effectiveFrost => frost * visibility;
-  double get effectiveChromaticAberration =>
-      chromaticAberration * visibility;
+  double get effectiveChromaticAberration => chromaticAberration * visibility;
   double get effectiveSaturation => 1 + (saturation - 1) * visibility;
   double get effectiveTransmissionGamma =>
       1 + (transmissionGamma - 1) * visibility;

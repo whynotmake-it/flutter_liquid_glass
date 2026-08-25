@@ -77,8 +77,10 @@ if [[ "$PREPARE_APP" == "1" ]]; then
     "$FLUTTER_BIN" build ios --simulator --debug \
       "${build_defines[@]}"
   )
-  xcrun simctl shutdown "$IOS_27_UDID" 2>/dev/null || true
-  xcrun simctl boot "$IOS_27_UDID"
+  # Never shut down a simulator here: it may be hosting unrelated user work.
+  # Reuse the pinned device if it is already booted; boot is idempotent for the
+  # capture's purposes and is scoped to IOS_27_UDID only.
+  xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
   xcrun simctl bootstatus "$IOS_27_UDID" -b
   xcrun simctl install "$IOS_27_UDID" \
     "$ROOT/flutter/build/ios/iphonesimulator/Runner.app"

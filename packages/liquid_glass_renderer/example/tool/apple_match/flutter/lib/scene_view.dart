@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'dart:math' as math;
+
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import 'scene.dart';
@@ -20,25 +22,31 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
   const defaults = LiquidGlassSettings();
   final tint = settings['tint'] is num
       ? Color((settings['tint']! as num).toInt())
-      : color(
-          'tint',
-          color('glass', defaults.tint),
-        );
+      : color('tint', color('glass', defaults.tint));
   return LiquidGlassSettings(
     tint: tint,
     thickness: number('thickness', defaults.thickness),
     edgeRefraction: number(
       'edgeRefraction',
-      8.0 * number('thickness', defaults.thickness) *
-          math.sqrt(math.max(0.0, math.pow(
-            number('refractiveIndex', defaults.effectiveOpticalIndex),
-            2,
-          ).toDouble() - 1.0)),
+      8.0 *
+          number('thickness', defaults.thickness) *
+          math.sqrt(
+            math.max(
+              0.0,
+              math
+                      .pow(
+                        number(
+                          'refractiveIndex',
+                          defaults.effectiveOpticalIndex,
+                        ),
+                        2,
+                      )
+                      .toDouble() -
+                  1.0,
+            ),
+          ),
     ),
-    refractionSpread: number(
-      'refractionSpread',
-      defaults.refractionSpread,
-    ),
+    refractionSpread: number('refractionSpread', defaults.refractionSpread),
     frost: number('frost', number('blur', defaults.frost)),
     transmissionGamma: number('transmissionGamma', defaults.transmissionGamma),
     vibrancy: number('vibrancy', defaults.vibrancy),
