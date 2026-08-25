@@ -91,3 +91,21 @@ capture does not account for the remaining per-layer footprint.
 All scenarios, including fake glass, run on Impeller so backend startup and
 process baselines remain comparable. Attribute deltas within the same scenario
 family; fake glass intentionally bypasses only the Flutter-GPU geometry pass.
+
+## Current redesign audit status (2026-08-25)
+
+Platform smoke gates currently pass with Flutter 3.47.1:
+
+- `flutter build apk --debug` succeeds with Android Impeller and Flutter GPU
+  manifest flags enabled.
+- `flutter build macos --profile` succeeds with the macOS Impeller and Flutter
+  GPU plist flags enabled.
+- The focused example widget/YAML/loupe tests and the full non-golden workflow
+  pass.
+
+The final performance ratio is intentionally still open. Existing three-run
+artifacts are useful historical controls, but they were captured across
+different renderer/perf revisions and cannot be presented as a clean
+before/after pair for the final state. A final same-runner macOS profile
+comparison is required before claiming the ≤5% gate; the Android build is a
+platform smoke check, not a substitute for that timing evidence.
