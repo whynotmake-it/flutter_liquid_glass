@@ -252,19 +252,12 @@ the registration gate.
 ### Multi-seed scan
 
 `seed_scan.py` was added to find a fair current-renderer basin across clear,
-low-blur, high-refraction candidates. It currently needs one small repair.
-
-First bug fixed: `Evaluator.evaluate(...)` returns a float, not a result dict.
-
-Current bug:
-
-```text
-TypeError: 'MetricResult' object is not subscriptable
-```
-
-`evaluator.last_result` is a typed `MetricResult`, not a dictionary. Inspect its
-fields or conversion helper in `compare/apple_match`; use attribute access or
-its serializer when recording `directPixelMeanAbsoluteError8Bit`.
+low-blur, high-refraction candidates. The typed `MetricResult` access is now
+fixed, and the scan validates the pinned reference metadata before starting.
+It emits an explicit `loupe-example-composition-seed-scan` summary and best
+scorecard, records the RawMagnifier composition, and marks the shader-level S0
+as retired. It must still be run against the pinned simulator after
+CoreSimulatorService recovers.
 
 No seed scan process is currently running.
 
@@ -277,9 +270,10 @@ IOS_27_UDID="$IOS_27_UDID" \
   --out out/loupe-seed-scan-pre-redesign
 ```
 
-Then seed a short staged refinement from the best candidate. The resulting
-best score is the honest pre-redesign loupe S0; the final model must beat it by
-at least 10 score points.
+Then seed a short staged refinement from the best candidate if composition
+optimization is still useful. The resulting score is composition evidence for
+the example loupe; it is not a renderer-only S0 and must not be compared using
+the retired fair-S0+10 gate.
 
 ## Planned new settings surface
 
@@ -431,9 +425,10 @@ The goal is complete only when all of these hold:
 
 ## Immediate next steps
 
-1. Repair `seed_scan.py`'s typed `MetricResult` access.
-2. Build the example loupe from a pre-shader magnified painted subtree and
-   record its pinned composition score separately from ordinary-glass gates.
+1. Run the hardened `seed_scan.py` composition scan once CoreSimulatorService
+   recovers; record its pinned metadata and composition score separately from
+   ordinary-glass gates.
+2. Re-capture pinned loupe/transparency visuals and post comparison images.
 3. Run the existing macOS performance benchmark for the pre-change baseline.
 4. Implement `refractionSpread` + displacement-amplitude parameterization; do
    not add a shader-level loupe scale.

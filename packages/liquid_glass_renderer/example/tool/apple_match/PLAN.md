@@ -105,4 +105,9 @@ presets), performance non-regressing.
 - 2026-08-25: repaired the transparency sweep contract: exact baseline tint
   RGB is shared across every position, only `tintAlpha` and `frost` are fit,
   and a structural audit now fails on unauthorized material drift. Comparator
-  coverage is 31 tests (one simulator smoke skipped without a device).
+  coverage is 35 tests (one simulator smoke skipped without a device).
+- 2026-08-25: hardened `seed_scan.py` for the pending loupe composition scan:
+  it validates pinned reference metadata, records the RawMagnifier composition,
+  derives the actual search axes, and emits a self-describing summary and best
+  scorecard. The historical shader-level S0 is explicitly retired. No seed
+  scan was run while CoreSimulatorService was unavailable.

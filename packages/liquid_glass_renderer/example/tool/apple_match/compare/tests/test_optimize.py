@@ -25,6 +25,15 @@ from apple_match.hotloop.session import (
     SignalReloadTrigger,
 )
 from hotloop_staged import has_optimization_wall, optimization_objective
+from seed_scan import (
+    ROOT as SEED_ROOT,
+    apply_scene_geometry,
+    load_reference_metadata,
+    search_space,
+    scan_summary,
+    validate_reference_assets,
+    validate_scene_geometry,
+)
 from transparency_sweep import (
     audit_shared_vector,
     interpret_curve,
@@ -188,6 +197,102 @@ class OptimizerTests(unittest.TestCase):
         ])
         self.assertEqual(failed["status"], "failed")
         self.assertEqual(failed["unauthorizedVaryingKeys"], ["tintRed"])
+
+    def test_seed_scan_metadata_requires_pinned_reference(self):
+        metadata = {
+            "runtime": "iOS 27.0 (24A5408d)",
+            "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+            "udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B",
+            "device": "iPhone 17 Pro",
+            "appearance": "light",
+            "api": "iOS 27 system text-selection loupe",
+            "medianFrameCount": 3,
+            "scene": "loupe",
+            "reduceMotion": True,
+            "reduceTransparency": False,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "metadata.json"
+            path.write_text(json.dumps(metadata))
+            self.assertEqual(load_reference_metadata(path, "loupe"), metadata)
+            with self.assertRaisesRegex(ValueError, "candidate UDID"):
+                load_reference_metadata(path, "loupe", candidate_udid="wrong")
+            metadata["udid"] = "wrong"
+            path.write_text(json.dumps(metadata))
+            with self.assertRaisesRegex(ValueError, "not pinned"):
+                load_reference_metadata(path, "loupe")
+
+    def test_committed_loupe_metadata_and_probe_assets_are_valid(self):
+        reference_dir = (
+            SEED_ROOT
+            / "references"
+            / "ios27-iphone17pro-light"
+            / "loupe"
+        )
+        metadata = validate_reference_assets(reference_dir, "loupe")
+        self.assertEqual(metadata["medianFrameCount"], 3)
+        self.assertEqual(metadata["udid"], "DB4F41F3-1C36-476D-B775-AFDC3686C75B")
+
+    def test_seed_scan_geometry_and_profile_search_space_are_explicit(self):
+        scene = json.loads((SEED_ROOT / "scenes/loupe.json").read_text())
+        settings = apply_scene_geometry(scene, {})
+        validate_scene_geometry(scene, settings)
+        settings["shapeWidth"] += 1.0
+        with self.assertRaisesRegex(ValueError, "shapeWidth"):
+            validate_scene_geometry(scene, settings)
+        axes = search_space(
+            [
+                {
+                    "tintAlpha": 0.05,
+                    "frost": 0.0,
+                    "thickness": 12.0,
+                    "edgeRefraction": edge,
+                    "refractionSpread": spread,
+                }
+                for edge in (25.0, 35.0)
+                for spread in (0.75, 1.0)
+            ],
+            profile_gate=True,
+        )
+        self.assertEqual(axes["mode"], "profile-gate")
+        self.assertEqual(axes["axes"]["refractionSpread"], [0.75, 1.0])
+
+    def test_seed_scan_summary_retires_shader_level_s0_for_composition_scan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            rows = [{
+                "score": 22.5,
+                "loss": 77.5,
+                "directMae8Bit": 198.0,
+                "settings": {"refractionSpread": 0.0},
+            }]
+            summary = scan_summary(
+                rows=rows,
+                all_seed_settings=[
+                    {
+                        "tintAlpha": 0.05,
+                        "frost": 0.0,
+                        "thickness": 12.0,
+                        "edgeRefraction": 25.0,
+                        "refractionSpread": 0.0,
+                    }
+                ],
+                all_seed_count=4,
+                scene_id="loupe",
+                scene_path=out / "loupe.json",
+                baseline_path=out / "baseline.json",
+                reference_metadata={"udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B"},
+                reference_metadata_path=out / "metadata.json",
+                out=out,
+                profile_gate=False,
+                scene_shape={"width": 116.3, "height": 85.7},
+            )
+            self.assertEqual(
+                summary["evidenceRole"], "loupe-example-composition-seed-scan"
+            )
+            self.assertEqual(summary["comparisonContract"]["s0Status"], "retired")
+            self.assertFalse(summary["composition"]["shaderLevelMagnification"])
+            self.assertTrue(summary["partial"])
 
     def test_neighbor_values_clamp_at_bounds(self):
         values = [1.0, 2.0, 3.0]

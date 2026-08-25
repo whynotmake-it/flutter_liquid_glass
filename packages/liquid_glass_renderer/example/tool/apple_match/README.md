@@ -379,6 +379,20 @@ because it treated Apple's intentional magnification as a renderer defect.
 `refractionSpread` continues to mean SDF profile reach, and the earlier
 shader-level affine experiment remains historical evidence only.
 
+When the pinned simulator is available, run the loupe example-composition
+seed scan with:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python seed_scan.py \
+  --scene-id loupe --out out/loupe-seed-scan-pre-redesign
+```
+
+The scan validates `metadata.json` against the pinned runtime/UDID and emits
+`summary.json`, `reference_metadata.json`, `scan.json`, and
+`best/scorecard.json`. It records the `RawMagnifier` composition and never
+applies shader-level zoom. The historical shader-level S0 is retired; this
+result is composition evidence for the example loupe.
+
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
 vector, with only monotonic `tintAlpha` and `frost` scalars allowed to vary.
