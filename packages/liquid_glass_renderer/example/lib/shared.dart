@@ -146,8 +146,13 @@ class ExampleLoupe extends StatelessWidget {
               magnificationScale: magnificationScale,
               focalPointOffset: focalPointOffset,
               decoration: MagnifierDecoration(
+                // Keep the backdrop fully opaque. The magnifier itself is the
+                // lens; any translucency belongs to the optional glass rim
+                // below, not to Flutter's captured backdrop.
+                opacity: 1,
                 shape: RoundedRectangleBorder(borderRadius: radius),
               ),
+              clipBehavior: Clip.hardEdge,
             ),
             LiquidGlass.withOwnLayer(
               settings: settings,

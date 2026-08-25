@@ -52,6 +52,9 @@ void main() {
 
     expect(find.text('Loupe composition'), findsOneWidget);
     expect(find.byType(RawMagnifier), findsOneWidget);
+    final magnifier = tester.widget<RawMagnifier>(find.byType(RawMagnifier));
+    expect(magnifier.decoration.opacity, 1);
+    expect(magnifier.clipBehavior, Clip.hardEdge);
   });
 
   test('all example platforms enable Impeller and Flutter GPU', () {

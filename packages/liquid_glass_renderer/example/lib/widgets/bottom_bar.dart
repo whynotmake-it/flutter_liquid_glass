@@ -313,8 +313,10 @@ class _ExtraButtonState extends State<_ExtraButton> {
                   size: Size.square(widget.config.size),
                   magnificationScale: loupeMagnification,
                   decoration: const MagnifierDecoration(
+                    opacity: 1,
                     shape: CircleBorder(),
                   ),
+                  clipBehavior: Clip.hardEdge,
                 ),
                 // A shared grouped pass cannot sample a sibling magnifier.
                 // Keep this explicit loupe composition independent, and use
@@ -326,6 +328,7 @@ class _ExtraButtonState extends State<_ExtraButton> {
                       LiquidGlassSettings.of(
                         context,
                       ).copyWith(
+                        visibility: 1,
                         tint: const Color.fromARGB(0, 255, 255, 255),
                         frost: 0,
                         refractionSpread: 0,
@@ -339,7 +342,10 @@ class _ExtraButtonState extends State<_ExtraButton> {
                         contourWidth: 0.75,
                       ),
                   shape: const LiquidOval(),
-                  child: GlassGlow(child: icon),
+                  // Do not put the icon in a glow layer here. A loupe is a
+                  // clear pre-shader magnifier; the icon should stay crisp and
+                  // the only material treatment should be the thin glass rim.
+                  child: icon,
                 ),
               ],
             ),
