@@ -79,6 +79,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   FlutterGpuGeometryRenderer? get gpuGeometryRenderer => _gpuGeometryRenderer;
   set gpuGeometryRenderer(FlutterGpuGeometryRenderer? value) {
     if (_gpuGeometryRenderer == value) return;
+    _gpuGeometryRenderer?.unregisterCoordinateMappingReader();
     _gpuGeometryRenderer = value;
     markNeedsPaint();
   }
