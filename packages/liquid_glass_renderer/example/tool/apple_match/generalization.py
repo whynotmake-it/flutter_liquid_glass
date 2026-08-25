@@ -134,7 +134,12 @@ def run_scene(*, scene_id, base, args, out, fit):
         if fit:
             def shape_loss(params):
                 evaluator.evaluate(params)
-                return 100.0 * min(evaluator.last_result.errors["shape"] / 0.2, 1.0)
+                # Keep the geometry objective continuous above the scorecard's
+                # normalization threshold.  The previous clamp made every
+                # starting control whose shape error exceeded .2 have the
+                # same loss, preventing coordinate descent from reaching the
+                # measured subpixel/size basin.
+                return 100.0 * evaluator.last_result.errors["shape"]
 
             geometry = coordinate_descent(
                 shape_loss,

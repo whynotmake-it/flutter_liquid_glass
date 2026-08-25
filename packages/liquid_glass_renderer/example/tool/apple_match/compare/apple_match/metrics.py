@@ -380,12 +380,15 @@ def component_errors(
         np.mean(np.abs(reference["B"][mask] - candidate["B"][mask]))
     )
 
-    zeros = np.zeros_like(ref_a)
+    # A/B are the paired primary/holdout RGBW fields.  Comparing A against a
+    # zero image makes every foreground glyph and material response look like
+    # optical flow; subtract the paired field first so the metric measures the
+    # displacement of the shared backdrop instead.
     optical_flow = signed_optical_flow(
         reference["A"],
-        zeros,
+        reference["B"],
         candidate["A"],
-        zeros,
+        candidate["B"],
     )
     flow = float(np.mean(np.abs(optical_flow[mask])) / 4.0)
 
@@ -962,8 +965,12 @@ def write_diagnostics(
     cv2.line(profile_canvas, (40, 560), (1160, 560), (180, 180, 180), 1)
     cv2.imwrite(str(output / "transmission_boundary_curvature.png"), profile_canvas)
 
-    zeros = np.zeros_like(reference["A"])
-    flow = signed_optical_flow(reference["A"], zeros, candidate["A"], zeros)
+    flow = signed_optical_flow(
+        reference["A"],
+        reference["B"],
+        candidate["A"],
+        candidate["B"],
+    )
     limit = max(float(np.percentile(np.abs(flow), 99)), 1e-6)
     normalized = np.clip(flow / limit, -1, 1)
     visual = np.zeros((*flow.shape, 3), dtype=np.uint8)

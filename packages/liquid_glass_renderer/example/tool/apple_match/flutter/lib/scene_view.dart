@@ -147,6 +147,14 @@ class MatchSceneView extends StatelessWidget {
               settings: matchGlassSettings(settings),
               shadows: matchGlassShadows(settings),
             )
+          else if (scene.profile == 'tab_bar_holdout')
+            _MatchTabBar(
+              rect: shapeRect,
+              cornerRadius: cornerRadius,
+              settings: matchGlassSettings(settings),
+              shadows: matchGlassShadows(settings),
+              probe: probe,
+            )
           else
             Positioned.fromRect(
               rect: shapeRect,
@@ -164,6 +172,152 @@ class MatchSceneView extends StatelessWidget {
 
   double _number(String key, double fallback) =>
       (settings[key] as num?)?.toDouble() ?? fallback;
+}
+
+/// Reproduces the small foreground that the system TabView places inside its
+/// glass bar. The holdout scene is intentionally harness-only: shipped users
+/// provide their own child content to [LiquidGlass].
+class _MatchTabBar extends StatelessWidget {
+  const _MatchTabBar({
+    required this.rect,
+    required this.cornerRadius,
+    required this.settings,
+    required this.shadows,
+    required this.probe,
+  });
+
+  final Rect rect;
+  final double cornerRadius;
+  final LiquidGlassSettings settings;
+  final List<BoxShadow> shadows;
+  final String probe;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = probe == 'C' ? Colors.white : Colors.black;
+    // The pinned white solid probe contains no visible system tab bar. Keep
+    // that capture honest instead of inventing foreground pixels for it.
+    final child = probe == 'D'
+        ? const SizedBox.expand()
+        : _MatchTabItems(foreground: foreground);
+    return Positioned.fromRect(
+      rect: rect,
+      child: LiquidGlass.withOwnLayer(
+        settings: settings,
+        shape: LiquidRoundedSuperellipse(borderRadius: cornerRadius),
+        shadows: shadows,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _MatchTabItems extends StatelessWidget {
+  const _MatchTabItems({required this.foreground});
+
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _MatchTabItem(
+          label: 'First',
+          glyph: _TabGlyph.circle,
+          foreground: foreground,
+          selected: true,
+        ),
+        _MatchTabItem(
+          label: 'Second',
+          glyph: _TabGlyph.square,
+          foreground: foreground,
+        ),
+        _MatchTabItem(
+          label: 'Third',
+          glyph: _TabGlyph.triangle,
+          foreground: foreground,
+        ),
+      ],
+    );
+  }
+}
+
+enum _TabGlyph { circle, square, triangle }
+
+class _MatchTabItem extends StatelessWidget {
+  const _MatchTabItem({
+    required this.label,
+    required this.glyph,
+    required this.foreground,
+    this.selected = false,
+  });
+
+  final String label;
+  final _TabGlyph glyph;
+  final Color foreground;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? const Color(0xFF007AFF) : foreground;
+    return Expanded(
+      child: DecoratedBox(
+        decoration: selected
+            ? BoxDecoration(
+                color: foreground.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(32),
+              )
+            : const BoxDecoration(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CustomPaint(
+              size: const Size.square(22),
+              painter: _TabGlyphPainter(glyph: glyph, color: color),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(color: color, fontSize: 14, height: 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TabGlyphPainter extends CustomPainter {
+  const _TabGlyphPainter({required this.glyph, required this.color});
+
+  final _TabGlyph glyph;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final bounds = Offset.zero & size;
+    switch (glyph) {
+      case _TabGlyph.circle:
+        canvas.drawCircle(bounds.center, size.shortestSide / 2, paint);
+      case _TabGlyph.square:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(bounds.deflate(1), const Radius.circular(2)),
+          paint,
+        );
+      case _TabGlyph.triangle:
+        final path = Path()
+          ..moveTo(bounds.center.dx, 1)
+          ..lineTo(bounds.right - 1, bounds.bottom - 1)
+          ..lineTo(bounds.left + 1, bounds.bottom - 1)
+          ..close();
+        canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TabGlyphPainter oldDelegate) =>
+      oldDelegate.glyph != glyph || oldDelegate.color != color;
 }
 
 /// Composes the iOS loupe as Flutter does: magnify the painted backdrop first,

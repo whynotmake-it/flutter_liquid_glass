@@ -26,16 +26,30 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
-        home: MatchSceneView(
-          scene: scene,
-          probe: 'A',
-          settings: const {},
-        ),
+        home: MatchSceneView(scene: scene, probe: 'A', settings: const {}),
       ),
     );
 
     expect(scene.profile, 'loupe');
     expect(find.byType(RawMagnifier), findsOneWidget);
+  });
+
+  testWidgets('tab holdout includes deterministic foreground content', (
+    tester,
+  ) async {
+    final file = File('../scenes/tab_bar_holdout.json');
+    final scene = MatchScene.fromBase64(
+      base64Encode(utf8.encode(file.readAsStringSync())),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MatchSceneView(scene: scene, probe: 'A', settings: const {}),
+      ),
+    );
+
+    expect(find.text('First'), findsOneWidget);
+    expect(find.text('Second'), findsOneWidget);
+    expect(find.text('Third'), findsOneWidget);
   });
 
   test('maps core optical settings', () {

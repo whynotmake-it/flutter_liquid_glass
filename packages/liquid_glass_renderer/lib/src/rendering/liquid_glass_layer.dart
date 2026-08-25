@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_setters_without_getters
 
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -360,11 +361,22 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final snapshot = shaderInputSnapshot;
     var shaderFilter = _cachedFilter;
     if (shaderFilter == null || _cachedFilterSnapshot != snapshot) {
-      final blurFilter = settings.effectiveFrost > 0
+      // Apple keeps the material vector stable while its smaller controls
+      // visibly retain more backdrop detail. Normalize the blur radius by the
+      // rendered control height, clamped at the canonical 94 logical-pixel
+      // toolbar height. This is a derived compositor scalar, not a scene
+      // setting, and avoids over-softening small capsules without adding a
+      // pass or per-frame work.
+      final materialHeight = shapes.length == 1
+          ? shapes.first.$2.bounds.height
+          : boundingBox.height;
+      final sizeNormalizedFrost =
+          settings.effectiveFrost * math.min(1.0, materialHeight / 94.0);
+      final blurFilter = sizeNormalizedFrost > 0
           ? ImageFilter.blur(
               tileMode: TileMode.mirror,
-              sigmaX: settings.effectiveFrost,
-              sigmaY: settings.effectiveFrost,
+              sigmaX: sizeNormalizedFrost,
+              sigmaY: sizeNormalizedFrost,
             )
           : null;
       shaderFilter = switch (blurFilter) {
