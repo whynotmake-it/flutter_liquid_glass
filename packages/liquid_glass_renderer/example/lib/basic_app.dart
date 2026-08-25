@@ -176,13 +176,8 @@ class BasicApp extends HookWidget {
                                     borderRadius: 20,
                                   ),
                                   child: GlassGlow(
-                                    child: SizedBox.square(
+                                    child: const SizedBox.square(
                                       dimension: 100,
-                                      child: Center(
-                                        child: fake.value
-                                            ? Text('FAKE')
-                                            : Text('REAL'),
-                                      ),
                                     ),
                                   ),
                                 ),
@@ -197,13 +192,8 @@ class BasicApp extends HookWidget {
                                 child: GlassGlow(
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.opaque,
-                                    child: SizedBox.square(
+                                    child: const SizedBox.square(
                                       dimension: 100,
-                                      child: Center(
-                                        child: fake.value
-                                            ? Text('FAKE')
-                                            : Text('REAL'),
-                                      ),
                                     ),
                                   ),
                                 ),
@@ -220,14 +210,9 @@ class BasicApp extends HookWidget {
                             child: GlassGlow(
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
-                                child: SizedBox(
+                                child: const SizedBox(
                                   width: 400,
                                   height: 64,
-                                  child: Center(
-                                    child: fake.value
-                                        ? Text('FAKE')
-                                        : Text('REAL'),
-                                  ),
                                 ),
                               ),
                             ),
