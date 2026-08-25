@@ -105,9 +105,28 @@ def validate_settings(settings: dict) -> None:
 
 
 def simctl(*arguments: str) -> str:
-    return subprocess.check_output(
-        ["xcrun", "simctl", *arguments], text=True
-    ).strip()
+    developer_dir = os.environ.get("DEVELOPER_DIR")
+    command = (
+        [str(Path(developer_dir) / "usr/bin/simctl")]
+        if developer_dir
+        else ["xcrun", "simctl"]
+    )
+    last_error = None
+    for attempt in range(4):
+        try:
+            return subprocess.check_output(
+                [*command, *arguments], text=True
+            ).strip()
+        except subprocess.CalledProcessError as error:
+            last_error = error
+            # CoreSimulator occasionally drops one client while the pinned
+            # runtime is waking. A bounded retry preserves real failures but
+            # avoids losing an otherwise deterministic capture to that
+            # transient XPC disconnect.
+            if attempt == 3:
+                raise
+            time.sleep(0.75 * (attempt + 1))
+    raise last_error  # pragma: no cover
 
 
 def atomic_write_json(path: Path, payload: dict) -> None:
@@ -307,9 +326,18 @@ class CaptureSession:
                 self.session.transport.tail_text()
             )
             self.session.terminate()
-        subprocess.run(
-            ["xcrun", "simctl", "terminate", self.udid, BUNDLE_ID], check=False
+        developer_dir = os.environ.get("DEVELOPER_DIR")
+        simctl = (
+            str(Path(developer_dir) / "usr/bin/simctl")
+            if developer_dir
+            else "xcrun"
         )
+        terminate_command = (
+            [simctl, "terminate", self.udid, BUNDLE_ID]
+            if developer_dir
+            else [simctl, "simctl", "terminate", self.udid, BUNDLE_ID]
+        )
+        subprocess.run(terminate_command, check=False)
 
 
 class Evaluator:

@@ -286,7 +286,6 @@ class BasicApp extends HookWidget {
                     blendNotifier: blendNotifier,
                     settingsNotifier: settingsNotifier,
                     backgroundNotifier: background,
-                    onClose: () => showSettings.value = false,
                   ),
                 ),
               ),

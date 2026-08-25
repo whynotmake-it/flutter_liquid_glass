@@ -161,11 +161,9 @@ float getShapeSDF(
 struct SceneSample {
     float distance;
     float halfMinor;
-    vec2 center;
-    float halfMajor;
 };
 
-SceneSample getShapeSampleFromArray(int index, vec2 p) {
+float getShapeDistanceFromArray(int index, vec2 p) {
     int baseIndex = index * 3;
     vec4 primitive = uShapeData[baseIndex];
     vec4 inverseBasis = uShapeData[baseIndex + 1];
@@ -188,17 +186,20 @@ SceneSample getShapeSampleFromArray(int index, vec2 p) {
         rseCircleCenters,
         rseSemiAxisAndRadii
     );
+    return localDistance * placement.z;
+}
+
+SceneSample getShapeSampleFromArray(int index, vec2 p) {
+    int baseIndex = index * 3;
+    vec4 primitive = uShapeData[baseIndex];
+    vec4 placement = uShapeData[baseIndex + 2];
     SceneSample resultSample;
-    resultSample.distance = localDistance * placement.z;
+    resultSample.distance = getShapeDistanceFromArray(index, p);
     // The placement scale is the same scale applied to the signed distance,
     // so this is the shape's local half-minor extent in scene pixels. Keeping
     // it beside the SDF avoids a second traversal and lets optical spread be
     // shape-relative rather than thickness-relative.
     resultSample.halfMinor = 0.5 * min(primitive.y, primitive.z) * placement.z;
-    // Placement is already expressed in matte pixels. Carry the center and
-    // major extent as metadata for the spread lens without another traversal.
-    resultSample.center = placement.xy;
-    resultSample.halfMajor = 0.5 * max(primitive.y, primitive.z) * placement.z;
     return resultSample;
 }
 
@@ -208,15 +209,12 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
     }
     float e = max(k - abs(a.distance - b.distance), 0.0);
     float distance = min(a.distance, b.distance) - e * e * 0.25 / k;
-    // Same bounded smooth-min blend used for the distance field. The reach is
-    // only metadata, but following the union weights keeps the profile
-    // continuous at a smooth group seam.
+    // Follow the same bounded smooth-min blend used for the distance field so
+    // the shape-relative profile remains continuous at a smooth group seam.
     float weightA = clamp(0.5 + (b.distance - a.distance) / (2.0 * k), 0.0, 1.0);
     SceneSample result;
     result.distance = distance;
     result.halfMinor = mix(b.halfMinor, a.halfMinor, weightA);
-    result.center = mix(b.center, a.center, weightA);
-    result.halfMajor = mix(b.halfMajor, a.halfMajor, weightA);
     return result;
 }
 
@@ -224,8 +222,6 @@ SceneSample sceneSample(vec2 p, int numShapes) {
     SceneSample empty;
     empty.distance = 1e9;
     empty.halfMinor = 0.0;
-    empty.center = vec2(0.0);
-    empty.halfMajor = 0.0;
     if (numShapes <= 0) {
         return empty;
     }
@@ -253,5 +249,30 @@ SceneSample sceneSample(vec2 p, int numShapes) {
 }
 
 float sceneSDF(vec2 p, int numShapes) {
-    return sceneSample(p, numShapes).distance;
+    if (numShapes <= 0) {
+        return 1e9;
+    }
+    int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
+    if (shapeCount == 1) {
+        return getShapeDistanceFromArray(0, p);
+    }
+
+    float result = 1e9;
+    float groupResult = 1e9;
+    for (int i = 0; i < MAX_SHAPES; i++) {
+        if (i >= shapeCount) break;
+        float marker = uShapeData[i * 3 + 2].w;
+        bool startsGroup = marker < 0.0;
+        float groupBlend = startsGroup ? -marker - 1.0 : marker;
+        float shapeDistance = getShapeDistanceFromArray(i, p);
+        if (startsGroup) {
+            result = min(result, groupResult);
+            groupResult = shapeDistance;
+        } else {
+            float e = max(groupBlend - abs(groupResult - shapeDistance), 0.0);
+            groupResult = min(groupResult, shapeDistance) -
+                e * e * 0.25 / max(groupBlend, 0.0001);
+        }
+    }
+    return min(result, groupResult);
 }

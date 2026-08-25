@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/preset_store.dart';
 import 'package:stupid_simple_sheet/stupid_simple_sheet.dart';
 
 Animation<double> useRotatingAnimationController() {
@@ -94,7 +95,6 @@ class SettingsSheet extends HookWidget {
     required this.settingsNotifier,
     required this.fake,
     this.backgroundNotifier,
-    this.onClose,
   });
 
   final ValueNotifier<double> blendNotifier;
@@ -102,7 +102,6 @@ class SettingsSheet extends HookWidget {
 
   final bool fake;
   final ValueNotifier<String>? backgroundNotifier;
-  final VoidCallback? onClose;
 
   Future<void> show(BuildContext context) {
     return Navigator.push(
@@ -115,6 +114,35 @@ class SettingsSheet extends HookWidget {
   Widget build(BuildContext context) {
     final settings = useValueListenable(settingsNotifier);
     final blend = useValueListenable(blendNotifier);
+    final presetStore = useMemoized(PresetStore.new);
+    final presetNames = useState<List<String>>(<String>[]);
+    final presetNameController = useTextEditingController();
+    useEffect(() {
+      var disposed = false;
+      presetStore.names().then((names) {
+        if (!disposed) presetNames.value = names;
+      });
+      return () {
+        disposed = true;
+      };
+    }, [presetStore]);
+
+    Future<void> refreshPresets() async {
+      presetNames.value = await presetStore.names();
+    }
+
+    Future<void> savePreset() async {
+      final requestedName = presetNameController.text.trim();
+      final name = requestedName.isEmpty ? 'custom' : requestedName;
+      await presetStore.save(name, settingsNotifier.value);
+      presetNameController.text = name;
+      await refreshPresets();
+    }
+
+    Future<void> loadPreset(String name) async {
+      final loaded = await presetStore.load(name);
+      if (loaded != null) settingsNotifier.value = loaded;
+    }
 
     return LiquidStretch(
       interactionScale: 1.005,
@@ -148,15 +176,6 @@ class SettingsSheet extends HookWidget {
                           'Settings',
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
-                        if (onClose != null)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: onClose,
-                              child: const Text('Close'),
-                            ),
-                          ),
                         const _SettingsSection(title: 'Background'),
                         Wrap(
                           spacing: 8,
@@ -321,6 +340,52 @@ class SettingsSheet extends HookWidget {
                           onChanged: (value) => settingsNotifier.value =
                               settings.copyWith(refractionSpread: value),
                         ),
+                        const _SettingsSection(title: 'Presets'),
+                        CupertinoTextField(
+                          controller: presetNameController,
+                          placeholder: 'Preset name',
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => savePreset(),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CupertinoButton.tinted(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                onPressed: savePreset,
+                                child: const Text('Save current'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: CupertinoButton.tinted(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                onPressed: refreshPresets,
+                                child: const Text('Refresh'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (presetNames.value.isNotEmpty)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              for (final name in presetNames.value)
+                                CupertinoButton.tinted(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  onPressed: () => loadPreset(name),
+                                  child: Text(name),
+                                ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -372,9 +437,12 @@ class _SettingsSlider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label),
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+            Expanded(
+              child: Text(label, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
             Text(value.toStringAsFixed(fractionDigits)),
           ],
         ),

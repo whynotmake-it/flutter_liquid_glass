@@ -86,7 +86,8 @@ class LiquidGlassSettings with Equatable {
   final double edgeRefraction;
 
   /// Extends the SDF optical profile into the face. `0` is the normal edge
-  /// glass profile; `1` approaches a full-face lens for loupe-like controls.
+  /// glass profile; `1` evaluates the profile across the full face. This is a
+  /// profile/refractive-field control, not a uniform backdrop zoom.
   final double refractionSpread;
 
   /// Backdrop frost/softening radius.
@@ -137,10 +138,11 @@ class LiquidGlassSettings with Equatable {
     return math.sqrt(1.0 + ratio * ratio);
   }
 
-  /// Shared displacement codec scale for the geometry and final passes.
+  /// Shared displacement codec scale for the geometry and final passes. The
+  /// public edge value is the analytic peak of the profile; using it directly
+  /// avoids wasting RGBA8 codes on unreachable displacement range.
   double get effectiveDisplacementScale =>
-      math.max(1e-3, math.max(10.0 * effectiveThickness,
-          1.05 * effectiveEdgeRefraction));
+      math.max(1e-3, 1.05 * effectiveEdgeRefraction);
 
   LiquidGlassSettings copyWith({
     double? visibility,

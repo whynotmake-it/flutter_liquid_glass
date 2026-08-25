@@ -25,6 +25,20 @@ void main() {
     skip: !_useTestBackground,
   );
 
+  testWidgets('settings has one close action and persistent preset controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const CupertinoApp(home: BasicApp()));
+    await tester.pump();
+
+    await tester.tap(find.text('Settings').last);
+    await tester.pump();
+
+    expect(find.text('Close'), findsOneWidget);
+    expect(find.text('Save current'), findsOneWidget);
+    expect(find.text('Refresh'), findsOneWidget);
+  });
+
   test('all example platforms enable Impeller and Flutter GPU', () {
     final android = File(
       'android/app/src/main/AndroidManifest.xml',

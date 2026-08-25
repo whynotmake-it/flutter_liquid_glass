@@ -16,5 +16,7 @@ fvm flutter run -d macos -t lib/basic_app.dart \
 ```
 
 Use `fvm flutter devices` to select an iOS or Android Impeller device instead
-of `macos`. The running app's sidebar exposes material controls, backgrounds,
-and the bundled YAML presets.
+of `macos`. The running app's sidebar exposes material controls, black/white/
+grid/image backgrounds, and YAML presets. Enter a name and choose **Save
+current** to persist the current material in the app documents directory; tap
+one of the listed names to load it again.

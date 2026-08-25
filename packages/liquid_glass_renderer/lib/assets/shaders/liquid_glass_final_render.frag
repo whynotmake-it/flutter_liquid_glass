@@ -5,7 +5,10 @@
 // the liquid glass effect efficiently
 
 #version 460 core
-precision mediump float;
+// Refraction is evaluated in global filter coordinates. Keep the affine
+// mapping and sub-pixel displacement in high precision on GLES; mediump turns
+// the coordinate subtraction into visible shimmer on large layers.
+precision highp float;
 
 #define DEBUG_GEOMETRY 0
 
@@ -241,13 +244,17 @@ void main() {
         return;
     }
 
-    float maxDisplacement = max(uDisplacementScale, uThickness * 10.0);
+    float maxDisplacement = max(uDisplacementScale, 0.001);
     vec2 displacement = decodeDisplacement(geometryData, maxDisplacement);
 
     vec2 invUSize = 1.0 / uSize;
     
     vec4 refractColor;
-    if (uChromaticAberration < 0.01) {
+    // The public/default value is intentionally small (~0.005), but it still
+    // represents a real channel separation. The old 0.01 cutoff silently
+    // disabled that range and made CA appear broken. Only exact-zero values
+    // take the single-sample fast path.
+    if (uChromaticAberration < 0.0001) {
         vec2 refractedUV = mirrorBackgroundUV(
             screenUV + displacement * invUSize,
             invUSize
