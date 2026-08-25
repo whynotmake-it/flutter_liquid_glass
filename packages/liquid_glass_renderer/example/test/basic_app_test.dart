@@ -40,6 +40,25 @@ void main() {
     expect(find.text('Close'), findsOneWidget);
     expect(find.text('Save current'), findsOneWidget);
     expect(find.text('Refresh'), findsOneWidget);
+    for (final background in ['image', 'black', 'white', 'grid']) {
+      expect(find.text(background), findsOneWidget);
+    }
+    for (final control in [
+      'Thickness',
+      'Glass opacity',
+      'Highlight',
+      'Contour strength',
+      'Contour width',
+      'Transmission gamma',
+      'Vibrancy',
+      'Frost',
+      'Chromatic aberration',
+      'Saturation',
+      'Peak displacement (px)',
+      'Face reach',
+    ]) {
+      expect(find.text(control), findsOneWidget);
+    }
     expect(find.text('REAL'), findsNothing);
     expect(find.text('FAKE'), findsNothing);
   });
