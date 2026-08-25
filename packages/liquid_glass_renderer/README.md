@@ -155,8 +155,8 @@ class MyGlassWidget extends StatelessWidget {
             child: LiquidGlassLayer(
               settings: const LiquidGlassSettings(
                 thickness: 20,
-                blur: 10,
-                glassColor: Color(0x33FFFFFF),
+                frost: 10,
+                tint: Color(0x33FFFFFF),
               ),
               child: LiquidGlass(
                 shape: LiquidRoundedSuperellipse(
@@ -185,7 +185,7 @@ If you need a single glass shape with custom settings and don't want to create a
 LiquidGlass.withOwnLayer(
   settings: const LiquidGlassSettings(
     thickness: 15,
-    blur: 8,
+    frost: 8,
   ),
   shape: LiquidRoundedSuperellipse(borderRadius: 30),
   child: const SizedBox.square(dimension: 100),
@@ -198,7 +198,7 @@ If you don't know whether a `LiquidGlassLayer` exists as an ancestor, use `Liqui
 LiquidGlass.auto(
   settings: const LiquidGlassSettings(
     thickness: 15,
-    blur: 8,
+    frost: 8,
   ),
   shape: LiquidRoundedSuperellipse(borderRadius: 30),
   child: const SizedBox.square(dimension: 100),
@@ -230,7 +230,7 @@ To blend multiple glass shapes together seamlessly, wrap them in a `LiquidGlassB
 LiquidGlassLayer(
   settings: const LiquidGlassSettings(
     thickness: 20,
-    blur: 10,
+    frost: 10,
   ),
   child: LiquidGlassBlendGroup(
     blend: 20.0, // Controls how much shapes blend together
@@ -264,15 +264,20 @@ You can have multiple `LiquidGlass` widgets in a `LiquidGlassLayer` without blen
 
 You can customize the appearance of the glass by providing `LiquidGlassSettings` to a `LiquidGlassLayer`, `LiquidGlass.withOwnLayer()`, or `LiquidGlass.auto()`. All glass widgets within that layer will share these settings.
 
+For the closest validated match to the light iOS 27 toolbar material, start
+with the size-specific preset and tune it for your control:
+
+```dart
+const LiquidGlassSettings.ios27ToolbarLight()
+```
+
+The preset is deliberately not the universal default. Apple's material varies
+with control size and appearance; this fit targets a toolbar-sized capsule in
+light appearance.
+
 ```dart
 LiquidGlassLayer(
-  settings: const LiquidGlassSettings(
-    thickness: 10,
-    glassColor: Color(0x1AFFFFFF),
-    lightIntensity: 1.5,
-    outlineIntensity: 0.5,
-    saturation: 1.2,
-  ),
+  settings: const LiquidGlassSettings.ios27ToolbarLight(),
   child: LiquidGlassBlendGroup(
     blend: 40, // blend is now on LiquidGlassBlendGroup, not settings
     child: // ... your LiquidGlass.grouped widgets
@@ -282,14 +287,15 @@ LiquidGlassLayer(
 
 Here's a breakdown of the key settings:
 
--   `glassColor`: The color tint of the glass. The alpha channel controls the intensity.
--   `thickness`: How much the glass refracts the background (higher = more distortion).
--   `blur`: Background blur strength (0 = no blur).
--   `refractiveIndex`: The refractive index of the glass material (1.0 = no refraction, ~1.5 = realistic glass).
--   `lightAngle`, `lightIntensity`: Control the direction and brightness of the virtual light source, creating highlights.
--   `ambientStrength`: The intensity of ambient light on the glass.
--   `outlineIntensity`: The visibility of the glass outline/edge.
--   `saturation`: Adjusts the color saturation of background pixels visible through the glass (1.0 = no change, <1.0 = desaturated, >1.0 = more saturated).
+-   `tint`: Unified material tint; alpha controls transmission.
+-   `thickness`: Optical profile depth in logical pixels.
+-   `edgeRefraction`: Peak edge displacement in pixels.
+-   `refractionSpread`: Extends the SDF profile into the face for lens/loupe controls.
+-   `frost`: Background softening strength (0 = no blur).
+-   `chromaticAberration`: Wavelength separation at the refracted edge.
+-   `highlight`: Paired directional edge-light strength.
+-   `contourStrength`, `contourWidth`: SDF-derived dark dielectric outline.
+-   `transmissionGamma`, `vibrancy`, `saturation`: Display transfer and color response.
 
 **Note:** The `blend` parameter has been moved from `LiquidGlassSettings` to the `LiquidGlassBlendGroup` constructor, as it specifically controls shape blending behavior.
 
@@ -297,12 +303,12 @@ Increasing saturation when using colored glass helps achieve an Apple-like aesth
 
 ### Adding Blur
 
-You can apply a background blur using the `blur` property in `LiquidGlassSettings`. This is independent of the glass refraction effect.
+You can apply a background blur using the `frost` property in `LiquidGlassSettings`. This is independent of the glass refraction effect.
 
 ```dart
 LiquidGlassLayer(
   settings: const LiquidGlassSettings(
-    blur: 10.0,
+    frost: 10.0,
     thickness: 20,
   ),
   child: // ... your glass widgets
@@ -356,8 +362,8 @@ FakeGlass(
     borderRadius: 20,
   ),
   settings: const LiquidGlassSettings(
-    blur: 10,
-    glassColor: Color(0x33FFFFFF),
+    frost: 10,
+    tint: Color(0x33FFFFFF),
   ),
   child: const SizedBox(
     height: 100,
@@ -373,14 +379,15 @@ Alternatively, you can enable fake glass for an entire layer:
 LiquidGlassLayer(
   fake: true,
   settings: const LiquidGlassSettings(
-    blur: 10,
-    glassColor: Color(0x33FFFFFF),
+    frost: 10,
+    tint: Color(0x33FFFFFF),
   ),
   child: // ... your glass widgets will automatically use FakeGlass
 )
 ```
 
-**Note:** `FakeGlass` does not support `thickness` or `refractiveIndex` properties since it doesn't perform actual refraction.
+**Note:** `FakeGlass` does not perform refraction; `edgeRefraction` and
+`refractionSpread` are ignored on that fallback path.
 
 ### `GlassGlow`: Interactive Touch Effects
 

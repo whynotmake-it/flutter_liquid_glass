@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -246,6 +247,8 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required int numShapes,
     required double refractiveIndex,
+    double refractionSpread = 0.0,
+    double? displacementScale,
     required double thickness,
     required double offsetX,
     required double offsetY,
@@ -291,6 +294,9 @@ class FlutterGpuGeometryRenderer {
       textureWidth: allocatedWidth.toDouble(),
       textureHeight: allocatedHeight.toDouble(),
       refractiveIndex: refractiveIndex,
+      refractionSpread: refractionSpread,
+      displacementScale: displacementScale ??
+          math.max(1e-3, math.max(10.0 * thickness, 1.05 * refractionSpread)),
       thickness: thickness,
       geometryAaHalfWidth: _geometryAaHalfWidth,
       numShapes: numShapes.toDouble(),
@@ -329,6 +335,8 @@ class FlutterGpuGeometryRenderer {
     required double textureWidth,
     required double textureHeight,
     required double refractiveIndex,
+    required double refractionSpread,
+    required double displacementScale,
     required double thickness,
     required double geometryAaHalfWidth,
     required double numShapes,
@@ -342,8 +350,9 @@ class FlutterGpuGeometryRenderer {
     floatData[uOffsetIndex + 1] = offsetY;
 
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
-    floatData[textureSizeIndex] = textureWidth;
-    floatData[textureSizeIndex + 1] = textureHeight;
+    // Reuse the existing vec2 slot for profile spread and codec scale.
+    floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
+    floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
 
     final opticalIndex = _offsetOpticalProps ~/ 4;
     floatData[opticalIndex] = refractiveIndex;
@@ -353,6 +362,7 @@ class FlutterGpuGeometryRenderer {
     floatData[opticalIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
     floatData[opticalIndex + 2] = thickness;
     floatData[opticalIndex + 3] = numShapes;
+
 
     final shapeDataStartIndex = _offsetShapeData ~/ 4;
     final shapeFloats = shapeData.length < 192 ? shapeData.length : 192;

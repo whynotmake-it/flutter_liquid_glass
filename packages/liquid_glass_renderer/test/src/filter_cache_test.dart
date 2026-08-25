@@ -57,7 +57,7 @@ void main() {
       expect(firstFilter, isNotNull);
 
       await tester.pumpWidget(
-        glass(settings: const LiquidGlassSettings(blur: 8)),
+        glass(settings: const LiquidGlassSettings(frost: 8)),
       );
       await tester.pumpAndSettle();
 

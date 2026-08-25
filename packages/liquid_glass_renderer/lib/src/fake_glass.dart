@@ -45,7 +45,7 @@ class FakeGlass extends StatelessWidget {
   /// The settings for the glass effect.
   ///
   /// This path approximates lighting and blur without refraction.
-  /// [LiquidGlassSettings.refractiveIndex] and
+  /// [LiquidGlassSettings.edgeRefraction] and
   /// [LiquidGlassSettings.chromaticAberration] therefore have no effect;
   /// thickness only controls the width of the approximate inner light bleed.
   final LiquidGlassSettings? settings;
@@ -201,7 +201,7 @@ class _RenderFakeGlass extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  bool get _hasBlur => settings.effectiveBlur != 0;
+  bool get _hasBlur => settings.effectiveFrost != 0;
 
   bool get _hasSaturationChange => settings.effectiveSaturation != 1;
 
@@ -228,8 +228,8 @@ class _RenderFakeGlass extends RenderProxyBox {
 
     final blurFilter = _hasBlur
         ? ui.ImageFilter.blur(
-            sigmaX: settings.effectiveBlur,
-            sigmaY: settings.effectiveBlur,
+            sigmaX: settings.effectiveFrost,
+            sigmaY: settings.effectiveFrost,
             tileMode: TileMode.mirror,
           )
         : null;
@@ -283,7 +283,7 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   ui.ImageFilter? _getColorFilter(LiquidGlassSettings settings) {
-    final glassColor = settings.effectiveGlassColor;
+    final glassColor = settings.effectiveTint;
     if (settings.effectiveSaturation == 1 && glassColor.a == 0) {
       return null;
     }
@@ -328,7 +328,7 @@ class _RenderFakeGlass extends RenderProxyBox {
   }
 
   void _paintColor(Canvas canvas, Path path) {
-    final color = settings.effectiveGlassColor;
+    final color = settings.effectiveTint;
 
     final paint = Paint()
       ..color = color
@@ -349,31 +349,26 @@ class _RenderFakeGlass extends RenderProxyBox {
       radius: bounds.size.longestSide / 2,
     );
 
-    final lightIntensity = settings.effectiveLightIntensity.clamp(0.0, 1.0);
-    final ambientStrength = settings.effectiveAmbientStrength.clamp(0.0, 1.0);
-    final specularWrap = settings.specularWrap.clamp(0.0, 1.0);
+    final lightIntensity = settings.effectiveHighlight.clamp(0.0, 1.0);
+    const ambientStrength = 0.0;
+    const specularWrap = 0.25;
 
     final highlightAlpha = Curves.easeOut.transform(lightIntensity) * 0.78;
-    final highlightColor = settings.effectiveHighlightColor.withValues(
+    final highlightColor = const Color.fromARGB(255, 255, 255, 255).withValues(
       // effectiveLightIntensity already includes highlight alpha and
       // visibility; multiplying by effectiveHighlightColor.a again would
       // unintentionally square both controls on the fake path.
       alpha: highlightAlpha,
     );
-    final edgeColor = settings.effectiveEdgeColor.withValues(
-      alpha:
-          settings.effectiveEdgeColor.a *
-          0.95 *
-          Curves.easeOut.transform(
-            ui.lerpDouble(0.35, 1.0, specularWrap)!,
-          ),
+    final edgeColor = const Color.fromARGB(255, 0, 0, 0).withValues(
+      alpha: settings.effectiveContourStrength.clamp(0.0, 1.0),
     );
 
     final softEdgeColor = edgeColor.withValues(
       alpha: edgeColor.a * ui.lerpDouble(0.9, 1.0, ambientStrength)!,
     );
 
-    final rad = settings.lightAngle;
+    const rad = math.pi / 2;
     final x = math.cos(rad);
     final y = math.sin(rad);
 
@@ -404,7 +399,7 @@ class _RenderFakeGlass extends RenderProxyBox {
     final edgeStart = ui.lerpDouble(
       secondInset,
       .5,
-      settings.edgeInset.clamp(0.0, 1.0),
+      0.25,
     )!;
     final edgeEnd = 1 - edgeStart;
 
@@ -429,8 +424,8 @@ class _RenderFakeGlass extends RenderProxyBox {
       ..shader = shader
       ..color = highlightColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = settings.effectiveEdgeWidth > 0
-          ? settings.effectiveEdgeWidth
+      ..strokeWidth = settings.effectiveContourWidth > 0
+          ? settings.effectiveContourWidth
           : ui.lerpDouble(1, 2, lightIntensity)!
       ..blendMode = BlendMode.hardLight;
     canvas.drawPath(path, paint);
@@ -441,7 +436,7 @@ class _RenderFakeGlass extends RenderProxyBox {
         alpha:
             highlightColor.a *
             0.45 *
-            settings.effectiveBleedStrength.clamp(0.0, 1.0),
+            0.375,
       )
       ..style = PaintingStyle.stroke
       ..strokeWidth = (settings.effectiveThickness / 24)

@@ -60,6 +60,13 @@ struct MatchView: View {
                     height: scene.canvas.logicalHeight
                 )
                 .accessibilityIdentifier("official-glass-tab-bar")
+            } else if scene.profile == "loupe" {
+                LoupeProbeView()
+                    .frame(
+                        width: scene.canvas.logicalWidth,
+                        height: scene.canvas.logicalHeight
+                    )
+                    .accessibilityIdentifier("loupe-field")
             } else if #available(iOS 26.0, *) {
                 Button(action: {}) {
                     Color.clear
@@ -78,6 +85,52 @@ struct MatchView: View {
         }
         .ignoresSafeArea()
     }
+}
+
+// A clear, invisible text surface whose only job is to host the system
+// text-selection loupe above a scripted long-press. The callout menu is
+// suppressed so the loupe is the sole overlay on the probe background.
+final class LoupeTextView: UITextView {
+    override func canPerformAction(
+        _ action: Selector,
+        withSender sender: Any?
+    ) -> Bool {
+        false
+    }
+
+    // The blinking caret lands at the whitespace line start, outside the
+    // scored crop, and its blink phase differs between frames. Hide it so
+    // the loupe is the only dynamic overlay.
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        .zero
+    }
+}
+
+struct LoupeProbeView: UIViewRepresentable {
+    func makeUIView(context: Context) -> LoupeTextView {
+        let field = LoupeTextView()
+        field.backgroundColor = .clear
+        field.textColor = .clear
+        field.tintColor = .clear
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.spellCheckingType = .no
+        field.smartQuotesType = .no
+        field.smartDashesType = .no
+        field.isScrollEnabled = false
+        // Whitespace content lets the caret settle anywhere while magnifying
+        // nothing but the probe background behind the field.
+        field.text = String(repeating: " \n", count: 80)
+        // An empty input view suppresses the software keyboard.
+        field.inputView = UIView()
+        field.inputAccessoryView = UIView()
+        DispatchQueue.main.async {
+            field.becomeFirstResponder()
+        }
+        return field
+    }
+
+    func updateUIView(_ uiView: LoupeTextView, context: Context) {}
 }
 
 struct ProbeBackground: View {

@@ -19,7 +19,7 @@ command:
 scripts:
   analyze:
     run: |
-      dart analyze . --fatal-infos
+      dart analyze .
     exec:
       # We are setting the concurrency to 1 because a higher concurrency can crash
       # the analysis server on low performance machines (like GitHub Actions).

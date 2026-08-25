@@ -93,12 +93,16 @@ class SettingsSheet extends HookWidget {
     required this.blendNotifier,
     required this.settingsNotifier,
     required this.fake,
+    this.backgroundNotifier,
+    this.onClose,
   });
 
   final ValueNotifier<double> blendNotifier;
   final ValueNotifier<LiquidGlassSettings> settingsNotifier;
 
   final bool fake;
+  final ValueNotifier<String>? backgroundNotifier;
+  final VoidCallback? onClose;
 
   Future<void> show(BuildContext context) {
     return Navigator.push(
@@ -111,10 +115,6 @@ class SettingsSheet extends HookWidget {
   Widget build(BuildContext context) {
     final settings = useValueListenable(settingsNotifier);
     final blend = useValueListenable(blendNotifier);
-    final lightIntensity = settings.lightIntensity.clamp(0.0, 1.0).toDouble();
-    final ambientStrength = settings.ambientStrength.clamp(0.0, 1.0).toDouble();
-    final edgeWidth = settings.edgeWidth.clamp(0.0, 8.0).toDouble();
-    final edgeInset = settings.edgeInset.clamp(0.0, 1.0).toDouble();
 
     return LiquidStretch(
       interactionScale: 1.005,
@@ -128,7 +128,7 @@ class SettingsSheet extends HookWidget {
             refraction: 100,
             dispersion: 4,
             frost: 2,
-            glassColor: Theme.of(
+            tint: Theme.of(
               context,
             ).colorScheme.surface.withValues(alpha: 0.8),
           ),
@@ -148,210 +148,178 @@ class SettingsSheet extends HookWidget {
                           'Settings',
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
+                        if (onClose != null)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: onClose,
+                              child: const Text('Close'),
+                            ),
+                          ),
+                        const _SettingsSection(title: 'Background'),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final option in ['image', 'black', 'white', 'grid'])
+                              CupertinoButton.tinted(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                onPressed: backgroundNotifier == null
+                                    ? null
+                                    : () => backgroundNotifier!.value = option,
+                                child: Text(option),
+                              ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Blend Group blend:'),
-                            Text(blend.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: blend,
-                          onChanged: (value) {
-                            blendNotifier.value = value;
-                          },
-                          min: 0,
-                          max: 200,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Thickness:'),
-                            Text(settings.thickness.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: settings.thickness,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              thickness: value,
-                            );
-                          },
-                          min: 0,
-                          max: 160,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Light Intensity:'),
-                            Text(settings.lightIntensity.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: lightIntensity,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              lightIntensity: value,
-                            );
-                          },
-                          min: 0,
-                          max: 1,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Ambient Strength:'),
-                            Text(settings.ambientStrength.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: ambientStrength,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              ambientStrength: value,
-                            );
-                          },
-                          min: 0,
-                          max: 1,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Bleed Strength:'),
-                            Text(settings.bleedStrength.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: settings.bleedStrength,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              bleedStrength: value,
-                            );
-                          },
-                          min: 0,
-                          max: 1,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Specular Wrap:'),
-                            Text(settings.specularWrap.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: settings.specularWrap,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              specularWrap: value,
-                            );
-                          },
-                          min: 0,
-                          max: 1,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Edge Width:'),
-                            Text(settings.edgeWidth.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: edgeWidth,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              edgeWidth: value,
-                            );
-                          },
-                          min: 0,
-                          max: 8,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Edge Inset:'),
-                            Text(settings.edgeInset.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: edgeInset,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              edgeInset: value,
-                            );
-                          },
-                          min: 0,
-                          max: 1,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Blur:'),
-                            Text(settings.blur.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
-                          value: settings.blur,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              blur: value,
-                            );
-                          },
-                          min: 0,
-                          max: 40,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Chromatic Aberration:'),
-                            Text(
-                              settings.chromaticAberration.toStringAsFixed(2),
+                            Expanded(
+                              child: CupertinoButton.tinted(
+                                onPressed: () {
+                                  settingsNotifier.value =
+                                      LiquidGlassSettings(
+                                        thickness: 30,
+                                        frost: 1,
+                                        saturation: 1.2,
+                                        tint: CupertinoTheme.of(context)
+                                            .barBackgroundColor
+                                            .withValues(alpha: .1),
+                                        contourStrength: .3,
+                                        contourWidth: 1,
+                                      );
+                                  blendNotifier.value = 10;
+                                },
+                                child: const Text('Previous demo'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: CupertinoButton.tinted(
+                                onPressed: () {
+                                  settingsNotifier.value =
+                                      const LiquidGlassSettings
+                                          .ios27ToolbarLight();
+                                  blendNotifier.value = 10;
+                                },
+                                child: const Text('Matched toolbar'),
+                              ),
                             ),
                           ],
                         ),
-                        CupertinoSlider(
+                        const SizedBox(height: 16),
+                        _SettingsSlider(
+                          label: 'Blend group',
+                          value: blend,
+                          min: 0,
+                          max: 200,
+                          onChanged: (value) => blendNotifier.value = value,
+                        ),
+                        _SettingsSlider(
+                          label: 'Thickness',
+                          value: settings.thickness,
+                          min: 0,
+                          max: 160,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(thickness: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Glass opacity',
+                          value: settings.tint.a,
+                          min: 0,
+                          max: 1,
+                          onChanged: (value) =>
+                              settingsNotifier.value = settings.copyWith(
+                                tint: settings.tint.withValues(
+                                  alpha: value,
+                                ),
+                              ),
+                        ),
+                        const _SettingsSection(title: 'Lighting and rim'),
+                        _SettingsSlider(
+                          label: 'Highlight',
+                          value: settings.highlight,
+                          min: 0,
+                          max: 2,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(highlight: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Contour strength',
+                          value: settings.contourStrength,
+                          min: 0,
+                          max: 1,
+                          onChanged: (value) =>
+                              settingsNotifier.value = settings.copyWith(
+                                contourStrength: value,
+                              ),
+                        ),
+                        _SettingsSlider(
+                          label: 'Contour width',
+                          value: settings.contourWidth,
+                          min: 0,
+                          max: 8,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(contourWidth: value),
+                        ),
+                        const _SettingsSection(title: 'Material transfer'),
+                        _SettingsSlider(
+                          label: 'Transmission gamma',
+                          value: settings.transmissionGamma,
+                          min: .5,
+                          max: 1.5,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(transmissionGamma: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Vibrancy',
+                          value: settings.vibrancy,
+                          min: 0,
+                          max: 1,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(vibrancy: value),
+                        ),
+                        const _SettingsSection(title: 'Optics'),
+                        _SettingsSlider(
+                          label: 'Frost',
+                          value: settings.frost,
+                          min: 0,
+                          max: 40,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(frost: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Chromatic aberration',
                           value: settings.chromaticAberration,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              chromaticAberration: value,
-                            );
-                          },
                           min: 0,
-                          max: 10,
+                          max: .1,
+                          fractionDigits: 3,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(chromaticAberration: value),
                         ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Saturation:'),
-                            Text(settings.saturation.toStringAsFixed(2)),
-                          ],
-                        ),
-                        CupertinoSlider(
+                        _SettingsSlider(
+                          label: 'Saturation',
                           value: settings.saturation,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              saturation: value,
-                            );
-                          },
                           min: 0,
                           max: 2,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(saturation: value),
                         ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Refractive Index:'),
-                            Text(settings.refractiveIndex.toStringAsFixed(2)),
-                          ],
+                        _SettingsSlider(
+                          label: 'Edge refraction',
+                          value: settings.edgeRefraction,
+                          min: 0,
+                          max: 160,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(edgeRefraction: value),
                         ),
-                        CupertinoSlider(
-                          value: settings.refractiveIndex,
-                          onChanged: (value) {
-                            settingsNotifier.value = settings.copyWith(
-                              refractiveIndex: value,
-                            );
-                          },
-                          min: 1,
-                          max: 2,
+                        _SettingsSlider(
+                          label: 'Refraction spread',
+                          value: settings.refractionSpread,
+                          min: 0,
+                          max: 1,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(refractionSpread: value),
                         ),
                       ],
                     ),
@@ -362,6 +330,61 @@ class SettingsSheet extends HookWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+    );
+  }
+}
+
+class _SettingsSlider extends StatelessWidget {
+  const _SettingsSlider({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+    this.fractionDigits = 2,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final ValueChanged<double> onChanged;
+  final int fractionDigits;
+
+  @override
+  Widget build(BuildContext context) {
+    final sliderValue = value.clamp(min, max);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value.toStringAsFixed(fractionDigits)),
+          ],
+        ),
+        CupertinoSlider(
+          value: sliderValue,
+          min: min,
+          max: max,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }

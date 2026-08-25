@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
 import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
+import 'package:liquid_glass_renderer_example/preset_store.dart';
 import 'package:rivership/rivership.dart';
 
 void main() {
@@ -28,17 +29,10 @@ const _testBackgroundColors = [
 
 final settingsNotifier = ValueNotifier(
   _useTestBackground
-      ? LiquidGlassSettings(
-          blur: _testBlur.toDouble(),
-          thickness: 40,
-          saturation: 1,
+      ? LiquidGlassSettings.ios27ToolbarLight(
+          frost: _testBlur.toDouble(),
         )
-      : LiquidGlassSettings(
-          thickness: 30,
-          blur: 1,
-          saturation: 1.2,
-          glassColor: Colors.white.withValues(alpha: 0.2),
-        ),
+      : const LiquidGlassSettings.ios27ToolbarLight(),
 );
 
 final blendNotifier = ValueNotifier(10.0);
@@ -50,6 +44,12 @@ class BasicApp extends HookWidget {
   Widget build(BuildContext context) {
     final tab = useState(0);
     final fake = useState(false);
+    final showSettings = useState(false);
+    final background = useState(_useTestBackground ? 'grid' : 'image');
+    useEffect(() {
+      PresetStore().seed();
+      return null;
+    }, const []);
 
     final visibility = useState(true);
     final visibilityValue = useSingleMotion(
@@ -60,27 +60,24 @@ class BasicApp extends HookWidget {
     const shadows = [
       BoxShadow(
         blurStyle: BlurStyle.outer,
-        color: Color.from(alpha: 0.05, red: 0, green: 0, blue: 0),
-        offset: Offset(0, 1),
-        blurRadius: 2,
+        color: Color.from(alpha: 0.04, red: 0, green: 0, blue: 0),
+        blurRadius: 1,
       ),
       BoxShadow(
         blurStyle: BlurStyle.outer,
-        color: Color.from(alpha: 0.1, red: 0, green: 0, blue: 0),
-        offset: Offset(0, 8),
-        blurRadius: 30,
+        color: Color.from(
+          alpha: 0.08,
+          red: 32 / 255,
+          green: 32 / 255,
+          blue: 32 / 255,
+        ),
+        offset: Offset(0, 4),
+        blurRadius: 10,
+        spreadRadius: -1,
       ),
     ];
 
-    return GestureDetector(
-      onTap: () {
-        SettingsSheet(
-          fake: fake.value,
-          blendNotifier: blendNotifier,
-          settingsNotifier: settingsNotifier,
-        ).show(context);
-      },
-      child: CupertinoPageScaffold(
+    return CupertinoPageScaffold(
         child: Stack(
           children: [
             CustomScrollView(
@@ -93,7 +90,11 @@ class BasicApp extends HookWidget {
                     (context, index) => Stack(
                       children: [
                         Positioned.fill(
-                          child: _useTestBackground
+                          child: background.value == 'black'
+                              ? const ColoredBox(color: Colors.black)
+                              : background.value == 'white'
+                              ? const ColoredBox(color: Colors.white)
+                              : background.value == 'grid' || _useTestBackground
                               ? DecoratedBox(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -144,15 +145,6 @@ class BasicApp extends HookWidget {
                 ]),
                 builder: (context, child) {
                   final settings = settingsNotifier.value.copyWith(
-                    glassColor: CupertinoTheme.of(
-                      context,
-                    ).barBackgroundColor.withValues(alpha: 0.1),
-                    edgeColor: Color.from(
-                      alpha: .3,
-                      red: .1,
-                      green: .1,
-                      blue: .1,
-                    ),
                     visibility: visibilityValue,
                   );
                   return LiquidGlassLayer(
@@ -284,9 +276,31 @@ class BasicApp extends HookWidget {
                 ),
               ),
             ),
+            if (showSettings.value)
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 360,
+                  child: SettingsSheet(
+                    fake: fake.value,
+                    blendNotifier: blendNotifier,
+                    settingsNotifier: settingsNotifier,
+                    backgroundNotifier: background,
+                    onClose: () => showSettings.value = false,
+                  ),
+                ),
+              ),
+            Positioned(
+              right: 16,
+              top: 16,
+              child: CupertinoButton.filled(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                onPressed: () => showSettings.value = !showSettings.value,
+                child: Text(showSettings.value ? 'Close' : 'Settings'),
+              ),
+            ),
           ],
         ),
-      ),
     );
   }
 }

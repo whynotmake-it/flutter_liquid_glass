@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import 'scene.dart';
@@ -16,62 +17,37 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     number('${prefix}Blue', fallback.b * 255).round(),
     number('${prefix}Alpha', fallback.a),
   );
-  Color neutralColor(String prefix, Color fallback) {
-    final luminance = number(
-      '${prefix}Luminance',
-      (fallback.r + fallback.g + fallback.b) * 255 / 3,
-    ).round();
-    return Color.fromRGBO(
-      luminance,
-      luminance,
-      luminance,
-      number('${prefix}Alpha', fallback.a),
-    );
-  }
-
-  Color? optionalNeutralColor(String prefix) {
-    if (!settings.containsKey('${prefix}Alpha') &&
-        !settings.containsKey('${prefix}Luminance')) {
-      return null;
-    }
-    return neutralColor(prefix, Colors.transparent);
-  }
-
   const defaults = LiquidGlassSettings();
   return LiquidGlassSettings(
-    glassColor: color('glass', defaults.glassColor),
+    tint: color('glass', defaults.tint),
     thickness: number('thickness', defaults.thickness),
-    blur: number('blur', defaults.blur),
-    lightAngle: number('lightAngle', defaults.lightAngle),
-    lightIntensity: number('lightIntensity', defaults.lightIntensity),
-    ambientStrength: number('ambientStrength', defaults.ambientStrength),
-    highlightColor: neutralColor('highlight', defaults.highlightColor),
-    edgeColor: neutralColor('edge', defaults.edgeColor),
-    edgeWidth: number('edgeWidth', defaults.edgeWidth),
-    outerContourColor: optionalNeutralColor('outerContour'),
-    outerContourWidth: settings.containsKey('outerContourWidth')
-        ? number('outerContourWidth', defaults.edgeWidth)
-        : null,
-    edgeInset: number('edgeInset', defaults.edgeInset),
-    specularWrap: number('specularWrap', defaults.specularWrap),
-    bleedStrength: number('bleedStrength', defaults.bleedStrength),
+    edgeRefraction: number(
+      'edgeRefraction',
+      8.0 * number('thickness', defaults.thickness) *
+          math.sqrt(math.max(0.0, math.pow(
+            number('refractiveIndex', defaults.effectiveRefractiveIndex),
+            2,
+          ).toDouble() - 1.0)),
+    ),
+    refractionSpread: number(
+      'refractionSpread',
+      defaults.refractionSpread,
+    ),
+    frost: number('frost', number('blur', defaults.frost)),
     transmissionGamma: number('transmissionGamma', defaults.transmissionGamma),
     vibrancy: number('vibrancy', defaults.vibrancy),
-    faceShadingStrength: number(
-      'faceShadingStrength',
-      defaults.faceShadingStrength,
+    highlight: number(
+      'highlight',
+      number('lightIntensity', defaults.highlight),
     ),
-    faceShadingDepth: number('faceShadingDepth', defaults.faceShadingDepth),
-    innerShadowStrength: number(
-      'innerShadowStrength',
-      defaults.innerShadowStrength,
+    contourStrength: number(
+      'contourStrength',
+      number('edgeAlpha', defaults.contourStrength),
     ),
-    innerShadowDepth: number('innerShadowDepth', defaults.innerShadowDepth),
-    innerShadowDirectionality: number(
-      'innerShadowDirectionality',
-      defaults.innerShadowDirectionality,
+    contourWidth: number(
+      'contourWidth',
+      number('edgeWidth', defaults.contourWidth),
     ),
-    refractiveIndex: number('refractiveIndex', defaults.refractiveIndex),
     saturation: number('saturation', defaults.saturation),
     chromaticAberration: number(
       'chromaticAberration',

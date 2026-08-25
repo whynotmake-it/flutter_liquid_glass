@@ -499,13 +499,18 @@ def main() -> None:
         help="Comma-separated ordered stage names.",
     )
     parser.add_argument("--out", type=Path, default=ROOT / "out/hotloop")
+    parser.add_argument(
+        "--scene-id",
+        default="toolbar_capsule",
+        help="Scene id under scenes/ (default toolbar_capsule).",
+    )
     parser.add_argument("--wall-threshold", type=float, default=0.05)
     parser.add_argument("--wall-consecutive", type=int, default=2)
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
 
-    scene_path = ROOT / "scenes/toolbar_capsule.json"
+    scene_path = ROOT / "scenes" / f"{args.scene_id}.json"
     scene = json.loads(scene_path.read_text())
     crop = scene_crop(scene)
     reference_dir = ROOT / "references" / REFERENCE_SET / scene["id"]

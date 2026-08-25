@@ -3,119 +3,87 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 void main() {
-  test('visibility scales every visual setting exactly once', () {
+  test('iOS 27 toolbar preset uses the unified material axes', () {
+    const settings = LiquidGlassSettings.ios27ToolbarLight();
+    expect(settings.tint.r, closeTo(253 / 255, .001));
+    expect(settings.tint.g, closeTo(252 / 255, .001));
+    expect(settings.tint.b, closeTo(253 / 255, .001));
+    expect(settings.tint.a, closeTo(.53, .001));
+    expect(settings.thickness, 12);
+    expect(settings.frost, 7);
+    expect(settings.edgeRefraction, closeTo(27.42, .01));
+    expect(settings.refractionSpread, 0);
+    expect(settings.highlight, .5);
+    expect(settings.contourStrength, .1);
+    expect(settings.contourWidth, 1);
+  });
+
+  test('visibility scales the shared material axes once', () {
     const settings = LiquidGlassSettings(
       visibility: .5,
-      glassColor: Color.fromARGB(128, 20, 40, 60),
+      tint: Color.fromARGB(128, 20, 40, 60),
       thickness: 40,
-      blur: 12,
+      edgeRefraction: 80,
+      refractionSpread: .8,
+      frost: 12,
       chromaticAberration: 2,
-      lightIntensity: 2,
-      ambientStrength: .8,
-      highlightColor: Color.fromARGB(128, 255, 255, 255),
-      edgeColor: Color.fromARGB(128, 0, 0, 0),
-      edgeWidth: 4,
-      outerContourColor: Color.fromARGB(200, 0, 0, 0),
-      outerContourWidth: 3,
-      bleedStrength: .6,
       transmissionGamma: .8,
       vibrancy: .4,
-      faceShadingStrength: .3,
-      faceShadingDepth: 16,
-      innerShadowStrength: .2,
-      innerShadowDepth: 12,
-      innerShadowDirectionality: .6,
+      highlight: .6,
+      contourStrength: .3,
+      contourWidth: 4,
       saturation: 2,
     );
-
-    expect(settings.effectiveGlassColor.a, closeTo(128 / 255 * .5, .001));
+    expect(settings.effectiveTint.a, closeTo(128 / 255 * .5, .001));
     expect(settings.effectiveThickness, 20);
-    expect(settings.effectiveBlur, 6);
+    expect(settings.effectiveEdgeRefraction, 40);
+    expect(settings.effectiveRefractionSpread, .4);
+    expect(settings.effectiveFrost, 6);
     expect(settings.effectiveChromaticAberration, 1);
-    expect(settings.effectiveLightIntensity, closeTo(128 / 255, .001));
-    expect(settings.effectiveAmbientStrength, .4);
-    expect(settings.effectiveHighlightColor.a, closeTo(128 / 255 * .5, .001));
-    expect(settings.effectiveEdgeColor.a, closeTo(128 / 255 * .5, .001));
-    expect(settings.effectiveEdgeWidth, 2);
-    expect(
-      settings.effectiveOuterContourColor.a,
-      closeTo(200 / 255 * .5, .001),
-    );
-    expect(settings.effectiveOuterContourWidth, 1.5);
-    expect(
-      settings.effectiveOuterMaterialContourColor.a,
-      closeTo(200 / 255 * .5, .001),
-    );
-    expect(settings.effectiveOuterMaterialContourWidth, 1.5);
-    expect(settings.effectiveBleedStrength, .3);
     expect(settings.effectiveTransmissionGamma, .9);
     expect(settings.effectiveVibrancy, .2);
-    expect(settings.effectiveFaceShadingStrength, .15);
-    expect(settings.effectiveFaceShadingDepth, 8);
-    expect(settings.effectiveInnerShadowStrength, .1);
-    expect(settings.effectiveInnerShadowDepth, 6);
-    expect(settings.effectiveInnerShadowDirectionality, .3);
+    expect(settings.effectiveHighlight, .3);
+    expect(settings.effectiveContourStrength, .15);
+    expect(settings.effectiveContourWidth, 2);
     expect(settings.effectiveSaturation, 1.5);
   });
 
-  test('copyWith preserves and updates every setting', () {
+  test('copyWith updates the unified settings vector', () {
     const original = LiquidGlassSettings();
     final changed = original.copyWith(
       visibility: .8,
-      glassColor: const Color(0x33445566),
+      tint: const Color(0x33445566),
       thickness: 31,
-      blur: 7,
+      edgeRefraction: 42,
+      refractionSpread: .5,
+      frost: 7,
       chromaticAberration: .2,
-      lightAngle: .3,
-      lightIntensity: 1.4,
-      ambientStrength: .1,
-      highlightColor: const Color(0x778899AA),
-      edgeColor: const Color(0xBBCCDDEE),
-      edgeWidth: 2,
-      edgeInset: .4,
-      specularWrap: .6,
-      bleedStrength: .7,
+      saturation: 1.1,
       transmissionGamma: .9,
       vibrancy: .5,
-      faceShadingStrength: .15,
-      faceShadingDepth: 40,
-      innerShadowStrength: .2,
-      innerShadowDepth: 12,
-      innerShadowDirectionality: .6,
-      refractiveIndex: 1.4,
-      saturation: 1.1,
+      highlight: .4,
+      contourStrength: .15,
+      contourWidth: 2,
     );
-
     expect(changed, isNot(original));
-    expect(
-      changed.props,
-      [
-        .8,
-        const Color(0x33445566),
-        31,
-        7,
-        .2,
-        .3,
-        1.4,
-        .1,
-        const Color(0x778899AA),
-        const Color(0xBBCCDDEE),
-        2,
-        null,
-        null,
-        .4,
-        .6,
-        .7,
-        .9,
-        .5,
-        .15,
-        40,
-        .2,
-        12,
-        .6,
-        1.4,
-        1.1,
-      ],
+    expect(changed.tint, const Color(0x33445566));
+    expect(changed.edgeRefraction, 42);
+    expect(changed.refractionSpread, .5);
+    expect(changed.contourWidth, 2);
+  });
+
+  test('preset JSON round trips the public material vector', () {
+    const original = LiquidGlassSettings(
+      tint: Color(0x88445566),
+      thickness: 18,
+      edgeRefraction: 32,
+      refractionSpread: .4,
+      frost: 6,
+      highlight: .7,
+      contourStrength: .2,
+      contourWidth: 1.5,
     );
+    final restored = LiquidGlassSettings.fromJson(original.toJson());
+    expect(restored, original);
   });
 }

@@ -288,7 +288,8 @@ extension on LiquidGlassSettings {
     if (other == null) return false;
 
     return effectiveThickness != other.effectiveThickness ||
-        refractiveIndex != other.refractiveIndex;
+        edgeRefraction != other.edgeRefraction ||
+        refractionSpread != other.refractionSpread;
   }
 }
 

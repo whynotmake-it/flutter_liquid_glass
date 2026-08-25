@@ -22,7 +22,8 @@
         "toolbar_capsule",
         "small_capsule",
         "large_capsule",
-        "tab_bar_holdout"
+        "tab_bar_holdout",
+        "loupe"
       ]
     },
     "canvas": {

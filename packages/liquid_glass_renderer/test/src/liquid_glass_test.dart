@@ -150,7 +150,7 @@ void main() {
                     LiquidGlass.withOwnLayer(
                       settings: settingsWithoutLighting.copyWith(
                         thickness: 2,
-                        glassColor: Colors.blue.withValues(alpha: 0.5),
+                        tint: Colors.blue.withValues(alpha: 0.5),
                       ),
                       glassContainsChild: true,
                       shape: LiquidRoundedSuperellipse(
@@ -177,7 +177,7 @@ void main() {
                     LiquidGlassLayer(
                       settings: settingsWithoutLighting.copyWith(
                         thickness: 2,
-                        glassColor: Colors.blue.withValues(alpha: 0.5),
+                        tint: Colors.blue.withValues(alpha: 0.5),
                       ),
                       child: LiquidGlassBlendGroup(
                         child: LiquidGlass.grouped(
@@ -222,7 +222,7 @@ void main() {
                 child: buildWithGridPaper(
                   LiquidGlassLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      glassColor: Colors.red.withValues(alpha: 0.5),
+                      tint: Colors.red.withValues(alpha: 0.5),
                     ),
                     child: LiquidGlassBlendGroup(
                       blend: blend,
@@ -288,7 +288,7 @@ void main() {
                 LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
                     thickness: 18,
-                    glassColor: Colors.cyan.withValues(alpha: .25),
+                    tint: Colors.cyan.withValues(alpha: .25),
                   ),
                   child: LiquidGlassBlendGroup(
                     child: Center(
@@ -340,7 +340,7 @@ void main() {
                   child: LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
                       thickness: 18,
-                      glassColor: Colors.cyan.withValues(alpha: .25),
+                      tint: Colors.cyan.withValues(alpha: .25),
                     ),
                     glassContainsChild: true,
                     shape: const LiquidRoundedRectangle(borderRadius: 28),
@@ -514,7 +514,7 @@ void main() {
                 builder: (_, value, __) => LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
                     thickness: 18,
-                    glassColor: Colors.cyan.withValues(alpha: .25),
+                    tint: Colors.cyan.withValues(alpha: .25),
                   ),
                   child: Transform.translate(
                     offset: value,
@@ -574,7 +574,7 @@ void main() {
           final renderer = renderObject.gpuGeometryRenderer!;
           final initialRenderCount = renderer.debugRenderCount;
 
-          settings.value = settings.value.copyWith(glassColor: Colors.cyan);
+          settings.value = settings.value.copyWith(tint: Colors.cyan);
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount);
 
@@ -597,7 +597,7 @@ Future<void> _pumpAtDpr2(WidgetTester tester) async {
 Widget _transformGlass() => LiquidGlass.withOwnLayer(
   settings: settingsWithoutLighting.copyWith(
     thickness: 18,
-    glassColor: Colors.cyan.withValues(alpha: .25),
+    tint: Colors.cyan.withValues(alpha: .25),
   ),
   shape: const LiquidRoundedRectangle(borderRadius: 28),
   child: const SizedBox(width: 240, height: 150),
@@ -634,9 +634,9 @@ Widget _coordinateRegressionScene() => Stack(
       top: 250,
       child: LiquidGlass.withOwnLayer(
         settings: settingsWithoutLighting.copyWith(
-          blur: 5,
+          frost: 5,
           thickness: 60,
-          glassColor: Colors.white.withValues(alpha: .08),
+          tint: Colors.white.withValues(alpha: .08),
         ),
         shape: const LiquidRoundedRectangle(borderRadius: 48),
         child: const SizedBox(width: 390, height: 220),

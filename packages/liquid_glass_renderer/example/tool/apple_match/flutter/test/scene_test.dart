@@ -25,10 +25,10 @@ void main() {
       'refractiveIndex': 1.15,
       'saturation': 1.2,
     });
-    expect(settings.blur, 9);
+    expect(settings.frost, 9);
     expect(settings.thickness, 12);
-    expect(settings.lightIntensity, 0.4);
-    expect(settings.refractiveIndex, 1.15);
+    expect(settings.highlight, 0.4);
+    expect(settings.edgeRefraction, closeTo(54.5, 0.1));
     expect(settings.saturation, 1.2);
   });
 }

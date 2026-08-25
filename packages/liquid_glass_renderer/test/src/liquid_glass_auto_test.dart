@@ -91,7 +91,7 @@ void main() {
     testWidgets('uses custom settings when creating own layer', (tester) async {
       const customSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(
@@ -118,7 +118,7 @@ void main() {
       );
       const autoSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(

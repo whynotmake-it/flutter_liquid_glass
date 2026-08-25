@@ -17,37 +17,36 @@ uniform vec2 uSize;
 uniform vec2 uGeometryOffset;
 uniform vec2 uGeometrySize;
 
-uniform vec4 uGlassColor;
+uniform vec4 uTint;
 uniform vec3 uOpticalProps;
 uniform vec3 uLightConfig;
 uniform vec2 uLightDirection;
 uniform vec4 uHighlightColor;
-uniform vec4 uEdgeColor;
-uniform vec4 uOuterContourColor;
-uniform vec2 uOuterContourConfig;
-uniform vec4 uSpecularConfig;
+uniform vec4 uContourColor;
+uniform vec4 uReservedContourColor;
+uniform vec2 uContourConfig;
+uniform vec4 uProfileConfig;
 uniform vec2 uMaterialConfig;
-uniform vec2 uFaceShadingConfig;
-uniform vec3 uInnerShadowConfig;
+uniform vec2 uReservedFaceConfig;
+uniform vec3 uReservedShadowConfig;
 
-float uRefractiveIndex = uOpticalProps.x;
+float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
-float uAmbientStrength = uLightConfig.y;
+float uAmbientStrength = 0.0;
 float uSaturation = uLightConfig.z;
-float uEdgeWidth = uSpecularConfig.x;
-float uEdgeInset = uSpecularConfig.y;
-float uBleedStrength = uSpecularConfig.z;
-float uSpecularWrap = uSpecularConfig.w;
+float uEdgeWidth = uContourConfig.x;
+float uEdgeInset = 0.25;
+float uBleedStrength = 0.375;
+float uSpecularWrap = 0.25;
 float uTransmissionGamma = uMaterialConfig.x;
 float uVibrancy = uMaterialConfig.y;
-float uFaceShadingStrength = uFaceShadingConfig.x;
-float uFaceShadingDepth = uFaceShadingConfig.y;
-float uInnerShadowStrength = uInnerShadowConfig.x;
-float uInnerShadowDepth = uInnerShadowConfig.y;
-float uInnerShadowDirectionality = uInnerShadowConfig.z;
-float uOuterContourWidth = uOuterContourConfig.x;
+float uFaceShadingStrength = uLightConfig.x * 0.03;
+float uFaceShadingDepth = max(uThickness * 3.0, 1.0);
+float uInnerShadowStrength = uContourColor.a * 0.25;
+float uInnerShadowDepth = max(uThickness, 1.0);
+float uInnerShadowDirectionality = 0.0;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
@@ -74,9 +73,7 @@ vec3 applySpecularHighlights(
     if (
         uLightIntensity < 0.01 &&
         uAmbientStrength < 0.01 &&
-        uEdgeColor.a < 0.01 &&
-        uFaceShadingStrength < 0.001 &&
-        uInnerShadowStrength < 0.001
+        uContourColor.a < 0.01
     ) {
         return baseColor;
     }
@@ -138,7 +135,7 @@ vec3 applySpecularHighlights(
         edgeFactor < 0.01 &&
         bleedBand < 0.01 &&
         uFaceShadingStrength < 0.001 &&
-        uInnerShadowStrength < 0.001
+        uContourColor.a < 0.001
     ) {
         return baseColor;
     }
@@ -185,83 +182,24 @@ vec3 applySpecularHighlights(
     float lightSupport =
         abs(uLightDirection.x) * halfSize.x +
         abs(uLightDirection.y) * halfSize.y;
-    float faceDepth = max(uFaceShadingDepth, 0.001);
-    float faceRise = smoothstep(0.0, faceDepth * 0.35, inwardDistance);
-    float faceFall = 1.0 - smoothstep(
-        faceDepth * 0.35,
-        faceDepth,
-        inwardDistance
-    );
-    // The coordinate-map transform supplies screen-oriented geometry UVs on
-    // Metal. Negative projection selects the screen-top, light-facing half for
-    // the default upward light.
-    float lightSide = smoothstep(
-        -lightSupport * 0.08,
-        lightSupport * 0.08,
-        -dot(facePosition, uLightDirection)
-    );
-    float faceShading = clamp(
-        faceRise * faceFall * lightSide *
-        max(uFaceShadingStrength, 0.0),
+    // The contour also supplies a derived, symmetric bevel occlusion. This is
+    // not an independent shadow control: it is the same SDF profile viewed as
+    // absorption beneath a dielectric coating.
+    float bevelOcclusion = clamp(
+        (1.0 - smoothstep(0.0, max(uThickness, 1.0), inwardDistance)) *
+        uContourColor.a * 0.25,
         0.0,
         1.0
     );
-    float innerShadowDepth = max(uInnerShadowDepth, 0.001);
-    float innerShadow = clamp(
-        (1.0 - smoothstep(0.0, innerShadowDepth, inwardDistance)) *
-        max(uInnerShadowStrength, 0.0),
-        0.0,
-        1.0
-    );
-    // Preserve the symmetric ambient occlusion at directionality 0, while
-    // allowing a configurable fraction to deepen on the light-opposed side.
-    // The centered factor keeps the mean shadow strength unchanged instead of
-    // turning directionality into an undocumented global intensity control.
-    if (uInnerShadowDirectionality > 0.001) {
-        float edgeFacingLight = dot(normalXY, uLightDirection);
-        float directionalShadowFactor = 1.0 + clamp(
-            uInnerShadowDirectionality,
-            0.0,
-            1.0
-        ) * (-edgeFacingLight * 0.5);
-        innerShadow = clamp(
-            innerShadow * directionalShadowFactor,
-            0.0,
-            1.0
-        );
-    }
-
-    // A material contour is evaluated in this pass rather than painted as a
-    // separate canvas stroke. That keeps its coverage in the same compositing
-    // domain as the specular layer: a highlight can eclipse the dark edge
-    // locally, while the contour remains visible on the unlit silhouette.
-    float outerContourCoverage = uOuterContourWidth > 0.0
-        ? 1.0 - smoothstep(
-            0.0,
-            max(uOuterContourWidth, 0.001),
-            inwardDistance
-        )
-        : 0.0;
-    float outerContourAlpha = clamp(
-        outerContourCoverage * uOuterContourColor.a,
-        0.0,
-        1.0
-    );
-    // The dark material contour exists around the complete silhouette. The
-    // specular reflection is a separate layer above it, so highlights can
-    // locally eclipse the contour without punching discontinuities into it.
-    // This is both simpler and closer to a coated dielectric than weakening
-    // the outline with a hand-authored directional mask.
     float edgeAbsorption = clamp(
-        outlineCoverage * uEdgeColor.a,
+        outlineCoverage * uContourColor.a,
         0.0,
         1.0
     );
     float edgeTransmittance = 1.0 - edgeAbsorption;
     vec3 result = baseColor * edgeTransmittance +
-        uEdgeColor.rgb * edgeAbsorption;
-    result *= (1.0 - faceShading) * (1.0 - innerShadow);
-    result = mix(result, uOuterContourColor.rgb, outerContourAlpha);
+        uContourColor.rgb * edgeAbsorption;
+    result *= 1.0 - bevelOcclusion;
     result += highlightColor * highlightAmount;
 
     return result;
@@ -303,7 +241,7 @@ void main() {
         return;
     }
 
-    float maxDisplacement = uThickness * 10.0;
+    float maxDisplacement = max(uDisplacementScale, uThickness * 10.0);
     vec2 displacement = decodeDisplacement(geometryData, maxDisplacement);
 
     vec2 invUSize = 1.0 / uSize;
@@ -344,8 +282,8 @@ void main() {
         max(refractColor.rgb, vec3(0.0)),
         vec3(max(uTransmissionGamma, 0.01))
     );
-    vec3 materialColor = uGlassColor.rgb * uGlassColor.a;
-    transmittedColor *= 1.0 - uGlassColor.a;
+    vec3 materialColor = uTint.rgb * uTint.a;
+    transmittedColor *= 1.0 - uTint.a;
     vec3 baseColor = materialColor + transmittedColor;
     baseColor = applySaturation(baseColor, uSaturation);
     float chroma = max(max(baseColor.r, baseColor.g), baseColor.b) -

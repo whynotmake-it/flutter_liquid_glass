@@ -375,7 +375,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
   };
 
   Widget _buildScenario(double t) {
-    final settings = const LiquidGlassSettings(thickness: 30, blur: 15);
+    final settings = const LiquidGlassSettings(thickness: 30, frost: 15);
     final moving = Transform.translate(
       offset: Offset(-180 + 360 * t, 40 * math.sin(t * math.pi * 2)),
       child: _tile(0),

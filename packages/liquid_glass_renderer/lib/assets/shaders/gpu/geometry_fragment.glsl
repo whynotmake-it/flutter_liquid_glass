@@ -1,5 +1,6 @@
 // Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 2: widened edge-distance field and
+// Geometry encoding revision 3: widened edge-distance field, profile reach,
+// and a shared displacement codec scale.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
@@ -32,6 +33,7 @@ layout(std140) uniform GeometryUniforms {
 
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
+float uRefractionSpread = uTextureSize.x;
 out vec4 fragColor;
 
 void main() {
@@ -67,14 +69,22 @@ void main() {
     float dx = dFdx(sd);
     float dy = dFdy(sd);
 
-    float n_cos = max(uThickness + surfaceSd, 0.0) / uThickness;
+    float profileReach = uThickness *
+        (1.0 + 8.0 * clamp(uRefractionSpread, 0.0, 1.0));
+    float n_cos = 1.0 - clamp(-surfaceSd / max(profileReach, 0.001), 0.0, 1.0);
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));
 
     vec3 normal = normalize(vec3(dx * n_cos, dy * n_cos, n_sin));
 
-    float x = uThickness + surfaceSd;
-    float sqrtTerm = sqrt(max(0.0, uThickness * uThickness - x * x));
-    float height = mix(sqrtTerm, uThickness, float(surfaceSd < -uThickness));
+    // The normal edge profile is a circular arc. Increasing spread extends
+    // that same profile into the face, giving loupe controls a full-lens
+    // displacement without adding a pass or a texture.
+    float reach = profileReach;
+    float inwardDistance = max(-surfaceSd, 0.0);
+    float profileX = min(inwardDistance, reach);
+    float normalizedProfile = profileX / max(reach, 0.001);
+    float profileHeight = sqrt(max(0.0, normalizedProfile * (2.0 - normalizedProfile)));
+    float height = uThickness * profileHeight;
 
     float baseHeight = uThickness * 8.0;
     vec3 incident = vec3(0.0, 0.0, -1.0);
@@ -89,7 +99,7 @@ void main() {
 
     fragColor = encodeDisplacementData(
         displacement,
-        maxDisplacement,
+        max(uTextureSize.y, maxDisplacement),
         edgeDistance,
         uThickness,
         foregroundAlpha

@@ -19,8 +19,8 @@ final testScenarioConstraints = BoxConstraints.tight(const Size(500, 500));
 
 const settingsWithoutLighting = LiquidGlassSettings(
   chromaticAberration: 0,
-  lightIntensity: 0,
-  blur: 0,
+  highlight: 0,
+  frost: 0,
 );
 
 Widget buildWithGridPaper(Widget child) {

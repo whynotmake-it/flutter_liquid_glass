@@ -22,11 +22,11 @@ void main() {
             child: buildWithGridPaper(
               const FakeGlass(
                 settings: LiquidGlassSettings(
-                  blur: 0,
+                  frost: 0,
                   saturation: 1,
                   chromaticAberration: 0,
-                  lightIntensity: 0,
-                  glassColor: Color.fromARGB(128, 0, 0, 255),
+                  highlight: 0,
+                  tint: Color.fromARGB(128, 0, 0, 255),
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
                 child: SizedBox.square(dimension: 300),
@@ -38,10 +38,10 @@ void main() {
             child: buildWithGridPaper(
               const FakeGlass(
                 settings: LiquidGlassSettings(
-                  blur: 0,
+                  frost: 0,
                   saturation: 1,
                   chromaticAberration: 0,
-                  lightIntensity: 0,
+                  highlight: 0,
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
                 child: SizedBox.square(
@@ -56,10 +56,10 @@ void main() {
             child: buildWithGridPaper(
               const FakeGlass(
                 settings: LiquidGlassSettings(
-                  blur: 0,
+                  frost: 0,
                   chromaticAberration: 0,
-                  lightIntensity: 0,
-                  glassColor: Color.fromARGB(128, 0, 0, 255),
+                  highlight: 0,
+                  tint: Color.fromARGB(128, 0, 0, 255),
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
                 child: SizedBox.square(dimension: 300),
@@ -85,11 +85,11 @@ void main() {
                 FakeGlass(
                   settings: LiquidGlassSettings(
                     visibility: visibility,
-                    blur: 0,
+                    frost: 0,
                     saturation: 1,
                     chromaticAberration: 0,
-                    lightIntensity: 0,
-                    glassColor: const Color.fromARGB(128, 0, 0, 255),
+                    highlight: 0,
+                    tint: const Color.fromARGB(128, 0, 0, 255),
                   ),
                   shadows: const [
                     BoxShadow(
@@ -121,11 +121,11 @@ void main() {
                 FakeGlass(
                   settings: LiquidGlassSettings(
                     visibility: visibility,
-                    blur: 0,
+                    frost: 0,
                     saturation: 1,
                     chromaticAberration: 0,
-                    lightIntensity: 0,
-                    glassColor: const Color.fromARGB(128, 0, 0, 255),
+                    highlight: 0,
+                    tint: const Color.fromARGB(128, 0, 0, 255),
                   ),
                   shadows: const [
                     BoxShadow(

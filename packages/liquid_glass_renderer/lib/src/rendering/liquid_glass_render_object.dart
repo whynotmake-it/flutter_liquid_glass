@@ -51,7 +51,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     if (_settings == value) return;
     final geometryInputsChanged =
         _settings?.effectiveThickness != value.effectiveThickness ||
-        _settings?.refractiveIndex != value.refractiveIndex;
+        _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
+        _settings?.effectiveRefractionSpread !=
+            value.effectiveRefractionSpread;
     final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
     final isIdle = value.effectiveThickness <= 0;
     _settings = value;
@@ -136,46 +138,46 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     _shaderSettingsRevision++;
     renderShader.setFloatUniforms(initialIndex: 6, (value) {
       value
-        ..setColor(settings.effectiveGlassColor)
+        ..setColor(settings.effectiveTint)
         ..setFloats([
-          settings.refractiveIndex,
+          settings.effectiveDisplacementScale,
           settings.effectiveChromaticAberration,
           settings.effectiveThickness,
-          settings.effectiveLightIntensity,
-          settings.effectiveAmbientStrength,
+          settings.effectiveHighlight,
+          0.0,
           settings.effectiveSaturation,
         ])
         ..setOffset(
-          Offset(
-            cos(settings.lightAngle),
-            sin(settings.lightAngle),
+          const Offset(0, 1),
+        )
+        ..setColor(const Color.fromARGB(255, 255, 255, 255))
+        ..setColor(
+          Color.fromARGB(
+            (settings.effectiveContourStrength.clamp(0.0, 1.0) * 255)
+                .round(),
+            0,
+            0,
+            0,
           ),
         )
-        ..setColor(settings.effectiveHighlightColor)
-        ..setColor(settings.effectiveEdgeColor)
-        ..setColor(settings.effectiveOuterMaterialContourColor)
+        ..setColor(const Color.fromARGB(0, 0, 0, 0))
         ..setFloats([
-          settings.effectiveOuterMaterialContourWidth,
+          settings.effectiveContourWidth,
           0.0,
         ])
         ..setFloats([
-          settings.effectiveEdgeWidth,
-          settings.edgeInset,
-          settings.effectiveBleedStrength,
-          settings.specularWrap,
+          settings.effectiveContourWidth,
+          0.25,
+          0.375,
+          0.25,
         ])
         ..setFloats([
           settings.effectiveTransmissionGamma,
           settings.effectiveVibrancy,
         ])
         ..setFloats([
-          settings.effectiveFaceShadingStrength,
-          settings.effectiveFaceShadingDepth,
-        ])
-        ..setFloats([
-          settings.effectiveInnerShadowStrength,
-          settings.effectiveInnerShadowDepth,
-          settings.effectiveInnerShadowDirectionality,
+          settings.effectiveHighlight,
+          40.0,
         ]);
     });
   }
@@ -706,7 +708,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         shapeData: _shapeData,
         rseData: _rseData,
         numShapes: numShapes,
-        refractiveIndex: settings.refractiveIndex,
+        refractiveIndex: settings.effectiveRefractiveIndex,
+        refractionSpread: settings.effectiveRefractionSpread,
+        displacementScale: settings.effectiveDisplacementScale,
         thickness: settings.effectiveThickness,
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,

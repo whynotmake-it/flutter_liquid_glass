@@ -331,3 +331,35 @@ Generated build products, virtual environments, caches, and candidate output
 are ignored. Only small, deliberately reviewed reference/evidence PNGs should
 be versioned. No production renderer or shader changes are required by the
 harness itself.
+# Renderer redesign status (2026-08-25)
+
+The shipped renderer now uses a unified material vector: `tint`, `thickness`,
+`edgeRefraction`, `refractionSpread`, `frost`, `chromaticAberration`,
+`saturation`, `transmissionGamma`, `vibrancy`, `highlight`, `contourStrength`,
+and `contourWidth`. The geometry pass keeps the existing SDF/refraction field,
+adds a profile-reach scalar for loupe controls, and shares a displacement codec
+scale with the final pass. No pass, texture, or per-frame CPU solve was added.
+
+The example can be launched with:
+
+```bash
+cd packages/liquid_glass_renderer/example
+fvm flutter run -d macos -t lib/basic_app.dart
+```
+
+The deterministic grid mode used by screenshots/tests is:
+
+```bash
+fvm flutter run -d macos -t lib/basic_app.dart \
+  --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
+  --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=0
+```
+
+The sidebar exposes the unified controls and image/black/white/grid
+backgrounds. Presets are scalar YAML files under the app documents directory;
+`ios27-toolbar-light.yaml` and `neutral-default.yaml` are seeded on first run.
+
+Focused GPU/shader/settings tests and the example smoke test are green. The
+full melos non-golden suite still has existing headless layer-tree failures,
+and post-redesign Apple scorecards/performance traces have not yet been
+re-fit. Those remain hard gates before calling this production-ready.

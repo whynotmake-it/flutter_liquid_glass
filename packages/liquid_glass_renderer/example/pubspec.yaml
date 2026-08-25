@@ -18,6 +18,7 @@ dependencies:
   rivership: ^0.4.0+8
   motor: ^1.0.0-dev.3
   google_fonts: ^6.2.1
+  path_provider: ^2.1.5
   stupid_simple_sheet: ^0.9.1+1
   flutter_shaders: ^0.1.3
 

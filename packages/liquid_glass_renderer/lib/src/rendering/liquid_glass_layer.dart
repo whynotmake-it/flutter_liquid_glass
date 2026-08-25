@@ -19,10 +19,6 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 // The Apple-match harness can ablate the legacy Canvas contour while fitting
 // the shader's material contour. This is deliberately compile-time and
 // private: production callers do not get a second public outline switch.
-const _disableCanvasContour = bool.fromEnvironment(
-  'LIQUID_GLASS_DISABLE_CANVAS_CONTOUR',
-);
-
 /// Represents a layer of multiple [LiquidGlass] shapes or
 /// [LiquidGlassBlendGroup]s that have shared [LiquidGlassSettings] and will be
 /// rendered together.
@@ -364,11 +360,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final snapshot = shaderInputSnapshot;
     var shaderFilter = _cachedFilter;
     if (shaderFilter == null || _cachedFilterSnapshot != snapshot) {
-      final blurFilter = settings.effectiveBlur > 0
+      final blurFilter = settings.effectiveFrost > 0
           ? ImageFilter.blur(
               tileMode: TileMode.mirror,
-              sigmaX: settings.effectiveBlur,
-              sigmaY: settings.effectiveBlur,
+              sigmaX: settings.effectiveFrost,
+              sigmaY: settings.effectiveFrost,
             )
           : null;
       shaderFilter = switch (blurFilter) {
@@ -419,31 +415,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           },
           oldLayer: _clipPathLayerHandle.layer,
         );
-
-    // Keep the material contour independent from the fractional coverage in
-    // the GPU matte. The shader's rim is intentionally coverage-weighted for
-    // antialiasing, but that makes a dark outline disappear against a light
-    // background at the exact silhouette. Painting the configured contour on
-    // the canonical Flutter shape path preserves a visible outside edge while
-    // leaving the shader's directional highlights free to shape the inner rim.
-    if (!_disableCanvasContour &&
-        // An explicit outerContourColor is rendered by the final material
-        // shader so the specular highlight can eclipse it naturally. Keep the
-        // canvas stroke only as the legacy fallback for existing settings.
-        settings.outerContourColor == null &&
-        settings.effectiveOuterContourWidth > 0 &&
-        settings.effectiveOuterContourColor.a > 0) {
-      final contourColor = settings.effectiveOuterContourColor;
-      final contourPaint = Paint()
-        ..color = contourColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = settings.effectiveOuterContourWidth;
-      context.canvas
-        ..save()
-        ..translate(offset.dx, offset.dy)
-        ..drawPath(clipPath, contourPaint)
-        ..restore();
-    }
 
     _clipRectLayerHandle.layer = context.pushClipRect(
       needsCompositing,
