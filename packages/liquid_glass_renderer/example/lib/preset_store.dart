@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Small dependency-free YAML dialect used for user-editable example presets.
 /// Values are scalar material fields emitted by [LiquidGlassSettings.toJson].
@@ -62,8 +63,11 @@ class PresetStore {
 
   Future<void> seed() async {
     if ((await names()).isEmpty) {
-      await save('ios27-toolbar-light', const LiquidGlassSettings.ios27ToolbarLight());
-      await save('neutral-default', const LiquidGlassSettings());
+      for (final name in ['ios27-toolbar-light', 'neutral-default']) {
+        final yaml = await rootBundle.loadString('assets/presets/$name.yaml');
+        final directory = await _directory();
+        await File('${directory.path}/$name.yaml').writeAsString(yaml);
+      }
     }
   }
 }

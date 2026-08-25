@@ -61,6 +61,11 @@ def main() -> None:
         type=int,
         help="Evaluate an evenly spaced subset of the full grid (partial scan)",
     )
+    parser.add_argument(
+        "--profile-gate",
+        action="store_true",
+        help="Run the bounded loupe profile gate (E={25,35,45,55}, spread={.75,1})",
+    )
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
@@ -87,18 +92,36 @@ def main() -> None:
     )
 
     all_seeds = []
-    for alpha, frost, thickness, ri in itertools.product(
-        [0.05, 0.12, 0.25, 0.4], [0.0, 2.0, 7.0], [12.0, 20.0, 28.0], [1.08, 1.2]
-    ):
+    if args.profile_gate:
+        seed_specs = (
+            (0.05, 0.0, 12.0, edge, spread)
+            for edge, spread in itertools.product([25.0, 35.0, 45.0, 55.0], [0.75, 1.0])
+        )
+    else:
+        seed_specs = (
+            (
+                alpha,
+                frost,
+                thickness,
+                8.0 * thickness * (max(0.0, ri * ri - 1.0) ** 0.5),
+                1.0,
+            )
+            for alpha, frost, thickness, ri in itertools.product(
+                [0.05, 0.12, 0.25, 0.4],
+                [0.0, 2.0, 7.0],
+                [12.0, 20.0, 28.0],
+                [1.08, 1.2, 1.6, 2.5],
+            )
+        )
+    for alpha, frost, thickness, edge_refraction, spread in seed_specs:
         seed = dict(base)
-        edge_refraction = 8.0 * thickness * (max(0.0, ri * ri - 1.0) ** 0.5)
         seed.update(
             {
                 "tintAlpha": alpha,
                 "frost": frost,
                 "thickness": thickness,
                 "edgeRefraction": edge_refraction,
-                "refractionSpread": 1.0,
+                "refractionSpread": spread,
                 "contourStrength": 0.35,
                 "contourWidth": 1.0,
                 "highlight": 0.5,
@@ -161,6 +184,11 @@ def main() -> None:
 
     rows.sort(key=lambda row: row["score"], reverse=True)
     (out / "scan.json").write_text(json.dumps(rows, indent=2) + "\n")
+    best_dir = out / "best"
+    best_dir.mkdir()
+    (best_dir / "settings.json").write_text(
+        json.dumps(rows[0]["settings"], indent=2) + "\n"
+    )
     print(
         json.dumps(
             {

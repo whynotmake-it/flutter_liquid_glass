@@ -91,7 +91,16 @@ void main() {
     float invRefractiveIndex = 1.0 / uRefractiveIndex;
     vec3 baseRefract = refract(incident, normal, invRefractiveIndex);
     float baseRefractLength = (height + baseHeight) / max(0.001, abs(baseRefract.z));
-    vec2 displacement = baseRefract.xy * baseRefractLength;
+    vec2 refractedDisplacement = baseRefract.xy * baseRefractLength;
+
+    // The loupe has a low-power affine lens through its body in addition to
+    // the circular edge refraction. Blend it only with spread; spread=0 keeps
+    // the established toolbar path unchanged. The field is center-relative,
+    // so it generalizes across capsules without another pass or texture.
+    float edgePeak = 8.0 * uThickness * sqrt(max(uRefractiveIndex * uRefractiveIndex - 1.0, 0.0));
+    float lensGain = clamp(edgePeak / max(scene.halfMajor, 0.001), 0.0, 0.9);
+    vec2 affineLens = -(fragCoord - scene.center) * lensGain;
+    vec2 displacement = mix(refractedDisplacement, affineLens, spread);
 
     float maxDisplacement = uThickness * 10.0;
     float edgeDistance = max(-sd, 0.0);

@@ -34,3 +34,4 @@ flutter:
 
   assets:
     - assets/
+    - assets/presets/

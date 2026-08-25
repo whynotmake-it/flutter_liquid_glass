@@ -69,7 +69,7 @@ def capture_references(args) -> None:
         "/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer",
     )
     env["LIQUID_GLASS_TINT_CONTROL_METHOD"] = CONTROL_METHOD
-    for position in POSITIONS:
+    for position in args.positions:
         subprocess.run(
             [str(ROOT / "apple/set_transparency_slider.sh"), str(position)],
             check=True,
@@ -94,18 +94,16 @@ def capture_references(args) -> None:
 
 def materialize(virtual: dict) -> dict:
     settings = dict(virtual)
-    # Blur is intentionally out of scope for this sweep. Keep accepting the
-    # historical virtual key in old baselines, but never send it to the live
-    # renderer or optimize it as if it were a refraction parameter.
-    settings.pop("blurMix", None)
-    tint_level = round(float(settings.pop("tintLevel")))
-    settings.update(
-        {
-            "glassRed": tint_level,
-            "glassGreen": tint_level,
-            "glassBlue": tint_level,
-        }
-    )
+    # The slider fit intentionally shares one canonical material vector. Only
+    # these two documented transmission scalars are allowed to vary per
+    # position: tint alpha and frost. No legacy blurMix/glassAlpha knobs are
+    # sent to the renderer.
+    tint_level = round(float(settings.pop("tintLevel", 255.0)))
+    settings.update({
+        "tintRed": tint_level,
+        "tintGreen": tint_level,
+        "tintBlue": tint_level,
+    })
     return settings
 
 
@@ -155,15 +153,22 @@ def save_fit(
         "errors": evaluator.last_result.errors,
         "measurements": evaluator.last_result.details,
         "weights": WEIGHTS,
-        "fixedBlurSigma": settings["blur"],
+        "sharedVector": {
+            key: settings[key]
+            for key in (
+                "thickness", "edgeRefraction", "refractionSpread", "frost",
+                "chromaticAberration", "saturation", "transmissionGamma",
+                "vibrancy", "highlight", "contourStrength", "contourWidth",
+            )
+        },
         "fitted": {
-            "blurMix": virtual.get("blurMix", 0.0),
-            "glassAlpha": settings["glassAlpha"],
+            "tintAlpha": settings["tintAlpha"],
+            "frost": settings["frost"],
             "tintLevel": virtual["tintLevel"],
-            "glassColor": [
-                settings["glassRed"],
-                settings["glassGreen"],
-                settings["glassBlue"],
+            "tintColor": [
+                settings["tintRed"],
+                settings["tintGreen"],
+                settings["tintBlue"],
             ],
         },
         "settings": settings,
@@ -190,25 +195,21 @@ def is_monotonic(values: list[float], tolerance: float = 0.051) -> bool:
     )
 
 
-def interpret_curve(blur_mix: list[float]) -> dict:
-    spread = max(blur_mix) - min(blur_mix)
-    flat_at_one = all(abs(value - 1.0) <= 0.051 for value in blur_mix)
-    monotonic = is_monotonic(blur_mix)
-    if flat_at_one:
-        status = "rejected"
-        reason = "blurMix stayed flat at 1.0 across all slider positions"
-    elif monotonic and spread >= 0.10:
+def interpret_curve(values: list[float], label: str) -> dict:
+    spread = max(values) - min(values)
+    monotonic = is_monotonic(values)
+    if monotonic and spread >= 0.02:
         status = "confirmed"
-        reason = "fitted blurMix varies monotonically with Tint Amount"
+        reason = f"fitted {label} varies monotonically with Tint Amount"
     else:
         status = "inconclusive"
-        reason = "fitted blurMix is neither flat-at-one nor materially monotonic"
+        reason = f"fitted {label} is not materially monotonic"
     return {
         "status": status,
         "reason": reason,
         "monotonic": monotonic,
         "spread": spread,
-        "flatAtOne": flat_at_one,
+        "label": label,
     }
 
 
@@ -260,7 +261,7 @@ def write_curve_plot(path: Path, rows: list[dict]) -> None:
         )
 
     series = (
-        ("glassAlpha", [row["glassAlpha"] for row in rows], (40, 150, 40)),
+        ("tint alpha", [row["tintAlpha"] for row in rows], (40, 150, 40)),
         ("tintLevel / 255", [row["tintLevel"] / 255.0 for row in rows], (40, 40, 210)),
     )
     for label, values, color in series:
@@ -328,13 +329,12 @@ def fit_sweep(args) -> dict:
     baseline = load_baseline(args.baseline.resolve())
     baseline_virtual = {
         **baseline,
-        "blurMix": 0.0,
         "tintLevel": float(
             np.mean(
                 [
-                    baseline["glassRed"],
-                    baseline["glassGreen"],
-                    baseline["glassBlue"],
+                    baseline["tintRed"],
+                    baseline["tintGreen"],
+                    baseline["tintBlue"],
                 ]
             )
         ),
@@ -377,8 +377,8 @@ def fit_sweep(args) -> dict:
                 evaluator.evaluate(materialize(virtual))
                 row = {
                     "params": {
-                        "blurMix": virtual["blurMix"],
-                        "glassAlpha": virtual["glassAlpha"],
+                        "tintAlpha": virtual["tintAlpha"],
+                        "frost": virtual["frost"],
                         "tintLevel": virtual["tintLevel"],
                     },
                     "objective": fit_objective(evaluator),
@@ -391,7 +391,8 @@ def fit_sweep(args) -> dict:
                 evaluate,
                 baseline_virtual,
                 {
-                    "glassAlpha": [0.18, 0.38, 0.58, 0.72, 0.86],
+                    "tintAlpha": [0.05, 0.18, 0.38, 0.58, 0.72, 0.86],
+                    "frost": [0.0, 2.0, 5.0, 7.0, 10.0],
                     "tintLevel": [215.0, 235.0, 255.0],
                 },
                 max_iters=args.max_iters,
@@ -402,9 +403,10 @@ def fit_sweep(args) -> dict:
                 evaluate,
                 coarse_best,
                 {
-                    "glassAlpha": fine_values(
-                        coarse_best["glassAlpha"], 0.20, 0.04, 0.02, 0.98
+                    "tintAlpha": fine_values(
+                        coarse_best["tintAlpha"], 0.20, 0.04, 0.02, 0.98
                     ),
+                    "frost": fine_values(coarse_best["frost"], 3.0, 1.0, 0.0, 12.0),
                     "tintLevel": fine_values(
                         coarse_best["tintLevel"], 24.0, 8.0, 191.0, 255.0
                     ),
@@ -425,8 +427,8 @@ def fit_sweep(args) -> dict:
             cards.append(card)
             print(
                 f"TRANSPARENCY_FIT position={position:.2f} "
-                f"blurMix={card['fitted']['blurMix']:.3f} "
-                f"alpha={card['fitted']['glassAlpha']:.3f} "
+                f"alpha={card['fitted']['tintAlpha']:.3f} "
+                f"frost={card['fitted']['frost']:.3f} "
                 f"tint={card['fitted']['tintLevel']:.1f} "
                 f"score={card['score']:.4f}",
                 flush=True,
@@ -435,8 +437,8 @@ def fit_sweep(args) -> dict:
     rows = [
         {
             "sliderPosition": card["sliderPosition"],
-            "blurMix": card["fitted"]["blurMix"],
-            "glassAlpha": card["fitted"]["glassAlpha"],
+            "tintAlpha": card["fitted"]["tintAlpha"],
+            "frost": card["fitted"]["frost"],
             "tintLevel": card["fitted"]["tintLevel"],
             "score": card["score"],
             "fitObjective": card["fitObjective"],
@@ -448,11 +450,11 @@ def fit_sweep(args) -> dict:
         for card in cards
     ]
     interpretation = {
-        "status": "skipped",
-        "reason": "Blur was deliberately excluded; only transparency/tint response was fitted.",
-        "monotonic": None,
-        "spread": 0.0,
-        "flatAtOne": False,
+        "status": "shared-vector-with-two-scalars",
+        "reason": "All material fields are shared; only tint alpha and frost vary per slider position.",
+        "allowedPerPositionScalars": ["tintAlpha", "frost"],
+        "tintAlpha": interpret_curve([row["tintAlpha"] for row in rows], "tintAlpha"),
+        "frost": interpret_curve([row["frost"] for row in rows], "frost"),
     }
     plot = out / "blur_mix_mapping.png"
     write_curve_plot(plot, rows)
@@ -463,14 +465,21 @@ def fit_sweep(args) -> dict:
         "udid": args.udid,
         "sliderControlMethod": CONTROL_METHOD,
         "medianFrameCount": args.frames,
-        "fixedBlurSigma": baseline["blur"],
+        "sharedVector": {
+            key: baseline[key]
+            for key in (
+                "thickness", "edgeRefraction", "refractionSpread", "chromaticAberration",
+                "saturation", "transmissionGamma", "vibrancy", "highlight",
+                "contourStrength", "contourWidth",
+            )
+        },
         "positions": list(positions),
         "curve": rows,
         "interpretation": interpretation,
         "plot": str(plot.resolve()),
         "defaultPositionCorrection": (
-            "The prior blurMix=1.0 result measured only slider position 0.50; "
-            "the sweep interpretation supersedes any mechanism-wide rejection."
+            "The redesign fits a shared material vector and reports only the "
+            "two permitted per-position transmission scalars."
         ),
         "visualInspection": (
             "The signed diffs measure the transparent-slider transmission and "
@@ -530,7 +539,7 @@ def main() -> None:
     parser.add_argument(
         "--baseline",
         type=Path,
-        default=ROOT / "out/approved-renderer/wall_report.json",
+        default=ROOT / "settings/baseline.json",
     )
     parser.add_argument(
         "--wall-report",

@@ -372,6 +372,19 @@ smoke scan is in `out/loupe-seed-scan-post-redesign-8-correct-shape/` (8/72
 seeds, best 8.6626). A full fair loupe rerun and the system text-selection
 loupe integration remain required before claiming the +10 loupe gate.
 
+The bounded post-profile loupe gate is reproducible with
+`seed_scan.py --profile-gate`; it evaluates `edgeRefraction={25,35,45,55}`
+and `refractionSpread={.75,1}` against the pinned four-probe reference. The
+shape-relative affine spread field (`edgeRefraction / halfMajor`) adds no
+pass, texture, or per-frame CPU work. The current eight-seed evidence is in
+`out/loupe-profile-gate-affine/` (best comparator score 11.5062 at E=45,
+spread=1). This is a measured improvement over the earlier 8.6626 result,
+but the complete loupe/system integration and holdout gates remain open.
+
+The canonical transparency-vector smoke is in
+`out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
+vector, with only monotonic `tintAlpha` and `frost` scalars allowed to vary.
+
 Focused GPU/shader/settings tests and the example smoke/YAML test are green.
 The full melos non-golden suite still has headless layer-tree failures, and
 the macOS/Android performance audit plus tab/capsule holdout scorecards are

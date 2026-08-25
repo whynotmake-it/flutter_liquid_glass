@@ -161,6 +161,8 @@ float getShapeSDF(
 struct SceneSample {
     float distance;
     float halfMinor;
+    vec2 center;
+    float halfMajor;
 };
 
 SceneSample getShapeSampleFromArray(int index, vec2 p) {
@@ -193,6 +195,10 @@ SceneSample getShapeSampleFromArray(int index, vec2 p) {
     // it beside the SDF avoids a second traversal and lets optical spread be
     // shape-relative rather than thickness-relative.
     resultSample.halfMinor = 0.5 * min(primitive.y, primitive.z) * placement.z;
+    // Placement is already expressed in matte pixels. Carry the center and
+    // major extent as metadata for the spread lens without another traversal.
+    resultSample.center = placement.xy;
+    resultSample.halfMajor = 0.5 * max(primitive.y, primitive.z) * placement.z;
     return resultSample;
 }
 
@@ -209,6 +215,8 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
     SceneSample result;
     result.distance = distance;
     result.halfMinor = mix(b.halfMinor, a.halfMinor, weightA);
+    result.center = mix(b.center, a.center, weightA);
+    result.halfMajor = mix(b.halfMajor, a.halfMajor, weightA);
     return result;
 }
 
@@ -216,6 +224,8 @@ SceneSample sceneSample(vec2 p, int numShapes) {
     SceneSample empty;
     empty.distance = 1e9;
     empty.halfMinor = 0.0;
+    empty.center = vec2(0.0);
+    empty.halfMajor = 0.0;
     if (numShapes <= 0) {
         return empty;
     }

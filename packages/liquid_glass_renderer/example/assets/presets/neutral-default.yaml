@@ -1,0 +1,14 @@
+# Bundled neutral seed preset
+visibility: 1.0
+tint: 16777215
+thickness: 20.0
+edgeRefraction: 106.13
+refractionSpread: 0.0
+frost: 5.0
+chromaticAberration: 0.01
+saturation: 1.5
+transmissionGamma: 1.0
+vibrancy: 0.0
+highlight: 1.0
+contourStrength: 0.0
+contourWidth: 0.0

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer_example/basic_app.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
@@ -43,5 +44,16 @@ void main() {
     const settings = LiquidGlassSettings.ios27ToolbarLight();
     final restored = PresetStore.fromYaml(PresetStore.toYaml(settings));
     expect(restored.toJson(), settings.toJson());
+  });
+
+  test('bundled seed presets are available to the persistent store', () async {
+    final toolbar = await rootBundle.loadString(
+      'assets/presets/ios27-toolbar-light.yaml',
+    );
+    final neutral = await rootBundle.loadString(
+      'assets/presets/neutral-default.yaml',
+    );
+    expect(toolbar, contains('edgeRefraction:'));
+    expect(neutral, contains('refractionSpread:'));
   });
 }
