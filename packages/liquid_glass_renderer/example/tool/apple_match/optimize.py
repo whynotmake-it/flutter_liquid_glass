@@ -97,6 +97,7 @@ def main():
         parser.error("--udid or IOS_27_UDID is required")
     args.scene = args.scene.resolve()
     args.baseline = args.baseline.resolve()
+    args.out = args.out.resolve()
 
     scene = validate_scene(args.scene, ROOT / "scenes/schema.json")
     reference = ROOT / "references" / args.reference_set / scene["id"]

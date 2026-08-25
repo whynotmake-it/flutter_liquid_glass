@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 class MatchScene {
   MatchScene({
+    required this.profile,
     required this.width,
     required this.height,
     required this.scale,
@@ -22,6 +23,7 @@ class MatchScene {
           probe['background']! as Map<String, Object?>;
     }
     return MatchScene(
+      profile: json['profile']! as String,
       width: (canvas['logicalWidth']! as num).toDouble(),
       height: (canvas['logicalHeight']! as num).toDouble(),
       scale: canvas['scale']! as int,
@@ -41,6 +43,7 @@ class MatchScene {
   );
 
   final double width;
+  final String profile;
   final double height;
   final int scale;
   final Rect shapeRect;

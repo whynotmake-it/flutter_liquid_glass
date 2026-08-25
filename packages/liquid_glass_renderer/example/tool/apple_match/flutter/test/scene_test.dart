@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:apple_match_flutter/scene.dart';
 import 'package:apple_match_flutter/scene_view.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -15,6 +16,26 @@ void main() {
     expect(scene.scale, 3);
     expect(scene.probes.keys, orderedEquals(['A', 'B', 'C', 'D']));
     expect(scene.shapeRect.width, closeTo(225.333, 0.0001));
+    expect(scene.profile, 'toolbar_capsule');
+  });
+
+  testWidgets('loupe scenes magnify before the glass layer', (tester) async {
+    final file = File('../scenes/loupe.json');
+    final scene = MatchScene.fromBase64(
+      base64Encode(utf8.encode(file.readAsStringSync())),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MatchSceneView(
+          scene: scene,
+          probe: 'A',
+          settings: const {},
+        ),
+      ),
+    );
+
+    expect(scene.profile, 'loupe');
+    expect(find.byType(RawMagnifier), findsOneWidget);
   });
 
   test('maps core optical settings', () {

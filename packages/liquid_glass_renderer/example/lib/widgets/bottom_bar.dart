@@ -324,7 +324,14 @@ class _ExtraButtonState extends State<_ExtraButton> {
                   fake: widget.fake,
                   settings: LiquidGlassSettings.of(
                     context,
-                  ).copyWith(frost: 0, refractionSpread: 0),
+                  ).copyWith(
+                    tint: const Color.fromARGB(0, 255, 255, 255),
+                    frost: 0,
+                    refractionSpread: 0,
+                    saturation: 1,
+                    transmissionGamma: 1,
+                    vibrancy: 0,
+                  ),
                   shape: const LiquidOval(),
                   child: GlassGlow(child: icon),
                 ),
@@ -602,9 +609,12 @@ class _TabIndicatorState extends State<_TabIndicator>
                           ),
                         ],
                         fake: widget.fake,
-                        settings: LiquidGlassSettings.ios27ToolbarLight(
+                        settings: LiquidGlassSettings(
                           visibility: thickness,
+                          edgeRefraction: 40,
                           frost: 0,
+                          contourStrength: .2,
+                          contourWidth: 1,
                         ),
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: 64,

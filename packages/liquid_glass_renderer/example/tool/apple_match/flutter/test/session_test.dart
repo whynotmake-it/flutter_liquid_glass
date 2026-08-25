@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 MatchScene testScene() {
   return MatchScene(
+    profile: 'toolbar_capsule',
     width: 100,
     height: 100,
     scale: 1,

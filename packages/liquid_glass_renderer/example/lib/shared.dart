@@ -15,6 +15,24 @@ Animation<double> useRotatingAnimationController() {
   )..repeat();
 }
 
+// Apple’s loupe is a clear lens: its backdrop is enlarged, but it does not
+// inherit the toolbar’s milky tint or frost. Keep the edge optics and contour
+// from the matched toolbar while neutralizing transmission for this example.
+const _clearLoupeSettings = LiquidGlassSettings(
+  tint: Color.fromARGB(0, 255, 255, 255),
+  thickness: 12,
+  edgeRefraction: 27.42,
+  refractionSpread: 0,
+  frost: 0,
+  chromaticAberration: 0.005,
+  saturation: 1,
+  transmissionGamma: 1,
+  vibrancy: 0,
+  highlight: 0.5,
+  contourStrength: 0.1,
+  contourWidth: 1,
+);
+
 class VerticalStripes extends StatelessWidget {
   const VerticalStripes({super.key, this.stripeThickness = 100.0});
 
@@ -156,7 +174,7 @@ class LoupeExamplePage extends StatelessWidget {
           const Positioned.fill(child: Grid()),
           Center(
             child: ExampleLoupe(
-              settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+              settings: _clearLoupeSettings,
               focalPointOffset: const Offset(0, 64),
             ),
           ),

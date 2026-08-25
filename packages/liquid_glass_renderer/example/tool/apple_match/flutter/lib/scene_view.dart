@@ -140,15 +140,23 @@ class MatchSceneView extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(child: ProbeBackground(spec: background)),
-          Positioned.fromRect(
-            rect: shapeRect,
-            child: LiquidGlass.withOwnLayer(
+          if (scene.profile == 'loupe')
+            _MatchLoupe(
+              rect: shapeRect,
+              cornerRadius: cornerRadius,
               settings: matchGlassSettings(settings),
-              shape: matchGlassShape(settings, cornerRadius),
               shadows: matchGlassShadows(settings),
-              child: const SizedBox.expand(),
+            )
+          else
+            Positioned.fromRect(
+              rect: shapeRect,
+              child: LiquidGlass.withOwnLayer(
+                settings: matchGlassSettings(settings),
+                shape: matchGlassShape(settings, cornerRadius),
+                shadows: matchGlassShadows(settings),
+                child: const SizedBox.expand(),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -156,6 +164,54 @@ class MatchSceneView extends StatelessWidget {
 
   double _number(String key, double fallback) =>
       (settings[key] as num?)?.toDouble() ?? fallback;
+}
+
+/// Composes the iOS loupe as Flutter does: magnify the painted backdrop first,
+/// then apply the ordinary liquid-glass pass to that higher-resolution source.
+/// This keeps intentional loupe enlargement out of the renderer shader and
+/// avoids magnifying already filtered pixels.
+class _MatchLoupe extends StatelessWidget {
+  const _MatchLoupe({
+    required this.rect,
+    required this.cornerRadius,
+    required this.settings,
+    required this.shadows,
+  });
+
+  final Rect rect;
+  final double cornerRadius;
+  final LiquidGlassSettings settings;
+  final List<BoxShadow> shadows;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = rect.size;
+    final borderRadius = BorderRadius.circular(cornerRadius);
+    return Positioned.fromRect(
+      rect: rect,
+      child: SizedBox.fromSize(
+        size: size,
+        child: Stack(
+          children: [
+            RawMagnifier(
+              size: size,
+              magnificationScale: 1.55,
+              focalPointOffset: const Offset(0, 75.15),
+              decoration: MagnifierDecoration(
+                shape: RoundedRectangleBorder(borderRadius: borderRadius),
+              ),
+            ),
+            LiquidGlass.withOwnLayer(
+              settings: settings.copyWith(frost: 0),
+              shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
+              shadows: shadows,
+              child: const SizedBox.expand(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ProbeBackground extends StatelessWidget {
