@@ -109,3 +109,27 @@ different renderer/perf revisions and cannot be presented as a clean
 before/after pair for the final state. A final same-runner macOS profile
 comparison is required before claiming the ≤5% gate; the Android build is a
 platform smoke check, not a substitute for that timing evidence.
+
+## 2026-08-25 renderer redesign measurements
+
+Two focused measurements isolate the current optimization work; neither is the
+final gate audit yet.
+
+- A conservative smooth-union AABB lower bound is intended to skip exact
+  superellipse evaluation only when `boxLowerBound >= currentDistance + blend`.
+  The first implementation used an unsigned inside-box distance, so its grouped
+  timings (2.30, 1.98, and 1.98 ms p95) are invalid evidence and must not be
+  used as a regression result. The bound is now signed; fresh grouped A/B
+  measurements are required before retaining the cull.
+- The shared coordinate atlas replaces one 2×1 texture overwrite per animated
+  layer with one overwrite per atlas page. The valid three-repetition
+  independent16 run produced raster p95 5.20/5.23/5.28 ms (median 5.23 ms,
+  CV 0.7%), peak footprints 1036.9/1047.8/1055.5 MB (median 1047.8 MB,
+  CV 0.9%), and about 97,269 command-buffer submissions in the one completed
+  retry. The pre-atlas focused control was about 111,760 submissions and
+  1,061 MB peak. This is a meaningful attribution signal, not a passed ≤5%
+  before/after gate; the same-runner baseline comparison remains open.
+
+The atlas uses stable per-layer rows, a fixed page size, CPU-side row
+freelists, context-loss recreation, and a focused GPU test covering shared page
+identity and distinct rows. It does not add a backdrop pass or public setting.

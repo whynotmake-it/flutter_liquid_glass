@@ -83,3 +83,9 @@ presets), performance non-regressing.
 - 2026-08-25: clear loupe example composition verified in both entry points;
   focused example tests/analyzer pass. Simulator service remains unavailable,
   so fresh pinned loupe and slider evidence is still pending.
+- 2026-08-25: added a conservative exact smooth-union AABB cull and a shared
+  coordinate-texture atlas. The cull's first unsigned inside-box bound was
+  corrected to a signed conservative bound after review; its earlier timings
+  are discarded. Focused GPU tests pass; repeated macOS evidence shows the
+  atlas removes most per-layer coordinate submissions, but the final
+  before/after performance gate and pinned visual validation remain open.

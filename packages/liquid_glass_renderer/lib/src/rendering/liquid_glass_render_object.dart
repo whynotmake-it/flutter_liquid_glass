@@ -18,6 +18,11 @@ import 'package:meta/meta.dart';
 /// render them to the screen with the liquid glass effect.
 @internal
 abstract class LiquidGlassRenderObject extends RenderProxyBox {
+  // The final-render shader's reserved-face vec4 starts at float 38; its Y
+  // component carries the stable coordinate-atlas row. Keep the ABI detail
+  // named so a shader-layout change cannot silently leave a magic index stale.
+  static const int _coordinateRowFloatIndex = 39;
+
   LiquidGlassRenderObject({
     required this._link,
     required this.renderShader,
@@ -122,6 +127,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @mustCallSuper
   void detach() {
+    _gpuGeometryRenderer?.unregisterCoordinateMappingReader();
     super.detach();
   }
 
@@ -175,7 +181,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         ])
         ..setFloats([
           settings.effectiveHighlight,
-          40.0,
+          0.0,
         ]);
     });
   }
@@ -344,11 +350,29 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     if (renderer == null) {
       throw StateError('Flutter GPU coordinate renderer is unavailable.');
     }
+    renderer.registerCoordinateMappingReader(_currentCoordinateMapping);
+    final mapping = _currentCoordinateMapping();
+    renderer.updateCoordinateMapping(
+      basisXX: mapping.basisXX,
+      basisYX: mapping.basisYX,
+      basisXY: mapping.basisXY,
+      basisYY: mapping.basisYY,
+      originX: mapping.originX,
+      originY: mapping.originY,
+    );
+    // uReservedFaceConfig.y is intentionally unused by the material model;
+    // it carries the stable atlas-row selector without changing the filter
+    // snapshot when ancestor transforms move.
+    renderShader.setFloat(_coordinateRowFloatIndex, renderer.coordinateRow);
+    return renderer.coordinateImage!;
+  }
+
+  CoordinateMapping _currentCoordinateMapping() {
     final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
     final origin = MatrixUtils.transformPoint(globalToMatte, Offset.zero);
     final axisX = MatrixUtils.transformPoint(globalToMatte, const Offset(1, 0));
     final axisY = MatrixUtils.transformPoint(globalToMatte, const Offset(0, 1));
-    renderer.updateCoordinateMapping(
+    return (
       basisXX: axisX.dx - origin.dx,
       basisYX: axisY.dx - origin.dx,
       basisXY: axisX.dy - origin.dy,
@@ -356,7 +380,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       originX: origin.dx * devicePixelRatio,
       originY: origin.dy * devicePixelRatio,
     );
-    return renderer.coordinateImage!;
   }
 
   /// True once geometry has been encoded, so ancestor motion can stay on the
