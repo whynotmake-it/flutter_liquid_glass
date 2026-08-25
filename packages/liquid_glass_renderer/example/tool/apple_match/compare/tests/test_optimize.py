@@ -25,7 +25,12 @@ from apple_match.hotloop.session import (
     SignalReloadTrigger,
 )
 from hotloop_staged import has_optimization_wall, optimization_objective
-from transparency_sweep import interpret_curve, is_monotonic
+from transparency_sweep import (
+    audit_shared_vector,
+    interpret_curve,
+    is_monotonic,
+    materialize,
+)
 
 
 class OptimizerTests(unittest.TestCase):
@@ -151,6 +156,38 @@ class OptimizerTests(unittest.TestCase):
             interpret_curve([0.2, 0.8, 0.3, 0.9, 0.4])["status"],
             "inconclusive",
         )
+
+    def test_transparency_materialize_preserves_shared_tint_color(self):
+        tint_color = (253, 252, 253)
+        first = materialize({"tintAlpha": 0.2, "frost": 1.0}, tint_color)
+        second = materialize({"tintAlpha": 0.8, "frost": 7.0}, tint_color)
+        self.assertEqual(first["tintRed"], 253)
+        self.assertEqual(first["tintGreen"], 252)
+        self.assertEqual(first["tintBlue"], 253)
+        self.assertEqual(
+            [first[key] for key in ("tintRed", "tintGreen", "tintBlue")],
+            [second[key] for key in ("tintRed", "tintGreen", "tintBlue")],
+        )
+        self.assertNotEqual(first["tintAlpha"], second["tintAlpha"])
+        self.assertNotIn("tintLevel", first)
+
+    def test_transparency_shared_vector_audit_rejects_unauthorized_drift(self):
+        base = {"thickness": 10.0, "tintRed": 253, "tintGreen": 252, "tintBlue": 253,
+                "tintAlpha": 0.2, "frost": 1.0}
+        passed = audit_shared_vector([
+            base,
+            {**base, "tintAlpha": 0.8, "frost": 7.0},
+        ])
+        self.assertEqual(passed["status"], "passed")
+        self.assertEqual(
+            passed["observedVaryingKeys"], ["frost", "tintAlpha"]
+        )
+        failed = audit_shared_vector([
+            base,
+            {**base, "tintAlpha": 0.8, "tintRed": 240},
+        ])
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["unauthorizedVaryingKeys"], ["tintRed"])
 
     def test_neighbor_values_clamp_at_bounds(self):
         values = [1.0, 2.0, 3.0]

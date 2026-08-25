@@ -83,9 +83,26 @@ presets), performance non-regressing.
 - 2026-08-25: clear loupe example composition verified in both entry points;
   focused example tests/analyzer pass. Simulator service remains unavailable,
   so fresh pinned loupe and slider evidence is still pending.
-- 2026-08-25: added a conservative exact smooth-union AABB cull and a shared
-  coordinate-texture atlas. The cull's first unsigned inside-box bound was
-  corrected to a signed conservative bound after review; its earlier timings
-  are discarded. Focused GPU tests pass; repeated macOS evidence shows the
-  atlas removes most per-layer coordinate submissions, but the final
-  before/after performance gate and pinned visual validation remain open.
+- 2026-08-25: tested a conservative smooth-union cull and shared coordinate
+  atlas as performance candidates. The cull's first unsigned bound was
+  corrected during review, but neither candidate produced a proven end-to-end
+  frame-time or memory win; both experiments were reverted to preserve the
+  no-new-per-frame-work invariant. Their measurements remain in the audit as
+  rejected evidence.
+- 2026-08-25: reran the repository contract with the pinned Flutter 3.47.1
+  toolchain: `melos run analyze`, `melos run test-without-goldens`, harness
+  analyzer/tests, comparator tests, and the Android debug build all pass.
+  CoreSimulatorService still refuses connections, so fresh pinned loupe,
+  slider, and post-change image evidence remain blocked by infrastructure;
+  existing shader-level loupe scans are explicitly not used as the retired
+  pre-shader composition gate.
+- 2026-08-25: completed a focused three-repetition macOS run for
+  `baselineMotion`, `grouped16Motion`, `independent16Motion`, and `layerChurn`
+  without xctrace. Median raster means were 1.27/1.36/3.33/1.48 ms and median
+  raster p95 values were 1.53/1.91/5.28/2.08 ms respectively; repeatability
+  failed (CV 16–49%), so this is diagnostic evidence only, not the final ≤5%
+  performance gate. Independent16 peak footprint remained about 0.93–1.12 GB.
+- 2026-08-25: repaired the transparency sweep contract: exact baseline tint
+  RGB is shared across every position, only `tintAlpha` and `frost` are fit,
+  and a structural audit now fails on unauthorized material drift. Comparator
+  coverage is 31 tests (one simulator smoke skipped without a device).

@@ -381,10 +381,11 @@ references/ios27-iphone17pro-light-transparency/slider-050/
 references/ios27-iphone17pro-light-transparency/slider-100/
 ```
 
-Metadata pins the same iOS 27 runtime and UDID. `transparency_sweep.py` currently
-fits per-position virtual settings. Update it after the new model lands so all
-three positions share one vector and vary no more than two documented scalars,
-likely `tint alpha` and `frost`.
+Metadata pins the same iOS 27 runtime and UDID. `transparency_sweep.py` now
+copies the exact baseline tint RGB into one shared vector and fits no more than
+the two documented per-position scalars `tint alpha` and `frost`. Its emitted
+constraint audit rejects unauthorized material drift; fresh pinned endpoint
+visuals remain required after CoreSimulatorService recovery.
 
 ## Example app work — not started
 

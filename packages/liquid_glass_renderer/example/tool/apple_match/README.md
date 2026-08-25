@@ -201,22 +201,21 @@ experiment; the reference app itself still renders the public
 IOS_27_UDID="$IOS_27_UDID" python3 transparency_sweep.py --force-reference
 ```
 
-With fixed blur sigma 6, the fitted `(blurMix, glassAlpha, neutral tint)` curve
-was `(0.75, 0.54, 235)`, `(0.95, 0.50, 255)`,
-`(1.00, 0.62, 247)`, `(0.95, 0.80, 227)`, and
-`(1.00, 0.86, 227)`. The 0.05 dip at position 0.75 is one fine-search step and
-falls within the fit tolerance: blur mix rises from 0.75 and saturates near 1,
-while overlay alpha rises strongly across the upper slider range. The sweep
-therefore supports the fixed-blur mix path and supersedes the earlier
-single-position rejection. Exact scores, diagnostics, and absolute evidence
-paths are in `out/transparency-sweep/summary.json`; the same summary is linked
-from `out/approved-renderer/wall_report.json`.
+The current fitter keeps the exact baseline tint RGB as one shared material
+vector and searches only the documented per-position scalars `tintAlpha` and
+`frost`. It emits a structural constraint audit in
+`out/transparency-sweep/summary.json`; any drift in tint, geometry, or another
+material field fails the run rather than being misreported as a two-scalar fit.
+`frost` is a provisional transmission control, not a claim that Apple's
+blurred/unblurred blend is solved. Exact scores, diagnostics, and absolute
+evidence paths are in `out/transparency-sweep/summary.json`; the same summary
+is linked from `out/approved-renderer/wall_report.json`.
 
-Visual inspection still shows a material upper-end limitation that the
-aggregate score understates: at position 1 Apple's glass is nearly opaque,
-while the fitted candidate retains visible RGB grid structure. The sweep
-supports a rising, saturating blur mix, but the current neutral tint/alpha
-response is not a complete model of the Settings slider.
+The older fixed-blur-mix curve below is retained as historical evidence only.
+Visual inspection still shows an upper-end limitation that aggregate scores
+understate: Apple's glass becomes nearly opaque while the candidate retains
+visible RGB grid structure. That residual remains outside the current
+looks-first lighting/refraction work.
 
 Independent bright/dark rim fitting retained zero intensity for both rims. The
 ordinary directional light moved from 0 to 0.2 and raised the revised highlight

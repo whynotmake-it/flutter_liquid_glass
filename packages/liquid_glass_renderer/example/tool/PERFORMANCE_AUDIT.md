@@ -110,26 +110,39 @@ before/after pair for the final state. A final same-runner macOS profile
 comparison is required before claiming the ≤5% gate; the Android build is a
 platform smoke check, not a substitute for that timing evidence.
 
-## 2026-08-25 renderer redesign measurements
+## 2026-08-25 renderer optimization experiments (rejected)
 
-Two focused measurements isolate the current optimization work; neither is the
-final gate audit yet.
+Two focused measurements evaluated candidates; neither is part of the current
+renderer and neither is the final gate audit.
 
-- A conservative smooth-union AABB lower bound is intended to skip exact
+- A conservative smooth-union AABB lower bound was evaluated to skip exact
   superellipse evaluation only when `boxLowerBound >= currentDistance + blend`.
-  The first implementation used an unsigned inside-box distance, so its grouped
-  timings (2.30, 1.98, and 1.98 ms p95) are invalid evidence and must not be
-  used as a regression result. The bound is now signed; fresh grouped A/B
-  measurements are required before retaining the cull.
-- The shared coordinate atlas replaces one 2×1 texture overwrite per animated
+  Its first implementation used an unsigned inside-box distance; after fixing
+  that correctness issue, there was still no valid end-to-end proof of a win.
+  The cull was reverted and its grouped timings are historical only.
+- A shared coordinate atlas replaced one 2×1 texture overwrite per animated
   layer with one overwrite per atlas page. The valid three-repetition
   independent16 run produced raster p95 5.20/5.23/5.28 ms (median 5.23 ms,
   CV 0.7%), peak footprints 1036.9/1047.8/1055.5 MB (median 1047.8 MB,
   CV 0.9%), and about 97,269 command-buffer submissions in the one completed
   retry. The pre-atlas focused control was about 111,760 submissions and
   1,061 MB peak. This is a meaningful attribution signal, not a passed ≤5%
-  before/after gate; the same-runner baseline comparison remains open.
+  before/after gate. Raster p95 did not improve and the atlas introduced extra
+  reader lifecycle/per-frame preparation work, so it was reverted.
 
-The atlas uses stable per-layer rows, a fixed page size, CPU-side row
-freelists, context-loss recreation, and a focused GPU test covering shared page
-identity and distinct rows. It does not add a backdrop pass or public setting.
+The atlas implementation and its focused identity/row test were removed from
+the current renderer; no atlas texture, reader registry, or coordinate-row
+uniform remains in shipped code.
+
+The focused no-trace audit in `build/benchmark-final-focused-current` measured
+median per-run raster means of 1.27 ms (`baselineMotion`), 1.36 ms
+(`grouped16Motion`), 3.33 ms (`independent16Motion`), and 1.48 ms
+(`layerChurn`); corresponding median raster p95 values were 1.53, 1.91, 5.28,
+and 2.08 ms. All four scenario families exceeded the repeatability limit, so
+these values are diagnostic only. Independent16 peak footprint remained
+approximately 0.93–1.12 GB, and no final ≤5% before/after claim is made.
+
+The transparency harness now enforces the same no-hidden-work discipline for
+material fitting: baseline tint RGB is copied exactly, and only `tintAlpha`
+and `frost` may vary by slider position. Its structural constraint audit is
+recorded alongside the fit scorecards.

@@ -108,13 +108,6 @@ class FlutterGpuGeometryRenderer {
   static final Map<String, _SharedGeometryResources> _resolvedAssetResources =
       {};
 
-  // Coordinate mappings are tiny (two affine texels), but Texture.overwrite
-  // still submits a staging blit and command buffer. Keep stable rows in a
-  // shared atlas and batch all registered layer mappings on the first update
-  // of a frame. The final shader selects its row with a stable float uniform,
-  // so ancestor motion updates texel contents without rebuilding filters.
-  static final _CoordinateAtlas _coordinateAtlas = _CoordinateAtlas();
-
   /// One bump allocator for every geometry pass in the current frame.
   ///
   /// HostBuffer retains four device-buffer blocks. Sizing each renderer to a
@@ -183,26 +176,14 @@ class FlutterGpuGeometryRenderer {
   int _textureWidth = 0;
   int _textureHeight = 0;
 
-  _CoordinateSlot? _coordinateSlot;
+  gpu.Texture? _coordinateTexture;
+  ui.Image? _coordinateImage;
+  final ByteData _coordinateData = ByteData(32);
 
   late final gpu.DeviceBuffer _vertexBuffer;
   late final gpu.BufferView _vertexBufferView;
 
-  ui.Image? get coordinateImage => _coordinateSlot?.image;
-
-  /// Stable normalized row used by the final shader's coordinate atlas.
-  double get coordinateRow => _coordinateSlot?.row ?? 0.5;
-
-  void registerCoordinateMappingReader(CoordinateMappingReader reader) {
-    _initCoordinateTexture();
-    _coordinateAtlas.registerReader(this, reader);
-  }
-
-  /// Stops the shared atlas from calling a detached render object's transform
-  /// reader while another layer is being painted.
-  void unregisterCoordinateMappingReader() {
-    _coordinateAtlas.unregisterReader(this);
-  }
+  ui.Image? get coordinateImage => _coordinateImage;
 
   void updateCoordinateMapping({
     required double basisXX,
@@ -213,21 +194,40 @@ class FlutterGpuGeometryRenderer {
     required double originY,
   }) {
     _initCoordinateTexture();
-    _coordinateAtlas.update(
-      this,
-      (
-        basisXX: basisXX,
-        basisYX: basisYX,
-        basisXY: basisXY,
-        basisYY: basisYY,
-        originX: originX,
-        originY: originY,
-      ),
-    );
+    final floats = _coordinateData.buffer.asFloat32List();
+    if (floats[0] == basisXX &&
+        floats[1] == basisYX &&
+        floats[2] == basisXY &&
+        floats[3] == basisYY &&
+        floats[4] == originX &&
+        floats[5] == originY) {
+      return;
+    }
+    floats
+      ..[0] = basisXX
+      ..[1] = basisYX
+      ..[2] = basisXY
+      ..[3] = basisYY
+      ..[4] = originX
+      ..[5] = originY
+      ..[6] = 0
+      ..[7] = 0;
+    _coordinateTexture!.overwrite(_coordinateData);
   }
 
   void _initCoordinateTexture() {
-    _coordinateSlot ??= _coordinateAtlas.acquire(this);
+    if (_coordinateTexture != null) return;
+    _coordinateTexture = gpu.gpuContext.createTexture(
+      gpu.StorageMode.hostVisible,
+      2,
+      1,
+      format: gpu.PixelFormat.r32g32b32a32Float,
+      enableRenderTargetUsage: false,
+    );
+    if (_coordinateTexture!.isValid != true) {
+      throw StateError('LiquidGlass coordinate mapping texture is invalid.');
+    }
+    _coordinateImage = _coordinateTexture!.asImage();
   }
 
   void _bindUniformLayout(gpu.Shader fragmentShader) {
@@ -418,183 +418,8 @@ class FlutterGpuGeometryRenderer {
     _texture = null;
     _image = null;
     _renderTarget = null;
-    _coordinateAtlas.release(this);
-    _coordinateSlot = null;
-  }
-}
-
-typedef CoordinateMapping = ({
-  double basisXX,
-  double basisYX,
-  double basisXY,
-  double basisYY,
-  double originX,
-  double originY,
-});
-
-typedef CoordinateMappingReader = CoordinateMapping Function();
-
-class _CoordinateSlot {
-  _CoordinateSlot(this.page, this.rowIndex);
-
-  final _CoordinateAtlasPage page;
-  final int rowIndex;
-
-  double get row => (rowIndex + 0.5) / _CoordinateAtlasPage.rowsPerPage;
-  ui.Image get image => page.image;
-}
-
-class _CoordinateAtlasPage {
-  static const int rowsPerPage = 64;
-
-  _CoordinateAtlasPage() {
-    _data = ByteData(2 * rowsPerPage * 16);
-    _freeRows.addAll(List<int>.generate(rowsPerPage, (index) => index));
-  }
-
-  late final ByteData _data;
-  final List<int> _freeRows = <int>[];
-  final Set<int> _dirtyRows = <int>{};
-  gpu.Texture? _texture;
-  ui.Image? _image;
-
-  ui.Image get image {
-    _ensureTexture();
-    return _image!;
-  }
-
-  int? acquireRow() => _freeRows.isEmpty ? null : _freeRows.removeLast();
-
-  void releaseRow(int row) {
-    _freeRows.add(row);
-    _dirtyRows.remove(row);
-  }
-
-  bool write(int row, CoordinateMapping mapping) {
-    final floats = _data.buffer.asFloat32List();
-    final first = row * 8;
-    if (floats[first] == mapping.basisXX &&
-        floats[first + 1] == mapping.basisYX &&
-        floats[first + 2] == mapping.basisXY &&
-        floats[first + 3] == mapping.basisYY &&
-        floats[first + 4] == mapping.originX &&
-        floats[first + 5] == mapping.originY) {
-      return false;
-    }
-    floats
-      ..[first] = mapping.basisXX
-      ..[first + 1] = mapping.basisYX
-      ..[first + 2] = mapping.basisXY
-      ..[first + 3] = mapping.basisYY
-      ..[first + 4] = mapping.originX
-      ..[first + 5] = mapping.originY
-      ..[first + 6] = 0
-      ..[first + 7] = 0;
-    _dirtyRows.add(row);
-    return true;
-  }
-
-  void flush() {
-    _ensureTexture();
-    if (_dirtyRows.isEmpty) return;
-    _texture!.overwrite(_data);
-    _dirtyRows.clear();
-  }
-
-  void _ensureTexture() {
-    if (_texture?.isValid == true && _image != null) return;
-    _texture = gpu.gpuContext.createTexture(
-      gpu.StorageMode.hostVisible,
-      2,
-      rowsPerPage,
-      format: gpu.PixelFormat.r32g32b32a32Float,
-      enableRenderTargetUsage: false,
-    );
-    if (_texture!.isValid != true) {
-      throw StateError('LiquidGlass coordinate atlas texture is invalid.');
-    }
-    _image = _texture!.asImage();
-    // A context recreation invalidates the old native texture but not the
-    // CPU rows. Upload the full page when the replacement is first used.
-    _dirtyRows.addAll(List<int>.generate(rowsPerPage, (index) => index));
-  }
-}
-
-class _CoordinateAtlas {
-  final List<_CoordinateAtlasPage> _pages = <_CoordinateAtlasPage>[];
-  final Map<FlutterGpuGeometryRenderer, _CoordinateSlot> _slots =
-      <FlutterGpuGeometryRenderer, _CoordinateSlot>{};
-  final Map<FlutterGpuGeometryRenderer, CoordinateMappingReader> _readers =
-      <FlutterGpuGeometryRenderer, CoordinateMappingReader>{};
-  final Set<FlutterGpuGeometryRenderer> _preparedReaders =
-      <FlutterGpuGeometryRenderer>{};
-  Duration? _preparedFrame;
-
-  _CoordinateSlot acquire(FlutterGpuGeometryRenderer renderer) {
-    for (final page in _pages) {
-      final row = page.acquireRow();
-      if (row != null) {
-        final slot = _CoordinateSlot(page, row);
-        _slots[renderer] = slot;
-        return slot;
-      }
-    }
-    final page = _CoordinateAtlasPage();
-    _pages.add(page);
-    final row = page.acquireRow()!;
-    final slot = _CoordinateSlot(page, row);
-    _slots[renderer] = slot;
-    return slot;
-  }
-
-  void registerReader(
-    FlutterGpuGeometryRenderer renderer,
-    CoordinateMappingReader reader,
-  ) {
-    _readers[renderer] = reader;
-  }
-
-  void unregisterReader(FlutterGpuGeometryRenderer renderer) {
-    _readers.remove(renderer);
-    _preparedReaders.remove(renderer);
-  }
-
-  void update(FlutterGpuGeometryRenderer renderer, CoordinateMapping mapping) {
-    final slot = _slots[renderer];
-    if (slot == null) return;
-    final frame = SchedulerBinding.instance.currentSystemFrameTimeStamp;
-    if (_preparedFrame != frame) {
-      _preparedFrame = frame;
-      _prepareFrame();
-    }
-    // A renderer can first appear after the initial frame preparation (for
-    // example, a newly mounted independent layer). Upload its row once so it
-    // never displays an uninitialized atlas entry.
-    if (!_preparedReaders.contains(renderer)) {
-      slot.page.write(slot.rowIndex, mapping);
-      slot.page.flush();
-      _preparedReaders.add(renderer);
-    }
-  }
-
-  void _prepareFrame() {
-    _preparedReaders.clear();
-    for (final entry in _readers.entries) {
-      final slot = _slots[entry.key];
-      if (slot == null) continue;
-      slot.page.write(slot.rowIndex, entry.value());
-      _preparedReaders.add(entry.key);
-    }
-    for (final page in _pages) {
-      page.flush();
-    }
-  }
-
-  void release(FlutterGpuGeometryRenderer renderer) {
-    final slot = _slots.remove(renderer);
-    _readers.remove(renderer);
-    _preparedReaders.remove(renderer);
-    slot?.page.releaseRow(slot.rowIndex);
+    _coordinateTexture = null;
+    _coordinateImage = null;
   }
 }
 

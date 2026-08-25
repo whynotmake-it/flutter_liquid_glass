@@ -28,6 +28,7 @@ from apple_match.hotloop import (  # noqa: E402
 from apple_match.metrics import WEIGHTS, write_diagnostics  # noqa: E402
 
 POSITIONS = (0.0, 0.25, 0.5, 0.75, 1.0)
+PER_POSITION_SCALARS = ("tintAlpha", "frost")
 REFERENCE_SET = "ios27-iphone17pro-light-transparency"
 CONTROL_METHOD = (
     "simctl defaults write com.apple.UIKit UIViewGlassTintAmount "
@@ -92,19 +93,64 @@ def capture_references(args) -> None:
     )
 
 
-def materialize(virtual: dict) -> dict:
+def materialize(
+    virtual: dict, shared_tint_color: tuple[int, int, int]
+) -> dict:
     settings = dict(virtual)
     # The slider fit intentionally shares one canonical material vector. Only
     # these two documented transmission scalars are allowed to vary per
     # position: tint alpha and frost. No legacy blurMix/glassAlpha knobs are
     # sent to the renderer.
-    tint_level = round(float(settings.pop("tintLevel", 255.0)))
+    # Tint RGB is deliberately not a fit parameter. It belongs to the shared
+    # material vector and is copied exactly from the validated baseline rather
+    # than collapsed to a neutral average.
+    for key in ("tintLevel", "tintRed", "tintGreen", "tintBlue"):
+        settings.pop(key, None)
     settings.update({
-        "tintRed": tint_level,
-        "tintGreen": tint_level,
-        "tintBlue": tint_level,
+        "tintRed": int(shared_tint_color[0]),
+        "tintGreen": int(shared_tint_color[1]),
+        "tintBlue": int(shared_tint_color[2]),
     })
     return settings
+
+
+def _setting_equal(left, right) -> bool:
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return bool(np.isclose(left, right, atol=1e-6, rtol=0.0))
+    return left == right
+
+
+def audit_shared_vector(settings_by_position: list[dict]) -> dict:
+    """Verify that only the documented per-position scalars vary."""
+    if not settings_by_position:
+        raise ValueError("at least one materialized settings vector is required")
+    all_keys = set().union(*(settings.keys() for settings in settings_by_position))
+    baseline = settings_by_position[0]
+    missing_keys = sorted(
+        key for key in all_keys
+        if any(key not in settings for settings in settings_by_position)
+    )
+    observed_varying_keys = sorted(
+        key
+        for key in all_keys
+        if any(
+            key not in settings
+            or not _setting_equal(settings[key], baseline.get(key))
+            for settings in settings_by_position[1:]
+        )
+    )
+    unauthorized = sorted(
+        key for key in observed_varying_keys if key not in PER_POSITION_SCALARS
+    )
+    passed = not missing_keys and not unauthorized
+    return {
+        "status": "passed" if passed else "failed",
+        "allowedPerPositionScalars": list(PER_POSITION_SCALARS),
+        "observedVaryingKeys": observed_varying_keys,
+        "unauthorizedVaryingKeys": unauthorized,
+        "missingKeys": missing_keys,
+        "sharedKeysIdentical": not missing_keys and not unauthorized,
+    }
 
 
 def fit_objective(evaluator: Evaluator) -> float:
@@ -131,9 +177,10 @@ def save_fit(
     evaluator: Evaluator,
     reference: dict,
     history: list,
+    shared_tint_color: tuple[int, int, int],
 ) -> dict:
     directory.mkdir(parents=True, exist_ok=True)
-    settings = materialize(virtual)
+    settings = materialize(virtual, shared_tint_color)
     capture = directory / "capture"
     capture.mkdir(exist_ok=True)
     references = directory / "reference"
@@ -156,15 +203,18 @@ def save_fit(
         "sharedVector": {
             key: settings[key]
             for key in (
-                "thickness", "edgeRefraction", "refractionSpread", "frost",
+                "thickness", "edgeRefraction", "refractionSpread",
                 "chromaticAberration", "saturation", "transmissionGamma",
                 "vibrancy", "highlight", "contourStrength", "contourWidth",
             )
         },
+        "sharedTintColor": list(shared_tint_color),
+        "perPositionScalars": {
+            key: settings[key] for key in PER_POSITION_SCALARS
+        },
         "fitted": {
             "tintAlpha": settings["tintAlpha"],
             "frost": settings["frost"],
-            "tintLevel": virtual["tintLevel"],
             "tintColor": [
                 settings["tintRed"],
                 settings["tintGreen"],
@@ -265,7 +315,7 @@ def write_curve_plot(path: Path, rows: list[dict]) -> None:
 
     series = (
         ("tint alpha", [row["tintAlpha"] for row in rows], (40, 150, 40)),
-        ("tintLevel / 255", [row["tintLevel"] / 255.0 for row in rows], (40, 40, 210)),
+        ("frost / 12", [row["frost"] / 12.0 for row in rows], (40, 40, 210)),
     )
     for label, values, color in series:
         points = np.asarray(
@@ -330,18 +380,10 @@ def fit_sweep(args) -> dict:
     scene = json.loads(scene_path.read_text())
     crop = scene_crop(scene)
     baseline = load_baseline(args.baseline.resolve())
-    baseline_virtual = {
-        **baseline,
-        "tintLevel": float(
-            np.mean(
-                [
-                    baseline["tintRed"],
-                    baseline["tintGreen"],
-                    baseline["tintBlue"],
-                ]
-            )
-        ),
-    }
+    shared_tint_color = tuple(
+        int(round(baseline[key])) for key in ("tintRed", "tintGreen", "tintBlue")
+    )
+    baseline_virtual = dict(baseline)
     positions = args.positions
     references = {
         position: load_reference_probes(reference_dir(position), crop)
@@ -377,12 +419,11 @@ def fit_sweep(args) -> dict:
             evaluation_rows = []
 
             def evaluate(virtual):
-                evaluator.evaluate(materialize(virtual))
+                evaluator.evaluate(materialize(virtual, shared_tint_color))
                 row = {
                     "params": {
                         "tintAlpha": virtual["tintAlpha"],
                         "frost": virtual["frost"],
-                        "tintLevel": virtual["tintLevel"],
                     },
                     "objective": fit_objective(evaluator),
                     "score": evaluator.last_result.score,
@@ -396,7 +437,6 @@ def fit_sweep(args) -> dict:
                 {
                     "tintAlpha": [0.05, 0.18, 0.38, 0.58, 0.72, 0.86],
                     "frost": [0.0, 2.0, 5.0, 7.0, 10.0],
-                    "tintLevel": [215.0, 235.0, 255.0],
                 },
                 max_iters=args.max_iters,
                 min_improvement=0.01,
@@ -410,15 +450,12 @@ def fit_sweep(args) -> dict:
                         coarse_best["tintAlpha"], 0.20, 0.04, 0.02, 0.98
                     ),
                     "frost": fine_values(coarse_best["frost"], 3.0, 1.0, 0.0, 12.0),
-                    "tintLevel": fine_values(
-                        coarse_best["tintLevel"], 24.0, 8.0, 191.0, 255.0
-                    ),
                 },
                 max_iters=args.fine_max_iters,
                 min_improvement=0.005,
             )
             best = fine["bestParams"]
-            evaluator.evaluate(materialize(best))
+            evaluator.evaluate(materialize(best, shared_tint_color))
             card = save_fit(
                 out / position_id(position),
                 position=position,
@@ -426,13 +463,13 @@ def fit_sweep(args) -> dict:
                 evaluator=evaluator,
                 reference=references[position],
                 history=evaluation_rows,
+                shared_tint_color=shared_tint_color,
             )
             cards.append(card)
             print(
                 f"TRANSPARENCY_FIT position={position:.2f} "
                 f"alpha={card['fitted']['tintAlpha']:.3f} "
                 f"frost={card['fitted']['frost']:.3f} "
-                f"tint={card['fitted']['tintLevel']:.1f} "
                 f"score={card['score']:.4f}",
                 flush=True,
             )
@@ -442,7 +479,6 @@ def fit_sweep(args) -> dict:
             "sliderPosition": card["sliderPosition"],
             "tintAlpha": card["fitted"]["tintAlpha"],
             "frost": card["fitted"]["frost"],
-            "tintLevel": card["fitted"]["tintLevel"],
             "score": card["score"],
             "fitObjective": card["fitObjective"],
             "scorecard": str(
@@ -452,10 +488,16 @@ def fit_sweep(args) -> dict:
         }
         for card in cards
     ]
+    constraint = audit_shared_vector([card["settings"] for card in cards])
+    if constraint["status"] != "passed":
+        raise RuntimeError(
+            "transparency sweep violated its shared-vector contract: "
+            f"{constraint}"
+        )
     interpretation = {
         "status": "shared-vector-with-two-scalars",
         "reason": "All material fields are shared; only tint alpha and frost vary per slider position.",
-        "allowedPerPositionScalars": ["tintAlpha", "frost"],
+        "allowedPerPositionScalars": list(PER_POSITION_SCALARS),
         "tintAlpha": interpret_curve([row["tintAlpha"] for row in rows], "tintAlpha"),
         "frost": interpret_curve([row["frost"] for row in rows], "frost"),
     }
@@ -476,9 +518,12 @@ def fit_sweep(args) -> dict:
                 "contourStrength", "contourWidth",
             )
         },
+        "sharedTintColor": list(shared_tint_color),
+        "perPositionScalars": list(PER_POSITION_SCALARS),
         "positions": list(positions),
         "curve": rows,
         "interpretation": interpretation,
+        "constraint": constraint,
         "plot": str(plot.resolve()),
         "defaultPositionCorrection": (
             "The redesign fits a shared material vector and reports only the "
@@ -486,8 +531,9 @@ def fit_sweep(args) -> dict:
         ),
         "visualInspection": (
             "The signed diffs measure the transparent-slider transmission and "
-            "tint response only. Blur is intentionally held out of this fit; "
-            "the endpoint captures are retained for later visual review."
+            "tint response. Frost remains a provisional second transmission "
+            "scalar; this fit does not claim Apple's blurred/unblurred blend "
+            "model is solved. Endpoint captures are retained for visual review."
         ),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

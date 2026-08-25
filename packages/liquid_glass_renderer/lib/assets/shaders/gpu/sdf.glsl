@@ -193,30 +193,6 @@ float getShapeDistanceFromArray(int index, vec2 p) {
     return localDistance * placement.z;
 }
 
-// A transformed shape's axis-aligned box is a conservative outer bound. The
-// distance to that box, converted by the minimum singular value already
-// stored in placement.z, is therefore a lower bound for the exact SDF. This
-// lets smooth-union traversal reject a later member only when it cannot alter
-// the union (d_box >= current + blend); no visible edge is approximated.
-float getShapeBoxLowerBound(int index, vec2 p) {
-    int baseIndex = index * 3;
-    vec4 primitive = uShapeData[baseIndex];
-    vec4 inverseBasis = uShapeData[baseIndex + 1];
-    vec4 placement = uShapeData[baseIndex + 2];
-    vec2 delta = p - placement.xy;
-    vec2 localPoint = vec2(
-        inverseBasis.x * delta.x + inverseBasis.y * delta.y,
-        inverseBasis.z * delta.x + inverseBasis.w * delta.y
-    );
-    // Use the signed distance to the conservative axis-aligned box. Returning
-    // zero for points inside the box is not a valid lower bound for a signed
-    // field: an overlapping later shape can still have a negative distance
-    // and change the smooth union there.
-    vec2 q = abs(localPoint) - primitive.yz * 0.5;
-    float boxDistance = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0);
-    return boxDistance * placement.z;
-}
-
 SceneSample getShapeSampleFromArray(int index, vec2 p) {
     int baseIndex = index * 3;
     vec4 primitive = uShapeData[baseIndex];
@@ -265,13 +241,6 @@ SceneSample sceneSample(vec2 p, int numShapes) {
         float marker = uShapeData[i * 3 + 2].w;
         bool startsGroup = marker < 0.0;
         float groupBlend = startsGroup ? -marker - 1.0 : marker;
-        if (!startsGroup &&
-            getShapeBoxLowerBound(i, p) >= groupResult.distance + groupBlend) {
-            // smoothUnion(groupResult, shape, k) is exactly groupResult when
-            // shape >= groupResult + k. Keep the exact SDF on the only region
-            // where this member can influence the result.
-            continue;
-        }
         SceneSample shapeValue = getShapeSampleFromArray(i, p);
         if (startsGroup) {
             result = result.distance < groupResult.distance ? result : groupResult;
@@ -299,12 +268,6 @@ float sceneSDF(vec2 p, int numShapes) {
         float marker = uShapeData[i * 3 + 2].w;
         bool startsGroup = marker < 0.0;
         float groupBlend = startsGroup ? -marker - 1.0 : marker;
-        if (!startsGroup &&
-            getShapeBoxLowerBound(i, p) >= groupResult + groupBlend) {
-            // See sceneSample above: the lower bound proves this member is
-            // outside the smooth-union influence band.
-            continue;
-        }
         float shapeDistance = getShapeDistanceFromArray(i, p);
         if (startsGroup) {
             result = min(result, groupResult);

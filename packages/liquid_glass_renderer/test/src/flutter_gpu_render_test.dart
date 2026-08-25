@@ -262,39 +262,4 @@ void main() {
     },
     skip: expectFallback,
   );
-
-  test(
-    'coordinate mappings share an atlas page with stable rows',
-    () async {
-      final first = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      final second = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      addTearDown(first.dispose);
-      addTearDown(second.dispose);
-
-      first.updateCoordinateMapping(
-        basisXX: 1,
-        basisYX: 0,
-        basisXY: 0,
-        basisYY: 1,
-        originX: 4,
-        originY: 8,
-      );
-      second.updateCoordinateMapping(
-        basisXX: 1,
-        basisYX: 0,
-        basisXY: 0,
-        basisYY: 1,
-        originX: 12,
-        originY: 16,
-      );
-
-      expect(first.coordinateImage, same(second.coordinateImage));
-      expect(first.coordinateRow, isNot(equals(second.coordinateRow)));
-    },
-    skip: expectFallback,
-  );
 }

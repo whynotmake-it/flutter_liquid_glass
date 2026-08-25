@@ -33,11 +33,6 @@ uniform vec2 uMaterialConfig;
 uniform vec2 uReservedFaceConfig;
 uniform vec3 uReservedShadowConfig;
 
-// The second reserved face slot is a stable normalized row in the shared
-// coordinate atlas. Keeping this in an existing unused slot avoids changing
-// the public material vector or adding a per-frame filter input.
-float uCoordinateRow = uReservedFaceConfig.y;
-
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
 float uThickness = uOpticalProps.z;
@@ -221,14 +216,8 @@ void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
     vec2 screenUV = fragCoord / uSize;
 
-    vec4 filterToMatteBasis = texture(
-        uCoordinateTexture,
-        vec2(0.25, uCoordinateRow)
-    );
-    vec2 filterToMatteOffset = texture(
-        uCoordinateTexture,
-        vec2(0.75, uCoordinateRow)
-    ).xy;
+    vec4 filterToMatteBasis = texture(uCoordinateTexture, vec2(0.25, 0.5));
+    vec2 filterToMatteOffset = texture(uCoordinateTexture, vec2(0.75, 0.5)).xy;
     vec2 matteCoord = vec2(
         dot(filterToMatteBasis.xy, fragCoord),
         dot(filterToMatteBasis.zw, fragCoord)
