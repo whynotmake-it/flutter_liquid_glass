@@ -356,7 +356,18 @@ class _MatchLoupe extends StatelessWidget {
               ),
             ),
             LiquidGlass.withOwnLayer(
-              settings: settings.copyWith(frost: 0),
+              // The system text-selection loupe is a clear lens. Its
+              // magnification belongs to RawMagnifier above; never let a
+              // candidate's ordinary material vector turn this holdout into
+              // a frosted, opaque pill or a full-face shader zoom.
+              settings: settings.copyWith(
+                tint: const Color.fromARGB(0, 255, 255, 255),
+                refractionSpread: 0,
+                frost: 0,
+                saturation: 1,
+                transmissionGamma: 1,
+                vibrancy: 0,
+              ),
               shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
               shadows: shadows,
               child: const SizedBox.expand(),

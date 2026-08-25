@@ -17,9 +17,6 @@ import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
-// The Apple-match harness can ablate the legacy Canvas contour while fitting
-// the shader's material contour. This is deliberately compile-time and
-// private: production callers do not get a second public outline switch.
 /// Represents a layer of multiple [LiquidGlass] shapes or
 /// [LiquidGlassBlendGroup]s that have shared [LiquidGlassSettings] and will be
 /// rendered together.

@@ -439,3 +439,31 @@ The goal is complete only when all of these hold:
 8. Iterate only from measured residuals; every new knob needs ≥2-scene evidence.
 9. Build example sidebar/background/preset workflow.
 10. Run final verification contract and independent audit.
+
+## Continuation update (2026-08-25)
+
+The active renderer/example state is now:
+
+- The loupe is an example/harness composition: `RawMagnifier` paints a 1.55×
+  backdrop first, followed by the ordinary liquid-glass layer. The loupe path
+  forcibly neutralizes tint, frost, face reach, saturation, gamma, and vibrancy;
+  `refractionSpread` is not a loupe zoom control.
+- Small-control frost is derived from rendered height, clamped at the 94 px
+  toolbar reference. This is one cached compositor scalar, not a new public
+  setting, pass, texture, or per-frame solve.
+- The corrected paired A/B optical-flow metric is used for current evidence;
+  comparing A against an all-zero image incorrectly counted foreground glyphs
+  and material response as flow.
+- Current measured scorecards are toolbar 91.7814, small capsule 86.3452,
+  large capsule 80.6343, and tab holdout 43.0289. A fresh pinned loupe
+  composition score is still required.
+- `melos run analyze`, `melos run test-without-goldens`, focused harness tests,
+  package GPU tests, and comparator tests pass with the pinned Flutter 3.47.1
+  toolchain.
+
+The final loupe capture/fit must use Xcode 27.0 beta 5 and the pinned UDID. On
+the latest attempt CoreSimulatorService became unavailable; no other simulator
+was shut down. Do not weaken the pinned-device gate or accept stale pre-shader
+scan outputs as final evidence. Once the service is healthy, run the bounded
+scan and staged validation described in `PLAN.md`, keeping magnification and
+focal offset fixed while fitting only ordinary edge optics.

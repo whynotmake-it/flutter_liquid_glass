@@ -59,11 +59,11 @@ presets), performance non-regressing.
 
 ## Execution order
 - [x] Orientation complete
-- [ ] 1. Loupe scene: native trigger + capture + flutter counterpart + refs + baseline
+- [~] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score pending simulator recovery
 - [ ] 2. Perf baseline (before any renderer change)
-- [ ] 3. New model design doc (mapping Apple layers → our stages)
-- [ ] 4. Implement: shaders + Settings + Dart pipeline + match-app mapping + optimizer stages
-- [ ] 5. Re-fit toolbar/small/large/holdout + loupe + slider {0,.5,1}; generalization
+- [x] 3. New model design doc (mapping Apple layers → our stages)
+- [x] 4. Implement: shaders + Settings + Dart pipeline + match-app mapping + optimizer stages
+- [~] 5. Re-fit toolbar/small/large/holdout + loupe + slider {0,.5,1}; generalization evidence is partial
 - [ ] 6. Perf after-audit
 - [ ] 7. Example app: sidebar, ≥4 backgrounds, YAML presets in docs dir, seed presets
 - [ ] 8. Tests (settings model, YAML round-trip), analyzer clean

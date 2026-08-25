@@ -389,3 +389,71 @@ cannot run in this headless environment. We are intentionally deferring the
 expensive macOS/Android benchmark suite until the visual settings and example
 workflow are stable; tab/capsule holdout scorecards and the final performance
 audit remain hard gates before calling this production-ready.
+
+## Current redesign evidence (2026-08-25)
+
+The historical staged-search notes above describe the pre-redesign harness.
+The current renderer and harness use the following Apple-layer mapping; this
+table is the contract for new changes:
+
+| Apple layer/effect | Current implementation | Evidence/constraint |
+| --- | --- | --- |
+| `CASDFElementLayer` / `CASDFOutputEffect` | One shared SDF geometry matte and displacement field | Same geometry pass; no extra capture |
+| `CABackdropLayer.glassBackground` | Final shader displacement sample, frost, saturation, gamma, and vibrancy | `frost` is compositor blur; smaller controls receive a derived size-normalized sigma |
+| Opposite `CASDFGlassHighlightEffect` lobes | Paired directional highlight and opposite-light response from the displacement normal | Controlled by the single `highlight` lobe |
+| Dielectric silhouette/absorption | SDF-derived dark contour in the final shader | `contourStrength` and `contourWidth` share the same profile |
+| `vibrantColorMatrix` | `saturation`, `transmissionGamma`, and `vibrancy` | No independent face-fill or inner-shadow workaround knobs |
+| iOS 27 tint amount | `tint` alpha plus the documented transparency sweep scalars | Slider positions must share one vector and vary at most two scalars |
+| Text-selection loupe | Flutter `RawMagnifier` paints the backdrop first, then ordinary glass | Example/harness composition only; no shader-level zoom |
+
+The evidence ledger below is intentionally explicit about what is and is not a
+final gate. Scores use the corrected paired A/B optical-flow metric.
+
+| Scene/capture | Current score | Evidence |
+| --- | ---: | --- |
+| Toolbar | 91.7814 | `out/metric-ab-audit/toolbar/scorecard.json` |
+| Small capsule | 86.3452 | `out/small-final-fit-2/best/scorecard.json` |
+| Large capsule | 80.6343 | `out/generalization-ab-geometry-1/large_capsule/final/scorecard.json` |
+| Tab-bar holdout | 43.0289 | `out/generalization-ab-geometry-1/tab_bar_holdout/final/scorecard.json` |
+| Loupe | pending fresh pinned capture | Simulator composition must be re-captured with the clear pre-shader path |
+
+The small-control fit uses the same material vector as the toolbar and derives
+its lower frost sigma from rendered height; it does not add a public knob or a
+render pass. The tab holdout includes deterministic harness-only foreground
+content because Apple's `TabView` reference contains icons, labels, and a
+selection treatment; shipped callers still provide their own child content.
+
+### Surviving settings and evidence policy
+
+`LiquidGlassSettings` intentionally exposes only the following material axes:
+
+| Setting | Meaning | Required evidence before changing/removing |
+| --- | --- | --- |
+| `visibility` | Transition multiplier | API utility; not a material-fit axis |
+| `tint` | Unified material color/transparency | Toolbar + at least one capsule/holdout |
+| `thickness` | Optical profile depth | Toolbar + small/large capsule fits |
+| `edgeRefraction` | Peak rim displacement in logical pixels | Toolbar + small/large capsule fits |
+| `refractionSpread` | SDF profile reach, never backdrop zoom | At least two non-loupe scenes |
+| `frost` | Backdrop softening radius | Toolbar + small capsule; size normalization is internal |
+| `chromaticAberration` | Wavelength separation at the rim | Retain only after two-scene improvement |
+| `saturation` | Transmitted backdrop saturation | Toolbar + capsule/holdout |
+| `transmissionGamma` | Display-referred transmission curve | Toolbar + capsule/holdout |
+| `vibrancy` | Backdrop-aware chroma lift | Toolbar + capsule/holdout |
+| `highlight` | Paired directional highlight lobe | Black/white toolbar + capsule |
+| `contourStrength` | Dark dielectric contour strength | White-background toolbar + capsule |
+| `contourWidth` | Contour width in logical pixels | White-background toolbar + capsule |
+
+Legacy names (`blurMix`, `glassAlpha`, `refractiveIndex`, independent rim RGB
+triplets, and `innerShadow*`) are harness compatibility inputs only and are not
+part of shipped `lib/src`.
+
+### Escalation contract
+
+The goal is not production-ready until the pinned iOS 27 evidence and the
+performance audit are complete. A visual change may be accepted only when it
+improves the relevant decomposed metric in at least two scenes, remains within
+the shared-vector transparency rule, and does not add a pass, texture, backdrop
+capture, or per-frame CPU solve. If a score improves while a black/white
+lighting residual worsens, keep the residual visible and do not hide it in a
+new independent shader weight. Simulator service failures are infrastructure
+blockers; never close unrelated simulators or weaken the pinned-device gate.

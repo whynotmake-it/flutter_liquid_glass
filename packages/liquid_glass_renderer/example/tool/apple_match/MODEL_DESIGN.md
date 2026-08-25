@@ -29,7 +29,8 @@ Material knobs on `LiquidGlassSettings`:
 |---|---|---|
 | `thickness` | (kept) | discrete per control size in harness fits |
 | `edgeRefraction` | `refractiveIndex` | frozen-RI rejection; amplitude fits pending |
-| `frost` | `blur` | blurMtf stage gains on toolbar + loupe |
+| `refractionSpread` | (new) | SDF profile reach for ordinary glass; loupe magnification is composed before the shader and never uses this as a zoom control |
+| `frost` | `blur` | size-normalized blur fit on toolbar + small capsule |
 | `tint` (Color) | `glassColor` | tintColor stage gains on ≥2 scenes |
 | `saturation` | (kept) | vibrancy stage fits 0.7–1.5 across scenes |
 | `transmissionGamma` | (kept) | toneResponse stage |
