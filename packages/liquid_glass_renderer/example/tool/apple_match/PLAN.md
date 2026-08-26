@@ -213,3 +213,13 @@ presets), performance non-regressing.
   surfaces. Evidence is in
   `out/material-attribution-chromaticAberration-cutoff/summary.json`; this is
   a visual attribution result and still needs repeated same-runner perf A/B.
+- 2026-08-26: re-registered the small capsule with a frozen shared material
+  vector using a seven-value width sweep `{148.0, 148.333, 148.667, 149.0,
+  149.333, 149.667, 150.0}` logical pixels. `148.667` produces the Apple
+  detected 446 px width (versus the prior 450 px), reduces shape error
+  `0.017853→0.009236`, and reduces flow error `0.036286→0.028248`; three
+  repeated captures were byte-stable. Its combined error nevertheless worsens
+  `0.063668→0.065295` (2.6%), and the shared-vector 1.25× generalization gate
+  remains failed. This is useful scene-registration evidence, not a renderer or
+  default-material change. Captures and scorecards are in
+  `out/small-width-registration/`.

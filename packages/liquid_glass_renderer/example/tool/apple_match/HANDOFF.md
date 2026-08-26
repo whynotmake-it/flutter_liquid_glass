@@ -472,3 +472,16 @@ was shut down. Do not weaken the pinned-device gate or accept stale pre-shader
 scan outputs as final evidence. Once the service is healthy, run the bounded
 scan and staged validation described in `PLAN.md`, keeping magnification and
 focal offset fixed while fitting only ordinary edge optics.
+
+## Continuation update (2026-08-26)
+
+Sol reviewed the small-capsule residual and identified a registration overhang:
+the candidate was 450 physical pixels wide while Apple was 446, with matching
+center and height. A pinned seven-value width sweep found the exact-registration
+candidate at `shapeWidth=148.667`; three repeated captures were identical and
+shape/flow errors improved materially. The candidate's combined error regressed
+2.6%, however, so it is not a valid shared-vector or renderer change. Keep the
+current 150 px setting as the authoritative frozen-vector run and retain the
+captures under `out/small-width-registration/` for future scene-specific
+registration work. Do not fit a new shader profile until registration and the
+combined/flow gates agree.
