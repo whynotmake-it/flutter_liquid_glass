@@ -553,3 +553,15 @@ rely on panel order alone when sharing a comparison.
 
 The current parameter-by-parameter report and annotated iteration index are in
 [`FULL_REPORT.md`](FULL_REPORT.md).
+
+The evidence contract is machine-readable in
+[`settings/evidence_manifest.json`](settings/evidence_manifest.json). Validate
+its field coverage with:
+
+```bash
+python3 validate_evidence_manifest.py
+```
+
+Use `--strict` when auditing a release candidate; it fails while any material
+setting is still pending or rejected, rather than treating missing evidence as
+an implicit pass.

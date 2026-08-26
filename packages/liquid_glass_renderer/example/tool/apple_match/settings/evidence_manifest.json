@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "metricRevision": "score_images-v1",
+  "referenceSet": "ios27-iphone17pro-light",
+  "qualification": {
+    "minimumImprovingScenes": 2,
+    "holdoutRegressionAllowed": false,
+    "strictMode": "pending and rejected entries fail"
+  },
+  "settings": {
+    "visibility": {
+      "status": "exempt",
+      "reason": "Transition utility; not a material-fit knob.",
+      "evidence": []
+    },
+    "tint": {
+      "status": "pending",
+      "reason": "Tint is represented by the tintAlpha attribution scan; no two-scene promotion has been accepted.",
+      "evidence": [{
+        "axis": "tintAlpha",
+        "baseline": 0.53,
+        "candidate": 0.555,
+        "scenes": ["small_capsule"],
+        "delta": {"combined": -0.0004, "score": -0.54},
+        "artifact": "out/material-attribution-tint/summary.json"
+      }]
+    },
+    "thickness": {
+      "status": "pending",
+      "reason": "Recovered per-geometry values (12 px toolbar, 8 px capsules) are not a frozen shared-parameter proof.",
+      "evidence": [{
+        "axis": "geometry-generalization",
+        "baseline": "frozen RI",
+        "candidate": "per-geometry thickness",
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"smallToToolbarCombinedRatio": 1.9},
+        "artifact": "out/generalization-toolbar-vector/summary.json"
+      }]
+    },
+    "edgeRefraction": {
+      "status": "pending",
+      "reason": "The retained edge scan moves by less than the promotion threshold and does not justify changing the shipped named preset.",
+      "evidence": [{
+        "axis": "edgeRefraction",
+        "baseline": 18.3,
+        "candidate": 8.0,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"note": "small movement within noise; no accepted promotion"},
+        "artifact": "out/material-attribution-edge/summary.json"
+      }]
+    },
+    "refractionSpread": {
+      "status": "rejected",
+      "reason": "No shared spread value closes the capsule generalization gap; the best coupled row remains about 2.01x toolbar combined error.",
+      "evidence": [{
+        "axis": "refractionSpread",
+        "baseline": 0.0,
+        "candidate": 0.25,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"smallCombinedRelativeImprovement": 0.0025, "smallToToolbarRatio": 1.9},
+        "artifact": "out/spread-grid-current/summary.json"
+      }]
+    },
+    "frost": {
+      "status": "pending",
+      "reason": "Scene optima disagree (small 5, toolbar 7, large 8); the clear 0-2 endpoint scan is still required.",
+      "evidence": [{
+        "axis": "frost",
+        "baseline": 7.0,
+        "candidate": 5.0,
+        "scenes": ["small_capsule"],
+        "delta": {"score": 1.14, "combined": -0.0007, "flow": 0.0133},
+        "artifact": "out/material-attribution-frost/summary.json"
+      }]
+    },
+    "chromaticAberration": {
+      "status": "rejected",
+      "reason": "Values 0 through 0.01 are byte-identical in all three scenes; larger values do not improve score.",
+      "evidence": [{
+        "axis": "chromaticAberration",
+        "baseline": 0.005,
+        "candidate": 0.0,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"byteIdenticalThrough": 0.01},
+        "artifact": "out/material-attribution-chromaticAberration-cutoff/summary.json"
+      }]
+    },
+    "saturation": {
+      "status": "pending",
+      "reason": "No retained two-scene attribution row is present in the current ledger.",
+      "evidence": []
+    },
+    "transmissionGamma": {
+      "status": "pending",
+      "reason": "Gamma movement is small and no cross-scene promotion has been accepted.",
+      "evidence": [{
+        "axis": "transmissionGamma",
+        "baseline": 0.9,
+        "candidate": 0.925,
+        "scenes": ["small_capsule", "large_capsule"],
+        "delta": {"note": "small combined movement; toolbar regresses"},
+        "artifact": "out/material-attribution-gamma/summary.json"
+      }]
+    },
+    "vibrancy": {
+      "status": "pending",
+      "reason": "The small-scene candidate does not establish a retained shared-vector improvement.",
+      "evidence": [{
+        "axis": "vibrancy",
+        "baseline": 0.15,
+        "candidate": 0.225,
+        "scenes": ["small_capsule", "toolbar_capsule"],
+        "delta": {"note": "sub-threshold movement; no promotion"},
+        "artifact": "out/material-attribution-vibrancy/summary.json"
+      }]
+    },
+    "highlight": {
+      "status": "pending",
+      "reason": "Black/white lighting captures exist, but a qualifying two-scene numeric improvement is not yet accepted for the shipped knob.",
+      "evidence": [{
+        "axis": "highlight",
+        "baseline": 0.4,
+        "candidate": 0.6,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"note": "retained lighting probe; not a two-scene promotion"},
+        "artifact": "out/annotated-comparisons/toolbar-lighting-current-annotated.png"
+      }]
+    },
+    "contourStrength": {
+      "status": "pending",
+      "reason": "White-background contour evidence is visual but lacks an accepted two-scene improvement row.",
+      "evidence": [{
+        "axis": "contourStrength",
+        "baseline": 0.65,
+        "candidate": 0.35,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"note": "visual white-background residual remains"},
+        "artifact": "out/annotated-comparisons/small-lighting-current-annotated.png"
+      }]
+    },
+    "contourWidth": {
+      "status": "pending",
+      "reason": "No accepted two-scene contour-width attribution is present in the current ledger.",
+      "evidence": []
+    }
+  }
+}

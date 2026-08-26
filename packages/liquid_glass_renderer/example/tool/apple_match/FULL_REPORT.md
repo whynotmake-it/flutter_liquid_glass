@@ -164,6 +164,15 @@ best rows, and inspection of A, B, C, and D together.
 - Final same-runner performance ratio and small/toolbar ≤1.25× gate remain
   open.
 
+The settings evidence contract is now executable. The machine-readable
+[`evidence manifest`](settings/evidence_manifest.json) covers every public
+`LiquidGlassSettings` field and records its status as `qualified`, `pending`,
+`rejected`, or API-utility `exempt`, with artifact-backed scene rows where
+available. Run `python3 validate_evidence_manifest.py` for the structural audit;
+`--strict` intentionally exits nonzero until every material knob has qualifying
+two-scene evidence. This prevents the documentation table from being mistaken
+for proof that the gate is closed.
+
 Do not call this production-ready until the pinned visual endpoint scan,
 the small/toolbar generalization gate, and the final same-runner performance
 audit pass. Native traces cannot substitute for that audit.

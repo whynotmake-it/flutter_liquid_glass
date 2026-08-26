@@ -265,3 +265,8 @@ presets), performance non-regressing.
   parity, and added the private example default with `frost=0`. The center and
   bottom bar now consume one live settings source; focused tests assert the
   no-frost path and exact YAML parity.
+- 2026-08-27: added `settings/evidence_manifest.json` and
+  `validate_evidence_manifest.py`. The structural audit enumerates every public
+  settings field and makes pending/rejected two-scene evidence explicit; strict
+  mode remains red until the actual visual gate is closed. Comparator coverage
+  is now 44 tests with one expected simulator smoke skip.
