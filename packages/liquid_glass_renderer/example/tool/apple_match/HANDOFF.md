@@ -494,3 +494,11 @@ timed out during xctrace finalization twice at the 308-second watchdog, so the
 native grouped-vs-independent comparison and final ≤5% performance gate remain
 open. Do not treat in-process GPU numbers or a timed-out trace as native Metal
 evidence.
+
+The benchmark also supports `TRACE_WAIT_FOR_READY=false` for short,
+high-density traces. It waits for the app's post-warmup measurement marker
+before attaching xctrace; the parser still rejects overlap failures and
+interval-loss CV above 30%. Current three-repetition probes had one valid
+independent16 trace and two rejected, while grouped16 had two valid and one
+rejected. The mode is a reliability improvement, not final performance-gate
+evidence.

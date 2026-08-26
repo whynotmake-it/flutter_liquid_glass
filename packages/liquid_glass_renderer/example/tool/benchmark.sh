@@ -43,6 +43,10 @@ TRACE_MEASURE_MILLISECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_MEASURE_MILLISECONDS:
 # trace by default; callers may opt into a bounded window when they have
 # measured that the selected instrument set preserves the workload overlap.
 TRACE_WINDOW_SECONDS="${LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS:-0}"
+# Short, high-density traces can attach more reliably to the already-warmed
+# workload than to a notification gate that starts after recording begins.
+# Keep the gate as the default for longer/low-density probes.
+TRACE_WAIT_FOR_READY="${LIQUID_GLASS_BENCHMARK_TRACE_WAIT_FOR_READY:-true}"
 REPETITIONS="${LIQUID_GLASS_BENCHMARK_REPETITIONS:-3}"
 ENFORCE_THRESHOLDS="${LIQUID_GLASS_BENCHMARK_ENFORCE:-false}"
 SKIP_BUILD="${LIQUID_GLASS_BENCHMARK_SKIP_BUILD:-false}"
@@ -226,6 +230,10 @@ capture_trace_attempt() {
   terminate_existing_benchmark_targets
   rm -rf "$trace_path" "$toc_path"
   rm -f "$trace_drive_log" "$notification_ready" "$notification_received" "$notification_gate"
+  local trace_start_gate="$notification_received"
+  if [[ "$TRACE_WAIT_FOR_READY" != true ]]; then
+    trace_start_gate=""
+  fi
   env \
     FLUTTER_ENGINE_SWITCHES=3 \
     FLUTTER_ENGINE_SWITCH_1=enable-dart-profiling=true \
@@ -237,7 +245,7 @@ capture_trace_attempt() {
     LIQUID_GLASS_BENCHMARK_TRACE_MEASURE_MILLISECONDS="$TRACE_MEASURE_MILLISECONDS" \
     LIQUID_GLASS_BENCHMARK_REPETITION="$repetition" \
     LIQUID_GLASS_BENCHMARK_TRACE_RUN=1 \
-    LIQUID_GLASS_BENCHMARK_TRACE_START_GATE="$notification_received" \
+    LIQUID_GLASS_BENCHMARK_TRACE_START_GATE="$trace_start_gate" \
     "$APP_EXECUTABLE" >"$trace_drive_log" 2>&1 &
   trace_run_pid=$!
   ACTIVE_RUN_PID="$trace_run_pid"
@@ -249,6 +257,18 @@ capture_trace_attempt() {
   ACTIVE_NOTIFICATION_PID=$!
   if ! wait_for_file "$notification_ready" 5; then
     printf 'Could not register for xctrace readiness notification.\n' >>"$trace_log"
+    return 1
+  fi
+
+  # In prewarmed mode the app has already completed its normal warmup and
+  # entered the repeating half-second workload before Instruments attaches.
+  # This avoids spending a one-second high-density trace on process startup.
+  if [[ "$TRACE_WAIT_FOR_READY" != true ]] && ! wait_for_log \
+    "$trace_drive_log" \
+    "LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:$scenario:" \
+    "$TRACE_START_TIMEOUT"; then
+    printf 'Target did not enter the prewarmed trace workload within %ss.\n' \
+      "$TRACE_START_TIMEOUT" >>"$trace_log"
     return 1
   fi
 
@@ -284,18 +304,16 @@ capture_trace_attempt() {
     stop_trace_process "$trace_pid"
     return 1
   fi
-  if ! wait_for_file "$notification_received" "$TRACE_START_TIMEOUT"; then
+  if [[ "$TRACE_WAIT_FOR_READY" == true ]] && ! wait_for_file "$notification_received" "$TRACE_START_TIMEOUT"; then
     printf 'xctrace did not post its tracing-started notification within %ss.\n' \
       "$TRACE_START_TIMEOUT" >>"$trace_log"
     stop_trace_process "$trace_pid"
     return 1
   fi
-  # The target is deliberately gated on this notification. Starting the
-  # workload before Instruments attaches leaves the rolling kdebug buffer with
-  # mostly pre-capture windows (and often zero GPU intervals), especially for
-  # grouped layers. Wait for the target's explicit ready marker and first
-  # measurement window before starting the finalization watchdog.
-  if ! wait_for_log \
+  # The gated mode starts the expensive scene only after Instruments attaches;
+  # the short prewarmed mode intentionally reuses the workload that began
+  # after its normal warmup, avoiding a long attach-to-first-frame gap.
+  if [[ "$TRACE_WAIT_FOR_READY" == true ]] && ! wait_for_log \
     "$trace_drive_log" \
     "LIQUID_GLASS_BENCHMARK_TRACE_READY:$scenario" \
     "$TRACE_START_TIMEOUT"; then

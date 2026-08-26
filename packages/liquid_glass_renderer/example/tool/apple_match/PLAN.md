@@ -230,3 +230,9 @@ presets), performance non-regressing.
   the 308 s finalization watchdog twice. `benchmark.sh` now defaults its
   opt-in trace window to `0`; the independent event-density limitation remains
   open and no final cross-revision performance gate is claimed.
+- 2026-08-26: added an opt-in prewarmed trace mode that waits for the app's
+  post-warmup measurement marker before xctrace attaches. A three-repetition
+  independent16 probe produced one sound trace (51.4% traced GPU utilization,
+  4.31 ms/frame) and two strict event-loss rejections; grouped16 produced two
+  sound traces and one rejection. This improves attachment ordering but does
+  not close the native reliability or final performance gates.

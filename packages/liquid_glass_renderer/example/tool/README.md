@@ -155,6 +155,12 @@ selected Instruments set preserves overlap; an empty
 tracing disabled. GPU intervals
 are measured by their own duration column, never the CPU-to-GPU start
 latency column that shares the same serialized element name. Set
+`LIQUID_GLASS_BENCHMARK_TRACE_WAIT_FOR_READY=false` for a short, high-density
+probe: the harness waits for the app's normal post-warmup measurement marker
+before attaching xctrace, then retains only traces that pass the same overlap
+and intervals-per-frame checks. This mode improves attachment timing but does
+not make independent16 traces inherently reliable; rejected captures remain
+unavailable. Set
 `LIQUID_GLASS_BENCHMARK_CAPTURE_NATIVE_TRACE=false` for a diagnostic
 frame/native-memory-only run when validating an `xctrace` failure; CI must not
 use this escape hatch. Set `LIQUID_GLASS_BENCHMARK_ENFORCE=true` to fail when

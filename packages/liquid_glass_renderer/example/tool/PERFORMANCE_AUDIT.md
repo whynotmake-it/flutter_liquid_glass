@@ -164,6 +164,13 @@ exceeded the 308-second finalization watchdog in two fresh attempts even with
 the complete-trace mode; this is recorded as unresolved Instruments event
 density, not as a renderer or SDF regression.
 
+For short high-density probes, `TRACE_WAIT_FOR_READY=false` waits for the
+app's post-warmup measurement marker before attaching xctrace. In a
+three-repetition independent16 probe, one trace passed (51.4% traced GPU
+utilization, 4.31 ms/frame) and two were rejected for event loss; the matching
+grouped16 probe had two valid traces and one rejection. These are repeatability
+diagnostics, not the final cross-revision performance gate.
+
 The pinned loupe composition scan is now also runnable and truthful: the
 `RawMagnifier` owns enlargement, so the 12-candidate grid varies only
 `thickness` and `edgeRefraction`; clear-material overrides are recorded rather
