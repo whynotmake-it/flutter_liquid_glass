@@ -83,7 +83,8 @@ capture does not account for the remaining per-layer footprint.
 The next looks-first probe is the shared `chromaticAberration` axis:
 
 ```bash
-PYTHONPATH=compare compare/.venv/bin/python material_attribution_scan.py \
+cd packages/liquid_glass_renderer/example/tool/apple_match
+IOS_27_UDID="$IOS_27_UDID" PYTHONPATH=compare compare/.venv/bin/python material_attribution_scan.py \
   --axis chromaticAberration --repetitions 1 \
   --out out/material-attribution-chromaticAberration
 ```
