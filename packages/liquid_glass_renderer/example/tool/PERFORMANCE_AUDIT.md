@@ -223,3 +223,29 @@ spread axis as the generalization fix. The complete raw rows, repeatability,
 and pinned metadata are recorded in
 `apple_match/out/spread-grid-current/summary.json`. The final `.5` small
 capture is available as [spread-grid candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/spread-grid-current/small_capsule/live/A.png), with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png).
+
+## Coupled spread/thickness probe (2026-08-26)
+
+Because spread and thickness enter the shader's reach, slope, and
+thickness-derived optical index together, `coupled_spread_scan.py` tested the
+existing model jointly: shared spread `{0,.25,.5,.75,1}` and independently
+selected thickness `{2,4,6,8,10,12,16}` for each recovered geometry. Every
+candidate was freshly rendered once on the pinned simulator and its four probe
+captures were retained under `out/coupled-spread-scan/<scene>/candidates/`.
+Selection used the existing optics loss (flow plus combined error), never the
+cross-scene ratio.
+
+The scan still rejected the model as a generalization fix. The best selected
+rows were:
+
+| shared spread | toolbar (thickness / score) | small (thickness / score / combined) | large (thickness / score) |
+|---:|---:|---:|---:|
+| 0 | 2 / 92.1894 | 2 / 85.6538 / .063231 | 2 / 89.2351 |
+| .25 | 2 / 92.2049 | 2 / 85.6319 / .063221 | 2 / 89.2551 |
+| .5 | 2 / 92.2069 | 4 / 85.6234 / .063242 | 2 / 89.2459 |
+| .75 | 2 / 92.2009 | 4 / 85.6216 / .063287 | 2 / 89.2409 |
+| 1 | 2 / 92.1974 | 2 / 85.6428 / .063239 | 2 / 89.2411 |
+
+Small remains about 2.01x the same-spread toolbar error and below the recorded
+86.3452 capsule gate at every candidate. No public setting or shader change is
+justified by this result. A representative retained image is [coupled candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/coupled-spread-scan/small_capsule/candidates/spread-1/thickness-2/rep-1/A.png); compare it with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full numeric rows and selection details are in `out/coupled-spread-scan/summary.json`.

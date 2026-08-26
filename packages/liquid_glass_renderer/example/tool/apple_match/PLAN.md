@@ -127,6 +127,15 @@ presets), performance non-regressing.
   gate therefore failed for the entire existing axis. No renderer change or
   performance claim was inferred. Full rows and captures are in
   `out/spread-grid-current/summary.json`.
+- 2026-08-26: completed the coupled existing-model scan recommended by review:
+  shared spread `{0,.25,.5,.75,1}` with independently selected thickness from
+  `{2,4,6,8,10,12,16}` for toolbar/small/large, one fresh pinned render per
+  candidate, and retained A-D captures for every row. The best small combined
+  error was 0.063221 (spread .25, thickness 2), still about 2.01x the same
+  candidate's toolbar error and below the 86.3452 historical capsule score.
+  The coupled axis is rejected as a generalization fix; no new public knob or
+  shader change was justified. Evidence is in
+  `out/coupled-spread-scan/summary.json`.
 - 2026-08-26: reran the pinned Flutter 3.47.1 repository gates on the current
   stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
   analyzer output remains informational lint debt only. The simulator-free

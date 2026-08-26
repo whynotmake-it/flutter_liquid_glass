@@ -408,6 +408,15 @@ The grid is diagnostic and should only promote a value if it improves the
 small capsule and preserves toolbar/large scores; the current pinned run is
 recorded as a rejected experiment in `out/spread-grid-current/summary.json`.
 
+For the stronger coupled probe, use `coupled_spread_scan.py`; it scans the
+same shared spread axis while selecting thickness independently per geometry
+and preserves every candidate's A-D capture:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python coupled_spread_scan.py \
+  --out out/coupled-spread-scan --repetitions 1
+```
+
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
 vector, with only monotonic `tintAlpha` and `frost` scalars allowed to vary.
