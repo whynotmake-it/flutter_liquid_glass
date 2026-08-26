@@ -58,9 +58,10 @@ presets), performance non-regressing.
 - `gpu/geometry_fragment.glsl`: shared SDF geometry matte, generalized profile
   reach, cached displacement encoding, and the existing one-pass `refract()`
   field; the narrow profile remains the `refractionSpread == 0` special case.
-- `liquid_glass_final_render.frag`: one backdrop sample path (three channel
-  samples only when chromatic aberration is non-zero), unified tint/transmission
-  transform, paired directional highlights, and an SDF-derived dark contour.
+- `liquid_glass_final_render.frag`: one backdrop sample path for subpixel
+  chromatic separation (three channel samples only when the displacement-bound
+  CA threshold is exceeded), unified tint/transmission transform, paired
+  directional highlights, and an SDF-derived dark contour.
 - `LiquidGlassSettings` exposes the evidence-gated vector: visibility, tint,
   thickness, edgeRefraction, refractionSpread, frost, chromaticAberration,
   saturation, transmissionGamma, vibrancy, highlight, contourStrength, and
