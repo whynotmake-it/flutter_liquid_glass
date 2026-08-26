@@ -68,7 +68,8 @@ capture does not account for the remaining per-layer footprint.
 
 1. **Cull sparse shape layers.** Compare dense and window-spanning layouts at
    1/2/4/8/16 shapes. Add conservative AABB rejection or spatial bins only if
-   the spread/dense delta confirms SDF evaluation is the bottleneck.
+   the comparison isolates shape evaluation as a material part of the frame;
+   a spread or density delta by itself is not proof of an SDF bottleneck.
 2. **Cache real-path filters and transformed clip paths.** Benchmark a static
    layer repainted by unrelated foreground animation, then cache by settings
    and geometry revision if raster CPU/allocation remains material.
@@ -184,8 +185,11 @@ recorded alongside the fit scorecards.
 
 ## SDF and shader-branch decision (2026-08-26)
 
-Flutter 3.47.1's Impeller `uber_sdf.frag` renders rounded superellipses with
-the same six-step bounded superellipse solve used by this package. It also
+Flutter 3.47.1's Impeller `uber_sdf.frag` contains an opt-in rounded-
+superellipse SDF path with the same six-step bounded superellipse solve used
+by this package. Ordinary Flutter does not always take that path: the canvas
+selects UberSDF only when SDFs are enabled and the shape is compatible,
+otherwise it uses tessellated rounded-superellipse geometry. The shader also
 branches for RSE octant selection and the circular-arc versus superellipse
 section. Therefore a branchless rewrite is not an optimization assumption:
 per-fragment branches may diverge, while evaluating both sides of a `mix`
