@@ -469,8 +469,8 @@ final gate. Scores use the corrected paired A/B optical-flow metric.
 | Scene/capture | Current score | Evidence |
 | --- | ---: | --- |
 | Toolbar | 91.7814 | `out/metric-ab-audit/toolbar/scorecard.json` |
-| Small capsule | 86.3452 | `out/small-final-fit-2/best/scorecard.json` |
-| Large capsule | 80.6343 | `out/generalization-ab-geometry-1/large_capsule/final/scorecard.json` |
+| Small capsule (shared vector) | 85.2647 | `out/generalization-toolbar-vector/small_capsule/final/scorecard.json` (historical standalone fit: 86.3452) |
+| Large capsule (shared vector) | 89.4927 | `out/generalization-toolbar-vector/large_capsule/final/scorecard.json` (historical standalone fit: 80.6343) |
 | Tab-bar holdout | 43.0289 | `out/generalization-ab-geometry-1/tab_bar_holdout/final/scorecard.json` |
 | Loupe | 13.5557 | `out/loupe-scorecard-effective/final/scorecard.json` (fresh pinned iOS 27; pre-shader `RawMagnifier`) |
 

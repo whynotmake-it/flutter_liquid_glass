@@ -453,9 +453,10 @@ The active renderer/example state is now:
 - The corrected paired A/B optical-flow metric is used for current evidence;
   comparing A against an all-zero image incorrectly counted foreground glyphs
   and material response as flow.
-- Current measured scorecards are toolbar 91.7814, small capsule 86.3452,
-  large capsule 80.6343, and tab holdout 43.0289. A fresh pinned loupe
-  composition score is still required.
+- Current frozen-vector scorecards are toolbar 91.7814, small capsule 85.2647,
+  large capsule 89.4927, and tab holdout 43.0289. The historical standalone
+  small/large fits (86.3452/80.6343) are retained for comparison only. A fresh
+  pinned loupe composition score is still required.
 - `melos run analyze`, `melos run test-without-goldens`, focused harness tests,
   package GPU tests, and comparator tests pass with the pinned Flutter 3.47.1
   toolchain.

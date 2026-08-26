@@ -44,10 +44,12 @@ presets), performance non-regressing.
 - Optimizer stages: hotloop_staged.py STAGES dict (line 35+)
 - Score = 100×(1−weighted err): appearance 30% / radial-flow 25% / edge 15% /
   specular(black probe) 15% / tint(white probe) 15%
-- Current evidence: toolbar 91.7814; small capsule 86.3452; large capsule
-  80.6343; tab-bar holdout 43.0289 after adding deterministic harness-only
-  foreground; paired A/B flow metric is now authoritative. A fresh pinned
-  loupe composition score and final performance ratio remain open.
+- Current shared-vector evidence: toolbar 91.7814; small capsule 85.2647;
+  large capsule 89.4927; tab-bar holdout 43.0289 after adding deterministic
+  harness-only foreground. Historical standalone fits were small 86.3452 and
+  large 80.6343; they are not the frozen-vector gate. The paired A/B flow
+  metric is authoritative. A fresh pinned loupe composition score and final
+  performance ratio remain open.
 - preapproved_renderer_baseline.json = richer fresnel/caustics/env-light forward
   model (prior sign-off artifact, only consumed by generalization.py; NOT in shipped
   shader) — prior art for the new model design
@@ -143,6 +145,18 @@ presets), performance non-regressing.
   within noise. All three failed Sol's retention thresholds, so defaults and
   renderer code remain unchanged. A-D captures and diagnostics are retained
   under `out/material-attribution-{frost,gamma,edge}`.
+- 2026-08-26: reviewed and rejected a proposed superlinear height-to-frost
+  normalization. Choosing exponent 1.84 exactly replayed the already measured
+  small-capsule frost=5 image while preserving the clamped toolbar/large
+  controls; its combined error worsened 0.063668→0.064354 and flow worsened
+  0.036286→0.049595. The existing linear normalization remains the only
+  evidence-backed shared-size mapping; future work should target the small
+  capsule's core-flow residual instead of a score-only frost fit.
+- 2026-08-26: ran one fresh pinned small-capsule capture with the existing
+  shared material and thickness 10 (the historical small-fit value). It moved
+  score only 85.2647→85.2782 and combined error worsened 0.063668→0.063952;
+  thickness alone is not the missing generalization fix. The candidate and
+  diagnostics are retained in `out/one-off-small-thickness10/`.
 - 2026-08-26: completed the attribution ledger with vibrancy and tint alpha.
   Vibrancy's best small combined/flow movement was only 0.8%/2.2%; tint's was
   0.6%/3.3% while regressing toolbar/large and perturbing the transparency
