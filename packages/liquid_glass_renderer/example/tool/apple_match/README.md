@@ -514,3 +514,23 @@ capture, or per-frame CPU solve. If a score improves while a black/white
 lighting residual worsens, keep the residual visible and do not hide it in a
 new independent shader weight. Simulator service failures are infrastructure
 blockers; never close unrelated simulators or weaken the pinned-device gate.
+
+### Annotating comparison images
+
+Images posted from the harness should identify panel provenance and candidate
+settings. The deterministic overlay preserves source pixels and adds only a
+metadata header and panel labels:
+
+```bash
+python3 annotate_comparison.py \
+  --input out/<run>/holdout_comparison.png \
+  --output out/<run>/holdout_comparison-annotated.png \
+  --title 'small_capsule comparison' \
+  --subtitle 'frost=7; score=85.2647; combined=.063668' \
+  --label 'APPLE GROUND TRUTH' \
+  --label 'FLUTTER CANDIDATE' \
+  --label 'DIFF / RESIDUAL'
+```
+
+The left panel is always labeled explicitly as the Apple ground truth; never
+rely on panel order alone when sharing a comparison.
