@@ -189,3 +189,9 @@ presets), performance non-regressing.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
+- 2026-08-26: added a bounded shared `chromaticAberration` attribution probe
+  with values `{0,.001,.0025,.005,.01}`. Zero exercises the final shader's
+  one-backdrop-sample path while `.005` preserves the authoritative default;
+  the probe is documented in the README and audit but has not been run because
+  CoreSimulatorService and the agent-device daemon are unavailable. No default
+  or renderer change is inferred without its three-scene visual evidence.
