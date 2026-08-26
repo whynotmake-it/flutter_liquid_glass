@@ -146,3 +146,21 @@ The transparency harness now enforces the same no-hidden-work discipline for
 material fitting: baseline tint RGB is copied exactly, and only `tintAlpha`
 and `frost` may vary by slider position. Its structural constraint audit is
 recorded alongside the fit scorecards.
+
+## SDF and shader-branch decision (2026-08-26)
+
+Flutter 3.47.1's Impeller `uber_sdf.frag` renders rounded superellipses with
+the same six-step bounded superellipse solve used by this package. It also
+branches for RSE octant selection and the circular-arc versus superellipse
+section. Therefore a branchless rewrite is not an optimization assumption:
+per-fragment branches may diverge, while evaluating both sides of a `mix`
+can cost more. Keep the branches that select the mathematically required
+piecewise SDF.
+
+In the shipped geometry shader, `hasFaceSpread` is a draw-uniform fast path,
+but it only avoids the extra `halfMinor` bookkeeping in `sceneSample`; both
+paths still evaluate each shape once. The zero-chromatic-aberration path and
+coverage early returns avoid texture/downstream work and are the more credible
+fast paths. The SDF matte is persistent and is rebuilt only when geometry or
+settings are dirty, so no SDF bottleneck claim is justified without a targeted
+geometry-pass A/B measurement.

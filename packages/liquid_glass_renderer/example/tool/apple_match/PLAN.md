@@ -111,6 +111,12 @@ presets), performance non-regressing.
   derives the actual search axes, and emits a self-describing summary and best
   scorecard. The historical shader-level S0 is explicitly retired. No seed
   scan was run while CoreSimulatorService was unavailable.
+- 2026-08-26: audited the proposed shader-branch optimization against Flutter
+  3.47.1's Impeller `uber_sdf.frag`. Flutter uses the same bounded SDF and
+  piecewise branches, so the renderer keeps the mathematically required SDF
+  branches; only uniform branches that skip real texture or bookkeeping work
+  are treated as fast paths. No SDF bottleneck claim is made without a stable,
+  targeted geometry-pass A/B measurement.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
