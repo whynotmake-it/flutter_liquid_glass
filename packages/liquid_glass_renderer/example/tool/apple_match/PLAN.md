@@ -189,9 +189,12 @@ presets), performance non-regressing.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
-- 2026-08-26: added a bounded shared `chromaticAberration` attribution probe
-  with values `{0,.001,.0025,.005,.01}`. Zero exercises the final shader's
-  one-backdrop-sample path while `.005` preserves the authoritative default;
-  the probe is documented in the README and audit but has not been run because
-  CoreSimulatorService and the agent-device daemon are unavailable. No default
-  or renderer change is inferred without its three-scene visual evidence.
+- 2026-08-26: ran the shared `chromaticAberration` probe on the pinned iOS 27
+  simulator with values `{0,.001,.0025,.005,.01,.025,.05,.1}`. Values 0 through
+  `.01` produced byte-identical A captures in toolbar, small, and large scenes;
+  larger values changed only a few pixels and did not improve score. The final
+  shader therefore uses one backdrop sample when `abs(CA) * maxDisplacement`
+  is below 0.5 source pixels, preserving three-channel sampling for larger
+  surfaces. Evidence is in
+  `out/material-attribution-chromaticAberration-cutoff/summary.json`; this is
+  a visual attribution result and still needs repeated same-runner perf A/B.

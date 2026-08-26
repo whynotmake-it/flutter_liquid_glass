@@ -51,6 +51,14 @@ float uInnerShadowStrength = uContourColor.a * 0.25;
 float uInnerShadowDepth = max(uThickness, 1.0);
 float uInnerShadowDirectionality = 0.0;
 
+// The fitted/default CA range is below the pixel response of the backdrop
+// sampler: the pinned three-scene scan found no score or decoded-image gain
+// through |CA| = .01. Bound the fast path by the maximum encoded displacement,
+// rather than by CA alone, so a large-refraction surface does not silently lose
+// visible dispersion. The threshold is a conservative half-pixel total
+// red-to-blue spread (a quarter pixel on either side of green).
+const float kChromaticAberrationSubpixelThreshold = 0.5;
+
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
 uniform sampler2D uCoordinateTexture;
@@ -250,12 +258,13 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     
     vec4 refractColor;
-    // The public/default value is intentionally small (~0.005), but it still
-    // represents a real channel separation. The old 0.01 cutoff silently
-    // disabled that range and made CA appear broken. Values whose magnitude is
-    // below 0.0001 take the single-sample fast path; larger positive or
-    // negative values preserve the three-channel separation.
-    if (uChromaticAberration < 0.0001) {
+    // Skip two texture reads only when the maximum channel separation is
+    // subpixel. The uniform predicate stays coherent across the layer and the
+    // displacement bound keeps this optimization valid for either CA sign.
+    if (
+        abs(uChromaticAberration) * maxDisplacement <=
+        kChromaticAberrationSubpixelThreshold
+    ) {
         vec2 refractedUV = mirrorBackgroundUV(
             screenUV + displacement * invUSize,
             invUSize

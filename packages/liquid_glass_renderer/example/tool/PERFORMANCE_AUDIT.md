@@ -90,10 +90,12 @@ IOS_27_UDID="$IOS_27_UDID" PYTHONPATH=compare compare/.venv/bin/python material_
 ```
 
 It compares the current `.005` default with zero (the one-backdrop-sample
-path) and small nonzero values across toolbar, small, and large capsules. The
-scan must pass the existing two-scene attribution and regression checks before
-any default or shader policy change is considered. It is a visual-fit probe,
-not a substitute for the later same-runner performance gate.
+path) and values up to `.1` across toolbar, small, and large capsules. The
+upper values are diagnostic: they test whether the relative-displacement
+parameterization is merely too weak to see. The scan must pass the existing
+two-scene attribution and regression checks before any default or shader policy
+change is considered. It is a visual-fit probe, not a substitute for the later
+same-runner performance gate.
 
 ## Required comparisons
 
@@ -218,6 +220,16 @@ and coverage early returns avoid texture/downstream work and are the more
 credible fast paths. The SDF matte is persistent and is rebuilt only when
 geometry or settings are dirty, so no SDF bottleneck claim is justified
 without a targeted geometry-pass A/B measurement.
+
+The final shader's chromatic path now uses one backdrop read whenever the
+maximum encoded displacement multiplied by `abs(chromaticAberration)` is below
+0.5 source pixels. This is a coherent uniform branch that removes two texture
+reads for the fitted values while preserving the three-sample path for larger
+refraction surfaces. The pinned three-scene scan (`out/material-attribution-
+chromaticAberration-cutoff/summary.json`) found byte-identical A captures for
+0 through `.01`; values above that boundary changed at most a few pixels and
+did not improve the score. This is a looks-safe optimization candidate, not a
+completed before/after performance gate.
 
 ## Shared refraction-spread probe (2026-08-26)
 

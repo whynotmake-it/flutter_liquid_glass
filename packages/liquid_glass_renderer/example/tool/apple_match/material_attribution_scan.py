@@ -46,7 +46,9 @@ AXES = {
     "tintAlpha": (0.48, 0.505, 0.53, 0.555, 0.58),
     # Zero selects the final shader's one-backdrop-sample path; .005 is the
     # authoritative toolbar/capsule default and must remain in the grid.
-    "chromaticAberration": (0.0, 0.001, 0.0025, 0.005, 0.01),
+    # The upper values test whether the current relative-displacement
+    # parameterization is simply too weak to be visually observable.
+    "chromaticAberration": (0.0, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1),
 }
 
 
