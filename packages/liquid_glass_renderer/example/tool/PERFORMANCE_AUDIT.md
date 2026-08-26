@@ -154,6 +154,16 @@ raster-p95 CV 3.2%, in-process GPU/frame CV 7.3%, and footprint-peak CV 1.7%.
 The trace result is now sound attribution evidence for this scenario; it is not
 a production performance gate or proof that the SDF is the bottleneck.
 
+The focused final-state probe on 2026-08-26 also established a harness detail:
+passing xctrace `--window 21s` can produce a one-second trace whose retained
+timeline ends before the gated workload starts, so the parser correctly reports
+no overlap. Omitting `--window` produced a valid current grouped trace
+(35.3% traced GPU utilization, 2.93 ms/frame). The benchmark script therefore
+defaults `TRACE_WINDOW_SECONDS` to `0` for opt-in traces. Independent16 still
+exceeded the 308-second finalization watchdog in two fresh attempts even with
+the complete-trace mode; this is recorded as unresolved Instruments event
+density, not as a renderer or SDF regression.
+
 The pinned loupe composition scan is now also runnable and truthful: the
 `RawMagnifier` owns enlargement, so the 12-candidate grid varies only
 `thickness` and `edgeRefraction`; clear-material overrides are recorded rather

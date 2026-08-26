@@ -223,3 +223,10 @@ presets), performance non-regressing.
   remains failed. This is useful scene-registration evidence, not a renderer or
   default-material change. Captures and scorecards are in
   `out/small-width-registration/`.
+- 2026-08-26: the current focused Metal probe showed xctrace windowed mode
+  (`--window 21s`) truncating the retained timeline to about one second before
+  the gated workload. Omitting the window yielded a valid grouped16 trace
+  (35.3% traced GPU utilization, 2.93 ms/frame); independent16 still exceeded
+  the 308 s finalization watchdog twice. `benchmark.sh` now defaults its
+  opt-in trace window to `0`; the independent event-density limitation remains
+  open and no final cross-revision performance gate is claimed.

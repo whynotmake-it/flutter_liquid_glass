@@ -485,3 +485,12 @@ current 150 px setting as the authoritative frozen-vector run and retain the
 captures under `out/small-width-registration/` for future scene-specific
 registration work. Do not fit a new shader profile until registration and the
 combined/flow gates agree.
+
+The current macOS trace probe found that xctrace's windowed mode can truncate
+an 8-second recording to roughly one second before the gated workload. The
+benchmark harness now defaults `LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS=0`
+(no `--window`), which produced a valid grouped16 trace. Independent16 still
+timed out during xctrace finalization twice at the 308-second watchdog, so the
+native grouped-vs-independent comparison and final ≤5% performance gate remain
+open. Do not treat in-process GPU numbers or a timed-out trace as native Metal
+evidence.
