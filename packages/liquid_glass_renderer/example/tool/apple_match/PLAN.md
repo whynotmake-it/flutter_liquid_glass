@@ -117,6 +117,10 @@ presets), performance non-regressing.
   branches; only uniform branches that skip real texture or bookkeeping work
   are treated as fast paths. No SDF bottleneck claim is made without a stable,
   targeted geometry-pass A/B measurement.
+- 2026-08-26: reran the pinned Flutter 3.47.1 repository gates on the current
+  stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
+  analyzer output remains informational lint debt only. The simulator-free
+  comparator suite remains 35 tests with one expected device smoke skip.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
