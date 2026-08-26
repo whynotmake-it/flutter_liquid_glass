@@ -125,6 +125,13 @@ intervals. A one-run Metal-Application-only probe produced no GPU table, so the
 GPU instrument cannot simply be removed to solve the problem. These captures
 are retained as diagnostic evidence; no native Metal gate is claimed.
 
+The trace harness now uses its existing start-gate handshake: the app waits for
+the xctrace readiness notification before emitting its measured windows. This
+corrects timestamp ordering, but an 8-second gated grouped capture still
+retained only one sound window and failed the same fixed-event-buffer check.
+The remaining limitation is Instruments event density, not a shader branch or
+SDF decision.
+
 ## 2026-08-25 renderer optimization experiments (rejected)
 
 Two focused measurements evaluated candidates; neither is part of the current

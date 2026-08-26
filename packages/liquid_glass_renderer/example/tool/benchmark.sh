@@ -233,17 +233,10 @@ capture_trace_attempt() {
     LIQUID_GLASS_BENCHMARK_TRACE_MEASURE_MILLISECONDS="$TRACE_MEASURE_MILLISECONDS" \
     LIQUID_GLASS_BENCHMARK_REPETITION="$repetition" \
     LIQUID_GLASS_BENCHMARK_TRACE_RUN=1 \
+    LIQUID_GLASS_BENCHMARK_TRACE_START_GATE="$notification_received" \
     "$APP_EXECUTABLE" >"$trace_drive_log" 2>&1 &
   trace_run_pid=$!
   ACTIVE_RUN_PID="$trace_run_pid"
-  if ! wait_for_log \
-    "$trace_drive_log" \
-    "LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:$scenario:" \
-    60; then
-    printf 'Target did not begin its post-warmup trace workload.\n' >>"$trace_log"
-    terminate_existing_benchmark_targets
-    return 1
-  fi
 
   "$NOTIFICATION_WAITER" \
     "$notification_name" \
@@ -290,6 +283,29 @@ capture_trace_attempt() {
   if ! wait_for_file "$notification_received" "$TRACE_START_TIMEOUT"; then
     printf 'xctrace did not post its tracing-started notification within %ss.\n' \
       "$TRACE_START_TIMEOUT" >>"$trace_log"
+    stop_trace_process "$trace_pid"
+    return 1
+  fi
+  # The target is deliberately gated on this notification. Starting the
+  # workload before Instruments attaches leaves the rolling kdebug buffer with
+  # mostly pre-capture windows (and often zero GPU intervals), especially for
+  # grouped layers. Wait for the target's explicit ready marker and first
+  # measurement window before starting the finalization watchdog.
+  if ! wait_for_log \
+    "$trace_drive_log" \
+    "LIQUID_GLASS_BENCHMARK_TRACE_READY:$scenario" \
+    "$TRACE_START_TIMEOUT"; then
+    printf 'Target did not pass the trace start gate within %ss.\n' \
+      "$TRACE_START_TIMEOUT" >>"$trace_log"
+    stop_trace_process "$trace_pid"
+    return 1
+  fi
+  if ! wait_for_log \
+    "$trace_drive_log" \
+    "LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:$scenario:" \
+    "$TRACE_START_TIMEOUT"; then
+    printf 'Target did not begin its post-warmup trace workload.\n' \
+      >>"$trace_log"
     stop_trace_process "$trace_pid"
     return 1
   fi

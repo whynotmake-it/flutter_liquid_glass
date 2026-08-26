@@ -134,6 +134,12 @@ presets), performance non-regressing.
   intervals. A one-run Metal-Application-only probe produced no GPU table at
   all, confirming that removing the GPU instrument cannot repair this capture
   path. The traces remain diagnostic and no native Metal gate is claimed.
+- 2026-08-26: wired the existing trace-start handshake in `benchmark.sh` so
+  the trace workload begins only after xctrace posts its readiness notification.
+  A gated 8-second grouped capture still retained only one sound window and
+  was rejected for the same fixed-event-buffer starvation; the handshake fixes
+  timestamp ordering but not Instruments' event-density limit. No shader/SDF
+  optimization was inferred from these rejected captures.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
