@@ -534,3 +534,6 @@ python3 annotate_comparison.py \
 
 The left panel is always labeled explicitly as the Apple ground truth; never
 rely on panel order alone when sharing a comparison.
+
+The current parameter-by-parameter report and annotated iteration index are in
+[`FULL_REPORT.md`](FULL_REPORT.md).
