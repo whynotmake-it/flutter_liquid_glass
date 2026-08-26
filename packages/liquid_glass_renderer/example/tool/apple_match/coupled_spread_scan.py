@@ -26,6 +26,7 @@ from apple_match.hotloop import (  # noqa: E402
     load_reference_probes,
     scene_crop,
 )
+from apple_match.metrics import write_diagnostics  # noqa: E402
 
 REFERENCE_SET = "ios27-iphone17pro-light"
 SCENES = ("toolbar_capsule", "small_capsule", "large_capsule")
@@ -125,6 +126,7 @@ def evaluate_scene(
                         / f"rep-{repetition}"
                     )
                     copy_capture(evaluator, capture_dir)
+                    write_diagnostics(capture_dir, reference, evaluator.last_images)
                     row = {
                         "scene": scene_id,
                         "spread": spread,
