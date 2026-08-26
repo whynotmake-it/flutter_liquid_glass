@@ -247,3 +247,8 @@ presets), performance non-regressing.
 - 2026-08-26: reran `melos run analyze` and `melos run
   test-without-goldens` through the pinned Flutter/Dart 3.47.1 SDK. Both
   completed successfully; analyzer output remains informational lint debt only.
+- 2026-08-26: Sol reviewed the frost concern and recommended deferring any
+  shared default or size-normalization change. Moving the small scene toward
+  its frost-5 headline-score row worsens combined error (`.063668→.064354`)
+  and flow (`.036286→.049595`), while lowering the shared value regresses the
+  toolbar/large fits. Await the pinned `0…9` scan before making a mapping change.
