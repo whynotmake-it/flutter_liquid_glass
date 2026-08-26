@@ -530,10 +530,16 @@ The goal is not production-ready until the pinned iOS 27 evidence and the
 performance audit are complete. A visual change may be accepted only when it
 improves the relevant decomposed metric in at least two scenes, remains within
 the shared-vector transparency rule, and does not add a pass, texture, backdrop
-capture, or per-frame CPU solve. If a score improves while a black/white
-lighting residual worsens, keep the residual visible and do not hide it in a
-new independent shader weight. Simulator service failures are infrastructure
-blockers; never close unrelated simulators or weaken the pinned-device gate.
+capture, or per-frame CPU solve. During lighting recovery, use `frost=0` and
+treat the weighted score as diagnostic only. Every measured iteration must post
+an annotated Apple / Flutter / residual composite containing both black and
+white rows, plus C/D rim, lip, and face residuals. The retained pre-redesign
+`split-contour-transmission2` result is the hard regression floor: specular
+`.020399`, black response `.001302`, white response `.001198`, and RGBW rim
+`.051522`. If any of those or the visible edge response worsens, reject the
+candidate even when its aggregate score improves. Simulator service failures
+are infrastructure blockers; never close unrelated simulators or weaken the
+pinned-device gate.
 
 ### Annotating comparison images
 

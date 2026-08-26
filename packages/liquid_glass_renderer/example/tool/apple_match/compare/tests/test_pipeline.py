@@ -150,6 +150,8 @@ class MetricTests(unittest.TestCase):
             transfer["transmission"]["innerBevel"]["meanAbsoluteError8Bit"],
             0.0,
         )
+        self.assertTrue(exact.details["lightingRegressionGate"]["passed"])
+        self.assertEqual(exact.details["lightingRegressionGate"]["failures"], {})
 
         changed = {key: image.copy() for key, image in reference.items()}
         changed["A"][56:72, 56:72, :] = np.clip(
@@ -160,6 +162,18 @@ class MetricTests(unittest.TestCase):
         self.assertGreater(pixels["glass"]["meanAbsoluteError8Bit"], 0.0)
         self.assertGreater(pixels["glass"]["mismatchedPixelFraction2Of255"], 0.0)
         self.assertEqual(pixels["rim"]["meanAbsoluteError8Bit"], 0.0)
+
+    def test_lighting_regression_gate_cannot_be_hidden_by_headline_score(self):
+        reference = synthetic(blur=1)
+        candidate = synthetic(blur=1, highlight=0.30)
+
+        result = score_images(reference, candidate)
+
+        self.assertGreater(result.score, 90.0)
+        gate = result.details["lightingRegressionGate"]
+        self.assertFalse(gate["passed"])
+        self.assertFalse(gate["weightedScoreCanOverride"])
+        self.assertIn("specular", gate["failures"])
 
     def test_fixed_blur_mix_has_linear_endpoints(self):
         image = synthetic()["A"]

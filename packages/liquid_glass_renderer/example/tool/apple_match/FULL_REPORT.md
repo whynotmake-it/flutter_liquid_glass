@@ -5,18 +5,35 @@ ledger for the redesign. Every comparison image linked here is a harness
 capture; annotated images label the left panel `APPLE GROUND TRUTH`, the middle
 panel `FLUTTER CANDIDATE`, and the right panel `DIFF / RESIDUAL`.
 
+## 2026-08-27 lighting-process correction
+
+The current redesign candidate is not the visual baseline. Compared with the
+retained pre-redesign `split-contour-transmission2` capture, specular error rose
+from `.020399` to `.044304`, black response from `.001302` to `.003952`, white
+response from `.001198` to `.006528`, and RGBW rim error from `.051522` to
+`.112397`. The shader redesign removed independently modeled face shading,
+inner-bevel shadow, and contour transmission and replaced them with a symmetric
+occlusion derived from contour strength. That simplification coupled the white
+outline and lighting response and allowed the aggregate optimizer to promote a
+visibly worse result.
+
+The recovery images are [`pre-redesign baseline`](out/annotated-comparisons/recovered-pre-redesign-lighting-annotated.png)
+and [`current regression`](out/annotated-comparisons/current-redesign-lighting-regression-annotated.png).
+Further visual iterations use `frost=0`, publish annotated black/white evidence,
+and must beat the recovered lighting floor before they can change defaults.
+
 ## What “frost” means on the Apple side
 
-Apple does not expose a frost number in the reference. The Apple panel is a
-rendered A/B probe (RGBW grid), not an Apple candidate with settings. `frost`
-is only our compositor blur radius. The Apple image therefore cannot be read as
-“frost=0”; it is the target response that our candidate settings must fit.
+Apple does not expose a numeric frost setting in the reference. For the clear
+lighting probe used in the current comparison, however, the visual target has
+no observable frost and the Flutter candidate must therefore use `frost=0`.
+Other Apple material/slider endpoints may include background softening and must
+be attributed separately.
 
-The previous image used the shared candidate vector with `frost=7`. The
+The previous image incorrectly used the shared candidate vector with `frost=7`. The
 small-control compositor normalizes that to approximately `7 × 63 / 94 = 4.69`
-logical pixels. It is visibly softer than the Apple target, so the clear
-endpoint is now included in the next scan. It has not been measured yet because
-CoreSimulatorService is currently unavailable.
+logical pixels. It is visibly softer than the Apple target and is rejected as
+evidence for this clear lighting probe.
 
 ## Probe contract
 

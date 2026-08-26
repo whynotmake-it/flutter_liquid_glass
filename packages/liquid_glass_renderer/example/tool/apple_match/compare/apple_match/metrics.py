@@ -20,6 +20,27 @@ WEIGHTS = {
     "holdout": 0.10,
 }
 
+# Retained pre-redesign `split-contour-transmission2` lighting evidence. These
+# limits deliberately do not alter the historical weighted score. They prevent
+# a broad transmission/shape improvement from promoting a visibly worse solid
+# material response, which is exactly how the current redesign regressed.
+LIGHTING_REGRESSION_FLOOR = {
+    "specular": 0.02039874333422631,
+    "blackResponse": 0.0013020634651184082,
+    "whiteResponse": 0.0011981725692749023,
+    "rgbwRim": 0.05152193829417229,
+    "C.rim": 0.027245165780186653,
+    "C.topLip": 0.007331379689276218,
+    "C.bottomLip": 0.0020518237724900246,
+    "C.topFace": 0.006569442339241505,
+    "C.bottomFace": 0.0008423990220762789,
+    "D.rim": 0.015629854053258896,
+    "D.topLip": 0.009254779666662216,
+    "D.bottomLip": 0.0014369497075676918,
+    "D.topFace": 0.009314684197306633,
+    "D.bottomFace": 0.0008317932952195406,
+}
+
 
 @dataclass(frozen=True)
 class MetricResult:
@@ -844,6 +865,31 @@ def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarr
             - 0.15 * normalized["channel"]
             - 0.10 * normalized["specular"]
         ),
+    }
+    observed_lighting = {
+        "specular": errors["specular"],
+        "blackResponse": details["blackResponseError"],
+        "whiteResponse": details["whiteResponseError"],
+        "rgbwRim": details["rgbwRimError"],
+    }
+    for probe in ("C", "D"):
+        for region in ("rim", "topLip", "bottomLip", "topFace", "bottomFace"):
+            observed_lighting[f"{probe}.{region}"] = details["pixelResiduals"][
+                probe
+            ][region]["meanAbsoluteError"]
+    failed_lighting = {
+        name: {"observed": observed_lighting[name], "maximum": maximum}
+        for name, maximum in LIGHTING_REGRESSION_FLOOR.items()
+        if observed_lighting[name] > maximum
+    }
+    details["lightingRegressionGate"] = {
+        "baseline": "split-contour-transmission2",
+        "probeContract": "solid C/D; clear material (frost=0)",
+        "passed": not failed_lighting,
+        "observed": observed_lighting,
+        "maximums": LIGHTING_REGRESSION_FLOOR,
+        "failures": failed_lighting,
+        "weightedScoreCanOverride": False,
     }
     return MetricResult(
         errors=errors,

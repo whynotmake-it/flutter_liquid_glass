@@ -1,10 +1,14 @@
 # Goal ledger — renderer model redesign (20260825101909-8ei3kw)
 
-Objective: rebuild the effect model to match Apple internals (SDF-profile refraction,
-dual directional highlights, unified tint/transparency axis), evidence-gated knobs,
-extend harness with a separately modeled loupe composition + transparency axis
-{0,.5,1}, re-fit all scenes, rebuild example shell (sidebar/backgrounds/YAML
-presets), performance non-regressing.
+Objective: recover and then exceed the last proven Apple lighting match before
+continuing the broader renderer redesign. The immediate target is the clear
+(`frost=0`) black/white material response: directional face gradient, dark
+dielectric contour, highlight-over-contour occlusion, inner bevel shadow, and
+exterior shadow. The weighted headline score is diagnostic only during this
+recovery; no setting or shader simplification may be promoted when the annotated
+black/white residual or an edge-region metric regresses. Once that floor is
+restored, continue the SDF-profile refraction, unified tint/transparency, loupe
+composition, example shell, generalization, and non-regressing performance work.
 
 ## User decisions (grilling, 2026-08-25)
 - Full breaking redesign approved (supersedes README escalation contract).
@@ -15,10 +19,19 @@ presets), performance non-regressing.
 - Dark appearance + physical device parity = recorded follow-ups, NOT gates.
 
 ## Gates (verification contract)
+0. Visual-first lighting recovery on the pinned toolbar reference with `frost=0`:
+   every iteration posts an annotated Apple / Flutter / residual composite for
+   black and white; the pre-redesign baseline is a hard floor (`specular`
+   ≤.020399, black response ≤.001302, white response ≤.001199, RGBW rim
+   ≤.051522), and C/D rim, lip, and face regions must not regress. A higher
+   aggregate score cannot override this gate.
 1. `melos run analyze` exit 0
 2. `melos run test-without-goldens` exit 0 (+ settings model tests + YAML round-trip)
-3. lib/src grep: zero blur-mix mixers / innerShadow* trio / independent rim RGB triplets;
-   settings doc table maps every surviving knob → ≥2 improving scenes
+3. lib/src grep: zero blur-mix mixers / arbitrary independent rim RGB triplets;
+   settings doc table maps every surviving knob → ≥2 improving scenes. Face
+   gradient, bevel shadow, contour transmission, and highlight occlusion may be
+   restored as renderer features when black/white evidence proves them; do not
+   collapse them into one contour multiplier merely to reduce the public API.
 4. out/<final-run>/summary.json: toolbar ≥85.88, tab_bar_holdout >33.40,
    capsules ≥ pre-change bests, loupe has a pinned example-composition score
    using pre-shader magnification (not the retired pre-redesign S0+10 comparison),
@@ -74,6 +87,8 @@ presets), performance non-regressing.
   are not shipped.
 
 ## Execution order
+- [~] 0. Recover pre-redesign lighting floor with frost disabled; current redesign
+  fails all four top-level lighting measurements and is not an acceptable baseline
 - [x] Orientation complete
 - [x] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score recorded
 - [x] 2. Perf baseline captured; final same-runner before/after ratio remains open
