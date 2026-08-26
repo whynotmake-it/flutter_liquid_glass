@@ -194,7 +194,7 @@ presets), performance non-regressing.
   `.01` produced byte-identical A captures in toolbar, small, and large scenes;
   larger values changed only a few pixels and did not improve score. The final
   shader therefore uses one backdrop sample when `abs(CA) * maxDisplacement`
-  is below 0.5 source pixels, preserving three-channel sampling for larger
+  is below 0.25 source pixels, preserving three-channel sampling for larger
   surfaces. Evidence is in
   `out/material-attribution-chromaticAberration-cutoff/summary.json`; this is
   a visual attribution result and still needs repeated same-runner perf A/B.

@@ -55,9 +55,9 @@ float uInnerShadowDirectionality = 0.0;
 // sampler: the pinned three-scene scan found no score or decoded-image gain
 // through |CA| = .01. Bound the fast path by the maximum encoded displacement,
 // rather than by CA alone, so a large-refraction surface does not silently lose
-// visible dispersion. The threshold is a conservative half-pixel total
-// red-to-blue spread (a quarter pixel on either side of green).
-const float kChromaticAberrationSubpixelThreshold = 0.5;
+// visible dispersion. The threshold is a conservative quarter-pixel total
+// red-to-blue spread (an eighth pixel on either side of green).
+const float kChromaticAberrationSubpixelThreshold = 0.25;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;

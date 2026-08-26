@@ -223,7 +223,7 @@ without a targeted geometry-pass A/B measurement.
 
 The final shader's chromatic path now uses one backdrop read whenever the
 maximum encoded displacement multiplied by `abs(chromaticAberration)` is below
-0.5 source pixels. This is a coherent uniform branch that removes two texture
+0.25 source pixels. This is a coherent uniform branch that removes two texture
 reads for the fitted values while preserving the three-sample path for larger
 refraction surfaces. The pinned three-scene scan (`out/material-attribution-
 chromaticAberration-cutoff/summary.json`) found byte-identical A captures for
