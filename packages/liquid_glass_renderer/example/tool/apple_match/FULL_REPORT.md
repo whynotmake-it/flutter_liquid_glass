@@ -65,6 +65,17 @@ The loupe score is a composition score: `RawMagnifier` paints the backdrop at
 1.55× before the ordinary glass shader. It is not evidence that shader-level
 zoom is correct.
 
+For the current `frost=7` vector, the harness decomposes the headline score as
+follows. `black ΔL*` and `white ΔL*` are signed candidate-minus-Apple values in
+8-bit luminance (negative means the Flutter candidate is darker); `boundary px`
+is the mean transmission-boundary position error.
+
+| Scene | Direct MAE8 | Refraction stage | Blur-MTF stage | Tint stage | Highlight stage | Holdout stage | black ΔL* | white ΔL* | RGBW rim | boundary px |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Toolbar | 2.5985 | 99.5382 | 89.1218 | 91.1542 | 82.2786 | 85.4963 | -1.0079 | -1.6647 | .112397 | .1813 |
+| Small capsule | 3.6009 | 96.3714 | 86.9773 | 84.1423 | 80.8473 | 74.5688 | -.0767 | -.4745 | .108544 | .8289 |
+| Large capsule | 2.9393 | 99.1476 | 69.8280 | 92.0227 | 84.7179 | 85.1619 | -1.3656 | -2.5374 | .094195 | .9234 |
+
 ## Parameter iterations and retained images
 
 Each scan held all other material fields fixed and retained A–D captures. The

@@ -511,3 +511,13 @@ while `frost=7` remains the shared toolbar/large fit. The frost probe grid now
 includes `0` through `9` so a clear-endpoint hypothesis is not silently
 excluded; rerun it only after CoreSimulatorService recovers and do not alter
 the shipped default without fresh cross-scene evidence.
+
+The latest reporting pass added `write_metric_ledger.py`. It rescored all 138
+retained material-attribution rows from their saved A/B/C/D captures, so the
+generated `out/annotated-comparisons/iterations/METRIC_LEDGER.{md,json}` keeps
+the headline score alongside direct MAE, black/white signed luminance,
+refraction flow and boundary curvature, blur-MTF, tint, highlight, holdout,
+and rim measurements. Every row links to an explicitly annotated image; the
+historical duplicate chromatic-aberration scan intentionally points at the
+single retained cutoff image. The current black/white composites are
+`out/annotated-comparisons/{small,toolbar}-lighting-current-annotated.png`.

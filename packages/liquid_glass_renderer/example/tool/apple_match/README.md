@@ -35,6 +35,8 @@ from iOS 26 or older must never be placed in `references/`.
 - `references/`: immutable, named Apple capture sets. Replacement requires
   `FORCE_REFERENCE=1`.
 - `out/`: ignored candidates, diagnostics, and scorecards.
+- `write_metric_ledger.py`: rescoring utility that rebuilds the full numeric
+  ledger from retained A/B/C/D captures without rerunning Flutter.
 
 ## Reproducible setup
 
@@ -104,6 +106,17 @@ of thickness, blur, light angle, and light intensity, and writes:
 Every scorecard exposes component errors, weights, normalization thresholds,
 alignment, inputs, and exact settings. The tab bar is not optimized in this
 slice; if added, it must remain a holdout.
+
+For the current looks audit, regenerate the detailed per-row report (including
+black/white luminance, refraction flow and boundary curvature) with:
+
+```bash
+compare/.venv/bin/python3 write_metric_ledger.py
+```
+
+The annotated image index and generated ledger are under
+`out/annotated-comparisons/iterations/`; the tracked summary and evidence
+status are in [`FULL_REPORT.md`](FULL_REPORT.md).
 
 ## Fast iteration loop (hot reload)
 
