@@ -30,8 +30,8 @@ uniform vec4 uReservedContourColor;
 uniform vec2 uContourConfig;
 uniform vec4 uProfileConfig;
 uniform vec2 uMaterialConfig;
-uniform vec2 uReservedFaceConfig;
-uniform vec3 uReservedShadowConfig;
+uniform vec2 uFaceGradientConfig;
+uniform vec3 uBevelShadowConfig;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -40,16 +40,16 @@ float uLightIntensity = uLightConfig.x;
 float uAmbientStrength = 0.0;
 float uSaturation = uLightConfig.z;
 float uEdgeWidth = uContourConfig.x;
+float uContourTransmittance = uContourConfig.y;
 float uEdgeInset = 0.25;
 float uBleedStrength = 0.375;
 float uSpecularWrap = 0.25;
 float uTransmissionGamma = uMaterialConfig.x;
 float uVibrancy = uMaterialConfig.y;
-float uFaceShadingStrength = uLightConfig.x * 0.03;
-float uFaceShadingDepth = max(uThickness * 3.0, 1.0);
-float uInnerShadowStrength = uContourColor.a * 0.25;
-float uInnerShadowDepth = max(uThickness, 1.0);
-float uInnerShadowDirectionality = 0.0;
+float uFaceGradientStrength = uFaceGradientConfig.x;
+float uFaceGradientDepth = uFaceGradientConfig.y;
+float uBevelShadowStrength = uBevelShadowConfig.x;
+float uBevelShadowDepth = uBevelShadowConfig.y;
 
 // The fitted/default CA range is below the pixel response of the backdrop
 // sampler: the pinned three-scene scan found no score or decoded-image gain
@@ -77,6 +77,7 @@ vec2 mirrorBackgroundUV(vec2 uv, vec2 inverseTextureSize) {
 
 vec3 applySpecularHighlights(
     vec3 baseColor,
+    vec3 transmittedColor,
     vec4 geometryData,
     vec2 displacement,
     vec2 surfaceUV
@@ -84,7 +85,9 @@ vec3 applySpecularHighlights(
     if (
         uLightIntensity < 0.01 &&
         uAmbientStrength < 0.01 &&
-        uContourColor.a < 0.01
+        uContourColor.a < 0.01 &&
+        uFaceGradientStrength < 0.001 &&
+        uBevelShadowStrength < 0.001
     ) {
         return baseColor;
     }
@@ -145,8 +148,9 @@ vec3 applySpecularHighlights(
         outlineCoverage < 0.01 &&
         edgeFactor < 0.01 &&
         bleedBand < 0.01 &&
-        uFaceShadingStrength < 0.001 &&
-        uContourColor.a < 0.001
+        uContourColor.a < 0.001 &&
+        uFaceGradientStrength < 0.001 &&
+        uBevelShadowStrength < 0.001
     ) {
         return baseColor;
     }
@@ -188,20 +192,52 @@ vec3 applySpecularHighlights(
     // backdrop. Deriving it from baseColor creates colored perimeter residuals
     // on checkerboard/reference probes and makes highlights depend on blur.
     vec3 highlightColor = uHighlightColor.rgb;
-    vec2 facePosition = (surfaceUV - vec2(0.5)) * uGeometrySize;
-    vec2 halfSize = uGeometrySize * 0.5;
-    float lightSupport =
-        abs(uLightDirection.x) * halfSize.x +
-        abs(uLightDirection.y) * halfSize.y;
-    // The contour also supplies a derived, symmetric bevel occlusion. This is
-    // not an independent shadow control: it is the same SDF profile viewed as
-    // absorption beneath a dielectric coating.
-    float bevelOcclusion = clamp(
-        (1.0 - smoothstep(0.0, max(uThickness, 1.0), inwardDistance)) *
-        uContourColor.a * 0.25,
-        0.0,
-        1.0
-    );
+    // Both branches are uniform across the draw. Disabled lighting layers skip
+    // their ALU without introducing fragment divergence, texture samples, or
+    // another compositor pass.
+    float faceGradient = 0.0;
+    if (uFaceGradientStrength >= 0.001) {
+        vec2 facePosition = (surfaceUV - vec2(0.5)) * uGeometrySize;
+        vec2 halfSize = uGeometrySize * 0.5;
+        float lightSupport =
+            abs(uLightDirection.x) * halfSize.x +
+            abs(uLightDirection.y) * halfSize.y;
+        float faceDepth = max(uFaceGradientDepth, 0.001);
+        float faceRise = smoothstep(0.0, faceDepth * 0.35, inwardDistance);
+        float faceFall = 1.0 - smoothstep(
+            faceDepth * 0.35,
+            faceDepth,
+            inwardDistance
+        );
+        // The coordinate-map transform supplies screen-oriented geometry UVs
+        // on Metal. Negative projection selects the screen-top, light-facing
+        // half for the default upward light.
+        float lightSide = smoothstep(
+            -lightSupport * 0.08,
+            lightSupport * 0.08,
+            -dot(facePosition, uLightDirection)
+        );
+        faceGradient = clamp(
+            faceRise * faceFall * lightSide * uFaceGradientStrength,
+            0.0,
+            1.0
+        );
+    }
+    float bevelShadow = 0.0;
+    if (uBevelShadowStrength >= 0.001) {
+        bevelShadow = clamp(
+            (1.0 - smoothstep(
+                0.0,
+                max(uBevelShadowDepth, 0.001),
+                inwardDistance
+            )) * uBevelShadowStrength,
+            0.0,
+            1.0
+        );
+    }
+    // Contour transmittance is evaluated in the material pass, below the
+    // specular addition. Highlights therefore eclipse the dark contour
+    // naturally without an independent canvas stroke.
     float edgeAbsorption = clamp(
         outlineCoverage * uContourColor.a,
         0.0,
@@ -210,7 +246,13 @@ vec3 applySpecularHighlights(
     float edgeTransmittance = 1.0 - edgeAbsorption;
     vec3 result = baseColor * edgeTransmittance +
         uContourColor.rgb * edgeAbsorption;
-    result *= 1.0 - bevelOcclusion;
+    // Preserve only the configured fraction of the backdrop component. The
+    // material/tint emission remains fully affected by contour absorption,
+    // which keeps black-probe response independent from transmittance.
+    result += transmittedColor *
+        edgeAbsorption *
+        clamp(uContourTransmittance, 0.0, 1.0);
+    result *= (1.0 - faceGradient) * (1.0 - bevelShadow);
     result += highlightColor * highlightAmount;
 
     return result;
@@ -314,6 +356,7 @@ void main() {
     float alpha = geometryData.a;
     vec3 finalColor = applySpecularHighlights(
         baseColor,
+        transmittedColor,
         geometryData,
         displacement,
         geometryUV

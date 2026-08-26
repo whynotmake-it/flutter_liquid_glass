@@ -54,10 +54,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--settings", type=Path)
     parser.add_argument("--scene", type=Path)
+    parser.add_argument(
+        "--host-capture",
+        action="store_true",
+        help="Exclude the pinned simulator's four-pixel display-corner clip.",
+    )
     args = parser.parse_args()
 
     crop = None
     registration_rect = None
+    registration_exclusions = ()
     if args.scene:
         scene = json.loads(args.scene.read_text())
         shape = scene["shape"]
@@ -70,12 +76,29 @@ def main() -> None:
             round((shape["height"] + 2 * margin) * scale),
         )
         registration_rect = crop
+        canvas = scene["canvas"]
+        system_ui_height = round(40 * scale)
+        registration_exclusions = (
+            (
+                0,
+                round(canvas["logicalHeight"] * scale) - system_ui_height,
+                round(canvas["logicalWidth"] * scale),
+                system_ui_height,
+            ),
+        )
+        if args.host_capture:
+            width = round(canvas["logicalWidth"] * scale)
+            registration_exclusions += (
+                (0, 0, 4, 4),
+                (width - 4, 0, 4, 4),
+            )
     full_reference = load_probes(args.reference)
     full_candidate = load_probes(args.candidate)
     registration = verify_background_registration(
         full_reference["A"],
         full_candidate["A"],
         registration_rect or (0, 0, 0, 0),
+        registration_exclusions,
     )
     reference = load_probes(args.reference, crop)
     candidate = load_probes(args.candidate, crop)
@@ -131,6 +154,7 @@ def main() -> None:
             "holdout": 0.25,
         },
         "registration": registration,
+        "capturePlatform": "macos-host-golden" if args.host_capture else "device",
         "measurements": result.details,
         "alignmentShiftPixels": {"x": result.shift[0], "y": result.shift[1]},
         "cropPixels": crop,

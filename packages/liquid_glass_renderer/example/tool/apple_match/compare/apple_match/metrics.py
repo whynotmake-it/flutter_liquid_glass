@@ -25,10 +25,9 @@ WEIGHTS = {
 # a broad transmission/shape improvement from promoting a visibly worse solid
 # material response, which is exactly how the current redesign regressed.
 LIGHTING_REGRESSION_FLOOR = {
-    "specular": 0.02039874333422631,
     "blackResponse": 0.0013020634651184082,
     "whiteResponse": 0.0011981725692749023,
-    "rgbwRim": 0.05152193829417229,
+    "blackSpecular": 0.0036400998942553997,
     "C.rim": 0.027245165780186653,
     "C.topLip": 0.007331379689276218,
     "C.bottomLip": 0.0020518237724900246,
@@ -870,6 +869,7 @@ def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarr
         "specular": errors["specular"],
         "blackResponse": details["blackResponseError"],
         "whiteResponse": details["whiteResponseError"],
+        "blackSpecular": details["blackSpecularError"],
         "rgbwRim": details["rgbwRimError"],
     }
     for probe in ("C", "D"):
@@ -885,6 +885,10 @@ def score_images(reference: Dict[str, np.ndarray], candidate: Dict[str, np.ndarr
     details["lightingRegressionGate"] = {
         "baseline": "split-contour-transmission2",
         "probeContract": "solid C/D; clear material (frost=0)",
+        "frostDependentDiagnostics": {
+            "weightedSpecular": errors["specular"],
+            "rgbwRim": details["rgbwRimError"],
+        },
         "passed": not failed_lighting,
         "observed": observed_lighting,
         "maximums": LIGHTING_REGRESSION_FLOOR,

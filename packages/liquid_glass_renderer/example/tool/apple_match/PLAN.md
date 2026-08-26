@@ -21,10 +21,12 @@ composition, example shell, generalization, and non-regressing performance work.
 ## Gates (verification contract)
 0. Visual-first lighting recovery on the pinned toolbar reference with `frost=0`:
    every iteration posts an annotated Apple / Flutter / residual composite for
-   black and white; the pre-redesign baseline is a hard floor (`specular`
-   ≤.020399, black response ≤.001302, white response ≤.001199, RGBW rim
-   ≤.051522), and C/D rim, lip, and face regions must not regress. A higher
-   aggregate score cannot override this gate.
+   black and white; the pre-redesign solid-probe baseline is a hard floor
+   (black response ≤.001302, white response ≤.001199, black specular ≤.003641),
+   and C/D rim, lip, and face regions must not regress. Patterned RGBW/specular
+   measurements remain reported but cannot gate a `frost=0` lighting candidate
+   against a historical `frost=7` capture. A higher aggregate score cannot
+   override this gate.
 1. `melos run analyze` exit 0
 2. `melos run test-without-goldens` exit 0 (+ settings model tests + YAML round-trip)
 3. lib/src grep: zero blur-mix mixers / arbitrary independent rim RGB triplets;
@@ -38,7 +40,9 @@ composition, example shell, generalization, and non-regressing performance work.
    metadata pins iOS 27 runtime + UDID
 5. Slider-axis {0,.5,1}: shared param vector except ≤2 documented scalars
 6. Frozen-parameter generalization: small-capsule combined error ≤1.25× toolbar (was >1.5×)
-7. Perf audit before/after mean frame times, ≤ +5%
+7. Perf audit before/after mean frame times, ≤ +5%; focused lighting A/B is
+   complete (+.5% independent raster p95, +4.1% GPU/frame), while the final
+   full-suite/native-trace audit remains open
 8. README updated (Apple-layer→pipeline mapping table, scorecards incl. loupe,
    escalation section rewritten); example analyze-clean, sidebar + ≥4 backgrounds +
    preset persistence
@@ -79,16 +83,23 @@ composition, example shell, generalization, and non-regressing performance work.
 - `liquid_glass_final_render.frag`: one backdrop sample path for subpixel
   chromatic separation (three channel samples only when the displacement-bound
   CA threshold is exceeded), unified tint/transmission transform, paired
-  directional highlights, and an SDF-derived dark contour.
+  directional highlights, and SDF-derived contour, directional face gradient,
+  and inner-bevel shadow layers. Lighting recovery adds uniform-coherent ALU
+  only: no texture sample, backdrop capture, saveLayer, or CPU solve.
 - `LiquidGlassSettings` exposes the evidence-gated vector: visibility, tint,
   thickness, edgeRefraction, refractionSpread, frost, chromaticAberration,
   saturation, transmissionGamma, vibrancy, highlight, contourStrength, and
-  contourWidth. Legacy face-shading, independent rim, and inner-shadow weights
-  are not shipped.
+  contourWidth, contourTransmittance, faceGradientStrength/Depth, and
+  bevelShadowStrength/Depth. Independent rim RGB weights are not shipped.
 
 ## Execution order
-- [~] 0. Recover pre-redesign lighting floor with frost disabled; current redesign
-  fails all four top-level lighting measurements and is not an acceptable baseline
+- [x] Fast fitting backend: macOS Impeller/Flutter-GPU golden A/B/C/D capture,
+  host-only corner registration profile, and adjacent-candidate ranking
+  calibration. Use iOS simulator only for promoted/final candidates.
+- [~] 0. Recover pre-redesign lighting floor with frost disabled; iteration 15
+  removes the unsupported contact halo and improves D-rim, but five solid
+  regional floors remain open. RGBA16F and 2×/3× DPR outline diagnostics are
+  required before changing the SDF/codec.
 - [x] Orientation complete
 - [x] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score recorded
 - [x] 2. Perf baseline captured; final same-runner before/after ratio remains open

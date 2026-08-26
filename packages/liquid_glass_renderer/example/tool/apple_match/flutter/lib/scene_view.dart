@@ -62,6 +62,26 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'contourWidth',
       number('edgeWidth', defaults.contourWidth),
     ),
+    contourTransmittance: number(
+      'contourTransmittance',
+      number('contourTransmissionRatio', defaults.contourTransmittance),
+    ),
+    faceGradientStrength: number(
+      'faceGradientStrength',
+      number('faceShadingStrength', defaults.faceGradientStrength),
+    ),
+    faceGradientDepth: number(
+      'faceGradientDepth',
+      number('faceShadingDepth', defaults.faceGradientDepth),
+    ),
+    bevelShadowStrength: number(
+      'bevelShadowStrength',
+      number('innerShadowStrength', defaults.bevelShadowStrength),
+    ),
+    bevelShadowDepth: number(
+      'bevelShadowDepth',
+      number('innerShadowDepth', defaults.bevelShadowDepth),
+    ),
     saturation: number('saturation', defaults.saturation),
     chromaticAberration: number(
       'chromaticAberration',

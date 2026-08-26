@@ -87,6 +87,43 @@ bash apple/build.sh
 
 ## One-command capture and bounded search
 
+### Fast macOS GPU-golden fitting (default)
+
+Use the host path for ordinary parameter iterations. It runs the exact harness
+scene through macOS Impeller and Flutter GPU, captures at the scene's declared
+DPR, and writes the same A/B/C/D PNG contract consumed by the Python metrics:
+
+```bash
+SETTINGS_FILE="$PWD/settings/baseline.json" \
+CANDIDATE_OUT="$PWD/out/host-candidates/baseline" \
+bash flutter/host_capture.sh
+
+PYTHONPATH=compare compare/.venv/bin/python -m apple_match.cli \
+  --host-capture \
+  --reference references/ios27-iphone17pro-light/toolbar_capsule \
+  --candidate out/host-candidates/baseline \
+  --output out/host-baseline/score \
+  --settings out/host-candidates/baseline/settings.json \
+  --scene scenes/toolbar_capsule.json
+```
+
+`host_capture.sh` never invokes `simctl` and therefore cannot boot, stop, or
+modify a simulator. Flutter 3.47 can hang when one `flutter_tester` process
+performs repeated large GPU readbacks, so the wrapper deliberately uses one
+short GPU-golden test process per probe. The first retained calibration took
+14–20 seconds for all four probes, versus roughly 42 seconds for the existing
+three-frame simulator validation.
+
+The retained same-settings host/iOS comparison scores 99.4155. The adjacent
+contour-transmittance ranking was preserved: `.80` beat `.90` by `.00394` on
+macOS and `.00471` on iOS. The remaining platform residual is concentrated at
+the contour and cast-shadow rasterization, so promote host winners through the
+pinned iOS three-frame path before changing defaults. `--host-capture` changes
+only registration: it excludes the simulator display clip's four physical
+corner pixels; the scored material crop and every metric remain unchanged.
+
+### Pinned iOS promotion and final validation
+
 ```bash
 IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python run.py
 ```
@@ -519,10 +556,16 @@ selection treatment; shipped callers still provide their own child content.
 | `highlight` | Paired directional highlight lobe | Black/white toolbar + capsule |
 | `contourStrength` | Dark dielectric contour strength | White-background toolbar + capsule |
 | `contourWidth` | Contour width in logical pixels | White-background toolbar + capsule |
+| `contourTransmittance` | Backdrop transmission retained under the material contour | Black/white toolbar + capsule |
+| `faceGradientStrength` | Directional face-lighting gradient beneath the rim | Black/white toolbar + capsule |
+| `faceGradientDepth` | Inward reach of the directional face gradient | Black/white toolbar + capsule |
+| `bevelShadowStrength` | Ambient shadow beneath the inner bevel | White toolbar + capsule |
+| `bevelShadowDepth` | Inward reach of the inner-bevel shadow | White toolbar + capsule |
 
 Legacy names (`blurMix`, `glassAlpha`, `refractiveIndex`, independent rim RGB
-triplets, and `innerShadow*`) are harness compatibility inputs only and are not
-part of shipped `lib/src`.
+triplets, and `innerShadow*`) are harness compatibility inputs only. The live
+API uses material-layer names and evaluates every lighting layer in the same
+final pass; none adds a backdrop sample or canvas stroke.
 
 ### Escalation contract
 
@@ -534,9 +577,11 @@ capture, or per-frame CPU solve. During lighting recovery, use `frost=0` and
 treat the weighted score as diagnostic only. Every measured iteration must post
 an annotated Apple / Flutter / residual composite containing both black and
 white rows, plus C/D rim, lip, and face residuals. The retained pre-redesign
-`split-contour-transmission2` result is the hard regression floor: specular
-`.020399`, black response `.001302`, white response `.001198`, and RGBW rim
-`.051522`. If any of those or the visible edge response worsens, reject the
+`split-contour-transmission2` result is the solid-probe regression floor: black
+response `.001302`, white response `.001198`, and black specular `.003640`,
+plus its C/D edge regions. Patterned RGBW/specular metrics are still included
+in every report, but a historical `frost=7` row cannot gate a clear `frost=0`
+lighting candidate. If the solid response or visible edge worsens, reject the
 candidate even when its aggregate score improves. Simulator service failures
 are infrastructure blockers; never close unrelated simulators or weaken the
 pinned-device gate.

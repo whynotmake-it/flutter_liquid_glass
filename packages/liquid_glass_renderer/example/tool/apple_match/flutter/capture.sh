@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${SETTINGS_FILE:=$ROOT/settings/baseline.json}"
 : "${CANDIDATE_OUT:=$ROOT/out/candidates/baseline}"
 : "${CAPTURE_FRAMES:=3}"
+: "${CAPTURE_LAUNCH_SETTLE_SECONDS:=4}"
 : "${FLUTTER_BIN:=$HOME/fvm/versions/3.47.1/bin/flutter}"
 : "${PREPARE_APP:=1}"
 
@@ -28,7 +29,11 @@ launch_flutter() {
     --enable-impeller --enable-flutter-gpu \
     --probe "$probe" --settings-b64 "$SETTINGS_B64")"
   pid="${launch_output##*: }"
-  sleep 2
+  # A solid-white launch screen satisfies the D probe's background check before
+  # the Flutter surface or shader exists. Give the one-shot path a fixed launch
+  # settle window; the persistent hot loop uses its explicit settled-frame IPC
+  # instead and does not pay this delay per candidate.
+  sleep "$CAPTURE_LAUNCH_SETTLE_SECONDS"
 }
 
 screenshot_frame() {

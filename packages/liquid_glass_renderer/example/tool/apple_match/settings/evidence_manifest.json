@@ -131,17 +131,77 @@
       "reason": "White-background contour evidence is visual but lacks an accepted two-scene improvement row.",
       "evidence": [{
         "axis": "contourStrength",
-        "baseline": 0.65,
-        "candidate": 0.35,
+        "baseline": 0.2,
+        "candidate": 0.22,
         "scenes": ["toolbar_capsule"],
-        "delta": {"note": "visual white-background residual remains"},
-        "artifact": "out/annotated-comparisons/small-lighting-current-annotated.png"
+        "delta": {"blackResponse": -0.0004051, "blackSpecular": 0.0000259, "note": "iteration 15 versus recovered floor; capsule attribution remains open"},
+        "artifact": "out/annotated-comparisons/lighting-recovery-15-annotated.png"
       }]
     },
     "contourWidth": {
       "status": "pending",
       "reason": "No accepted two-scene contour-width attribution is present in the current ledger.",
       "evidence": []
+    },
+    "contourTransmittance": {
+      "status": "pending",
+      "reason": "The recovered toolbar baseline proves the layer is needed, but capsule attribution is still required.",
+      "evidence": [{
+        "axis": "contourTransmittance",
+        "baseline": 0.0,
+        "candidate": 0.8,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"whiteResponse": 0.0002241, "note": "iteration 15 versus recovered floor; clear solid probe"},
+        "artifact": "out/annotated-comparisons/lighting-recovery-15-annotated.png"
+      }]
+    },
+    "faceGradientStrength": {
+      "status": "pending",
+      "reason": "The recovered toolbar baseline proves directional face shading is needed; capsule attribution remains open.",
+      "evidence": [{
+        "axis": "faceGradientStrength",
+        "baseline": 0.0,
+        "candidate": 0.015,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"whiteResponse": -0.00533},
+        "artifact": "out/annotated-comparisons/recovered-pre-redesign-lighting-annotated.png"
+      }]
+    },
+    "faceGradientDepth": {
+      "status": "pending",
+      "reason": "Forty logical pixels is the recovered toolbar value; a second geometry is required before qualification.",
+      "evidence": [{
+        "axis": "faceGradientDepth",
+        "baseline": "derived",
+        "candidate": 40.0,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"note": "recovered pre-redesign lighting floor"},
+        "artifact": "out/annotated-comparisons/recovered-pre-redesign-lighting-annotated.png"
+      }]
+    },
+    "bevelShadowStrength": {
+      "status": "pending",
+      "reason": "The recovered toolbar baseline proves an inner-bevel shadow is needed; capsule attribution remains open.",
+      "evidence": [{
+        "axis": "bevelShadowStrength",
+        "baseline": 0.0,
+        "candidate": 0.025,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"specular": -0.023905},
+        "artifact": "out/annotated-comparisons/recovered-pre-redesign-lighting-annotated.png"
+      }]
+    },
+    "bevelShadowDepth": {
+      "status": "pending",
+      "reason": "Twelve logical pixels is the recovered toolbar value; a second geometry is required before qualification.",
+      "evidence": [{
+        "axis": "bevelShadowDepth",
+        "baseline": "derived",
+        "candidate": 12.0,
+        "scenes": ["toolbar_capsule"],
+        "delta": {"note": "recovered pre-redesign lighting floor"},
+        "artifact": "out/annotated-comparisons/recovered-pre-redesign-lighting-annotated.png"
+      }]
     }
   }
 }

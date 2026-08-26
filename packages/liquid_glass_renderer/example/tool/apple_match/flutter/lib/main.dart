@@ -37,6 +37,12 @@ Future<void> main() async {
             ),
           ),
   );
+  // iOS can restore the home indicator while the first Flutter view attaches.
+  // Reassert immersive mode after that frame so legacy one-shot captures have
+  // the same uncontaminated control pixels as the persistent hot-loop path.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  });
 }
 
 String? _argument(List<String> arguments, String name) {

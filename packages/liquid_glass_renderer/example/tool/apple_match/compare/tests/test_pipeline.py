@@ -173,7 +173,7 @@ class MetricTests(unittest.TestCase):
         gate = result.details["lightingRegressionGate"]
         self.assertFalse(gate["passed"])
         self.assertFalse(gate["weightedScoreCanOverride"])
-        self.assertIn("specular", gate["failures"])
+        self.assertIn("blackSpecular", gate["failures"])
 
     def test_fixed_blur_mix_has_linear_endpoints(self):
         image = synthetic()["A"]
@@ -218,6 +218,19 @@ class MetricTests(unittest.TestCase):
         shifted = np.roll(reference, 2, axis=1)
         with self.assertRaises(ValueError):
             verify_background_registration(reference, shifted, (40, 40, 48, 48))
+
+    def test_registration_can_exclude_host_display_corners(self):
+        reference = synthetic()["A"]
+        candidate = reference.copy()
+        candidate[:4, :4] = 0
+        candidate[:4, -4:] = 0
+        details = verify_background_registration(
+            reference,
+            candidate,
+            (40, 40, 48, 48),
+            ((0, 0, 4, 4), (124, 0, 4, 4)),
+        )
+        self.assertTrue(details["passed"])
 
 
 if __name__ == "__main__":

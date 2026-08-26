@@ -161,7 +161,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         ..setColor(const Color.fromARGB(0, 0, 0, 0))
         ..setFloats([
           settings.effectiveContourWidth,
-          0.0,
+          settings.effectiveContourTransmittance,
         ])
         ..setFloats([
           settings.effectiveContourWidth,
@@ -174,8 +174,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           settings.effectiveVibrancy,
         ])
         ..setFloats([
-          settings.effectiveHighlight,
-          40.0,
+          settings.effectiveFaceGradientStrength,
+          settings.effectiveFaceGradientDepth,
+        ])
+        ..setFloats([
+          settings.effectiveBevelShadowStrength,
+          settings.effectiveBevelShadowDepth,
+          0.0,
         ]);
     });
   }

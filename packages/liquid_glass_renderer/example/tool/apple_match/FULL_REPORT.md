@@ -22,6 +22,69 @@ and [`current regression`](out/annotated-comparisons/current-redesign-lighting-r
 Further visual iterations use `frost=0`, publish annotated black/white evidence,
 and must beat the recovered lighting floor before they can change defaults.
 
+### Retained clear-lighting recovery
+
+Iteration 15 is the retained toolbar candidate. It removes the contact shadow
+entirely and keeps the existing linear RGBA8 displacement codec. The material
+contour is widened inside the final shader and fit as the coupled vector
+`strength=.22`, `width=1.5`, `transmittance=.80`.
+Directional face gradient remains `.015/40` and inner bevel shadow `.025/12`.
+The full annotated comparison is [`iteration 15`](out/annotated-comparisons/lighting-recovery-15-annotated.png)
+and the nearest-neighbor outline crops are [`iteration 15 zoom`](out/annotated-comparisons/lighting-recovery-15-outline-zoom.png).
+
+| Clear solid metric | Recovered floor | Iteration 15 | Result |
+| --- | ---: | ---: | --- |
+| black response | .001302 | .000897 | pass |
+| white response | .001198 | .001422 | fail |
+| black specular | .003640 | .003666 | fail |
+| C rim | .027245 | .027619 | fail |
+
+The strict regional gate remains open. Removing the halo improves D rim from
+`.016994` to `.014039`, but white response, black specular, C rim, C
+bottom-face, and D bottom-lip remain above their recovered floors. Patterned
+RGBW/specular score components remain diagnostic because the retained
+historical row used `frost=7` and this lighting fit deliberately uses `frost=0`.
+The contact-shadow approach was rejected: it reduced a broad exterior-band
+average by adding a diffuse halo that is not present in the Apple reference.
+A nonlinear edge-distance codec was also rejected after an exact A/B produced
+visually indistinguishable crops and no score gain. Nearest-neighbor crops still
+show real contour stepping; RGBA16F and 2×/3× DPR diagnostics remain required
+before changing the SDF or its distance codec.
+
+### Focused performance audit
+
+The visual milestone ran a fresh three-repetition macOS profile audit for
+`baselineMotion`, `grouped16Motion`, and `independent16Motion`. Median raster
+p95 was `1.30 ms`, `1.61 ms`, and `4.50 ms` respectively; all ordinary
+frame-time, memory, repeatability, and completeness gates passed. A second
+opt-in same-build A/B compared the 16-shape workloads with the recovered
+contour/face/bevel uniforms disabled and enabled. Grouped GPU time was
+`3.00 → 3.01 ms/frame`; independent raster p95 was `4.38 → 4.40 ms` and GPU
+time `5.39 → 5.61 ms/frame` (+4.1%). This stays inside the ≤5% performance
+budget and confirms the lighting work remains uniform-coherent ALU in the
+existing pass. The second run's generic grouped row had one startup outlier
+and therefore failed the parser's 15% repeatability gate; the paired lit row
+itself had 0.8% GPU and 8.7% raster CV. No native Metal trace was requested for
+this bounded visual audit.
+
+### macOS GPU-golden fitting calibration
+
+Ordinary fitting no longer requires a simulator capture per candidate. The
+new `flutter/host_capture.sh` path runs the shared scene through macOS Impeller
+and Flutter GPU at DPR 3 and emits the same A/B/C/D PNG contract. It touches no
+simulator. Four isolated golden processes complete in 14–20 seconds; isolation
+works around a Flutter 3.47 teardown hang after repeated large GPU readbacks in
+one `flutter_tester` process.
+
+With iteration 15 settings, the macOS candidate scores `99.4155` against its
+iOS-simulator counterpart and `61.9584` against Apple, versus iOS `61.9966`.
+The adjacent `.80`/`.90` contour-transmittance ranking is preserved: macOS
+prefers `.80` by `.00394`, while iOS prefers it by `.00471`. The annotated
+same-settings comparison is [`host versus iOS`](out/annotated-comparisons/host-vs-ios-lighting-recovery-15-annotated.png).
+The remaining platform residual is visibly concentrated at the contour and
+cast shadow, so macOS is the default search backend but every promoted winner
+still requires the pinned three-frame iOS validation before changing defaults.
+
 ## What “frost” means on the Apple side
 
 Apple does not expose a numeric frost setting in the reference. For the clear
@@ -57,14 +120,16 @@ refraction or blur regression.
 | thickness | 8 px (small/large), 12 px (toolbar/tab) |
 | edgeRefraction | 18.3 px |
 | refractionSpread | 0 |
-| frost | 7 |
+| frost | 0 for the clear-lighting fit; 7 only for legacy patterned rows |
 | tint alpha | .53 |
 | saturation | .9 |
 | transmissionGamma | .9 |
 | vibrancy | .15 |
 | chromaticAberration | .005 |
-| highlight | .4 |
-| contourStrength / width | .65 / 1 px |
+| highlight | .5 |
+| contourStrength / width / transmittance | .22 / 1.5 px / .90 |
+| face gradient strength / depth | .015 / 40 px |
+| bevel shadow strength / depth | .025 / 12 px |
 
 The current cross-scene table treats `thickness` as a recovered
 geometry-specific scalar (12 px for the toolbar, 8 px for the capsules), while

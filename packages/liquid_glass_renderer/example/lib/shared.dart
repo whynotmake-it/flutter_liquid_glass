@@ -312,9 +312,9 @@ class SettingsSheet extends HookWidget {
                                     thickness: 30,
                                     frost: 1,
                                     saturation: 1.2,
-                                    tint: CupertinoTheme.of(context)
-                                        .barBackgroundColor
-                                        .withValues(alpha: .1),
+                                    tint: CupertinoTheme.of(
+                                      context,
+                                    ).barBackgroundColor.withValues(alpha: .1),
                                     contourStrength: .3,
                                     contourWidth: 1,
                                   );
@@ -392,6 +392,54 @@ class SettingsSheet extends HookWidget {
                           max: 8,
                           onChanged: (value) => settingsNotifier.value =
                               settings.copyWith(contourWidth: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Contour transmission',
+                          value: settings.contourTransmittance,
+                          min: 0,
+                          max: 1,
+                          onChanged: (value) =>
+                              settingsNotifier.value = settings.copyWith(
+                                contourTransmittance: value,
+                              ),
+                        ),
+                        _SettingsSlider(
+                          label: 'Directional face gradient',
+                          value: settings.faceGradientStrength,
+                          min: 0,
+                          max: .1,
+                          fractionDigits: 3,
+                          onChanged: (value) =>
+                              settingsNotifier.value = settings.copyWith(
+                                faceGradientStrength: value,
+                              ),
+                        ),
+                        _SettingsSlider(
+                          label: 'Face gradient depth',
+                          value: settings.faceGradientDepth,
+                          min: 0,
+                          max: 80,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(faceGradientDepth: value),
+                        ),
+                        _SettingsSlider(
+                          label: 'Inner bevel shadow',
+                          value: settings.bevelShadowStrength,
+                          min: 0,
+                          max: .2,
+                          fractionDigits: 3,
+                          onChanged: (value) =>
+                              settingsNotifier.value = settings.copyWith(
+                                bevelShadowStrength: value,
+                              ),
+                        ),
+                        _SettingsSlider(
+                          label: 'Bevel shadow depth',
+                          value: settings.bevelShadowDepth,
+                          min: 0,
+                          max: 40,
+                          onChanged: (value) => settingsNotifier.value =
+                              settings.copyWith(bevelShadowDepth: value),
                         ),
                         const _SettingsSection(title: 'Material transfer'),
                         _SettingsSlider(

@@ -10,5 +10,10 @@ saturation: 0.9
 transmissionGamma: 0.9
 vibrancy: 0.15
 highlight: 0.5
-contourStrength: 0.1
-contourWidth: 1.0
+contourStrength: 0.22
+contourWidth: 1.5
+contourTransmittance: 0.8
+faceGradientStrength: 0.015
+faceGradientDepth: 40.0
+bevelShadowStrength: 0.025
+bevelShadowDepth: 12.0

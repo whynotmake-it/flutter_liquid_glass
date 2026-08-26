@@ -291,9 +291,11 @@ enum BenchmarkScenario {
   grouped4Motion,
   grouped8Motion,
   grouped16Motion,
+  litGrouped16Motion,
   independent4Motion,
   independent8Motion,
   independent16Motion,
+  litIndependent16Motion,
   independent16SharedBackdrop,
   sparse16Motion,
   relativeBlendMotion,
@@ -404,6 +406,17 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
 
   Widget _buildScenario(double t) {
     final settings = const LiquidGlassSettings(thickness: 30, frost: 15);
+    final litSettings = const LiquidGlassSettings(
+      thickness: 30,
+      frost: 15,
+      contourStrength: .22,
+      contourWidth: 1.5,
+      contourTransmittance: .8,
+      faceGradientStrength: .015,
+      faceGradientDepth: 40,
+      bevelShadowStrength: .025,
+      bevelShadowDepth: 12,
+    );
     final moving = Transform.translate(
       offset: Offset(-180 + 360 * t, 40 * math.sin(t * math.pi * 2)),
       child: _tile(0),
@@ -473,6 +486,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         count: 16,
         t: t,
       ),
+      BenchmarkScenario.litGrouped16Motion => _groupedGrid(
+        settings: litSettings,
+        count: 16,
+        t: t,
+      ),
       BenchmarkScenario.independent4Motion => _independentGrid(
         settings: settings,
         count: 4,
@@ -485,6 +503,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
       ),
       BenchmarkScenario.independent16Motion => _independentGrid(
         settings: settings,
+        count: 16,
+        t: t,
+      ),
+      BenchmarkScenario.litIndependent16Motion => _independentGrid(
+        settings: litSettings,
         count: 16,
         t: t,
       ),

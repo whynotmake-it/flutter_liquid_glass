@@ -26,6 +26,11 @@ class LiquidGlassSettings with Equatable {
     this.highlight = 1.0,
     this.contourStrength = 0.0,
     this.contourWidth = 0.0,
+    this.contourTransmittance = 0.0,
+    this.faceGradientStrength = 0.0,
+    this.faceGradientDepth = 40.0,
+    this.bevelShadowStrength = 0.0,
+    this.bevelShadowDepth = 12.0,
   });
 
   /// Scoped fit for the iOS 27 light toolbar capsule reference.
@@ -46,8 +51,13 @@ class LiquidGlassSettings with Equatable {
        transmissionGamma = 0.9,
        vibrancy = 0.15,
        highlight = 0.5,
-       contourStrength = 0.1,
-       contourWidth = 1.0;
+       contourStrength = 0.22,
+       contourWidth = 1.5,
+       contourTransmittance = 0.8,
+       faceGradientStrength = 0.015,
+       faceGradientDepth = 40.0,
+       bevelShadowStrength = 0.025,
+       bevelShadowDepth = 12.0;
 
   /// Figma's percentage-based constructor mapped onto the unified axes.
   LiquidGlassSettings.figma({
@@ -144,6 +154,26 @@ class LiquidGlassSettings with Equatable {
   /// Evidence scope: white-background toolbar plus capsule.
   final double contourWidth;
 
+  /// Fraction of transmitted backdrop preserved beneath the dark contour.
+  ///
+  /// `0` makes the contour fully absorptive at [contourStrength]; `1` keeps
+  /// the backdrop unchanged while retaining the independently composited
+  /// highlight. This lets the highlight eclipse the contour without a canvas
+  /// stroke or another rendering pass.
+  final double contourTransmittance;
+
+  /// Strength of the broad directional gradient beneath the raised rim.
+  final double faceGradientStrength;
+
+  /// Distance in logical pixels over which the face gradient fades inward.
+  final double faceGradientDepth;
+
+  /// Strength of the ambient shadow immediately inside the raised bevel.
+  final double bevelShadowStrength;
+
+  /// Distance in logical pixels over which the bevel shadow fades inward.
+  final double bevelShadowDepth;
+
   Color get effectiveTint => tint.withValues(alpha: tint.a * visibility);
   double get effectiveThickness => thickness * visibility;
   double get effectiveEdgeRefraction => edgeRefraction * visibility;
@@ -156,7 +186,12 @@ class LiquidGlassSettings with Equatable {
   double get effectiveVibrancy => vibrancy * visibility;
   double get effectiveHighlight => highlight * visibility;
   double get effectiveContourStrength => contourStrength * visibility;
-  double get effectiveContourWidth => contourWidth * visibility;
+  double get effectiveContourWidth => contourWidth;
+  double get effectiveContourTransmittance => contourTransmittance;
+  double get effectiveFaceGradientStrength => faceGradientStrength * visibility;
+  double get effectiveFaceGradientDepth => faceGradientDepth;
+  double get effectiveBevelShadowStrength => bevelShadowStrength * visibility;
+  double get effectiveBevelShadowDepth => bevelShadowDepth;
 
   /// Internal optical index derived from the public peak displacement. The
   /// public value remains observable and comparable across sizes.
@@ -187,6 +222,11 @@ class LiquidGlassSettings with Equatable {
     double? highlight,
     double? contourStrength,
     double? contourWidth,
+    double? contourTransmittance,
+    double? faceGradientStrength,
+    double? faceGradientDepth,
+    double? bevelShadowStrength,
+    double? bevelShadowDepth,
   }) => LiquidGlassSettings(
     visibility: visibility ?? this.visibility,
     tint: tint ?? this.tint,
@@ -201,6 +241,11 @@ class LiquidGlassSettings with Equatable {
     highlight: highlight ?? this.highlight,
     contourStrength: contourStrength ?? this.contourStrength,
     contourWidth: contourWidth ?? this.contourWidth,
+    contourTransmittance: contourTransmittance ?? this.contourTransmittance,
+    faceGradientStrength: faceGradientStrength ?? this.faceGradientStrength,
+    faceGradientDepth: faceGradientDepth ?? this.faceGradientDepth,
+    bevelShadowStrength: bevelShadowStrength ?? this.bevelShadowStrength,
+    bevelShadowDepth: bevelShadowDepth ?? this.bevelShadowDepth,
   );
 
   /// Serializes the public material vector for example presets and tooling.
@@ -218,6 +263,11 @@ class LiquidGlassSettings with Equatable {
     'highlight': highlight,
     'contourStrength': contourStrength,
     'contourWidth': contourWidth,
+    'contourTransmittance': contourTransmittance,
+    'faceGradientStrength': faceGradientStrength,
+    'faceGradientDepth': faceGradientDepth,
+    'bevelShadowStrength': bevelShadowStrength,
+    'bevelShadowDepth': bevelShadowDepth,
   };
 
   /// Restores a material vector produced by [toJson].
@@ -242,6 +292,11 @@ class LiquidGlassSettings with Equatable {
       highlight: number('highlight', 1),
       contourStrength: number('contourStrength', 0),
       contourWidth: number('contourWidth', 0),
+      contourTransmittance: number('contourTransmittance', 0),
+      faceGradientStrength: number('faceGradientStrength', 0),
+      faceGradientDepth: number('faceGradientDepth', 40),
+      bevelShadowStrength: number('bevelShadowStrength', 0),
+      bevelShadowDepth: number('bevelShadowDepth', 12),
     );
   }
 
@@ -260,5 +315,10 @@ class LiquidGlassSettings with Equatable {
     highlight,
     contourStrength,
     contourWidth,
+    contourTransmittance,
+    faceGradientStrength,
+    faceGradientDepth,
+    bevelShadowStrength,
+    bevelShadowDepth,
   ];
 }

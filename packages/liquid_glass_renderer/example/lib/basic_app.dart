@@ -73,11 +73,6 @@ class BasicApp extends HookWidget {
     const shadows = [
       BoxShadow(
         blurStyle: BlurStyle.outer,
-        color: Color.from(alpha: 0.04, red: 0, green: 0, blue: 0),
-        blurRadius: 1,
-      ),
-      BoxShadow(
-        blurStyle: BlurStyle.outer,
         color: Color.from(
           alpha: 0.08,
           red: 32 / 255,
