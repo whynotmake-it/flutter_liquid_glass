@@ -117,6 +117,14 @@ registrant. Regenerating the workspace with `pod install` restored that project
 reference, and a clean Xcode-derived-data Profile build passed. This is a build
 integration repair, not a renderer change.
 
+On 2026-08-26, a focused three-repetition `grouped16Motion` trace using only
+the GPU and Metal Application instruments produced repeatable app metrics
+(raster-p95 CV 1.9%, in-process GPU CV 10.7%, footprint CV 0.8%), but all three
+native exports were rejected because most retained windows contained zero GPU
+intervals. A one-run Metal-Application-only probe produced no GPU table, so the
+GPU instrument cannot simply be removed to solve the problem. These captures
+are retained as diagnostic evidence; no native Metal gate is claimed.
+
 ## 2026-08-25 renderer optimization experiments (rejected)
 
 Two focused measurements evaluated candidates; neither is part of the current

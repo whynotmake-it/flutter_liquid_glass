@@ -127,6 +127,13 @@ presets), performance non-regressing.
   `pod install` restored the `Pods/Pods.xcodeproj` workspace reference; a fresh
   Flutter 3.47.1/Xcode 27 Profile build then passed. No simulator was opened or
   closed.
+- 2026-08-26: ran a focused three-repetition grouped16 native trace with the
+  GPU and Metal Application instruments only. All app metrics were repeatable
+  (raster-p95 CV 1.9%, in-process GPU CV 10.7%, footprint CV 0.8%), but every
+  xctrace export was rejected because most retained windows had zero GPU
+  intervals. A one-run Metal-Application-only probe produced no GPU table at
+  all, confirming that removing the GPU instrument cannot repair this capture
+  path. The traces remain diagnostic and no native Metal gate is claimed.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
