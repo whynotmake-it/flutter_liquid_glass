@@ -502,3 +502,12 @@ interval-loss CV above 30%. Current three-repetition probes had one valid
 independent16 trace and two rejected, while grouped16 had two valid and one
 rejected. The mode is a reliability improvement, not final performance-gate
 evidence.
+
+Comparison images are now annotated by `annotate_comparison.py`; shared images
+must label the left panel `APPLE GROUND TRUTH` and identify the candidate
+settings. The small-capsule comparison previously shared used `frost=7`.
+Existing pinned attribution rows put the small-scene score peak at `frost=5`,
+while `frost=7` remains the shared toolbar/large fit. The frost probe grid now
+includes `0` through `9` so a clear-endpoint hypothesis is not silently
+excluded; rerun it only after CoreSimulatorService recovers and do not alter
+the shipped default without fresh cross-scene evidence.

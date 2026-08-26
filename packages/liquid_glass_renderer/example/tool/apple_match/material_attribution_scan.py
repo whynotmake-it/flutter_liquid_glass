@@ -39,7 +39,10 @@ GEOMETRY_KEYS = (
     "thickness",
 )
 AXES = {
-    "frost": (3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0),
+    # Include the clear endpoint explicitly: visual inspection can suggest
+    # that a small control wants no compositor blur, and the attribution scan
+    # must test that hypothesis rather than assuming the toolbar range.
+    "frost": (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0),
     "transmissionGamma": (0.80, 0.85, 0.875, 0.90, 0.925, 0.95, 1.0),
     "edgeRefraction": (0.0, 8.0, 12.0, 18.3, 24.0, 32.0),
     "vibrancy": (0.0, 0.075, 0.15, 0.225, 0.30),

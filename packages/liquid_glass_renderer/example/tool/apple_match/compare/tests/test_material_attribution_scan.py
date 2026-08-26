@@ -19,6 +19,7 @@ SPEC.loader.exec_module(scan)
 class MaterialAttributionScanTest(unittest.TestCase):
     def test_grids_include_authoritative_defaults(self) -> None:
         self.assertIn(7.0, scan.AXES["frost"])
+        self.assertIn(0.0, scan.AXES["frost"])
         self.assertIn(0.9, scan.AXES["transmissionGamma"])
         self.assertIn(18.3, scan.AXES["edgeRefraction"])
         self.assertIn(0.15, scan.AXES["vibrancy"])

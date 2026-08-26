@@ -236,3 +236,11 @@ presets), performance non-regressing.
   4.31 ms/frame) and two strict event-loss rejections; grouped16 produced two
   sound traces and one rejection. This improves attachment ordering but does
   not close the native reliability or final performance gates.
+- 2026-08-26: annotated the comparison composites with explicit `APPLE GROUND
+  TRUTH`, `FLUTTER CANDIDATE`, and `DIFF / RESIDUAL` labels. The previously
+  shared small-capsule image used `frost=7`; the retained attribution scan shows
+  `frost=5` is the small-scene score peak, while `frost=7` remains required by
+  the shared toolbar/large vector. The frost attribution grid now includes the
+  clear endpoint `{0,1,2,...,9}` so the user's zero-blur hypothesis is tested
+  explicitly when the pinned simulator service is available; no default was
+  changed from stale/unavailable-device evidence.
