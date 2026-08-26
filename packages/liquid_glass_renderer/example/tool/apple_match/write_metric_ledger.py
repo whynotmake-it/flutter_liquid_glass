@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -22,6 +23,7 @@ from apple_match.metrics import score_images  # noqa: E402
 
 REFERENCE_SET = "ios27-iphone17pro-light"
 SCENES = ("toolbar_capsule", "small_capsule", "large_capsule")
+METRIC_REVISION = "score_images-v1 (metrics.py WEIGHTS 0.25/0.15/0.15/0.10/0.15/0.10/0.10)"
 
 
 def _fmt(value: float) -> str:
@@ -54,15 +56,24 @@ def collect(out: Path) -> list[dict]:
             measurements = score.details
             pixels = measurements["pixelResiduals"]
             record = {
+                "metricRevision": METRIC_REVISION,
+                "referenceSet": REFERENCE_SET,
                 "scan": summary_path.parent.name,
                 "axis": axis,
                 "scene": scene_id,
                 "value": row["value"],
                 "repetition": row["repetition"],
                 "capture": str(capture),
-                "score": score.score,
-                "errors": score.errors,
-                "directMae8Bit": measurements["directPixelMeanAbsoluteError8Bit"],
+                "stored": {
+                    "score": row["score"],
+                    "errors": row["errors"],
+                    "directMae8Bit": row["directMae8Bit"],
+                },
+                "rescored": {
+                    "score": score.score,
+                    "errors": score.errors,
+                    "directMae8Bit": measurements["directPixelMeanAbsoluteError8Bit"],
+                },
                 "stageScores": measurements["stageScores"],
                 "luminance": {
                     "blackResponseError": measurements["blackResponseError"],
@@ -99,15 +110,16 @@ def write_markdown(records: list[dict], path: Path) -> None:
         "# Detailed harness metric ledger",
         "",
         "Generated from retained attribution A/B/C/D captures; no simulator or",
-        "Flutter run is required. `score` is the historical weighted score.",
-        "`flowError`/`stageScore` are the refraction measurements, and the",
+        "Flutter run is required. Stored scanner values are preserved beside a",
+        "current-code rescore; provenance includes the reference set and metric",
+        "revision in the JSON ledger. `flowError`/`stageScore` are the refraction measurements, and the",
         "luminance fields are independently computed from the black/white probes.",
         "",
-        "| scan | scene | value | score | direct MAE8 | shape | combined | flow | blur MTF | tint | highlight | holdout | refraction | black ΔL* | white ΔL* | rim | boundary px | image |",
+        "| scan | scene | value | stored→rescored score | direct MAE8 | shape | combined | flow | blur MTF | tint | highlight | holdout | refraction | black ΔL* | white ΔL* | rim | boundary px | image |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for record in records:
-        e = record["errors"]
+        e = record["rescored"]["errors"]
         s = record["stageScores"]
         l = record["luminance"]
         r = record["refraction"]
@@ -123,8 +135,9 @@ def write_markdown(records: list[dict], path: Path) -> None:
             image_scan = "material-attribution-chromaticAberration-cutoff"
         image = f"out/annotated-comparisons/iterations/{image_scan}/{scene}/{value}-rep{record['repetition']}.png"
         lines.append(
-            f"| {scan} | {scene} | {record['value']:g} | {_fmt(record['score'])} | "
-            f"{_fmt(record['directMae8Bit'])} | {_fmt(e['shape'])} | {_fmt(e['combined'])} | "
+            f"| {scan} | {scene} | {record['value']:g} | "
+            f"{_fmt(record['stored']['score'])}→{_fmt(record['rescored']['score'])} | "
+            f"{_fmt(record['rescored']['directMae8Bit'])} | {_fmt(e['shape'])} | {_fmt(e['combined'])} | "
             f"{_fmt(e['flow'])} | {_fmt(s['blurMtf'])} | {_fmt(e['channel'])} | "
             f"{_fmt(e['specular'])} | {_fmt(e['holdout'])} | {_fmt(s['refraction'])} | "
             f"{_fmt(l['meanSignedBlack8Bit'])} | {_fmt(l['meanSignedWhite8Bit'])} | "
@@ -144,7 +157,16 @@ def main() -> None:
     json_path = args.json or args.out / "annotated-comparisons" / "iterations" / "METRIC_LEDGER.json"
     markdown_path = args.markdown or args.out / "annotated-comparisons" / "iterations" / "METRIC_LEDGER.md"
     json_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(json.dumps(records, indent=2) + "\n")
+    payload = {
+        "schemaVersion": 1,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "metricRevision": METRIC_REVISION,
+        "referenceSet": REFERENCE_SET,
+        "source": "material-attribution-*/summary.json retained A/B/C/D captures",
+        "rowCount": len(records),
+        "rows": records,
+    }
+    json_path.write_text(json.dumps(payload, indent=2) + "\n")
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     write_markdown(records, markdown_path)
     print(f"wrote {len(records)} rows to {json_path} and {markdown_path}")

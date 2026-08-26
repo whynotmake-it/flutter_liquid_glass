@@ -13,7 +13,7 @@ is only our compositor blur radius. The Apple image therefore cannot be read as
 “frost=0”; it is the target response that our candidate settings must fit.
 
 The previous image used the shared candidate vector with `frost=7`. The
-small-control compositor normalizes that to approximately `7 × 70 / 94 = 5.2`
+small-control compositor normalizes that to approximately `7 × 63 / 94 = 4.69`
 logical pixels. It is visibly softer than the Apple target, so the clear
 endpoint is now included in the next scan. It has not been measured yet because
 CoreSimulatorService is currently unavailable.
@@ -27,9 +27,10 @@ CoreSimulatorService is currently unavailable.
 | C | black | highlight, contour, dark response, specular behavior |
 | D | white | tint, outline, internal shadow/lighting response |
 
-The score combines appearance (30%), paired A/B radial flow (25%), edge (15%),
-black specular (15%), and white tint response (15%). `combined` and `flow` are
-kept beside the headline score because a score-only improvement can hide a
+The score uses the current metric weights: shape (25%), combined transmission
+(15%), paired A/B radial flow (15%), blur-MTF (10%), tint/channel (15%),
+highlight/specular (10%), and holdout (10%). `combined` and `flow` are kept
+beside the headline score because a score-only improvement can hide a
 refraction or blur regression.
 
 ## Current shared vector
@@ -47,6 +48,13 @@ refraction or blur regression.
 | chromaticAberration | .005 |
 | highlight | .4 |
 | contourStrength / width | .65 / 1 px |
+
+The current cross-scene table treats `thickness` as a recovered
+geometry-specific scalar (12 px for the toolbar, 8 px for the capsules), while
+the remaining material vector is shared. This is why the table is useful for
+looks attribution but does not prove the strict “fully frozen parameters”
+generalization gate; that gate remains open until a rerun freezes thickness as
+well or explicitly records an approved geometry exemption.
 
 The source vector is retained in
 `out/generalization-toolbar-vector/*/final/settings.json`.
@@ -92,8 +100,10 @@ running `compare/.venv/bin/python3 write_metric_ledger.py` from this directory:
 the historical score and direct MAE plus shape, combined transmission,
 refraction flow, blur-MTF, tint/channel, highlight/specular, holdout,
 black/white signed luminance, RGBW rim, and transmission-boundary curvature
-measurements for every retained A/B/C/D row. The ledger does not rerun Flutter
-or alter simulator state.
+measurements for every retained A/B/C/D row. Its JSON preserves the scanner's
+stored score/errors and the current-code rescore, with an explicit metric
+revision and reference-set identifier. The ledger does not rerun Flutter or
+alter simulator state.
 
 | Iteration | Values measured | Result | Representative image |
 | --- | --- | --- | --- |
@@ -135,10 +145,11 @@ best rows, and inspection of A, B, C, and D together.
 - Comparator tests: 42 passed, one expected simulator smoke skip.
 - Android debug and macOS Profile builds: passed.
 - Native Metal: grouped16 has partial valid repeats; independent16 remains
-  unreliable due Instruments event loss/finalization. No final native gate is
-  claimed.
+  unreliable due Instruments event loss/finalization. This remains requested
+  attribution evidence, not a production gate.
 - Final same-runner performance ratio and small/toolbar ≤1.25× gate remain
   open.
 
 Do not call this production-ready until the pinned visual endpoint scan,
-reliable independent16 native evidence, and the final performance audit pass.
+the small/toolbar generalization gate, and the final same-runner performance
+audit pass. Native traces cannot substitute for that audit.

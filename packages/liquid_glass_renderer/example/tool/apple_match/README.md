@@ -307,9 +307,9 @@ private glass API or private uniforms are used.
 ## Interpretation and limitations
 
 `score = 100 × (1 − weighted normalized error)`. The components are combined
-appearance (30%), signed radial-flow residual (25%), edge/gradient sharpness
-(15%), black-probe specular residual (15%), and white-probe tint residual
-(15%). Higher is better. This is a deterministic engineering score, not a
+shape (25%), combined transmission (15%), signed radial-flow residual (15%),
+edge/gradient sharpness (10%), tint/channel (15%), black-probe specular
+residual (10%), and holdout (10%). Higher is better. This is a deterministic engineering score, not a
 claim of perceptual identity.
 
 Simulator-to-physical-device equivalence is **pending** until the same probe is

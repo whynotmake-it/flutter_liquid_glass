@@ -42,14 +42,19 @@ presets), performance non-regressing.
 - Candidate JSON keys → LiquidGlassSettings mapping: flutter/lib/scene_view.dart
   matchGlassSettings()
 - Optimizer stages: hotloop_staged.py STAGES dict (line 35+)
-- Score = 100×(1−weighted err): appearance 30% / radial-flow 25% / edge 15% /
-  specular(black probe) 15% / tint(white probe) 15%
+- Score = 100×(1−weighted err): shape 25% / combined transmission 15% /
+  radial-flow 15% / blur-MTF 10% / tint-channel 15% / specular 10% /
+  holdout 10% (the `metrics.py` WEIGHTS map is authoritative).
 - Current shared-vector evidence: toolbar 91.7814; small capsule 85.2647;
   large capsule 89.4927; tab-bar holdout 43.0289 after adding deterministic
   harness-only foreground. Historical standalone fits were small 86.3452 and
   large 80.6343; they are not the frozen-vector gate. The paired A/B flow
-  metric is authoritative. A fresh pinned loupe composition score and final
-  performance ratio remain open.
+  metric is authoritative. The pinned loupe composition score is recorded;
+  slider endpoint evidence and the final performance ratio remain open.
+  The current scorecards recover thickness per geometry (12 px toolbar, 8 px
+  capsules), so they do not yet prove a strict all-parameters-frozen
+  generalization gate; a thickness-frozen rerun or an explicit geometry
+  exemption is still required.
 - preapproved_renderer_baseline.json = richer fresnel/caustics/env-light forward
   model (prior sign-off artifact, only consumed by generalization.py; NOT in shipped
   shader) — prior art for the new model design
@@ -85,7 +90,8 @@ presets), performance non-regressing.
 - 2026-08-25: goal activated; env verified; venv built; orientation reads done.
 - 2026-08-25: clear loupe example composition verified in both entry points;
   focused example tests/analyzer pass. Simulator service remains unavailable,
-  so fresh pinned loupe and slider evidence is still pending.
+  so fresh slider endpoint evidence is still pending; the pinned loupe
+  composition score is recorded separately.
 - 2026-08-25: tested a conservative smooth-union cull and shared coordinate
   atlas as performance candidates. The cull's first unsigned bound was
   corrected during review, but neither candidate produced a proven end-to-end

@@ -491,9 +491,10 @@ an 8-second recording to roughly one second before the gated workload. The
 benchmark harness now defaults `LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS=0`
 (no `--window`), which produced a valid grouped16 trace. Independent16 still
 timed out during xctrace finalization twice at the 308-second watchdog, so the
-native grouped-vs-independent comparison and final ≤5% performance gate remain
-open. Do not treat in-process GPU numbers or a timed-out trace as native Metal
-evidence.
+native grouped-vs-independent comparison remains an explicitly requested
+diagnostic, while the final ≤5% performance gate is measured separately from
+same-runner frame/memory data. Do not treat in-process GPU numbers or a
+timed-out trace as native Metal evidence.
 
 The benchmark also supports `TRACE_WAIT_FOR_READY=false` for short,
 high-density traces. It waits for the app's post-warmup measurement marker
