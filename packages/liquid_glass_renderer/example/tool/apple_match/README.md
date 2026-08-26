@@ -417,6 +417,20 @@ IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python coupled_spread_scan.py \
   --out out/coupled-spread-scan --repetitions 1
 ```
 
+To attribute the remaining capsule residual to an existing shared material
+control, run one bounded axis at a time. Every candidate is freshly rendered
+for all three capsule scenes and preserves A-D captures plus diagnostics:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py \
+  --axis frost --out out/material-attribution-frost
+```
+
+Supported axes are `frost`, `transmissionGamma`, `edgeRefraction`, `vibrancy`,
+and `tintAlpha`. Retain an axis only when its summary clears the documented
+10%/20% small-error attribution thresholds and the cross-scene regression
+checks; sub-threshold movement is not a renderer change.
+
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
 vector, with only monotonic `tintAlpha` and `frost` scalars allowed to vary.

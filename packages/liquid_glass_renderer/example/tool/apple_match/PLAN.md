@@ -105,7 +105,7 @@ presets), performance non-regressing.
 - 2026-08-25: repaired the transparency sweep contract: exact baseline tint
   RGB is shared across every position, only `tintAlpha` and `frost` are fit,
   and a structural audit now fails on unauthorized material drift. Comparator
-  coverage is 38 tests (one simulator smoke skipped without a device).
+  coverage is 40 tests (one simulator smoke skipped without a device).
 - 2026-08-25: hardened `seed_scan.py` for the pending loupe composition scan:
   it validates pinned reference metadata, records the RawMagnifier composition,
   derives the actual search axes, and emits a self-describing summary and best
@@ -136,6 +136,13 @@ presets), performance non-regressing.
   The coupled axis is rejected as a generalization fix; no new public knob or
   shader change was justified. Evidence is in
   `out/coupled-spread-scan/summary.json`.
+- 2026-08-26: ran shared existing-material attribution probes for frost,
+  transmission gamma, and edge refraction. Frost's small-capsule score peaked
+  at 86.4094 but worsened flow and combined error; gamma improved small
+  combined error only 0.4% with no flow movement; edge refraction was flat
+  within noise. All three failed Sol's retention thresholds, so defaults and
+  renderer code remain unchanged. A-D captures and diagnostics are retained
+  under `out/material-attribution-{frost,gamma,edge}`.
 - 2026-08-26: reran the pinned Flutter 3.47.1 repository gates on the current
   stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
   analyzer output remains informational lint debt only. The simulator-free

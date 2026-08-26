@@ -249,3 +249,29 @@ rows were:
 Small remains about 2.01x the same-spread toolbar error and below the recorded
 86.3452 capsule gate at every candidate. No public setting or shader change is
 justified by this result. A representative retained image is [coupled candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/coupled-spread-scan/small_capsule/candidates/spread-1/thickness-2/rep-1/A.png); compare it with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full numeric rows and selection details are in `out/coupled-spread-scan/summary.json`.
+
+## Shared material attribution probes (2026-08-26)
+
+After the spread/thickness rejection, the existing material vector was tested
+one shared scalar at a time on freshly rendered toolbar, small, and large
+capsules. Geometry, spread, and every other material field stayed fixed; each
+row retained A–D PNGs and diagnostics under its own directory. The probe is
+reproducible with:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py \
+  --axis frost --out out/material-attribution-frost
+```
+
+Frost `{3,4,5,6,7,8,9}` was rejected: small's best score was 86.4094 at 5,
+but flow worsened from .036286 to .049595 and combined error worsened from
+.063668 to .064354; large only improved at values that regressed toolbar.
+Gamma `{.80,.85,.875,.90,.925,.95,1}` was also rejected: small's best
+combined error was .063416 at .85 (0.4% better) with no flow improvement, far
+below the required attribution threshold. Edge refraction `{0,8,12,18.3,24,32}`
+was effectively flat: small's best was .063659/.036182 at 8 versus
+.063668/.036286 at the default 18.3, while larger values regressed.
+
+These controls therefore remain at their validated defaults; no renderer
+change is inferred from sub-threshold movement. Representative pairs are the
+[frost candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-frost/small_capsule/candidates/frost-5/rep-1/A.png), [gamma candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-gamma/small_capsule/candidates/transmissionGamma-0p85/rep-1/A.png), and [edge candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-edge/small_capsule/candidates/edgeRefraction-8/rep-1/A.png), each compared against the pinned [Apple small-capsule reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full rows are in the corresponding `out/material-attribution-*` summaries.
