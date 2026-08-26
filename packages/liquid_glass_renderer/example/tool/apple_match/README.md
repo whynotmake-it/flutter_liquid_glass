@@ -384,14 +384,29 @@ seed scan with:
 
 ```bash
 IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python seed_scan.py \
-  --scene-id loupe --out out/loupe-seed-scan-pre-redesign
+  --scene-id loupe --out out/loupe-seed-scan-effective
 ```
 
 The scan validates `metadata.json` against the pinned runtime/UDID and emits
 `summary.json`, `reference_metadata.json`, `scan.json`, and
-`best/scorecard.json`. It records the `RawMagnifier` composition and never
-applies shader-level zoom. The historical shader-level S0 is retired; this
-result is composition evidence for the example loupe.
+`best/scorecard.json`. For the loupe it evaluates the only effective material
+axes (`thickness` and `edgeRefraction`); `_MatchLoupe`-forced clear settings
+are recorded as overrides rather than falsely searched. It records the
+`RawMagnifier` composition and never applies shader-level zoom. The historical
+shader-level S0 is retired; this result is composition evidence for the example
+loupe.
+
+To probe the shared profile-reach control across recovered geometries, run the
+focused grid (it freshly renders every toolbar candidate):
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python spread_grid.py \
+  --out out/spread-grid-current --repetitions 2
+```
+
+The grid is diagnostic and should only promote a value if it improves the
+small capsule and preserves toolbar/large scores; the current pinned run is
+recorded as a rejected experiment in `out/spread-grid-current/summary.json`.
 
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
@@ -429,7 +444,7 @@ final gate. Scores use the corrected paired A/B optical-flow metric.
 | Small capsule | 86.3452 | `out/small-final-fit-2/best/scorecard.json` |
 | Large capsule | 80.6343 | `out/generalization-ab-geometry-1/large_capsule/final/scorecard.json` |
 | Tab-bar holdout | 43.0289 | `out/generalization-ab-geometry-1/tab_bar_holdout/final/scorecard.json` |
-| Loupe | pending fresh pinned capture | Simulator composition must be re-captured with the clear pre-shader path |
+| Loupe | 13.5557 | `out/loupe-scorecard-effective/final/scorecard.json` (fresh pinned iOS 27; pre-shader `RawMagnifier`) |
 
 The small-control fit uses the same material vector as the toolbar and derives
 its lower frost sigma from rendered height; it does not add a public knob or a

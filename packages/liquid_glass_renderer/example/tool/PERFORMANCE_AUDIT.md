@@ -136,6 +136,15 @@ raster-p95 CV 3.2%, in-process GPU/frame CV 7.3%, and footprint-peak CV 1.7%.
 The trace result is now sound attribution evidence for this scenario; it is not
 a production performance gate or proof that the SDF is the bottleneck.
 
+The pinned loupe composition scan is now also runnable and truthful: the
+`RawMagnifier` owns enlargement, so the 12-candidate grid varies only
+`thickness` and `edgeRefraction`; clear-material overrides are recorded rather
+than searched. The best fresh pinned score is 13.5557 in
+`out/loupe-scorecard-effective/final/scorecard.json`. The harness reproduces
+the reference Dynamic Island outside the scored crop and excludes that known
+device chrome plus the rounded top-left simulator corner from full-frame
+registration; all remaining RGBW control pixels match exactly.
+
 ## 2026-08-25 renderer optimization experiments (rejected)
 
 Two focused measurements evaluated candidates; neither is part of the current
@@ -190,3 +199,27 @@ and coverage early returns avoid texture/downstream work and are the more
 credible fast paths. The SDF matte is persistent and is rebuilt only when
 geometry or settings are dirty, so no SDF bottleneck claim is justified
 without a targeted geometry-pass A/B measurement.
+
+## Shared refraction-spread probe (2026-08-26)
+
+The existing `refractionSpread` axis was tested before adding any new shader
+knob. `spread_grid.py` freshly rendered all three recovered geometries on the
+pinned iOS 27 simulator for `{0,.0625,.125,.25,.5}`, with two repetitions per
+value and a persistent capture session per scene. The toolbar was re-rendered
+for every candidate; its settings were not reused as a stale scorecard.
+
+| spread | toolbar combined / score | small combined / score | large combined / score |
+|---:|---:|---:|---:|
+| 0 | .033417 / 91.7814 | .063668 / 85.2647 | .027357 / 89.4927 |
+| .0625 | .033431 / 91.7909 | .063588 / 85.2699 | .027362 / 89.5177 |
+| .125 | .033428 / 91.7978 | .063545 / 85.2737 | .027357 / 89.5211 |
+| .25 | .033426 / 91.7941 | .063511 / 85.2796 | .027357 / 89.5198 |
+| .5 | .033413 / 91.7896 | .063514 / 85.2831 | .027356 / 89.5150 |
+
+The tiny small-capsule improvement at `.25` is only 0.25% and remains 1.90x
+the toolbar error (the stated <=1.25x gate); all candidates also miss the
+recorded 86.3452 small-capsule pre-change score. This rejects the current
+spread axis as the generalization fix. The complete raw rows, repeatability,
+and pinned metadata are recorded in
+`apple_match/out/spread-grid-current/summary.json`. The final `.5` small
+capture is available as [spread-grid candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/spread-grid-current/small_capsule/live/A.png), with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png).

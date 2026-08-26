@@ -232,7 +232,11 @@ def main():
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
 
-    base = json.loads(args.settings.resolve().read_text())
+    loaded_settings = json.loads(args.settings.resolve().read_text())
+    # Accept either a plain settings vector or a scorecard containing one.
+    # This prevents a generalization audit from silently drifting from the
+    # authoritative toolbar fit when the scorecard is the current artifact.
+    base = loaded_settings.get("settings", loaded_settings)
     shared = {
         key: base[key]
         for key in (

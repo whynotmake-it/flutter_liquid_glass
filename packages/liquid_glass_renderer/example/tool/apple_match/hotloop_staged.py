@@ -59,6 +59,28 @@ STAGES = {
         "refractionSpread": [0.0, 0.25, 0.5, 0.75, 1.0],
         "chromaticAberration": [0.0, 0.0025, 0.005, 0.0075, 0.01],
     },
+    # The loupe's RawMagnifier owns enlargement; only these material controls
+    # remain effective on its clear glass shell. Keep this bounded stage
+    # separate from the ordinary pill search so a loupe fit cannot report
+    # changes to controls that _MatchLoupe intentionally overrides.
+    "loupeMaterial": {
+        "thickness": [0.0, 8.0, 12.0, 20.0, 28.0, 36.0],
+        "edgeRefraction": [
+            0.0,
+            20.0,
+            40.0,
+            80.0,
+            120.0,
+            180.0,
+            240.0,
+            300.0,
+            400.0,
+        ],
+        "chromaticAberration": [0.0, 0.001, 0.0025, 0.005],
+        "highlight": [0.0, 0.1, 0.2, 0.3, 0.5],
+        "contourStrength": [0.0, 0.05, 0.1, 0.2, 0.35],
+        "contourWidth": [0.5, 1.0, 1.5],
+    },
     "blurMtf": {
         "frost": [5.0, 6.0, 7.0, 8.0, 9.0],
     },
@@ -208,6 +230,7 @@ def diagnostic_stage_name(stage_name):
         "materialContour": "highlight",
         "transmissionContour": "highlight",
         "shapeProfile": "shape",
+        "loupeMaterial": "refinement",
         "subpixelRegistration": "shape",
         "subpixelVerticalRegistration": "shape",
         "exteriorShadow": "highlight",
@@ -788,7 +811,20 @@ def main() -> None:
         full_reference = read_rgb(reference_dir / "A.png")
         full_candidate = read_rgb(out / "final/capture/A.png")
         registration = verify_background_registration(
-            full_reference, full_candidate, crop
+            full_reference,
+            full_candidate,
+            crop,
+            extra_excluded_rects=(
+                (
+                    round(138.3333 * scene["canvas"]["scale"]) - 1,
+                    round(14.0 * scene["canvas"]["scale"]) - 1,
+                    round(125.3333 * scene["canvas"]["scale"]) + 2,
+                    round(36.6667 * scene["canvas"]["scale"]) + 2,
+                ),
+                (0, 0, 5, 5),
+            )
+            if args.scene_id == "loupe"
+            else (),
         )
         final_card = result_json(evaluator.last_result, current, evaluator)
         final_card["registration"] = registration

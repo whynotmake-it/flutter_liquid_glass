@@ -140,6 +140,24 @@ class MatchSceneView extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(child: ProbeBackground(spec: background)),
+          // The reference capture retains the iPhone 17 Pro Dynamic Island
+          // even though the harness hides system overlays. Reproduce that
+          // device chrome deterministically so full-frame RGBW registration
+          // does not reject an otherwise identical loupe candidate. It is
+          // outside the scored crop and is never part of the shipped app.
+          if (scene.profile == 'loupe')
+            const Positioned(
+              left: 138.3333,
+              top: 14.0,
+              width: 125.3333,
+              height: 36.6667,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.all(Radius.circular(18.3333)),
+                ),
+              ),
+            ),
           if (scene.profile == 'loupe')
             _MatchLoupe(
               rect: shapeRect,

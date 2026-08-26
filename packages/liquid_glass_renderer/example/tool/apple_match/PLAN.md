@@ -67,7 +67,7 @@ presets), performance non-regressing.
 
 ## Execution order
 - [x] Orientation complete
-- [~] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score pending simulator recovery
+- [x] 1. Loupe scene: native trigger + capture + Flutter pre-shader counterpart; fresh pinned composition score recorded
 - [x] 2. Perf baseline captured; final same-runner before/after ratio remains open
 - [x] 3. New model design doc (mapping Apple layers → our stages)
 - [x] 4. Implement: shaders + Settings + Dart pipeline + match-app mapping + optimizer stages
@@ -105,7 +105,7 @@ presets), performance non-regressing.
 - 2026-08-25: repaired the transparency sweep contract: exact baseline tint
   RGB is shared across every position, only `tintAlpha` and `frost` are fit,
   and a structural audit now fails on unauthorized material drift. Comparator
-  coverage is 35 tests (one simulator smoke skipped without a device).
+  coverage is 38 tests (one simulator smoke skipped without a device).
 - 2026-08-25: hardened `seed_scan.py` for the pending loupe composition scan:
   it validates pinned reference metadata, records the RawMagnifier composition,
   derives the actual search axes, and emits a self-describing summary and best
@@ -117,10 +117,20 @@ presets), performance non-regressing.
   branches; only uniform branches that skip real texture or bookkeeping work
   are treated as fast paths. No SDF bottleneck claim is made without a stable,
   targeted geometry-pass A/B measurement.
+- 2026-08-26: ran the focused shared `refractionSpread` grid on the pinned
+  iOS 27 simulator, freshly rendering toolbar, small, and large capsules for
+  each value `{0,.0625,.125,.25,.5}` twice. The baseline (`0`) remained the
+  best small-capsule combined error (0.063668); the apparent best at `.25`
+  improved it only to 0.063511 (0.25%), while toolbar and large changes stayed
+  within noise. Small remained 1.90x toolbar combined error and below the
+  recorded 86.3452 pre-change score at every value; the 1.25x generalization
+  gate therefore failed for the entire existing axis. No renderer change or
+  performance claim was inferred. Full rows and captures are in
+  `out/spread-grid-current/summary.json`.
 - 2026-08-26: reran the pinned Flutter 3.47.1 repository gates on the current
   stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
   analyzer output remains informational lint debt only. The simulator-free
-  comparator suite remains 35 tests with one expected device smoke skip.
+  comparator suite remains 38 tests with one expected device smoke skip.
 - 2026-08-26: the first macOS profile build exposed a stale generated workspace:
   `Runner.xcworkspace` listed only `Runner.xcodeproj`, so Xcode never built the
   existing `path_provider_foundation` pod and Swift could not import it. Running
@@ -147,6 +157,14 @@ presets), performance non-regressing.
   (traced-GPU utilization CV 6.1%, raster-p95 CV 3.2%, in-process GPU/frame CV
   7.3%, footprint-peak CV 1.7%). This validates the harness attribution path,
   not a renderer/SDF optimization or the final cross-revision perf gate.
+- 2026-08-26: repaired `seed_scan.py` so the loupe scan reports only its
+  effective `thickness`/`edgeRefraction` axes and records the clear settings
+  forced by `_MatchLoupe`; added simulator-free candidate-grid contracts. The
+  pinned 12-candidate scan completed with best score 13.5557. Full-frame
+  registration then passed after the harness reproduced the reference Dynamic
+  Island and explicitly excluded that device chrome plus the simulator corner
+  artifact from RGBW controls. The score is composition evidence, not a
+  renderer-only zoom claim.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.

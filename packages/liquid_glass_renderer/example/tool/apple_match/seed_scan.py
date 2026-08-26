@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import math
 import os
 import shutil
 import sys
@@ -32,6 +33,23 @@ from apple_match.metrics import WEIGHTS, read_rgb  # noqa: E402
 REFERENCE_SET = "ios27-iphone17pro-light"
 PINNED_RUNTIME = "iOS 27.0 (24A5408d)"
 PINNED_RUNTIME_IDENTIFIER = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+
+# The example loupe deliberately composes a pre-shader RawMagnifier with a
+# clear glass shell.  _MatchLoupe applies these overrides after the candidate
+# settings are mapped, so scanning them would produce duplicate captures while
+# falsely claiming that they were searched.
+LOUPE_FORCED_SETTINGS = {
+    "tintRed": 255.0,
+    "tintGreen": 255.0,
+    "tintBlue": 255.0,
+    "tintAlpha": 0.0,
+    "frost": 0.0,
+    "refractionSpread": 0.0,
+    "saturation": 1.0,
+    "transmissionGamma": 1.0,
+    "vibrancy": 0.0,
+}
+LOUPE_EFFECTIVE_AXES = ("thickness", "edgeRefraction")
 
 
 def load_reference_metadata(
@@ -135,8 +153,14 @@ def validate_scene_geometry(scene: dict, settings: dict) -> None:
             )
 
 
-def search_space(seeds: list[dict], profile_gate: bool) -> dict:
-    axes = (
+def search_space(
+    seeds: list[dict],
+    profile_gate: bool,
+    *,
+    axes: tuple[str, ...] | None = None,
+    forced_settings: dict | None = None,
+) -> dict:
+    axes = axes or (
         "tintAlpha",
         "frost",
         "thickness",
@@ -149,7 +173,108 @@ def search_space(seeds: list[dict], profile_gate: bool) -> dict:
             key: sorted({seed[key] for seed in seeds})
             for key in axes
         },
+        "effectiveAxes": list(axes),
+        "forcedSettings": forced_settings or {},
     }
+
+
+def deduplicate_settings(seeds: list[dict]) -> list[dict]:
+    """Remove candidates that render the same effective settings vector."""
+    unique: list[dict] = []
+    seen: set[str] = set()
+    for seed in seeds:
+        key = json.dumps(seed, sort_keys=True, separators=(",", ":"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(seed)
+    return unique
+
+
+def build_seed_candidates(
+    *,
+    scene_id: str,
+    scene: dict,
+    base: dict,
+    spread: float = 0.0,
+    profile_gate: bool = False,
+) -> tuple[list[dict], tuple[str, ...], dict]:
+    """Build truthful candidates and report the axes that affect this scene."""
+    base = apply_scene_geometry(scene, base)
+    if scene_id == "loupe":
+        if spread != 0.0 or profile_gate:
+            raise ValueError(
+                "loupe candidates use the pre-shader magnifier; --spread and "
+                "--profile-gate are not effective controls"
+            )
+        candidates = []
+        for thickness in (12.0, 20.0, 28.0):
+            for refractive_index in (1.08, 1.2, 1.6, 2.5):
+                seed = dict(base)
+                seed.update(LOUPE_FORCED_SETTINGS)
+                seed.update(
+                    {
+                        "thickness": thickness,
+                        "edgeRefraction": 8.0
+                        * thickness
+                        * math.sqrt(max(0.0, refractive_index**2 - 1.0)),
+                        "contourStrength": 0.35,
+                        "contourWidth": 1.0,
+                        "highlight": 0.5,
+                    }
+                )
+                candidates.append(seed)
+        return deduplicate_settings(candidates), LOUPE_EFFECTIVE_AXES, dict(
+            LOUPE_FORCED_SETTINGS
+        )
+
+    if profile_gate:
+        seed_specs = (
+            (0.05, 0.0, 12.0, edge, candidate_spread)
+            for edge, candidate_spread in itertools.product(
+                [25.0, 35.0, 45.0, 55.0], [0.75, 1.0]
+            )
+        )
+    else:
+        if not 0.0 <= spread <= 1.0:
+            raise ValueError("spread must be between 0 and 1")
+        seed_specs = (
+            (
+                alpha,
+                frost,
+                thickness,
+                8.0 * thickness * math.sqrt(max(0.0, ri**2 - 1.0)),
+                spread,
+            )
+            for alpha, frost, thickness, ri in itertools.product(
+                [0.05, 0.12, 0.25, 0.4],
+                [0.0, 2.0, 7.0],
+                [12.0, 20.0, 28.0],
+                [1.08, 1.2, 1.6, 2.5],
+            )
+        )
+    candidates = []
+    for alpha, frost, thickness, edge_refraction, candidate_spread in seed_specs:
+        seed = dict(base)
+        seed.update(
+            {
+                "tintAlpha": alpha,
+                "frost": frost,
+                "thickness": thickness,
+                "edgeRefraction": edge_refraction,
+                "refractionSpread": candidate_spread,
+                "contourStrength": 0.35,
+                "contourWidth": 1.0,
+                "highlight": 0.5,
+            }
+        )
+        candidates.append(seed)
+    return deduplicate_settings(candidates), (
+        "tintAlpha",
+        "frost",
+        "thickness",
+        "edgeRefraction",
+        "refractionSpread",
+    ), {}
 
 
 def scan_summary(
@@ -165,6 +290,8 @@ def scan_summary(
     out: Path,
     profile_gate: bool,
     scene_shape: dict,
+    effective_axes: tuple[str, ...] | None = None,
+    forced_settings: dict | None = None,
 ) -> dict:
     """Build a self-describing loupe example-composition result."""
     if not rows:
@@ -201,7 +328,12 @@ def scan_summary(
             "magnificationScale": 1.55,
             "shaderLevelMagnification": False,
         },
-        "search": search_space(all_seed_settings, profile_gate),
+        "search": search_space(
+            all_seed_settings,
+            profile_gate,
+            axes=effective_axes,
+            forced_settings=forced_settings,
+        ),
         "metric": {"name": "paired-AB-optical-flow-score", "weights": WEIGHTS},
         "best": {
             "score": best["score"],
@@ -289,47 +421,16 @@ def main() -> None:
     # silhouette and makes the baseline meaningless.
     base = apply_scene_geometry(scene, base)
 
-    all_seeds = []
-    if args.profile_gate:
-        seed_specs = (
-            (0.05, 0.0, 12.0, edge, spread)
-            for edge, spread in itertools.product(
-                [25.0, 35.0, 45.0, 55.0], [0.75, 1.0]
-            )
+    try:
+        all_seeds, effective_axes, forced_settings = build_seed_candidates(
+            scene_id=args.scene_id,
+            scene=scene,
+            base=base,
+            spread=args.spread,
+            profile_gate=args.profile_gate,
         )
-    else:
-        if not 0.0 <= args.spread <= 1.0:
-            parser.error("--spread must be between 0 and 1")
-        seed_specs = (
-            (
-                alpha,
-                frost,
-                thickness,
-                8.0 * thickness * (max(0.0, ri * ri - 1.0) ** 0.5),
-                args.spread,
-            )
-            for alpha, frost, thickness, ri in itertools.product(
-                [0.05, 0.12, 0.25, 0.4],
-                [0.0, 2.0, 7.0],
-                [12.0, 20.0, 28.0],
-                [1.08, 1.2, 1.6, 2.5],
-            )
-        )
-    for alpha, frost, thickness, edge_refraction, spread in seed_specs:
-        seed = dict(base)
-        seed.update(
-            {
-                "tintAlpha": alpha,
-                "frost": frost,
-                "thickness": thickness,
-                "edgeRefraction": edge_refraction,
-                "refractionSpread": spread,
-                "contourStrength": 0.35,
-                "contourWidth": 1.0,
-                "highlight": 0.5,
-            }
-        )
-        all_seeds.append(seed)
+    except ValueError as error:
+        parser.error(str(error))
     for seed in all_seeds:
         validate_scene_geometry(scene, seed)
     try:
@@ -418,6 +519,8 @@ def main() -> None:
         out=out,
         profile_gate=args.profile_gate,
         scene_shape=scene["shape"],
+        effective_axes=effective_axes,
+        forced_settings=forced_settings,
     )
     (best_dir / "scorecard.json").write_text(
         json.dumps(

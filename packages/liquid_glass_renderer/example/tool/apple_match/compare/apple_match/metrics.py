@@ -40,6 +40,7 @@ def verify_background_registration(
     reference: np.ndarray,
     candidate: np.ndarray,
     excluded_rect: Tuple[int, int, int, int],
+    extra_excluded_rects: Tuple[Tuple[int, int, int, int], ...] = (),
 ) -> Dict[str, object]:
     """Fail when control pixels outside the glass disagree."""
     if reference.shape != candidate.shape:
@@ -49,6 +50,8 @@ def verify_background_registration(
     mask = np.ones(reference.shape[:2], dtype=np.float32)
     x, y, width, height = excluded_rect
     mask[y : y + height, x : x + width] = 0
+    for x, y, width, height in extra_excluded_rects:
+        mask[y : y + height, x : x + width] = 0
     ref_gray = luminance(reference) * mask
     can_gray = luminance(candidate) * mask
     shift, response = cv2.phaseCorrelate(ref_gray, can_gray)
