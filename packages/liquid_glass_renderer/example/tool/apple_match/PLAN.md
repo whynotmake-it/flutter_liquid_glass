@@ -244,3 +244,6 @@ presets), performance non-regressing.
   clear endpoint `{0,1,2,...,9}` so the user's zero-blur hypothesis is tested
   explicitly when the pinned simulator service is available; no default was
   changed from stale/unavailable-device evidence.
+- 2026-08-26: reran `melos run analyze` and `melos run
+  test-without-goldens` through the pinned Flutter/Dart 3.47.1 SDK. Both
+  completed successfully; analyzer output remains informational lint debt only.
