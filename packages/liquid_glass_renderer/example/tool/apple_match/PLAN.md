@@ -140,6 +140,13 @@ presets), performance non-regressing.
   was rejected for the same fixed-event-buffer starvation; the handshake fixes
   timestamp ordering but not Instruments' event-density limit. No shader/SDF
   optimization was inferred from these rejected captures.
+- 2026-08-26: the trace benchmark now also holds the expensive animated scene
+  behind the readiness gate, so startup frames cannot fill the rolling event
+  buffer before Instruments attaches. A targeted 8-second `grouped16Motion`
+  capture passed all retained-window checks; three repetitions remained sound
+  (traced-GPU utilization CV 6.1%, raster-p95 CV 3.2%, in-process GPU/frame CV
+  7.3%, footprint-peak CV 1.7%). This validates the harness attribution path,
+  not a renderer/SDF optimization or the final cross-revision perf gate.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.

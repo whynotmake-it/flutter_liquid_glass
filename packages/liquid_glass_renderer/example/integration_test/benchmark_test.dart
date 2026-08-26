@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -41,7 +42,12 @@ Future<void> main() async {
   final timings = <FrameTiming>[];
   void collectTimings(List<FrameTiming> values) => timings.addAll(values);
 
-  runApp(_BenchmarkApp(scenario: scenario));
+  runApp(
+    _BenchmarkApp(
+      scenario: scenario,
+      traceStartGate: isTraceRun ? traceStartGate : null,
+    ),
+  );
   await SchedulerBinding.instance.endOfFrame;
   await Future<void>.delayed(Duration(seconds: warmupSeconds));
 
@@ -301,8 +307,9 @@ enum BenchmarkScenario {
 }
 
 class _BenchmarkApp extends StatefulWidget {
-  const _BenchmarkApp({required this.scenario});
+  const _BenchmarkApp({required this.scenario, this.traceStartGate});
   final BenchmarkScenario scenario;
+  final String? traceStartGate;
 
   @override
   State<_BenchmarkApp> createState() => _BenchmarkAppState();
@@ -311,6 +318,7 @@ class _BenchmarkApp extends StatefulWidget {
 class _BenchmarkAppState extends State<_BenchmarkApp>
     with SingleTickerProviderStateMixin {
   late final AnimationController controller;
+  bool traceGateOpen = false;
 
   @override
   void initState() {
@@ -319,6 +327,21 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
+    if (widget.traceStartGate == null || widget.traceStartGate!.isEmpty) {
+      traceGateOpen = true;
+      controller.repeat(reverse: true);
+    } else {
+      unawaited(_waitForTraceGate());
+    }
+  }
+
+  Future<void> _waitForTraceGate() async {
+    final gate = File(widget.traceStartGate!);
+    while (mounted && !gate.existsSync()) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    if (!mounted) return;
+    setState(() => traceGateOpen = true);
     controller.repeat(reverse: true);
   }
 
@@ -331,7 +354,12 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
   @override
   Widget build(BuildContext context) {
     final scenario = widget.scenario;
-    final scenarioWidget = _isAnimated(scenario)
+    // Keep the expensive benchmark scene out of the render loop while
+    // Instruments attaches. The shell supplies this gate only for trace runs;
+    // normal frame/memory measurements and production code are unchanged.
+    final scenarioWidget = !traceGateOpen
+        ? const SizedBox.expand()
+        : _isAnimated(scenario)
         ? AnimatedBuilder(
             animation: controller,
             builder: (_, __) => _buildScenario(controller.value),

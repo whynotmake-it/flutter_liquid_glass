@@ -126,11 +126,15 @@ GPU instrument cannot simply be removed to solve the problem. These captures
 are retained as diagnostic evidence; no native Metal gate is claimed.
 
 The trace harness now uses its existing start-gate handshake: the app waits for
-the xctrace readiness notification before emitting its measured windows. This
-corrects timestamp ordering, but an 8-second gated grouped capture still
-retained only one sound window and failed the same fixed-event-buffer check.
-The remaining limitation is Instruments event density, not a shader branch or
-SDF decision.
+the xctrace readiness notification before emitting its measured windows. The
+benchmark app also keeps the expensive scene out of the render loop until that
+gate file appears; normal frame/memory runs and production code are unchanged.
+After that change, a targeted 8-second grouped capture passed every retained
+half-second-window check (58.1% traced GPU utilization, 4.83 ms/frame). Three
+repetitions then passed with traced-GPU utilization 55.9/60.7/63.1% (CV 6.1%),
+raster-p95 CV 3.2%, in-process GPU/frame CV 7.3%, and footprint-peak CV 1.7%.
+The trace result is now sound attribution evidence for this scenario; it is not
+a production performance gate or proof that the SDF is the bottleneck.
 
 ## 2026-08-25 renderer optimization experiments (rejected)
 
