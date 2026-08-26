@@ -23,6 +23,8 @@ class MaterialAttributionScanTest(unittest.TestCase):
         self.assertIn(18.3, scan.AXES["edgeRefraction"])
         self.assertIn(0.15, scan.AXES["vibrancy"])
         self.assertIn(0.53, scan.AXES["tintAlpha"])
+        self.assertIn(0.0, scan.AXES["chromaticAberration"])
+        self.assertIn(0.005, scan.AXES["chromaticAberration"])
 
     def test_candidate_preserves_geometry_and_spread(self) -> None:
         toolbar = {

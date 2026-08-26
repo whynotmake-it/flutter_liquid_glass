@@ -80,6 +80,20 @@ capture does not account for the remaining per-layer footprint.
    final backdrop/refraction pass may dominate. Measure dynamic oval, rounded
    rectangle, and superellipse cases separately before adding shader variants.
 
+The next looks-first probe is the shared `chromaticAberration` axis:
+
+```bash
+PYTHONPATH=compare compare/.venv/bin/python material_attribution_scan.py \
+  --axis chromaticAberration --repetitions 1 \
+  --out out/material-attribution-chromaticAberration
+```
+
+It compares the current `.005` default with zero (the one-backdrop-sample
+path) and small nonzero values across toolbar, small, and large capsules. The
+scan must pass the existing two-scene attribution and regression checks before
+any default or shader policy change is considered. It is a visual-fit probe,
+not a substitute for the later same-runner performance gate.
+
 ## Required comparisons
 
 - `baselineMotion` versus `ancestorTranslatedLayer`

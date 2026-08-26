@@ -44,6 +44,9 @@ AXES = {
     "edgeRefraction": (0.0, 8.0, 12.0, 18.3, 24.0, 32.0),
     "vibrancy": (0.0, 0.075, 0.15, 0.225, 0.30),
     "tintAlpha": (0.48, 0.505, 0.53, 0.555, 0.58),
+    # Zero selects the final shader's one-backdrop-sample path; .005 is the
+    # authoritative toolbar/capsule default and must remain in the grid.
+    "chromaticAberration": (0.0, 0.001, 0.0025, 0.005, 0.01),
 }
 
 
