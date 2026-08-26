@@ -106,5 +106,9 @@ void main() {
     );
     expect(toolbar, contains('edgeRefraction:'));
     expect(neutral, contains('refractionSpread:'));
+    expect(
+      PresetStore.fromYaml(toolbar).toJson(),
+      LiquidGlassSettings.ios27ToolbarLight().toJson(),
+    );
   });
 }

@@ -11,10 +11,10 @@ void main() {
     expect(settings.tint.a, closeTo(.53, .001));
     expect(settings.thickness, 12);
     expect(settings.frost, 7);
-    expect(settings.edgeRefraction, closeTo(27.42, .01));
+    expect(settings.edgeRefraction, closeTo(18.3, .01));
     expect(settings.refractionSpread, 0);
-    expect(settings.highlight, .5);
-    expect(settings.contourStrength, .1);
+    expect(settings.highlight, .4);
+    expect(settings.contourStrength, .65);
     expect(settings.contourWidth, 1);
   });
 

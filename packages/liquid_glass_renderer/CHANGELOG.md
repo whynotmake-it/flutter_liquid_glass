@@ -1,3 +1,10 @@
+## Unreleased
+
+ - **FIX**: align the `ios27ToolbarLight` preset and bundled example seed with
+   the validated iOS 27 material vector (`edgeRefraction: 18.3`,
+   `highlight: 0.4`, `contourStrength: 0.65`). Existing generic settings and
+   user-saved presets are unchanged.
+
 ## 0.2.0-dev.4
 
 > Note: This release has breaking changes.
