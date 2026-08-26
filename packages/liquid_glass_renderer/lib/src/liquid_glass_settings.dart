@@ -39,14 +39,14 @@ class LiquidGlassSettings with Equatable {
          blue: 253 / 255,
        ),
        thickness = 12.0,
-       edgeRefraction = 18.3,
+       edgeRefraction = 27.42,
        refractionSpread = 0.0,
        chromaticAberration = 0.005,
        saturation = 0.9,
        transmissionGamma = 0.9,
        vibrancy = 0.15,
-       highlight = 0.4,
-       contourStrength = 0.65,
+       highlight = 0.5,
+       contourStrength = 0.1,
        contourWidth = 1.0;
 
   /// Figma's percentage-based constructor mapped onto the unified axes.

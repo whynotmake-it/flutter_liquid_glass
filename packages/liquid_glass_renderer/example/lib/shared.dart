@@ -328,7 +328,9 @@ class SettingsSheet extends HookWidget {
                               child: CupertinoButton.tinted(
                                 onPressed: () {
                                   settingsNotifier.value =
-                                      const LiquidGlassSettings.ios27ToolbarLight();
+                                      const LiquidGlassSettings.ios27ToolbarLight(
+                                        frost: 0,
+                                      );
                                   blendNotifier.value = 10;
                                 },
                                 child: const Text('Matched toolbar'),

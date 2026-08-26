@@ -59,6 +59,20 @@ well or explicitly records an approved geometry exemption.
 The source vector is retained in
 `out/generalization-toolbar-vector/*/final/settings.json`.
 
+Important provenance boundary: this harness vector is not automatically the
+demo's initial material. The shipped named `ios27ToolbarLight` preset remains
+on the last user-accepted optical values while the strict frozen-vector and
+visual gates are open. The example starts with the private
+`exampleDefaultGlassSettings` override (`frost=0`) so lighting and silhouette
+can be judged without a demo-only backdrop blur; loading or editing a preset
+can still opt into frost explicitly.
+
+The latest provenance correction is shown in this annotated composite:
+[`demo path correction`](out/annotated-comparisons/demo-provenance-correction-annotated.png).
+Its pixels are the retained harness lighting capture (not a fresh simulator
+render); the subtitle makes the harness `frost=7` versus demo `frost=0`
+distinction explicit.
+
 ## Scene scorecards
 
 | Scene | Score | combined | flow | black response | white response | image |

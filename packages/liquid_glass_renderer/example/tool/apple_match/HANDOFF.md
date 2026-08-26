@@ -473,6 +473,18 @@ scan outputs as final evidence. Once the service is healthy, run the bounded
 scan and staged validation described in `PLAN.md`, keeping magnification and
 focal offset fixed while fitting only ordinary edge optics.
 
+## Continuation update (2026-08-26, demo provenance correction)
+
+The harness's narrow shared-vector fit (`18.3 / .4 / .65 / frost 7`) was
+temporarily promoted into the named Dart preset without a fresh visual check of
+the example. That promotion made the demo's contour too dark and its lighting
+too subdued, so it was reverted to the last user-accepted named-preset values
+(`27.42 / .5 / .1 / frost 7`). The example now deliberately starts from a
+private `exampleDefaultGlassSettings` value with `frost=0`, and both the center
+glass and bottom bar consume the same live notifier. This keeps demo art
+direction separate from the still-open frozen-vector gate. The exact YAML tint
+integer is parity-tested against the constructor.
+
 ## Continuation update (2026-08-26)
 
 Sol reviewed the small-capsule residual and identified a registration overhang:

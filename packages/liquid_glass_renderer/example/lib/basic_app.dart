@@ -27,12 +27,19 @@ const _testBackgroundColors = [
   Color(0xff00c2d1),
 ];
 
+/// The example starts with a clear material so its lighting and silhouette are
+/// visible without an unrelated backdrop blur. Users can still opt into frost
+/// from the settings sidebar or by loading a preset.
+const exampleDefaultGlassSettings = LiquidGlassSettings.ios27ToolbarLight(
+  frost: 0,
+);
+
 final settingsNotifier = ValueNotifier(
   _useTestBackground
       ? LiquidGlassSettings.ios27ToolbarLight(
           frost: _testBlur.toDouble(),
         )
-      : const LiquidGlassSettings.ios27ToolbarLight(),
+      : exampleDefaultGlassSettings,
 );
 
 final blendNotifier = ValueNotifier(10.0);
@@ -229,38 +236,42 @@ class BasicApp extends HookWidget {
             bottom: false,
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: LiquidGlassBottomBar(
-                fake: fake.value,
-                extraButton: LiquidGlassBottomBarExtraButton(
-                  icon: CupertinoIcons.add_circled,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      CupertinoPageRoute<void>(
-                        builder: (context) => const LoupeExamplePage(),
-                      ),
-                    );
+              child: ListenableBuilder(
+                listenable: Listenable.merge([settingsNotifier, fake]),
+                builder: (context, child) => LiquidGlassBottomBar(
+                  fake: fake.value,
+                  glassSettings: settingsNotifier.value,
+                  extraButton: LiquidGlassBottomBarExtraButton(
+                    icon: CupertinoIcons.add_circled,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute<void>(
+                          builder: (context) => const LoupeExamplePage(),
+                        ),
+                      );
+                    },
+                    label: '',
+                    loupeMagnification: 1.1,
+                  ),
+                  tabs: [
+                    LiquidGlassBottomBarTab(
+                      label: 'Home',
+                      icon: CupertinoIcons.home,
+                    ),
+                    LiquidGlassBottomBarTab(
+                      label: 'Profile',
+                      icon: CupertinoIcons.person,
+                    ),
+                    LiquidGlassBottomBarTab(
+                      label: 'Settings',
+                      icon: CupertinoIcons.settings,
+                    ),
+                  ],
+                  selectedIndex: tab.value,
+                  onTabSelected: (index) {
+                    tab.value = index;
                   },
-                  label: '',
-                  loupeMagnification: 1.1,
                 ),
-                tabs: [
-                  LiquidGlassBottomBarTab(
-                    label: 'Home',
-                    icon: CupertinoIcons.home,
-                  ),
-                  LiquidGlassBottomBarTab(
-                    label: 'Profile',
-                    icon: CupertinoIcons.person,
-                  ),
-                  LiquidGlassBottomBarTab(
-                    label: 'Settings',
-                    icon: CupertinoIcons.settings,
-                  ),
-                ],
-                selectedIndex: tab.value,
-                onTabSelected: (index) {
-                  tab.value = index;
-                },
               ),
             ),
           ),

@@ -370,6 +370,9 @@ fvm flutter run -d macos -t lib/basic_app.dart \
 The sidebar exposes the unified controls and image/black/white/grid
 backgrounds. Presets are scalar YAML files under the app documents directory;
 `ios27-toolbar-light.yaml` and `neutral-default.yaml` are seeded on first run.
+The demo's initial material is a private clear override (`frost=0`) so the
+lighting and outline are inspectable; the named Apple-match seed retains its
+`frost=7` value and is applied only when explicitly loaded.
 The add button opens the example loupe composition: Flutter paints a
 `RawMagnifier` backdrop first, then the ordinary liquid-glass layer applies its
 edge refraction and lighting without magnifying filtered shader pixels.

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer_example/basic_app.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
+import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 const _useTestBackground = bool.fromEnvironment(
@@ -26,6 +27,10 @@ void main() {
     skip: !_useTestBackground,
   );
 
+  test('example default glass is explicitly clear', () {
+    expect(exampleDefaultGlassSettings.frost, 0);
+  });
+
   testWidgets('settings has one close action and persistent preset controls', (
     tester,
   ) async {
@@ -36,6 +41,11 @@ void main() {
 
     await tester.tap(find.text('Settings').last);
     await tester.pump();
+
+    final bottomBar = tester.widget<LiquidGlassBottomBar>(
+      find.byType(LiquidGlassBottomBar),
+    );
+    expect(bottomBar.glassSettings, settingsNotifier.value);
 
     expect(find.text('Close'), findsOneWidget);
     expect(find.text('Save current'), findsOneWidget);
@@ -61,6 +71,9 @@ void main() {
     }
     expect(find.text('REAL'), findsNothing);
     expect(find.text('FAKE'), findsNothing);
+
+    await tester.tap(find.text('Matched toolbar'));
+    expect(settingsNotifier.value.frost, 0);
   });
 
   testWidgets('loupe page uses the pre-shader magnifier composition', (

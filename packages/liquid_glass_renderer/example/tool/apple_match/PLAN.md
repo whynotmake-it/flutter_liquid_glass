@@ -258,3 +258,10 @@ presets), performance non-regressing.
   its frost-5 headline-score row worsens combined error (`.063668→.064354`)
   and flow (`.036286→.049595`), while lowering the shared value regresses the
   toolbar/large fits. Await the pinned `0…9` scan before making a mapping change.
+- 2026-08-26: corrected a provenance error in the demo defaults. The harness
+  shared-vector fit (`18.3/.4/.65`) had been promoted into the named preset
+  before visual acceptance and made the example's contour too dark. Restored
+  the last user-accepted named values (`27.42/.5/.1`), kept the bundled seed in
+  parity, and added the private example default with `frost=0`. The center and
+  bottom bar now consume one live settings source; focused tests assert the
+  no-frost path and exact YAML parity.
