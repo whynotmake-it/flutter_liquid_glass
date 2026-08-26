@@ -74,6 +74,16 @@ complete annotated image index is
 Representative annotated images are linked below; the index contains one
 annotated image for every retained candidate row.
 
+The complete numeric ledger is generated from those same retained captures by
+running `compare/.venv/bin/python3 write_metric_ledger.py` from this directory:
+[`METRIC_LEDGER.md`](out/annotated-comparisons/iterations/METRIC_LEDGER.md)
+([JSON](out/annotated-comparisons/iterations/METRIC_LEDGER.json)). It includes
+the historical score and direct MAE plus shape, combined transmission,
+refraction flow, blur-MTF, tint/channel, highlight/specular, holdout,
+black/white signed luminance, RGBW rim, and transmission-boundary curvature
+measurements for every retained A/B/C/D row. The ledger does not rerun Flutter
+or alter simulator state.
+
 | Iteration | Values measured | Result | Representative image |
 | --- | --- | --- | --- |
 | Frost | 3, 4, 5, 6, 7, 8, 9; 0–2 pending | Small headline score peaks at 5 (86.4094), but shared 7 has lower combined/flow and preserves toolbar/large. No default change. | [`small-frost-3-vs-5-vs-7`](out/annotated-comparisons/small-frost-3-vs-5-vs-7-annotated.png) |
@@ -96,6 +106,10 @@ directional highlights; legacy independent rim/inner-shadow weights are not
 shipped. Retained black/white iteration images are under each candidate's
 `solid_lighting_comparison.png` and are included in the annotated iteration
 index where a full comparison composite exists.
+
+Current black/white probe composites (Apple ground truth is the left panel in
+each row) are [`small capsule lighting`](out/annotated-comparisons/small-lighting-current-annotated.png)
+and [`toolbar lighting`](out/annotated-comparisons/toolbar-lighting-current-annotated.png).
 
 The clear visual residual is the small capsule's transmission/refraction
 response, not proof that Apple has a zero-valued frost parameter. The next
