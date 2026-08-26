@@ -143,10 +143,15 @@ presets), performance non-regressing.
   within noise. All three failed Sol's retention thresholds, so defaults and
   renderer code remain unchanged. A-D captures and diagnostics are retained
   under `out/material-attribution-{frost,gamma,edge}`.
+- 2026-08-26: completed the attribution ledger with vibrancy and tint alpha.
+  Vibrancy's best small combined/flow movement was only 0.8%/2.2%; tint's was
+  0.6%/3.3% while regressing toolbar/large and perturbing the transparency
+  contract. Both failed retention thresholds; all five existing shared axes
+  therefore remain at their validated defaults.
 - 2026-08-26: reran the pinned Flutter 3.47.1 repository gates on the current
   stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
   analyzer output remains informational lint debt only. The simulator-free
-  comparator suite remains 38 tests with one expected device smoke skip.
+  comparator suite remains 42 tests with one expected device smoke skip.
 - 2026-08-26: the first macOS profile build exposed a stale generated workspace:
   `Runner.xcworkspace` listed only `Runner.xcodeproj`, so Xcode never built the
   existing `path_provider_foundation` pod and Swift could not import it. Running

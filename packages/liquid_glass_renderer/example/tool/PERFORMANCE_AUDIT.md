@@ -271,6 +271,10 @@ combined error was .063416 at .85 (0.4% better) with no flow improvement, far
 below the required attribution threshold. Edge refraction `{0,8,12,18.3,24,32}`
 was effectively flat: small's best was .063659/.036182 at 8 versus
 .063668/.036286 at the default 18.3, while larger values regressed.
+Vibrancy `{0,.075,.15,.225,.30}` reached .063137/.035494 at .30, only a
+0.8%/2.2% movement and below the attribution threshold. Tint alpha
+`{.48,.505,.53,.555,.58}` reached .063272/.035099 at .555, but reduced the
+toolbar/large scores and conflicts with the transparency contract.
 
 These controls therefore remain at their validated defaults; no renderer
 change is inferred from sub-threshold movement. Representative pairs are the
