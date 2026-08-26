@@ -427,9 +427,11 @@ IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py
 ```
 
 Supported axes are `frost`, `transmissionGamma`, `edgeRefraction`, `vibrancy`,
-and `tintAlpha`. Retain an axis only when its summary clears the documented
-10%/20% small-error attribution thresholds and the cross-scene regression
-checks; sub-threshold movement is not a renderer change.
+`tintAlpha`, and `chromaticAberration`. The latter includes `0`, which selects
+the final shader's one-backdrop-sample path, and the authoritative `.005`
+default. Retain an axis only when its summary clears the documented 10%/20%
+small-error attribution thresholds and the cross-scene regression checks;
+sub-threshold movement is not a renderer change.
 
 The canonical transparency-vector smoke is in
 `out/transparency-shared-vector-smoke/`: positions 0/.5/1 share one material
