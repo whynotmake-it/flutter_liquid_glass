@@ -270,3 +270,8 @@ presets), performance non-regressing.
   settings field and makes pending/rejected two-scene evidence explicit; strict
   mode remains red until the actual visual gate is closed. Comparator coverage
   is now 44 tests with one expected simulator smoke skip.
+- 2026-08-27: corrected `generalization.py` so thickness is frozen from the
+  toolbar card by default; independent per-scene thickness fitting is now an
+  explicit `--fit-thickness` diagnostic. Summaries emit the formal small/
+  toolbar combined-error ratio and policy, preventing a per-geometry fit from
+  being mislabeled as frozen-parameter evidence. No simulator rerun was done.

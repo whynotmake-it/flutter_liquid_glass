@@ -248,13 +248,17 @@ for scene in small_capsule large_capsule tab_bar_holdout; do
 done
 ```
 
-Then fit only size/corner geometry and per-control thickness while freezing
-`refractiveIndex=1.08`, `shapeProfile=roundedRectangle`, and the toolbar
-appearance settings:
+Then fit only size/corner geometry while freezing the toolbar material vector,
+including its thickness and `shapeProfile`:
 
 ```bash
 IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python generalization.py
 ```
+
+The audit now freezes the toolbar card's `thickness` by default. Use
+`--fit-thickness` only for a clearly labeled per-scene diagnostic; that mode is
+never reported as frozen-parameter evidence. The emitted summary includes
+`thicknessPolicy` and the formal `generalizationGate` ratio.
 
 The bounded fit found:
 

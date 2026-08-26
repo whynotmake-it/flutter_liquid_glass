@@ -173,6 +173,12 @@ available. Run `python3 validate_evidence_manifest.py` for the structural audit;
 two-scene evidence. This prevents the documentation table from being mistaken
 for proof that the gate is closed.
 
+The generalization runner is likewise explicit about its policy: thickness is
+frozen to the toolbar card by default, while `--fit-thickness` is diagnostic
+only. Its `generalizationGate` reports the actual small-capsule combined-error
+ratio against the toolbar; the existing retained per-geometry captures are not
+treated as proof of the frozen-parameter gate.
+
 Do not call this production-ready until the pinned visual endpoint scan,
 the small/toolbar generalization gate, and the final same-runner performance
 audit pass. Native traces cannot substitute for that audit.

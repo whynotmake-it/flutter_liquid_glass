@@ -165,25 +165,26 @@ def run_scene(*, scene_id, base, args, out, fit):
                     + 0.4 * min(errors["combined"] / 0.25, 1.0)
                 )
 
-            optics = coordinate_descent(
-                optics_loss,
-                best_params,
-                {
-                    "thickness": [best_params["thickness"]]
-                    if args.quick
-                    else [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]
-                },
-                max_iters=args.max_iters,
-                min_improvement=0.02,
-            )
-            best_params = optics["bestParams"]
-            evaluator.evaluate(best_params)
-            save_evidence(
-                scene_out / "stages/thickness/best",
-                best_params,
-                evaluator,
-                reference,
-            )
+            if args.fit_thickness:
+                optics = coordinate_descent(
+                    optics_loss,
+                    best_params,
+                    {
+                        "thickness": [best_params["thickness"]]
+                        if args.quick
+                        else [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]
+                    },
+                    max_iters=args.max_iters,
+                    min_improvement=0.02,
+                )
+                best_params = optics["bestParams"]
+                evaluator.evaluate(best_params)
+                save_evidence(
+                    scene_out / "stages/thickness/best",
+                    best_params,
+                    evaluator,
+                    reference,
+                )
         else:
             evaluator.evaluate(initial)
             best_params = initial
@@ -228,6 +229,14 @@ def main():
         action="store_true",
         help="Run one pinned smoke evaluation per geometry scene.",
     )
+    parser.add_argument(
+        "--fit-thickness",
+        action="store_true",
+        help=(
+            "Diagnostic only: fit thickness independently per scene. The "
+            "default audit freezes thickness from the toolbar card."
+        ),
+    )
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
@@ -237,6 +246,14 @@ def main():
     # This prevents a generalization audit from silently drifting from the
     # authoritative toolbar fit when the scorecard is the current artifact.
     base = loaded_settings.get("settings", loaded_settings)
+    toolbar_card = json.loads(args.toolbar_card.resolve().read_text())
+    toolbar_settings = toolbar_card.get("settings", {})
+    if not args.fit_thickness and "thickness" in toolbar_settings:
+        # The formal generalization gate is frozen-parameter. Use the
+        # authoritative toolbar thickness for every fitted capsule; allowing
+        # each scene to optimize this field is a useful diagnostic, but cannot
+        # be reported as generalization evidence.
+        base = {**base, "thickness": toolbar_settings["thickness"]}
     shared = {
         key: base[key]
         for key in (
@@ -349,7 +366,21 @@ def main():
             ),
             "optimized": False,
         },
-        "frozenRiGeneralizes": comparable,
+        "thicknessPolicy": "per-scene diagnostic fit" if args.fit_thickness else "frozen-toolbar",
+        "frozenRiGeneralizes": comparable and not args.fit_thickness,
+        "generalizationGate": {
+            "metric": "small_capsule.combined / toolbar.combined",
+            "threshold": 1.25,
+            "smallCombinedRatio": float(
+                results["small_capsule"]["errors"]["combined"]
+                / max(toolbar_card["errors"]["combined"], 1e-9)
+            ),
+            "passed": bool(
+                not args.fit_thickness
+                and results["small_capsule"]["errors"]["combined"]
+                <= toolbar_card["errors"]["combined"] * 1.25
+            ),
+        },
         "thicknessScaling": {
             "classification": scaling,
             "linearSlope": float(slope),
