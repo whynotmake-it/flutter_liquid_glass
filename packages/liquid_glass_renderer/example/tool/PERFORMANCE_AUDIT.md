@@ -110,6 +110,13 @@ before/after pair for the final state. A final same-runner macOS profile
 comparison is required before claiming the ≤5% gate; the Android build is a
 platform smoke check, not a substitute for that timing evidence.
 
+The macOS build initially failed because the generated workspace omitted
+`Pods/Pods.xcodeproj`; Xcode consequently never produced the
+`path_provider_foundation` framework imported by the generated plugin
+registrant. Regenerating the workspace with `pod install` restored that project
+reference, and a clean Xcode-derived-data Profile build passed. This is a build
+integration repair, not a renderer change.
+
 ## 2026-08-25 renderer optimization experiments (rejected)
 
 Two focused measurements evaluated candidates; neither is part of the current

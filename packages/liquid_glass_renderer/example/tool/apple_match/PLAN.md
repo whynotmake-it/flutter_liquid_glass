@@ -121,6 +121,12 @@ presets), performance non-regressing.
   stack. `melos run analyze` and `melos run test-without-goldens` both exited 0;
   analyzer output remains informational lint debt only. The simulator-free
   comparator suite remains 35 tests with one expected device smoke skip.
+- 2026-08-26: the first macOS profile build exposed a stale generated workspace:
+  `Runner.xcworkspace` listed only `Runner.xcodeproj`, so Xcode never built the
+  existing `path_provider_foundation` pod and Swift could not import it. Running
+  `pod install` restored the `Pods/Pods.xcodeproj` workspace reference; a fresh
+  Flutter 3.47.1/Xcode 27 Profile build then passed. No simulator was opened or
+  closed.
 - 2026-08-25: annotated every surviving `LiquidGlassSettings` material field
   with its evidence-scene scope in the shipped API documentation; `visibility`
   is explicitly marked as a transition utility rather than a fit knob.
