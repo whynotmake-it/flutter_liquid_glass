@@ -166,8 +166,8 @@ piecewise SDF.
 
 In the shipped geometry shader, `hasFaceSpread` is a draw-uniform fast path,
 but it only avoids the extra `halfMinor` bookkeeping in `sceneSample`; both
-paths still evaluate each shape once. The zero-chromatic-aberration path and
-coverage early returns avoid texture/downstream work and are the more credible
-fast paths. The SDF matte is persistent and is rebuilt only when geometry or
-settings are dirty, so no SDF bottleneck claim is justified without a targeted
-geometry-pass A/B measurement.
+paths still evaluate each shape once. The near-zero-chromatic-aberration path
+and coverage early returns avoid texture/downstream work and are the more
+credible fast paths. The SDF matte is persistent and is rebuilt only when
+geometry or settings are dirty, so no SDF bottleneck claim is justified
+without a targeted geometry-pass A/B measurement.

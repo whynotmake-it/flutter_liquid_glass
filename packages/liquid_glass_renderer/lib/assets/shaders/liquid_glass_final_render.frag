@@ -252,8 +252,9 @@ void main() {
     vec4 refractColor;
     // The public/default value is intentionally small (~0.005), but it still
     // represents a real channel separation. The old 0.01 cutoff silently
-    // disabled that range and made CA appear broken. Only exact-zero values
-    // take the single-sample fast path.
+    // disabled that range and made CA appear broken. Values whose magnitude is
+    // below 0.0001 take the single-sample fast path; larger positive or
+    // negative values preserve the three-channel separation.
     if (uChromaticAberration < 0.0001) {
         vec2 refractedUV = mirrorBackgroundUV(
             screenUV + displacement * invUSize,
