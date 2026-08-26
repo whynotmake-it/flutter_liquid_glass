@@ -145,11 +145,14 @@ recording, which is why the budget is generous and a failed attempt waits
 retry. A trace whose Metal GPU interval table has no rows is likewise
 rejected and retried: a wedged Instruments data source (for example after a
 force-terminated recording) still saves a well-formed but empty bundle, which
-must never pass validation. Keep the default 60 s recording limit and 21 s
-rolling window for traced runs: the retained timeline shrinks with kdebug
-event density, and the sixteen-independent-layer workload retains only about
-0.1 s of a 3 s rolling window — far below the 450 ms alignment floor — while
-the default window retains about 18 s of the same recording. GPU intervals
+must never pass validation. Keep the default 60 s recording limit for traced
+runs. The script omits xctrace's rolling `--window` by default
+(`LIQUID_GLASS_BENCHMARK_TRACE_WINDOW_SECONDS=0`): on macOS 26 a 21 s window
+can truncate an 8 s recording to a roughly 1 s timeline that ends before the
+gated workload begins. Set a positive window only after validating that the
+selected Instruments set preserves overlap; an empty
+`LIQUID_GLASS_BENCHMARK_TRACE_SCENARIOS` remains the opt-out/default that keeps
+tracing disabled. GPU intervals
 are measured by their own duration column, never the CPU-to-GPU start
 latency column that shares the same serialized element name. Set
 `LIQUID_GLASS_BENCHMARK_CAPTURE_NATIVE_TRACE=false` for a diagnostic
