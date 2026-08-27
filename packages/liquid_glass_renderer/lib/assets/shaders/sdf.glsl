@@ -1,6 +1,8 @@
 // Shape array uniforms - 6 floats per shape (type, centerX, centerY, sizeW, sizeH, cornerRadius)
 // Reduced from 64 to 16 shapes to fit Impeller's uniform buffer limit (16 * 6 = 96 floats vs 384)
+#ifndef MAX_SHAPES
 #define MAX_SHAPES 16
+#endif
 
 float sdfRRect( in vec2 p, in vec2 b, in float r ) {
     float shortest = min(b.x, b.y);
@@ -60,53 +62,100 @@ float getShapeSDF(float type, vec2 p, vec2 center, vec2 size, float r) {
     return 1e9; // none
 }
 
-float getShapeSDFFromArray(int index, vec2 p, float shapeData[MAX_SHAPES * 6]) {
-    int baseIndex = index * 6;
-    float type = shapeData[baseIndex];
-    vec2 center = vec2(shapeData[baseIndex + 1], shapeData[baseIndex + 2]);
-    vec2 size = vec2(shapeData[baseIndex + 3], shapeData[baseIndex + 4]);
-    float cornerRadius = shapeData[baseIndex + 5];
-    
-    return getShapeSDF(type, p, center, size, cornerRadius);
+float getShapeSDFFromArray(int index, vec2 p) {
+#define RETURN_SHAPE_SDF(I) \
+    if (index == I) { \
+        return getShapeSDF( \
+            uShapeData[I * 6], \
+            p, \
+            vec2(uShapeData[I * 6 + 1], uShapeData[I * 6 + 2]), \
+            vec2(uShapeData[I * 6 + 3], uShapeData[I * 6 + 4]), \
+            uShapeData[I * 6 + 5] \
+        ); \
+    }
+
+    // SkSL requires uniform-array indices to be compile-time constants. Keep
+    // the public shape count while selecting each fixed slot explicitly.
+    RETURN_SHAPE_SDF(0)
+    RETURN_SHAPE_SDF(1)
+    RETURN_SHAPE_SDF(2)
+    RETURN_SHAPE_SDF(3)
+    RETURN_SHAPE_SDF(4)
+    RETURN_SHAPE_SDF(5)
+    RETURN_SHAPE_SDF(6)
+    RETURN_SHAPE_SDF(7)
+    RETURN_SHAPE_SDF(8)
+    RETURN_SHAPE_SDF(9)
+    RETURN_SHAPE_SDF(10)
+    RETURN_SHAPE_SDF(11)
+    RETURN_SHAPE_SDF(12)
+    RETURN_SHAPE_SDF(13)
+    RETURN_SHAPE_SDF(14)
+    RETURN_SHAPE_SDF(15)
+
+#undef RETURN_SHAPE_SDF
+    return 1e9;
 }
 
-float sceneSDF(vec2 p, int numShapes, float shapeData[MAX_SHAPES * 6], float blend) {
+float sceneSDF(vec2 p) {
+    int numShapes = int(uNumShapes);
     if (numShapes == 0) {
         return 1e9;
     }
     
-    float result = getShapeSDFFromArray(0, p, shapeData);
+    float result = getShapeSDFFromArray(0, p);
     
     // Optimized: unroll for common cases (1-4 shapes), use loop for 5+ shapes
     if (numShapes <= 4) {
         // Fully unrolled for 1-4 shapes (covers 90%+ of use cases)
         if (numShapes >= 2) {
-            float shapeSDF = getShapeSDFFromArray(1, p, shapeData);
-            result = smoothUnion(result, shapeSDF, blend);
+            float shapeSDF = getShapeSDFFromArray(1, p);
+            result = smoothUnion(result, shapeSDF, uBlend);
         }
         if (numShapes >= 3) {
-            float shapeSDF = getShapeSDFFromArray(2, p, shapeData);
-            result = smoothUnion(result, shapeSDF, blend);
+            float shapeSDF = getShapeSDFFromArray(2, p);
+            result = smoothUnion(result, shapeSDF, uBlend);
         }
         if (numShapes >= 4) {
-            float shapeSDF = getShapeSDFFromArray(3, p, shapeData);
-            result = smoothUnion(result, shapeSDF, blend);
+            float shapeSDF = getShapeSDFFromArray(3, p);
+            result = smoothUnion(result, shapeSDF, uBlend);
         }
     } else {
         // Dynamic loop for 5+ shapes (uncommon cases)
-        for (int i = 1; i < min(numShapes, MAX_SHAPES); i++) {
-            float shapeSDF = getShapeSDFFromArray(i, p, shapeData);
-            result = smoothUnion(result, shapeSDF, blend);
+        for (int i = 1; i < MAX_SHAPES; i++) {
+            if (i >= numShapes) {
+                break;
+            }
+            float shapeSDF = getShapeSDFFromArray(i, p);
+            result = smoothUnion(result, shapeSDF, uBlend);
         }
     }
     
     return result;
 }
 
-// Calculate 3D normal using derivatives (shader-specific normal calculation)
-vec3 getNormal(float sd, float thickness) {
+// Calculate the SDF gradient explicitly. Flutter runtime-effect shaders do not
+// expose screen-space derivative intrinsics on every renderer (notably web),
+// so sample one logical pixel on each side instead.
+vec3 getNormal(
+    vec2 p,
+    float sd,
+    float thickness
+) {
+#ifdef SKIA_GRAPHICS_BACKEND
+    const float epsilon = 1.0;
+    float dx = 0.5 * (
+        sceneSDF(p + vec2(epsilon, 0.0))
+            - sceneSDF(p - vec2(epsilon, 0.0))
+    );
+    float dy = 0.5 * (
+        sceneSDF(p + vec2(0.0, epsilon))
+            - sceneSDF(p - vec2(0.0, epsilon))
+    );
+#else
     float dx = dFdx(sd);
     float dy = dFdy(sd);
+#endif
     
     // The cosine and sine between normal and the xy plane
     float n_cos = max(thickness + sd, 0.0) / thickness;

@@ -34,7 +34,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.44.6'
           cache: true
       
       - name: Ⓜ️ Set up Melos
@@ -42,6 +42,10 @@ jobs:
 
       - name: 🧪 Run Analyze
         run: melos run analyze
+
+      - name: 🌐 Compile web example
+        working-directory: packages/liquid_glass_renderer/example
+        run: flutter build web --debug --no-wasm-dry-run
 
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
@@ -59,7 +63,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.44.6'
           cache: true
 
       - name: Ⓜ️ Set up Melos
@@ -86,7 +90,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.44.6'
           cache: true
 
       - name: Ⓜ️ Set up Melos

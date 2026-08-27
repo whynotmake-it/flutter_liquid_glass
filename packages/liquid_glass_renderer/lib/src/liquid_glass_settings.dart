@@ -6,6 +6,8 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 /// Represents the settings for a liquid glass effect.
+// EquatableMixin keeps compatibility with Equatable 2.0.8 consumers.
+// ignore: deprecated_member_use
 class LiquidGlassSettings with EquatableMixin {
   /// Creates a new [LiquidGlassSettings] with the given settings.
   const LiquidGlassSettings({
@@ -34,17 +36,17 @@ class LiquidGlassSettings with EquatableMixin {
     double lightAngle = 0.5 * pi,
     Color glassColor = const Color.fromARGB(0, 255, 255, 255),
   }) : this(
-          visibility: visibility,
-          refractiveIndex: 1 + (refraction / 100) * 0.2,
-          thickness: depth,
-          chromaticAberration: 4 * (dispersion / 100),
-          lightIntensity: lightIntensity / 100,
-          blur: frost,
-          lightAngle: lightAngle,
-          ambientStrength: 0.1,
-          saturation: 1.5,
-          glassColor: glassColor,
-        );
+         visibility: visibility,
+         refractiveIndex: 1 + (refraction / 100) * 0.2,
+         thickness: depth,
+         chromaticAberration: 4 * (dispersion / 100),
+         lightIntensity: lightIntensity / 100,
+         blur: frost,
+         lightAngle: lightAngle,
+         ambientStrength: 0.1,
+         saturation: 1.5,
+         glassColor: glassColor,
+       );
 
   /// Retrieves the nearest [LiquidGlassSettings] from the widget tree.
   ///
@@ -146,31 +148,30 @@ class LiquidGlassSettings with EquatableMixin {
     double? ambientStrength,
     double? refractiveIndex,
     double? saturation,
-  }) =>
-      LiquidGlassSettings(
-        visibility: visibility ?? this.visibility,
-        glassColor: glassColor ?? this.glassColor,
-        thickness: thickness ?? this.thickness,
-        blur: blur ?? this.blur,
-        chromaticAberration: chromaticAberration ?? this.chromaticAberration,
-        lightAngle: lightAngle ?? this.lightAngle,
-        lightIntensity: lightIntensity ?? this.lightIntensity,
-        ambientStrength: ambientStrength ?? this.ambientStrength,
-        refractiveIndex: refractiveIndex ?? this.refractiveIndex,
-        saturation: saturation ?? this.saturation,
-      );
+  }) => LiquidGlassSettings(
+    visibility: visibility ?? this.visibility,
+    glassColor: glassColor ?? this.glassColor,
+    thickness: thickness ?? this.thickness,
+    blur: blur ?? this.blur,
+    chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+    lightAngle: lightAngle ?? this.lightAngle,
+    lightIntensity: lightIntensity ?? this.lightIntensity,
+    ambientStrength: ambientStrength ?? this.ambientStrength,
+    refractiveIndex: refractiveIndex ?? this.refractiveIndex,
+    saturation: saturation ?? this.saturation,
+  );
 
   @override
   List<Object?> get props => [
-        visibility,
-        glassColor,
-        thickness,
-        blur,
-        chromaticAberration,
-        lightAngle,
-        lightIntensity,
-        ambientStrength,
-        refractiveIndex,
-        saturation,
-      ];
+    visibility,
+    glassColor,
+    thickness,
+    blur,
+    chromaticAberration,
+    lightAngle,
+    lightIntensity,
+    ambientStrength,
+    refractiveIndex,
+    saturation,
+  ];
 }

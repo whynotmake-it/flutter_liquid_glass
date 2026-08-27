@@ -122,16 +122,12 @@ class _RawGlassify extends SingleChildRenderObjectWidget {
 @internal
 class RenderGlassify extends RenderProxyBox {
   RenderGlassify({
-    required double devicePixelRatio,
-    required FragmentShader shader,
-    required LiquidGlassSettings settings,
+    required this._devicePixelRatio,
+    required this._shader,
+    required this._settings,
     required TickerProvider ticker,
-    bool debugRenderRefractionMap = false,
-  })  : _devicePixelRatio = devicePixelRatio,
-        _shader = shader,
-        _settings = settings,
-        _tickerProvider = ticker,
-        _debugRenderRefractionMap = debugRenderRefractionMap {
+    this._debugRenderRefractionMap = false,
+  }) : _tickerProvider = ticker {
     _ticker = _tickerProvider.createTicker((_) {
       markNeedsPaint();
     });
@@ -243,19 +239,14 @@ class RenderGlassify extends RenderProxyBox {
 /// with a captured child image
 class _GlassifyShaderLayer extends OffsetLayer {
   _GlassifyShaderLayer({
-    required FragmentShader shader,
-    required LiquidGlassSettings settings,
-    required double devicePixelRatio,
-    required Size layerSize,
-    required Size transformedSize,
+    required this._shader,
+    required this._settings,
+    required this._devicePixelRatio,
+    required this._layerSize,
+    required this._transformedSize,
     required super.offset,
-    required Offset globalOffset,
-  })  : _shader = shader,
-        _settings = settings,
-        _devicePixelRatio = devicePixelRatio,
-        _layerSize = layerSize,
-        _transformedSize = transformedSize,
-        _globalOffset = globalOffset;
+    required this._globalOffset,
+  });
 
   FragmentShader _shader;
   FragmentShader get shader => _shader;
@@ -353,8 +344,11 @@ class _GlassifyShaderLayer extends OffsetLayer {
 
   ui.Image _buildMaskImage([double? blur]) {
     final builder = ui.SceneBuilder();
-    final transform =
-        Matrix4.diagonal3Values(devicePixelRatio, devicePixelRatio, 1);
+    final transform = Matrix4.diagonal3Values(
+      devicePixelRatio,
+      devicePixelRatio,
+      1,
+    );
     final bounds = offset & layerSize;
 
     builder.pushTransform(transform.storage);
@@ -362,9 +356,9 @@ class _GlassifyShaderLayer extends OffsetLayer {
     builder.pop();
 
     return builder.build().toImageSync(
-          (devicePixelRatio * bounds.width).floor(),
-          (devicePixelRatio * bounds.height).floor(),
-        );
+      (devicePixelRatio * bounds.width).floor(),
+      (devicePixelRatio * bounds.height).floor(),
+    );
   }
 
   void _addMaskToScene(ui.SceneBuilder builder, [double? blur]) {

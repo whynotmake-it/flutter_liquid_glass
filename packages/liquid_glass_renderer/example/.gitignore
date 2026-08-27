@@ -49,7 +49,6 @@ ios/
 android/
 windows/
 linux/
-web/
 
 # FVM Version Cache
 .fvm/

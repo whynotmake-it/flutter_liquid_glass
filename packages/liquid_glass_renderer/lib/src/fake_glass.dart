@@ -59,8 +59,9 @@ class FakeGlass extends StatelessWidget {
     final settings = this.settings ?? LiquidGlassSettings.of(context);
 
     // If we are in a layer, we accept that layer's backdrop key.
-    final backdropKey =
-        this.settings == null ? BackdropGroup.of(context)?.backdropKey : null;
+    final backdropKey = this.settings == null
+        ? BackdropGroup.of(context)?.backdropKey
+        : null;
     return GlassShadow(
       shape: shape,
       shadows: shadows,
@@ -124,7 +125,9 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, covariant RenderObject renderObject) {
+    BuildContext context,
+    covariant RenderObject renderObject,
+  ) {
     if (renderObject is _RenderFakeGlass) {
       renderObject
         ..shape = shape
@@ -137,14 +140,11 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
 class _RenderFakeGlass extends RenderProxyBox {
   _RenderFakeGlass({
-    required LiquidShape shape,
-    required LiquidGlassSettings settings,
-    required BackdropKey? backdropKey,
-    required ui.FragmentShader colorShader,
-  })  : _shape = shape,
-        _settings = settings,
-        _backdropKey = backdropKey,
-        _colorShader = colorShader;
+    required this._shape,
+    required this._settings,
+    required this._backdropKey,
+    required this._colorShader,
+  });
 
   LiquidShape _shape;
   LiquidShape get shape => _shape;
@@ -265,10 +265,10 @@ class _RenderFakeGlass extends RenderProxyBox {
     ui.ImageFilter? saturationFilter,
   }) {
     if (saturationFilter != null) {
-      final saturationLayer = (_saturationLayerHandle.layer ??=
-          BackdropFilterLayer())
-        ..filter = saturationFilter
-        ..blendMode = BlendMode.srcATop;
+      final saturationLayer =
+          (_saturationLayerHandle.layer ??= BackdropFilterLayer())
+            ..filter = saturationFilter
+            ..blendMode = BlendMode.srcATop;
       context.pushLayer(
         saturationLayer,
         _paintInnerContent,
@@ -392,8 +392,11 @@ class _RenderFakeGlass extends RenderProxyBox {
     final inset = ui.lerpDouble(0, .5, gradientScale.clamp(0, 1))!;
 
     // How far the second stops are inset
-    final secondInset =
-        ui.lerpDouble(lightCoverage, .5, gradientScale.clamp(0, 1))!;
+    final secondInset = ui.lerpDouble(
+      lightCoverage,
+      .5,
+      gradientScale.clamp(0, 1),
+    )!;
 
     final shader = LinearGradient(
       colors: [

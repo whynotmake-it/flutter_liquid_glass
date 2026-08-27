@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 /// Represents a shape that can be used by a [LiquidGlass] widget.
+// EquatableMixin keeps compatibility with Equatable 2.0.8 consumers.
+// ignore: deprecated_member_use
 sealed class LiquidShape extends OutlinedBorder with EquatableMixin {
   const LiquidShape({super.side = BorderSide.none});
 
@@ -51,9 +53,9 @@ class LiquidRoundedSuperellipse extends LiquidShape {
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-        side: side,
-      );
+    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
+    side: side,
+  );
 
   @override
   LiquidRoundedSuperellipse copyWith({
@@ -121,9 +123,9 @@ class LiquidRoundedRectangle extends LiquidShape {
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-        side: side,
-      );
+    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
+    side: side,
+  );
 
   @override
   LiquidRoundedRectangle copyWith({

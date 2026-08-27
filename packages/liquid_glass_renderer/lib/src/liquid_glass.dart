@@ -42,10 +42,10 @@ class LiquidGlass extends StatelessWidget {
     this.clipBehavior = Clip.hardEdge,
     this.shadows = const [],
     super.key,
-  })  : grouped = false,
-        blendGroupLink = null,
-        ownLayerConfig = null,
-        _auto = false;
+  }) : grouped = false,
+       blendGroupLink = null,
+       ownLayerConfig = null,
+       _auto = false;
 
   /// Creates a new [LiquidGlass] that automatically renders on a parent
   /// [LiquidGlassLayer] if one exists, or creates its own layer if not.
@@ -66,10 +66,10 @@ class LiquidGlass extends StatelessWidget {
     this.glassContainsChild = false,
     this.clipBehavior = Clip.hardEdge,
     this.shadows = const [],
-  })  : grouped = true,
-        blendGroupLink = null,
-        ownLayerConfig = (settings, fake),
-        _auto = true;
+  }) : grouped = true,
+       blendGroupLink = null,
+       ownLayerConfig = (settings, fake),
+       _auto = true;
 
   /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
   ///
@@ -84,9 +84,9 @@ class LiquidGlass extends StatelessWidget {
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
     this.shadows = const [],
-  })  : ownLayerConfig = null,
-        grouped = true,
-        _auto = false;
+  }) : ownLayerConfig = null,
+       grouped = true,
+       _auto = false;
 
   /// Creates a new [LiquidGlass] that creates its own [LiquidGlassLayer].
   ///
@@ -105,9 +105,9 @@ class LiquidGlass extends StatelessWidget {
     this.clipBehavior = Clip.hardEdge,
     this.blendGroupLink,
     this.shadows = const [],
-  })  : ownLayerConfig = (settings, fake),
-        grouped = false,
-        _auto = false;
+  }) : ownLayerConfig = (settings, fake),
+       grouped = false,
+       _auto = false;
 
   /// The child of this widget.
   ///
@@ -332,12 +332,10 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 class RenderLiquidGlass extends RenderProxyBox
     with TransformTrackingRenderObjectMixin {
   RenderLiquidGlass({
-    required LiquidShape shape,
-    required bool glassContainsChild,
-    required GlassGroupLink? blendGroupLink,
-  })  : _shape = shape,
-        _glassContainsChild = glassContainsChild,
-        _blendGroupLink = blendGroupLink;
+    required this._shape,
+    required this._glassContainsChild,
+    required this._blendGroupLink,
+  });
 
   late LiquidShape _shape;
   LiquidShape get shape => _shape;

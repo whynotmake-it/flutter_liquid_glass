@@ -10,7 +10,6 @@ precision mediump float;
 #define DEBUG_BLUR_MATTE 0
 
 #include <flutter/runtime_effect.glsl>
-#include "shared.glsl"
 
 // Optimized uniform layout - grouped into vectors for 50% fewer API calls
 layout(location = 0) uniform vec2 uSize;                    // width, height (auto-set by Flutter)
@@ -42,6 +41,9 @@ uniform sampler2D uForegroundTexture;
 uniform sampler2D uForegroundBlurredTexture;
 layout(location = 0) out vec4 fragColor;
 
+#define BACKGROUND_TEXTURE uBackgroundTexture
+#include "shared.glsl"
+
 
 // Convert blurred alpha to approximate SDF that matches real SDF behavior
 float approximateSDF(float blurredAlpha, float thickness) {
@@ -60,9 +62,9 @@ vec2 findShapeCenter(vec2 currentUV) {
     float totalAlpha = 0.0;
     
     // Sample in a reasonable radius around the current point
-    int sampleRadius = 10;
-    for (int y = -sampleRadius; y <= sampleRadius; y++) {
-        for (int x = -sampleRadius; x <= sampleRadius; x++) {
+    const int sampleRadius = 10;
+    for (int y = -10; y <= 10; y++) {
+        for (int x = -10; x <= 10; x++) {
             vec2 sampleUV = currentUV + vec2(float(x), float(y)) * texelSize;
             
             // Make sure we're within texture bounds
@@ -217,7 +219,6 @@ void main() {
         uLightDirection, 
         uLightIntensity, 
         uAmbientStrength, 
-        uBackgroundTexture, 
         normal,
         foregroundColor.a,
         uGaussianBlur,
@@ -233,4 +234,3 @@ void main() {
         fragColor = mix(fragColor, blurred, 0.99);
     #endif
 }
-
