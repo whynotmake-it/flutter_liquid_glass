@@ -122,8 +122,8 @@ float sceneSDF(vec2 p, int numShapes, float blend) {
 
 // Calculate 3D normal using derivatives (shader-specific normal calculation)
 vec3 getNormal(float sd, float thickness) {
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
+    float dx = 0.0;
+    float dy = 0.0;
     
     // The cosine and sine between normal and the xy plane
     float n_cos = max(thickness + sd, 0.0) / thickness;

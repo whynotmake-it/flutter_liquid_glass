@@ -44,8 +44,10 @@ void main() {
         return;
     }
     
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
+    // Flutter web's SkSL compiler does not expose derivative intrinsics.
+    // Keep a stable front-facing normal for the debug/web fallback.
+    float dx = 0.0;
+    float dy = 0.0;
     
     float n_cos = max(uThickness + sd, 0.0) / uThickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));

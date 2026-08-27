@@ -36,8 +36,8 @@ void main() {
         return;
     }
 
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
+    float dx = 0.0;
+    float dy = 0.0;
 
     float n_cos = max(uThickness + sd, 0.0) / uThickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));

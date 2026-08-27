@@ -59,7 +59,7 @@ vec3 applySpecularHighlights(
     float inwardDistance = geometryData.b * opticalThickness;
     float edgeWidth = min(max(uEdgeWidth, 0.0), opticalThickness * 0.5);
     float highlightInset = edgeWidth * clamp(uEdgeInset, 0.0, 1.0);
-    float edgeFeather = max(fwidth(inwardDistance), 0.5);
+    float edgeFeather = 0.5;
 
     float innerRimMask = edgeWidth > 0.0
         ? smoothstep(
