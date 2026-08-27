@@ -20,13 +20,27 @@ const _defaultMeasureSeconds = int.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS',
   defaultValue: 8,
 );
+final _benchmarkBackdropScale =
+    double.tryParse(
+      const String.fromEnvironment(
+        'LIQUID_GLASS_BENCHMARK_BACKDROP_SCALE',
+        defaultValue: '1',
+      ),
+    ) ??
+    1;
+final _groupShadowAlpha =
+    double.tryParse(
+      const String.fromEnvironment(
+        'LIQUID_GLASS_BENCHMARK_GROUP_SHADOW_ALPHA',
+        defaultValue: '0',
+      ),
+    ) ??
+    0;
 const _native = MethodChannel('dev.liquid_glass_renderer/benchmark');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final nativeConfiguration =
-      await _native.invokeMapMethod<String, Object?>('configuration') ??
-      const <String, Object?>{};
+  final nativeConfiguration = await _readNativeConfiguration();
   final scenario = BenchmarkScenario.values.byName(
     nativeConfiguration['scenario'] as String? ?? _defaultScenarioName,
   );
@@ -71,7 +85,7 @@ Future<void> main() async {
     SchedulerBinding.instance.addTimingsCallback(countWindowFrames);
     while (true) {
       await _startGpuTiming();
-      await _native.invokeMethod<void>('beginInterval', scenario.name);
+      await _invokeNativeVoid('beginInterval', scenario.name);
       windowFrameCount = 0;
       stdout.writeln(
         'LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}:'
@@ -81,7 +95,7 @@ Future<void> main() async {
         Duration(milliseconds: traceMeasureMilliseconds),
       );
       await SchedulerBinding.instance.endOfFrame;
-      await _native.invokeMethod<void>('endInterval', scenario.name);
+      await _invokeNativeVoid('endInterval', scenario.name);
       final windowGpu = await _stopGpuTiming();
       // The optional trailing field carries the in-process GPU busy time in
       // microseconds; the window regex in the parser tolerates its absence.
@@ -101,14 +115,14 @@ Future<void> main() async {
   final preMeasureMemory = _representativeMemory(
     preMeasureStability.samples,
   );
-  await _native.invokeMethod<void>('startMemorySampling');
+  await _invokeNativeVoid('startMemorySampling');
 
   SchedulerBinding.instance.addTimingsCallback(collectTimings);
   await _startGpuTiming();
-  await _native.invokeMethod<void>('beginInterval', scenario.name);
+  await _invokeNativeVoid('beginInterval', scenario.name);
   debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}');
   await Future<void>.delayed(Duration(seconds: measureSeconds));
-  await _native.invokeMethod<void>('endInterval', scenario.name);
+  await _invokeNativeVoid('endInterval', scenario.name);
   final commandBufferGpu = await _stopGpuTiming();
   debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}');
   SchedulerBinding.instance.removeTimingsCallback(collectTimings);
@@ -137,11 +151,17 @@ Future<void> main() async {
     'preMeasureNativeMemory': preMeasureMemory,
     'preMeasureNativeMemorySamples': preMeasureStability.samples,
     'preMeasureMemoryStable': preMeasureStability.stable,
-    'preMeasureMemorySlopeMbPerSecond': preMeasureStability.slopeMbPerSecond,
+    'preMeasureMemorySlopeMbPerSecond':
+        preMeasureStability.slopeMbPerSecond.isFinite
+        ? preMeasureStability.slopeMbPerSecond
+        : null,
     'settledNativeMemory': settledMemory,
     'cooldownNativeMemory': cooldownMemory,
     'cooldownMemoryStable': cooldownStability.stable,
-    'cooldownMemorySlopeMbPerSecond': cooldownStability.slopeMbPerSecond,
+    'cooldownMemorySlopeMbPerSecond':
+        cooldownStability.slopeMbPerSecond.isFinite
+        ? cooldownStability.slopeMbPerSecond
+        : null,
   };
   debugPrint('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
 }
@@ -173,6 +193,28 @@ Future<Map<String, Object?>> _invokeGpuTiming(String method) async {
   }
 }
 
+Future<Map<String, Object?>> _readNativeConfiguration() async {
+  try {
+    return await _native.invokeMapMethod<String, Object?>('configuration') ??
+        const <String, Object?>{};
+  } on PlatformException {
+    return const <String, Object?>{};
+  } on MissingPluginException {
+    return const <String, Object?>{};
+  }
+}
+
+Future<bool> _invokeNativeVoid(String method, [Object? arguments]) async {
+  try {
+    await _native.invokeMethod<void>(method, arguments);
+    return true;
+  } on PlatformException {
+    return false;
+  } on MissingPluginException {
+    return false;
+  }
+}
+
 typedef _MemoryStability = ({
   List<Map<String, Object?>> samples,
   bool stable,
@@ -183,7 +225,9 @@ Future<_MemoryStability> _sampleUntilStable() async {
   final samples = <Map<String, Object?>>[];
   var slope = double.infinity;
   for (var attempt = 0; attempt < 3; attempt++) {
-    await _native.invokeMethod<void>('startMemorySampling');
+    if (!await _invokeNativeVoid('startMemorySampling')) {
+      return (samples: samples, stable: false, slopeMbPerSecond: slope);
+    }
     await Future<void>.delayed(const Duration(seconds: 5));
     samples.addAll(await _stopMemorySampling());
     slope = _memorySlope(samples);
@@ -228,21 +272,23 @@ double _memorySlope(List<Map<String, Object?>> samples) {
   final last = tail.skip(tail.length - window).toList();
   final firstMb = median(
     first
-        .map((sample) => (sample['physicalFootprintBytes'] as num) / 1048576)
+        .map((sample) => (sample['physicalFootprintBytes']! as num) / 1048576)
         .toList(),
   );
   final lastMb = median(
     last
-        .map((sample) => (sample['physicalFootprintBytes'] as num) / 1048576)
+        .map((sample) => (sample['physicalFootprintBytes']! as num) / 1048576)
         .toList(),
   );
   final firstSeconds = median(
     first
-        .map((sample) => (sample['timestampMicros'] as num) / 1000000)
+        .map((sample) => (sample['timestampMicros']! as num) / 1000000)
         .toList(),
   );
   final lastSeconds = median(
-    last.map((sample) => (sample['timestampMicros'] as num) / 1000000).toList(),
+    last
+        .map((sample) => (sample['timestampMicros']! as num) / 1000000)
+        .toList(),
   );
   return lastSeconds == firstSeconds
       ? double.infinity
@@ -270,21 +316,34 @@ Map<String, Object?>? _representativeMemory(
 }
 
 Future<List<Map<String, Object?>>> _stopMemorySampling() async {
-  final values = await _native.invokeListMethod<Object?>('stopMemorySampling');
-  return values
-          ?.whereType<Map<Object?, Object?>>()
-          .map(
-            (value) => value.map(
-              (key, item) => MapEntry(key as String, item),
-            ),
-          )
-          .toList() ??
-      const <Map<String, Object?>>[];
+  try {
+    final values = await _native.invokeListMethod<Object?>(
+      'stopMemorySampling',
+    );
+    return values
+            ?.whereType<Map<Object?, Object?>>()
+            .map(
+              (value) => value.map(
+                (key, item) => MapEntry(key! as String, item),
+              ),
+            )
+            .toList() ??
+        const <Map<String, Object?>>[];
+  } on PlatformException {
+    return const <Map<String, Object?>>[];
+  } on MissingPluginException {
+    return const <Map<String, Object?>>[];
+  }
 }
 
 enum BenchmarkScenario {
   baselineMotion,
   staticSingle,
+  plainStatic,
+  fakeLightingOnly,
+  fakeBlurOnly,
+  fakeSaturationOnly,
+  fakeBlurSaturation,
   translatedSingle,
   ancestorTranslatedLayer,
   scaledRotatedSingle,
@@ -399,23 +458,29 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
   bool _isAnimated(BenchmarkScenario scenario) => switch (scenario) {
     BenchmarkScenario.staticSingle ||
     BenchmarkScenario.largeStatic ||
+    BenchmarkScenario.plainStatic ||
+    BenchmarkScenario.fakeLightingOnly ||
+    BenchmarkScenario.fakeBlurOnly ||
+    BenchmarkScenario.fakeSaturationOnly ||
+    BenchmarkScenario.fakeBlurSaturation ||
     BenchmarkScenario.fakeStatic ||
     BenchmarkScenario.fakeLarge => false,
     _ => true,
   };
 
   Widget _buildScenario(double t) {
-    final settings = const LiquidGlassSettings(thickness: 30, frost: 15);
-    final litSettings = const LiquidGlassSettings(
+    final settings = LiquidGlassSettings(
+      thickness: 30,
+      frost: 15,
+      backdropScale: _benchmarkBackdropScale,
+    );
+    const litSettings = LiquidGlassSettings(
       thickness: 30,
       frost: 15,
       contourStrength: .22,
       contourWidth: 1.5,
       contourTransmittance: .8,
-      faceGradientStrength: .015,
-      faceGradientDepth: 40,
       bevelShadowStrength: .025,
-      bevelShadowDepth: 12,
     );
     final moving = Transform.translate(
       offset: Offset(-180 + 360 * t, 40 * math.sin(t * math.pi * 2)),
@@ -429,6 +494,32 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           settings: settings,
           shape: const LiquidRoundedSuperellipse(borderRadius: 32),
           child: _tile(0),
+        ),
+      ),
+      BenchmarkScenario.plainStatic => Center(child: _tile(0)),
+      BenchmarkScenario.fakeLightingOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          saturation: 1,
+        ),
+      ),
+      BenchmarkScenario.fakeBlurOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          saturation: 1,
+          highlight: 0,
+        ),
+      ),
+      BenchmarkScenario.fakeSaturationOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          highlight: 0,
+        ),
+      ),
+      BenchmarkScenario.fakeBlurSaturation => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
         ),
       ),
       BenchmarkScenario.translatedSingle => LiquidGlassLayer(
@@ -605,6 +696,17 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ),
   );
 
+  Widget _fakeLayer(LiquidGlassSettings settings) => LiquidGlassLayer(
+    settings: settings,
+    fake: true,
+    child: Center(
+      child: LiquidGlass(
+        shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+        child: _tile(0),
+      ),
+    ),
+  );
+
   // Constant per-layer tile size across the count ladder so the scenarios
   // isolate the cost of each additional independent layer.
   Widget _independentGrid({
@@ -650,6 +752,18 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
               children: List.generate(
                 count,
                 (index) => LiquidGlass.grouped(
+                  shadows: _groupShadowAlpha > 0
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: _groupShadowAlpha,
+                            ),
+                            offset: const Offset(0, 4),
+                            blurRadius: 8,
+                            spreadRadius: -1,
+                          ),
+                        ]
+                      : const [],
                   shape: LiquidRoundedSuperellipse(
                     borderRadius: 8.0 + index,
                   ),

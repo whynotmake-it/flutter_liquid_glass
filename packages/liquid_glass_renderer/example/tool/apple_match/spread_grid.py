@@ -25,7 +25,7 @@ from apple_match.hotloop import (  # noqa: E402
     scene_crop,
 )
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 SCENES = ("toolbar_capsule", "small_capsule", "large_capsule")
 DEFAULT_SPREADS = (0.0, 0.0625, 0.125, 0.25, 0.5)
 

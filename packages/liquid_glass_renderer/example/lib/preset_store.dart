@@ -49,7 +49,7 @@ class PresetStore {
 
   Future<void> save(String name, LiquidGlassSettings settings) async {
     final directory = await _directory();
-    final safeName = name.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+    final safeName = name.replaceAll(RegExp('[^A-Za-z0-9_.-]'), '_');
     final file = File('${directory.path}/$safeName.yaml');
     await file.writeAsString(toYaml(settings));
   }

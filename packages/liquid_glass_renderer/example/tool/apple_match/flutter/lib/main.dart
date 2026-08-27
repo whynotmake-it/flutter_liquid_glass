@@ -75,6 +75,8 @@ class MatchApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      themeMode: scene.appearance == 'dark' ? ThemeMode.dark : ThemeMode.light,
+      darkTheme: ThemeData.dark(),
       home: Scaffold(
         body: MatchSceneView(scene: scene, probe: probe, settings: settings),
       ),

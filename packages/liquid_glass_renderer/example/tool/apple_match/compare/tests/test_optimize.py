@@ -145,9 +145,6 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(optimization_objective("tintColor", result)[1], 1.5)
         self.assertEqual(optimization_objective("highlight", result)[1], 6.0)
         self.assertEqual(optimization_objective("outline", result)[1], 7.0)
-        self.assertEqual(
-            optimization_objective("faceShading", result)[1], 3.5
-        )
         self.assertEqual(optimization_objective("blurMtf", result)[1], 9.0)
 
     def test_transparency_curve_interpretation(self):

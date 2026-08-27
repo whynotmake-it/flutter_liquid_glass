@@ -21,7 +21,7 @@ from apple_match.cli import load_probes  # noqa: E402
 from apple_match.hotloop import load_reference_probes, scene_crop  # noqa: E402
 from apple_match.metrics import score_images  # noqa: E402
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 SCENES = ("toolbar_capsule", "small_capsule", "large_capsule")
 METRIC_REVISION = "score_images-v1 (metrics.py WEIGHTS 0.25/0.15/0.15/0.10/0.15/0.10/0.10)"
 

@@ -8,19 +8,27 @@ void main() {
     expect(settings.tint.r, closeTo(253 / 255, .001));
     expect(settings.tint.g, closeTo(252 / 255, .001));
     expect(settings.tint.b, closeTo(253 / 255, .001));
-    expect(settings.tint.a, closeTo(.53, .001));
+    expect(settings.tint.a, closeTo(.407, .001));
     expect(settings.thickness, 12);
     expect(settings.frost, 7);
     expect(settings.edgeRefraction, closeTo(27.42, .01));
     expect(settings.refractionSpread, 0);
-    expect(settings.highlight, .5);
-    expect(settings.contourStrength, .22);
-    expect(settings.contourWidth, 1.5);
+    expect(settings.backdropScale, 1);
+    expect(settings.highlight, .25);
+    expect(settings.highlightWidth, .75);
+    expect(settings.highlightWrap, .25);
+    expect(settings.highlightOppositeStrength, .5);
+    expect(settings.curvatureLighting, 0);
+    expect(settings.contourStrength, .15);
+    expect(settings.contourWidth, .65);
+    expect(settings.contourOffset, .25);
     expect(settings.contourTransmittance, .8);
-    expect(settings.faceGradientStrength, .015);
-    expect(settings.faceGradientDepth, 40);
-    expect(settings.bevelShadowStrength, .025);
-    expect(settings.bevelShadowDepth, 12);
+    expect(settings.bevelShadowStrength, .04);
+    expect(settings.bevelShadowDepth, 18);
+    expect(settings.bevelShadowOffset, 4);
+    expect(settings.bevelShadowDirectionality, .75);
+    expect(settings.bevelShadowSizeResponse, 0);
+    expect(settings.exteriorShadowSizeResponse, 1);
   });
 
   test('visibility fades strengths without shrinking material support', () {
@@ -30,36 +38,48 @@ void main() {
       thickness: 40,
       edgeRefraction: 80,
       refractionSpread: .8,
+      backdropScale: .75,
       frost: 12,
       chromaticAberration: 2,
       transmissionGamma: .8,
       vibrancy: .4,
       highlight: .6,
+      highlightWidth: 2.5,
+      highlightWrap: .3,
+      curvatureLighting: .4,
       contourStrength: .3,
       contourWidth: 4,
+      contourOffset: .5,
       contourTransmittance: .8,
-      faceGradientStrength: .06,
-      faceGradientDepth: 40,
       bevelShadowStrength: .1,
-      bevelShadowDepth: 12,
+      bevelShadowOffset: 3,
+      bevelShadowDirectionality: .8,
+      bevelShadowSizeResponse: .7,
+      exteriorShadowSizeResponse: .6,
       saturation: 2,
     );
     expect(settings.effectiveTint.a, closeTo(128 / 255 * .5, .001));
     expect(settings.effectiveThickness, 20);
     expect(settings.effectiveEdgeRefraction, 40);
     expect(settings.effectiveRefractionSpread, .4);
+    expect(settings.effectiveBackdropScale, .875);
     expect(settings.effectiveFrost, 6);
     expect(settings.effectiveChromaticAberration, 1);
     expect(settings.effectiveTransmissionGamma, .9);
     expect(settings.effectiveVibrancy, .2);
     expect(settings.effectiveHighlight, .3);
+    expect(settings.effectiveHighlightWidth, 2.5);
+    expect(settings.effectiveHighlightWrap, .3);
+    expect(settings.effectiveCurvatureLighting, .2);
     expect(settings.effectiveContourStrength, .15);
     expect(settings.effectiveContourWidth, 4);
+    expect(settings.effectiveContourOffset, .5);
     expect(settings.effectiveContourTransmittance, .8);
-    expect(settings.effectiveFaceGradientStrength, .03);
-    expect(settings.effectiveFaceGradientDepth, 40);
     expect(settings.effectiveBevelShadowStrength, .05);
     expect(settings.effectiveBevelShadowDepth, 12);
+    expect(settings.effectiveBevelShadowDirectionality, .4);
+    expect(settings.effectiveBevelShadowSizeResponse, .7);
+    expect(settings.effectiveExteriorShadowSizeResponse, .3);
     expect(settings.effectiveSaturation, 1.5);
   });
 
@@ -71,28 +91,43 @@ void main() {
       thickness: 31,
       edgeRefraction: 42,
       refractionSpread: .5,
+      backdropScale: .8,
       frost: 7,
       chromaticAberration: .2,
       saturation: 1.1,
       transmissionGamma: .9,
       vibrancy: .5,
       highlight: .4,
+      highlightWidth: 3,
+      highlightWrap: .2,
+      curvatureLighting: .6,
       contourStrength: .15,
       contourWidth: 2,
+      contourOffset: .75,
       contourTransmittance: .7,
-      faceGradientStrength: .02,
-      faceGradientDepth: 35,
       bevelShadowStrength: .03,
       bevelShadowDepth: 10,
+      bevelShadowOffset: 4,
+      bevelShadowDirectionality: .75,
+      bevelShadowSizeResponse: .65,
+      exteriorShadowSizeResponse: .55,
     );
     expect(changed, isNot(original));
     expect(changed.tint, const Color(0x33445566));
     expect(changed.edgeRefraction, 42);
     expect(changed.refractionSpread, .5);
+    expect(changed.backdropScale, .8);
+    expect(changed.highlightWrap, .2);
+    expect(changed.highlightWidth, 3);
+    expect(changed.curvatureLighting, .6);
     expect(changed.contourWidth, 2);
+    expect(changed.contourOffset, .75);
     expect(changed.contourTransmittance, .7);
-    expect(changed.faceGradientStrength, .02);
     expect(changed.bevelShadowStrength, .03);
+    expect(changed.bevelShadowOffset, 4);
+    expect(changed.bevelShadowDirectionality, .75);
+    expect(changed.bevelShadowSizeResponse, .65);
+    expect(changed.exteriorShadowSizeResponse, .55);
   });
 
   test('preset JSON round trips the public material vector', () {
@@ -101,15 +136,20 @@ void main() {
       thickness: 18,
       edgeRefraction: 32,
       refractionSpread: .4,
+      backdropScale: .85,
       frost: 6,
       highlight: .7,
+      highlightWidth: 2,
+      highlightWrap: .4,
+      curvatureLighting: .35,
       contourStrength: .2,
       contourWidth: 1.5,
+      contourOffset: .5,
       contourTransmittance: .75,
-      faceGradientStrength: .015,
-      faceGradientDepth: 40,
       bevelShadowStrength: .025,
-      bevelShadowDepth: 12,
+      bevelShadowOffset: 3,
+      bevelShadowDirectionality: .6,
+      bevelShadowSizeResponse: .55,
     );
     final restored = LiquidGlassSettings.fromJson(original.toJson());
     expect(restored, original);

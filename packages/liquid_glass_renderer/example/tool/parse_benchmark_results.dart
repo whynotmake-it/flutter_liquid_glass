@@ -1,3 +1,8 @@
+// The parser emits Markdown tables and diagnostic strings whose source form is
+// clearer when kept intact; bracketed metric names are prose, not Dart links.
+// ignore_for_file: cascade_invocations, comment_references
+// ignore_for_file: lines_longer_than_80_chars, no_adjacent_strings_in_list
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -93,7 +98,9 @@ void main(List<String> arguments) {
   }
   if (options['enforce'] == 'true' && violations.isNotEmpty) {
     stderr.writeln('Benchmark regression thresholds failed:');
-    for (final violation in violations) stderr.writeln('- $violation');
+    for (final violation in violations) {
+      stderr.writeln('- $violation');
+    }
     exitCode = 1;
   }
 }
@@ -102,7 +109,7 @@ Map<String, String> _options(List<String> args) {
   final result = <String, String>{};
   for (var i = 0; i < args.length; i += 2) {
     if (!args[i].startsWith('--') || i + 1 >= args.length) {
-      throw FormatException('Expected --name value arguments.');
+      throw const FormatException('Expected --name value arguments.');
     }
     result[args[i].substring(2)] = args[i + 1];
   }
@@ -357,7 +364,7 @@ _GpuReadResult _readGpuIntervals(
   };
   final intervals = <(int, int)>[];
   for (final match in RegExp(
-    r'<row>(.*?)</row>',
+    '<row>(.*?)</row>',
     dotAll: true,
   ).allMatches(xml)) {
     final row = match.group(1)!;
@@ -554,7 +561,7 @@ List<_MeasurementWindow> _readSignpostMeasurementWindows(
   final beginPids = <String, int>{};
   final windows = <_MeasurementWindow>[];
   for (final match in RegExp(
-    r'<row>(.*?)</row>',
+    '<row>(.*?)</row>',
     dotAll: true,
   ).allMatches(xml)) {
     final row = match.group(1)!;
@@ -620,10 +627,10 @@ List<_MeasurementWindow> _readLoggedMeasurementWindows(
   if (!traceAppLog.existsSync() || !traceToc.existsSync()) return const [];
   final toc = traceToc.readAsStringSync();
   final startText = RegExp(
-    r'<start-date>([^<]+)</start-date>',
+    '<start-date>([^<]+)</start-date>',
   ).firstMatch(toc)?.group(1);
   final durationText = RegExp(
-    r'<duration>([^<]+)</duration>',
+    '<duration>([^<]+)</duration>',
   ).firstMatch(toc)?.group(1);
   final processPidText = RegExp(
     r'<process type="attached"[^>]*name="liquid_glass_renderer_example"[^>]*pid="(\d+)"',
@@ -780,7 +787,7 @@ _MetalMetrics? _readMetalResources(
   var deallocatedBytes = 0;
   var largestAllocationBytes = 0;
   for (final match in RegExp(
-    r'<row>(.*?)</row>',
+    '<row>(.*?)</row>',
     dotAll: true,
   ).allMatches(xml)) {
     final row = match.group(1)!;
@@ -1058,7 +1065,9 @@ String _markdown(
       'Metal trace metrics are attribution-only and never gate.',
     );
   } else {
-    for (final violation in violations) out.writeln('- ❌ $violation');
+    for (final violation in violations) {
+      out.writeln('- ❌ $violation');
+    }
   }
   return out.toString();
 }
@@ -1076,7 +1085,7 @@ String _markdown(
 /// [_inProcessGpuFrameCvLimit] to a finite value (for example .15) to
 /// enforce its cross-repetition repeatability exactly like raster and
 /// footprint.
-final double? _inProcessGpuFrameCvLimit = null;
+const double? _inProcessGpuFrameCvLimit = null;
 
 List<String> _violations(
   List<_Report> reports,

@@ -67,6 +67,24 @@ struct MatchView: View {
                         height: scene.canvas.logicalHeight
                     )
                     .accessibilityIdentifier("loupe-field")
+            } else if scene.profile == "material_shape", #available(iOS 26.0, *) {
+                Color.clear
+                    .frame(
+                        width: scene.shape.width,
+                        height: scene.shape.height
+                    )
+                    .glassEffect(
+                        .regular,
+                        in: ReferenceGlassShape(
+                            kind: scene.shape.kind,
+                            cornerRadius: scene.shape.cornerRadius
+                        )
+                    )
+                    .position(
+                        x: scene.shape.x + scene.shape.width / 2,
+                        y: scene.shape.y + scene.shape.height / 2
+                    )
+                    .accessibilityIdentifier("official-glass-shape")
             } else if #available(iOS 26.0, *) {
                 Button(action: {}) {
                     Color.clear
@@ -84,6 +102,25 @@ struct MatchView: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+struct ReferenceGlassShape: Shape {
+    let kind: String
+    let cornerRadius: Double
+
+    func path(in rect: CGRect) -> Path {
+        switch kind {
+        case "circle":
+            Circle().path(in: rect)
+        case "roundedSuperellipse":
+            RoundedRectangle(
+                cornerRadius: cornerRadius,
+                style: .continuous
+            ).path(in: rect)
+        default:
+            Capsule(style: .continuous).path(in: rect)
+        }
     }
 }
 
@@ -139,6 +176,37 @@ struct ProbeBackground: View {
     var body: some View {
         if spec.kind == "solid" {
             Color(srgbHex: spec.color!)
+        } else if spec.kind == "tileGrid" {
+            Canvas { context, size in
+                let cell = Double(spec.cellSize!)
+                let gutter = Double(spec.gutter!)
+                let pattern = spec.pattern!
+                context.fill(
+                    Path(CGRect(origin: .zero, size: size)),
+                    with: .color(Color(srgbHex: spec.gutterColor!))
+                )
+                for row in 0..<Int(ceil(size.height / cell)) {
+                    let patternRow = pattern[row % pattern.count]
+                    for column in 0..<Int(ceil(size.width / cell)) {
+                        let offset = patternRow.index(
+                            patternRow.startIndex,
+                            offsetBy: column % patternRow.count
+                        )
+                        let code = String(patternRow[offset])
+                        context.fill(
+                            Path(
+                                CGRect(
+                                    x: Double(column) * cell,
+                                    y: Double(row) * cell,
+                                    width: cell - gutter,
+                                    height: cell - gutter
+                                )
+                            ),
+                            with: .color(Color(srgbHex: spec.palette![code]!))
+                        )
+                    }
+                }
+            }
         } else {
             Canvas { context, size in
                 let cell = Double(spec.cellSize!)

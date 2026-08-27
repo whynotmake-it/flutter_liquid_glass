@@ -295,7 +295,19 @@ def silhouette(image: np.ndarray, *, threshold: float = 0.02) -> np.ndarray:
     """Extract glass silhouette from the black solid probe."""
     mask = (luminance(image) > threshold).astype(np.uint8)
     kernel = np.ones((5, 5), np.uint8)
-    return cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        closed,
+        connectivity=8,
+    )
+    if component_count <= 1:
+        return closed
+    # Physical-device references can retain unrelated bright system chrome
+    # (for example the home indicator) on the otherwise-black probe. Glass is
+    # the dominant connected component; including every component turns a
+    # correctly registered toolbar into a full-height false silhouette.
+    largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    return (labels == largest).astype(np.uint8)
 
 
 def _mask_measurements(mask: np.ndarray, core_mask: np.ndarray) -> Dict[str, float]:

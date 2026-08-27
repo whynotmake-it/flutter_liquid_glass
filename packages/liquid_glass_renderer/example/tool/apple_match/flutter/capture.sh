@@ -9,6 +9,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${CAPTURE_LAUNCH_SETTLE_SECONDS:=4}"
 : "${FLUTTER_BIN:=$HOME/fvm/versions/3.47.1/bin/flutter}"
 : "${PREPARE_APP:=1}"
+: "${SCENE_ID:=toolbar_capsule}"
+: "${SCENE_FILE:=$ROOT/scenes/$SCENE_ID.json}"
 
 if [[ ! -x "$FLUTTER_BIN" ]]; then
   echo "Flutter 3.47.1 not found at $FLUTTER_BIN; set FLUTTER_BIN explicitly." >&2
@@ -16,8 +18,10 @@ if [[ ! -x "$FLUTTER_BIN" ]]; then
 fi
 export PATH="$ROOT/compat/bin:$PATH"
 
-SCENE_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(open(sys.argv[1],"rb").read()).decode())' "$ROOT/scenes/toolbar_capsule.json")"
+[[ -f "$SCENE_FILE" ]] || { echo "Unknown scene: $SCENE_FILE" >&2; exit 2; }
+SCENE_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(open(sys.argv[1],"rb").read()).decode())' "$SCENE_FILE")"
 SETTINGS_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(open(sys.argv[1],"rb").read()).decode())' "$SETTINGS_FILE")"
+APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE_FILE")"
 
 mkdir -p "$CANDIDATE_OUT"
 mkdir -p "$CANDIDATE_OUT/frames"
@@ -42,20 +46,7 @@ screenshot_frame() {
   local attempt
   for attempt in 1 2 3 4 5 6; do
     xcrun simctl io "$IOS_27_UDID" screenshot "$destination"
-    if python3 - "$probe" "$destination" <<'PY'
-import cv2
-import sys
-
-expected = {
-    "A": (0, 0, 255),
-    "B": (0, 0, 255),
-    "C": (0, 0, 0),
-    "D": (255, 255, 255),
-}[sys.argv[1]]
-image = cv2.imread(sys.argv[2], cv2.IMREAD_COLOR)
-pixel = tuple(int(value) for value in image[5, 5])
-raise SystemExit(0 if pixel == expected else 1)
-PY
+    if python3 "$ROOT/validate_probe_frame.py" "$SCENE_FILE" "$probe" "$destination"
     then
       return
     fi
@@ -90,6 +81,7 @@ if [[ "$PREPARE_APP" == "1" ]]; then
   xcrun simctl install "$IOS_27_UDID" \
     "$ROOT/flutter/build/ios/iphonesimulator/Runner.app"
 fi
+xcrun simctl ui "$IOS_27_UDID" appearance "$APPEARANCE"
 for probe in A B C D; do
   launch_flutter "$probe"
   if ! kill -0 "$pid" 2>/dev/null; then
@@ -110,4 +102,26 @@ for probe in A B C D; do
     "$CANDIDATE_OUT"/frames/"${probe}"_*.png
 done
 cp "$SETTINGS_FILE" "$CANDIDATE_OUT/settings.json"
+python3 - "$CANDIDATE_OUT/metadata.json" "$SCENE_FILE" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+scene = json.loads(Path(sys.argv[2]).read_text())
+Path(sys.argv[1]).write_text(
+    json.dumps(
+        {
+            "scene": scene["id"],
+            "shapeKind": scene["shape"]["kind"],
+            "appearance": scene["appearance"],
+            "captureType": "pinned iOS simulator Flutter candidate",
+            "captureEncoding": "SDR tone-mapped 8-bit PNG",
+            "medianFrameCount": int(os.environ.get("CAPTURE_FRAMES", "3")),
+        },
+        indent=2,
+    )
+    + "\n"
+)
+PY
 echo "$CANDIDATE_OUT"

@@ -81,7 +81,7 @@ def capture_matches(output: Path, settings: dict, *, frames: int = 1) -> bool:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--udid", default=os.environ.get("IOS_27_UDID"))
-    parser.add_argument("--reference-set", default="ios27-iphone17pro-light")
+    parser.add_argument("--reference-set", default="ios27-iphone17pro-ground-truth-v2/slider-000")
     parser.add_argument("--skip-reference-capture", action="store_true")
     parser.add_argument("--reuse-captures", action="store_true")
     args = parser.parse_args()

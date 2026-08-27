@@ -15,6 +15,7 @@ layout(std140) uniform GeometryUniforms {
     vec2 uOffset;
     vec2 uTextureSize;
     vec4 uOpticalProps;
+    vec4 uContourProps;
     vec4 uShapeData[MAX_SHAPES * 3];
     vec4 uRseData[MAX_SHAPES * 3];
 } geometryUniforms;
@@ -22,6 +23,7 @@ layout(std140) uniform GeometryUniforms {
 #define uOffset geometryUniforms.uOffset
 #define uTextureSize geometryUniforms.uTextureSize
 #define uOpticalProps geometryUniforms.uOpticalProps
+#define uContourProps geometryUniforms.uContourProps
 #define uNumShapes (uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
 #define uRseData geometryUniforms.uRseData
@@ -34,6 +36,7 @@ layout(std140) uniform GeometryUniforms {
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
 float uRefractionSpread = uTextureSize.x;
+float uContourExtent = uContourProps.x;
 out vec4 fragColor;
 
 void main() {
@@ -42,18 +45,9 @@ void main() {
     vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
     float spread = clamp(uRefractionSpread, 0.0, 1.0);
-    // The normal material has no face-spread lens. Keep its established SDF
-    // path free of the loupe metadata traversal; the extra shape metadata is
-    // only needed by controls that explicitly opt into refraction spread.
     bool hasFaceSpread = spread > 0.0;
-    SceneSample scene;
-    float sd;
-    if (hasFaceSpread) {
-        scene = sceneSample(fragCoord, int(uNumShapes));
-        sd = scene.distance;
-    } else {
-        sd = sceneSDF(fragCoord, int(uNumShapes));
-    }
+    SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
+    float sd = scene.distance;
 
     // Match Flutter 3.47's centered signed-distance antialiasing: the
     // coverage transition is half a physical pixel on either side of the
@@ -61,8 +55,17 @@ void main() {
     // inside the shape. This keeps the contour position independent of scale.
     float pixelSize = length(vec2(dFdx(sd), dFdy(sd)));
     float fade = clamp(uOpticalProps.y, 0.0, 1.0) * max(pixelSize, 1e-4);
-    float foregroundAlpha = 1.0 - smoothstep(-fade, fade, sd);
-    if (foregroundAlpha < 0.01) {
+    float materialAlpha = 1.0 - smoothstep(-fade, fade, sd);
+    // Keep geometry alive only as far as the final pass can draw an attached
+    // contour. The final shader reconstructs material AA from the signed SDF,
+    // so expanding this support does not expand the glass body itself.
+    float contourSupport = 1.0 - smoothstep(
+        max(uContourExtent - fade, 0.0),
+        uContourExtent,
+        sd
+    );
+    float effectSupport = max(materialAlpha, contourSupport);
+    if (effectSupport < 0.01) {
         fragColor = vec4(0.0);
         return;
     }
@@ -120,14 +123,19 @@ void main() {
     // above. Do not add a center-relative affine scale here: that merely
     // enlarges the backdrop and reads as a zoomed pill rather than refraction.
     vec2 displacement = refractedDisplacement;
-
-    float edgeDistance = max(-sd, 0.0);
-
+    vec2 surfaceGradient = vec2(dx, dy);
+    float surfaceGradientLength = length(surfaceGradient);
+    vec2 surfaceNormal = surfaceGradientLength > 0.0001
+        ? surfaceGradient / surfaceGradientLength
+        : vec2(0.0);
+    float displacementMagnitude = dot(displacement, surfaceNormal);
+    float signedEdgeDistance = -sd;
     fragColor = encodeDisplacementData(
-        displacement,
+        surfaceNormal,
+        displacementMagnitude,
         max(uTextureSize.y, 0.001),
-        edgeDistance,
+        signedEdgeDistance,
         uThickness,
-        foregroundAlpha
+        uContourExtent
     );
 }

@@ -12,14 +12,16 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 const _scenePath = String.fromEnvironment('HOST_CAPTURE_SCENE');
 const _settingsPath = String.fromEnvironment('HOST_CAPTURE_SETTINGS');
 const _outputPath = String.fromEnvironment('HOST_CAPTURE_OUT');
-const _probe = String.fromEnvironment('HOST_CAPTURE_PROBE');
+const _probeList = String.fromEnvironment('HOST_CAPTURE_PROBES');
+const _dprOverride = String.fromEnvironment('HOST_CAPTURE_DPR');
+const _captureFake = bool.fromEnvironment('HOST_CAPTURE_FAKE');
 
 void main() {
   final configurationMissing =
       _scenePath.isEmpty ||
       _settingsPath.isEmpty ||
       _outputPath.isEmpty ||
-      !const {'A', 'B', 'C', 'D'}.contains(_probe);
+      _probeList.isEmpty;
 
   testWidgets('captures the requested probe with the macOS Impeller renderer', (
     tester,
@@ -38,50 +40,83 @@ void main() {
     );
     final settings =
         jsonDecode(settingsFile.readAsStringSync())! as Map<String, Object?>;
+    final captureDpr = _dprOverride.isEmpty
+        ? scene.scale.toDouble()
+        : double.parse(_dprOverride);
 
     tester.view
-      ..devicePixelRatio = scene.scale.toDouble()
+      ..devicePixelRatio = captureDpr
       ..physicalSize = Size(
-        scene.width * scene.scale,
-        scene.height * scene.scale,
+        scene.width * captureDpr,
+        scene.height * captureDpr,
       );
     addTearDown(tester.view.reset);
 
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: RepaintBoundary(
-          key: captureKey,
-          child: MatchSceneView(
-            scene: scene,
-            probe: _probe,
-            settings: settings,
-          ),
-        ),
-      ),
-    );
-    await _pumpUntilGlassReady(tester);
-    await tester.pump();
+    final probes = _probeList
+        .split(RegExp(r'\s+'))
+        .where((probe) => probe.isNotEmpty)
+        .toList(growable: false);
+    expect(probes, isNotEmpty);
+    expect(probes, everyElement(isIn(const {'A', 'B', 'C', 'D'})));
 
-    final boundary =
-        captureKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    await expectLater(
-      boundary.toImage(pixelRatio: scene.scale.toDouble()),
-      matchesGoldenFile(Uri.file('${output.path}/$_probe.png')),
-    );
+    // Widget tests disable MaskFilter shadows globally. This harness is
+    // explicitly fitting those pixels, so enable them while the display list
+    // is built and rasterized, then restore the debug global before binding
+    // invariants run.
+    final shadowsWereDisabled = debugDisableShadows;
+    debugDisableShadows = false;
+    try {
+      for (final probe in probes) {
+        final captureKey = GlobalKey();
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: RepaintBoundary(
+              key: captureKey,
+              child: MatchSceneView(
+                scene: scene,
+                probe: probe,
+                settings: settings,
+                fake: _captureFake,
+              ),
+            ),
+          ),
+        );
+        await _pumpUntilGlassReady(tester, fake: _captureFake);
+        await tester.pump();
+
+        final boundary =
+            captureKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: captureDpr);
+        await expectLater(
+          image,
+          matchesGoldenFile(Uri.file('${output.path}/$probe.png')),
+        );
+      }
+    } finally {
+      debugDisableShadows = shadowsWereDisabled;
+    }
 
     settingsFile.copySync('${output.path}/settings.json');
   }, skip: configurationMissing);
 }
 
-Future<void> _pumpUntilGlassReady(WidgetTester tester) async {
+Future<void> _pumpUntilGlassReady(
+  WidgetTester tester, {
+  required bool fake,
+}) async {
   for (var frame = 0; frame < 60; frame++) {
-    if (find.byType(LiquidGlassLayer).evaluate().isNotEmpty &&
-        find.byType(FakeGlass).evaluate().isEmpty) {
+    final ready = fake
+        ? find.byType(FakeGlass).evaluate().isNotEmpty
+        : find.byType(LiquidGlassLayer).evaluate().isNotEmpty &&
+              find.byType(FakeGlass).evaluate().isEmpty;
+    if (ready) {
       return;
     }
     await tester.pump(const Duration(milliseconds: 16));
   }
-  fail('Flutter GPU LiquidGlassLayer did not become ready within 60 frames');
+  fail(
+    '${fake ? 'FakeGlass' : 'Flutter GPU LiquidGlassLayer'} did not become ready within 60 frames',
+  );
 }

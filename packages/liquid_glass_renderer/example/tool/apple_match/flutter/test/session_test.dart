@@ -9,10 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 MatchScene testScene() {
   return MatchScene(
     profile: 'toolbar_capsule',
+    appearance: 'light',
     width: 100,
     height: 100,
     scale: 1,
     shapeRect: const Rect.fromLTWH(10, 10, 50, 20),
+    shapeKind: 'capsule',
     cornerRadius: 10,
     probes: const {
       'A': {'kind': 'solid', 'color': '#000000'},

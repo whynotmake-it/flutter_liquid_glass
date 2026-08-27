@@ -6,13 +6,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${SCENE_FILE:=$ROOT/scenes/toolbar_capsule.json}"
 : "${CANDIDATE_OUT:=$ROOT/out/host-candidates/baseline}"
 : "${FLUTTER_BIN:=$HOME/fvm/versions/3.47.1/bin/flutter}"
+: "${CAPTURE_PROBES:=A B C D}"
+: "${CAPTURE_DPR:=}"
+: "${HOST_CAPTURE_FAKE:=false}"
 
 if [[ ! -x "$FLUTTER_BIN" ]]; then
   echo "Flutter 3.47.1 not found at $FLUTTER_BIN; set FLUTTER_BIN explicitly." >&2
   exit 4
 fi
 
-for probe in A B C D; do
+(
+  cd "$ROOT/flutter"
   "$FLUTTER_BIN" test \
     --enable-impeller \
     --enable-flutter-gpu \
@@ -20,8 +24,10 @@ for probe in A B C D; do
     --dart-define="HOST_CAPTURE_SCENE=$SCENE_FILE" \
     --dart-define="HOST_CAPTURE_SETTINGS=$SETTINGS_FILE" \
     --dart-define="HOST_CAPTURE_OUT=$CANDIDATE_OUT" \
-    --dart-define="HOST_CAPTURE_PROBE=$probe" \
+    --dart-define="HOST_CAPTURE_PROBES=$CAPTURE_PROBES" \
+    --dart-define="HOST_CAPTURE_DPR=$CAPTURE_DPR" \
+    --dart-define="HOST_CAPTURE_FAKE=$HOST_CAPTURE_FAKE" \
     test/host_capture_test.dart
-done
+)
 
 echo "$CANDIDATE_OUT"

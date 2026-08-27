@@ -1,5 +1,8 @@
 name: liquid_glass_workspace_workspace
 
+# Keep workspace commands on the same Flutter/Dart pair as package constraints.
+sdkPath: .fvm/flutter_sdk
+
 packages:
   - packages/*
   - "packages/**/example/"
@@ -37,7 +40,9 @@ scripts:
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      # Native-asset hooks for the package and example write the same shader
+      # bundle; running them concurrently races on that output file.
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages.
@@ -53,7 +58,7 @@ scripts:
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Generate coverage for the selected package.
@@ -69,7 +74,7 @@ scripts:
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages without golden tests.
@@ -86,7 +91,7 @@ scripts:
       --update-goldens
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages without golden tests.

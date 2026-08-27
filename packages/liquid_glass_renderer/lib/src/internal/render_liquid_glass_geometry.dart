@@ -34,6 +34,9 @@ mixin LiquidGlassShapeRenderObject on RenderBox {
   /// Whether this shape's child is painted inside the glass.
   bool get glassContainsChild;
 
+  /// Shadows painted by the parent layer before grouped glass shading.
+  List<BoxShadow> get layerShadows;
+
   /// Paints this shape's child from the layer's paint context.
   void paintFromLayer(
     PaintingContext context,
@@ -234,6 +237,16 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !anyShapeChangedInLayer &&
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
+      // Paint-only shape metadata (currently grouped shadows) must still
+      // refresh even when the SDF inputs and cached vector path are reusable.
+      // This keeps interactive shadow controls live without re-encoding the
+      // Flutter-GPU geometry texture.
+      geometry = GeometryCache(
+        bounds: geometry!.bounds,
+        shapes: shapes,
+        path: geometry!.path,
+        blend: geometry!.blend,
+      );
       renderLink?.markRebuilt(this);
 
       geometryState = LiquidGlassGeometryState.updated;
@@ -289,7 +302,9 @@ extension on LiquidGlassSettings {
 
     return effectiveThickness != other.effectiveThickness ||
         edgeRefraction != other.edgeRefraction ||
-        refractionSpread != other.refractionSpread;
+        refractionSpread != other.refractionSpread ||
+        contourWidth != other.contourWidth ||
+        contourOffset != other.contourOffset;
   }
 }
 
@@ -327,6 +342,7 @@ class ShapeGeometry extends Equatable {
     required this.shape,
     required this.glassContainsChild,
     required this.shapeBounds,
+    this.shadows = const [],
     this.shapeToGeometry,
   }) : rawCornerRadius = _getRadiusFromGlassShape(shape),
        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
@@ -355,6 +371,8 @@ class ShapeGeometry extends Equatable {
   /// Bounds in geometry-local coordinates (for painting)
   final Rect shapeBounds;
 
+  final List<BoxShadow> shadows;
+
   final Matrix4? shapeToGeometry;
 
   @override
@@ -363,6 +381,7 @@ class ShapeGeometry extends Equatable {
     shape,
     glassContainsChild,
     shapeBounds,
+    shadows,
     shapeToGeometry,
   ];
 }

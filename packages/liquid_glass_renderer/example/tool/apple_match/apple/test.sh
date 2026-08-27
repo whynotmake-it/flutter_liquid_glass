@@ -8,4 +8,6 @@ xcrun swiftc -parse-as-library \
   "$ROOT/apple/Sources/SceneModel.swift" \
   "$ROOT/apple/Tests/SceneModelTests.swift" \
   -o "$TEST_BINARY"
-"$TEST_BINARY" "$ROOT/scenes/toolbar_capsule.json"
+for scene in toolbar_capsule material_capsule material_capsule_tall material_circle material_card; do
+  "$TEST_BINARY" "$ROOT/scenes/$scene.json"
+done

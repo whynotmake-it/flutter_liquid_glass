@@ -1,3 +1,7 @@
+// Explicit canvas save/transform/restore sequences are easier to audit than
+// cascades across nested geometry loops.
+// ignore_for_file: cascade_invocations
+
 import 'dart:collection';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -8,6 +12,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
@@ -52,7 +57,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     final geometryInputsChanged =
         _settings?.effectiveThickness != value.effectiveThickness ||
         _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
-        _settings?.effectiveRefractionSpread != value.effectiveRefractionSpread;
+        _settings?.effectiveRefractionSpread !=
+            value.effectiveRefractionSpread ||
+        _settings?.effectiveContourWidth != value.effectiveContourWidth ||
+        _settings?.effectiveContourOffset != value.effectiveContourOffset;
     final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
     final isIdle = value.effectiveThickness <= 0;
     _settings = value;
@@ -98,6 +106,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// The bounding box of the geometry matte in the coordinate space of the
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
+  Offset _materialCenterInMatte = Offset.zero;
 
   /// The pre-rendered geometry texture in screen space.
   ///
@@ -139,11 +148,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       value
         ..setColor(settings.effectiveTint)
         ..setFloats([
-          settings.effectiveDisplacementScale,
+          settings.effectiveDisplacementScale * devicePixelRatio,
           settings.effectiveChromaticAberration,
-          settings.effectiveThickness,
+          settings.effectiveThickness * devicePixelRatio,
           settings.effectiveHighlight,
-          0.0,
+          settings.effectiveBackdropScale,
           settings.effectiveSaturation,
         ])
         ..setOffset(
@@ -158,29 +167,30 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
             0,
           ),
         )
-        ..setColor(const Color.fromARGB(0, 0, 0, 0))
         ..setFloats([
-          settings.effectiveContourWidth,
+          settings.effectiveBevelShadowDirectionality,
+          settings.effectiveBevelShadowSizeResponse,
+          settings.effectiveHighlightWidth * devicePixelRatio,
+          settings.effectiveHighlightOppositeStrength,
+        ])
+        ..setFloats([
+          settings.effectiveContourWidth * devicePixelRatio,
           settings.effectiveContourTransmittance,
         ])
         ..setFloats([
-          settings.effectiveContourWidth,
-          0.25,
-          0.375,
-          0.25,
+          settings.effectiveContourOffset * devicePixelRatio,
+          _materialCenterInMatte.dx * devicePixelRatio,
+          _materialCenterInMatte.dy * devicePixelRatio,
+          settings.effectiveHighlightWrap,
         ])
         ..setFloats([
           settings.effectiveTransmissionGamma,
           settings.effectiveVibrancy,
         ])
         ..setFloats([
-          settings.effectiveFaceGradientStrength,
-          settings.effectiveFaceGradientDepth,
-        ])
-        ..setFloats([
           settings.effectiveBevelShadowStrength,
-          settings.effectiveBevelShadowDepth,
-          0.0,
+          settings.effectiveBevelShadowDepth * devicePixelRatio,
+          settings.effectiveBevelShadowOffset * devicePixelRatio,
         ]);
     });
   }
@@ -248,7 +258,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       return;
     }
 
-    _paintBounds = boundingBox;
+    final materialPaintBounds = boundingBox.inflate(_contourOutset);
+    _paintBounds = _expandForLayerShadows(materialPaintBounds);
 
     if (settings.effectiveThickness <= 0) {
       // Keep any existing matte so ancestor motion stays compositor-only.
@@ -309,6 +320,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
               ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
               ..setSize(_geometryMatteBounds.size * devicePixelRatio);
           })
+          ..setFloatUniforms(initialIndex: 33, (value) {
+            value.setOffset(_materialCenterInMatte * devicePixelRatio);
+          })
           ..setImageSampler(1, geometryImage)
           ..setImageSampler(2, coordinateImage);
         _shaderInputSnapshot = _ShaderInputSnapshot(
@@ -318,16 +332,145 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           devicePixelRatio: devicePixelRatio,
           settingsRevision: _shaderSettingsRevision,
         );
+        _paintLayerShadows(context, offset, _shapesWithGeometry);
         paintLiquidGlass(
           context,
           offset,
           _shapesWithGeometry,
-          _paintBounds,
+          materialPaintBounds,
         );
       }
     }
 
     super.paint(context, offset);
+  }
+
+  Rect _expandForLayerShadows(Rect bounds) {
+    var result = bounds;
+    for (final (_, geometry, geometryToLayer) in _shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        final shadowScale = liquidGlassShadowScale(
+          shape.renderObject.size,
+          settings.effectiveExteriorShadowSizeResponse,
+        );
+        final shapeToLayer = shape.shapeToGeometry == null
+            ? geometryToLayer
+            : geometryToLayer.multiplied(shape.shapeToGeometry!);
+        for (final shadow in shape.shadows) {
+          final extent = max(
+            shadow.spreadRadius +
+                glassShadowBlurSupport(
+                  shadow.blurRadius * settings.visibility * shadowScale.blur,
+                ),
+            0,
+          ).toDouble();
+          final localBounds = (Offset.zero & shape.renderObject.size)
+              .shift(shadow.offset)
+              .inflate(extent);
+          result = result.expandToInclude(
+            MatrixUtils.transformRect(shapeToLayer, localBounds),
+          );
+        }
+      }
+    }
+    return result;
+  }
+
+  void _paintLayerShadows(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
+  ) {
+    final hasShadows = geometries.any(
+      (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
+    );
+    if (!hasShadows) return;
+
+    final canvas = context.canvas;
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.saveLayer(_paintBounds, Paint());
+
+    for (final (_, geometry, geometryToLayer) in geometries) {
+      for (final shape in geometry.shapes) {
+        if (shape.shadows.isEmpty) continue;
+        canvas.save();
+        canvas.transform(geometryToLayer.storage);
+        if (shape.shapeToGeometry case final transform?) {
+          canvas.transform(transform.storage);
+        }
+        final rect = Offset.zero & shape.renderObject.size;
+        final shadowScale = liquidGlassShadowScale(
+          shape.renderObject.size,
+          settings.effectiveExteriorShadowSizeResponse,
+        );
+        for (final shadow in shape.shadows) {
+          final paint = shadow
+              .copyWith(
+                color: shadow.color.withValues(
+                  alpha:
+                      shadow.color.a * settings.visibility * shadowScale.energy,
+                ),
+                blurRadius:
+                    shadow.blurRadius * settings.visibility * shadowScale.blur,
+                blurStyle: BlurStyle.normal,
+              )
+              .toPaint();
+          _drawLayerShadowShape(
+            canvas,
+            shape.shape,
+            rect.shift(shadow.offset).inflate(shadow.spreadRadius),
+            paint,
+          );
+        }
+        canvas.restore();
+      }
+    }
+
+    final cutoutPaint = Paint()..blendMode = BlendMode.dstOut;
+    for (final (_, geometry, geometryToLayer) in geometries) {
+      for (final shape in geometry.shapes) {
+        canvas.save();
+        canvas.transform(geometryToLayer.storage);
+        if (shape.shapeToGeometry case final transform?) {
+          canvas.transform(transform.storage);
+        }
+        _drawLayerShadowShape(
+          canvas,
+          shape.shape,
+          (Offset.zero & shape.renderObject.size).deflate(.5),
+          cutoutPaint,
+        );
+        canvas.restore();
+      }
+    }
+    canvas.restore();
+    canvas.restore();
+  }
+
+  void _drawLayerShadowShape(
+    Canvas canvas,
+    LiquidShape shape,
+    Rect rect,
+    Paint paint,
+  ) {
+    switch (shape) {
+      case LiquidRoundedSuperellipse(:final borderRadius):
+        canvas.drawRSuperellipse(
+          RSuperellipse.fromRectAndRadius(
+            rect,
+            Radius.circular(borderRadius),
+          ),
+          paint,
+        );
+      case LiquidOval():
+        canvas.drawOval(rect, paint);
+      case LiquidRoundedRectangle(:final borderRadius):
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
+          paint,
+        );
+    }
   }
 
   void _clearGeometryImage() {
@@ -448,6 +591,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   final List<double> _shapeData = [];
   final List<double> _rseData = [];
   static final Matrix4 _identity = Matrix4.identity();
+
+  double get _contourOutset {
+    if (settings.effectiveContourWidth <= 0) return 0;
+    return max(
+      0.5 / devicePixelRatio,
+      settings.effectiveContourOffset +
+          settings.effectiveContourWidth * 0.5 +
+          1.0 / devicePixelRatio,
+    );
+  }
 
   // Flutter 3.47 computes these RSE parameters when its geometry changes and
   // uploads them to the symmetric RSE shader. Mirror that construction here
@@ -576,11 +729,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       // mathematical shape. Keep that margin in the persistent geometry
       // texture so the positive side of the fade is not clipped at the matte
       // edge.
-      final aaPadding = 0.5 / devicePixelRatio;
+      final aaPadding = max(0.5 / devicePixelRatio, _contourOutset);
       final boundsInMatteSpace = MatrixUtils.transformRect(
         matteTransform,
         bounds.inflate(aaPadding),
       ).snapToPixels(devicePixelRatio);
+      _materialCenterInMatte = MatrixUtils.transformRect(
+        matteTransform,
+        bounds,
+      ).center;
 
       final textureWidth = (boundsInMatteSpace.width * devicePixelRatio).ceil();
       final textureHeight = (boundsInMatteSpace.height * devicePixelRatio)
@@ -713,8 +870,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         numShapes: numShapes,
         opticalIndex: settings.effectiveOpticalIndex,
         refractionSpread: settings.effectiveRefractionSpread,
-        displacementScale: settings.effectiveDisplacementScale,
-        thickness: settings.effectiveThickness,
+        displacementScale:
+            settings.effectiveDisplacementScale * devicePixelRatio,
+        thickness: settings.effectiveThickness * devicePixelRatio,
+        contourExtent: aaPadding * devicePixelRatio,
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,
       );

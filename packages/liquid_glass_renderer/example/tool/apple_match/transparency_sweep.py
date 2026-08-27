@@ -27,9 +27,9 @@ from apple_match.hotloop import (  # noqa: E402
 )
 from apple_match.metrics import WEIGHTS, write_diagnostics  # noqa: E402
 
-POSITIONS = (0.0, 0.25, 0.5, 0.75, 1.0)
+POSITIONS = (0.0, 0.5, 1.0)
 PER_POSITION_SCALARS = ("tintAlpha", "frost")
-REFERENCE_SET = "ios27-iphone17pro-light-transparency"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2"
 CONTROL_METHOD = (
     "simctl defaults write com.apple.UIKit UIViewGlassTintAmount "
     "(Settings → Appearance → Liquid Glass Tint Amount backing key)"

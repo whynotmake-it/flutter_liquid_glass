@@ -30,7 +30,7 @@ from apple_match.hotloop import (  # noqa: E402
 )
 from apple_match.metrics import WEIGHTS, read_rgb  # noqa: E402
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 PINNED_RUNTIME = "iOS 27.0 (24A5408d)"
 PINNED_RUNTIME_IDENTIFIER = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
 

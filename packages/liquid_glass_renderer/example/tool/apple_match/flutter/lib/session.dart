@@ -217,6 +217,10 @@ class SessionAppState extends State<SessionApp> {
     final spec = _spec;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      themeMode: widget.scene.appearance == 'dark'
+          ? ThemeMode.dark
+          : ThemeMode.light,
+      darkTheme: ThemeData.dark(),
       home: Scaffold(
         body: spec == null
             ? const ColoredBox(color: Color(0xFF000000))

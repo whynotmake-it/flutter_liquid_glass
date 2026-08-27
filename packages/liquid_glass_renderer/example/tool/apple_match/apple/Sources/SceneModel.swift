@@ -8,6 +8,7 @@ struct Scene: Decodable {
     }
 
     struct ShapeSpec: Decodable {
+        let kind: String
         let x: Double
         let y: Double
         let width: Double
@@ -29,6 +30,8 @@ struct Scene: Decodable {
             let markerColumn: Int?
             let markerRow: Int?
             let marker: [String]?
+            let palette: [String: String]?
+            let pattern: [String]?
         }
 
         let id: String

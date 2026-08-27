@@ -47,6 +47,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
           ),
     ),
     refractionSpread: number('refractionSpread', defaults.refractionSpread),
+    backdropScale: number('backdropScale', defaults.backdropScale),
     frost: number('frost', number('blur', defaults.frost)),
     transmissionGamma: number('transmissionGamma', defaults.transmissionGamma),
     vibrancy: number('vibrancy', defaults.vibrancy),
@@ -54,6 +55,13 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'highlight',
       number('lightIntensity', defaults.highlight),
     ),
+    highlightWidth: number('highlightWidth', defaults.highlightWidth),
+    highlightWrap: number('highlightWrap', defaults.highlightWrap),
+    highlightOppositeStrength: number(
+      'highlightOppositeStrength',
+      defaults.highlightOppositeStrength,
+    ),
+    curvatureLighting: number('curvatureLighting', defaults.curvatureLighting),
     contourStrength: number(
       'contourStrength',
       number('edgeAlpha', defaults.contourStrength),
@@ -62,17 +70,10 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'contourWidth',
       number('edgeWidth', defaults.contourWidth),
     ),
+    contourOffset: number('contourOffset', defaults.contourOffset),
     contourTransmittance: number(
       'contourTransmittance',
       number('contourTransmissionRatio', defaults.contourTransmittance),
-    ),
-    faceGradientStrength: number(
-      'faceGradientStrength',
-      number('faceShadingStrength', defaults.faceGradientStrength),
-    ),
-    faceGradientDepth: number(
-      'faceGradientDepth',
-      number('faceShadingDepth', defaults.faceGradientDepth),
     ),
     bevelShadowStrength: number(
       'bevelShadowStrength',
@@ -81,6 +82,22 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     bevelShadowDepth: number(
       'bevelShadowDepth',
       number('innerShadowDepth', defaults.bevelShadowDepth),
+    ),
+    bevelShadowOffset: number(
+      'bevelShadowOffset',
+      number('innerShadowOffset', defaults.bevelShadowOffset),
+    ),
+    bevelShadowDirectionality: number(
+      'bevelShadowDirectionality',
+      defaults.bevelShadowDirectionality,
+    ),
+    bevelShadowSizeResponse: number(
+      'bevelShadowSizeResponse',
+      defaults.bevelShadowSizeResponse,
+    ),
+    exteriorShadowSizeResponse: number(
+      'exteriorShadowSizeResponse',
+      defaults.exteriorShadowSizeResponse,
     ),
     saturation: number('saturation', defaults.saturation),
     chromaticAberration: number(
@@ -117,8 +134,15 @@ List<BoxShadow> matchGlassShadows(Map<String, Object?> settings) {
 /// Maps the `shapeProfile` settings key onto a concrete [LiquidShape].
 LiquidShape matchGlassShape(
   Map<String, Object?> settings,
+  String sceneShapeKind,
   double cornerRadius,
 ) {
+  if (sceneShapeKind == 'circle') {
+    return const LiquidOval();
+  }
+  if (sceneShapeKind == 'roundedSuperellipse') {
+    return LiquidRoundedSuperellipse(borderRadius: cornerRadius);
+  }
   return settings['shapeProfile'] == 'superellipse'
       ? LiquidRoundedSuperellipse(borderRadius: cornerRadius)
       : LiquidRoundedRectangle(borderRadius: cornerRadius);
@@ -134,12 +158,14 @@ class MatchSceneView extends StatelessWidget {
     required this.scene,
     required this.probe,
     required this.settings,
+    this.fake = false,
     super.key,
   });
 
   final MatchScene scene;
   final String probe;
   final Map<String, Object?> settings;
+  final bool fake;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +179,7 @@ class MatchSceneView extends StatelessWidget {
       width: shapeWidth,
       height: shapeHeight,
     );
-    final cornerRadius = _number('cornerRadius', shapeHeight / 2);
+    final cornerRadius = _number('cornerRadius', scene.cornerRadius);
     return SizedBox(
       width: scene.width,
       height: scene.height,
@@ -196,11 +222,11 @@ class MatchSceneView extends StatelessWidget {
           else
             Positioned.fromRect(
               rect: shapeRect,
-              child: LiquidGlass.withOwnLayer(
+              child: _MatchGlassSurface(
+                fake: fake,
                 settings: matchGlassSettings(settings),
-                shape: matchGlassShape(settings, cornerRadius),
+                shape: matchGlassShape(settings, scene.shapeKind, cornerRadius),
                 shadows: matchGlassShadows(settings),
-                child: const SizedBox.expand(),
               ),
             ),
         ],
@@ -210,6 +236,35 @@ class MatchSceneView extends StatelessWidget {
 
   double _number(String key, double fallback) =>
       (settings[key] as num?)?.toDouble() ?? fallback;
+}
+
+class _MatchGlassSurface extends StatelessWidget {
+  const _MatchGlassSurface({
+    required this.fake,
+    required this.settings,
+    required this.shape,
+    required this.shadows,
+  });
+
+  final bool fake;
+  final LiquidGlassSettings settings;
+  final LiquidShape shape;
+  final List<BoxShadow> shadows;
+
+  @override
+  Widget build(BuildContext context) => fake
+      ? FakeGlass(
+          settings: settings,
+          shape: shape,
+          shadows: shadows,
+          child: const SizedBox.expand(),
+        )
+      : LiquidGlass.withOwnLayer(
+          settings: settings,
+          shape: shape,
+          shadows: shadows,
+          child: const SizedBox.expand(),
+        );
 }
 
 /// Reproduces the small foreground that the system TabView places inside its
@@ -427,8 +482,48 @@ class ProbeBackground extends StatelessWidget {
     if (spec['kind'] == 'solid') {
       return ColoredBox(color: parseColor(spec['color']! as String));
     }
+    if (spec['kind'] == 'tileGrid') {
+      return CustomPaint(painter: TileGridPainter(spec: spec));
+    }
     return CustomPaint(painter: RgbwGridPainter(spec: spec));
   }
+}
+
+class TileGridPainter extends CustomPainter {
+  const TileGridPainter({required this.spec});
+
+  final Map<String, Object?> spec;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cellSize = (spec['cellSize']! as num).toDouble();
+    final gutter = (spec['gutter']! as num).toDouble();
+    final palette = (spec['palette']! as Map<String, Object?>).map(
+      (key, value) => MapEntry(key, parseColor(value! as String)),
+    );
+    final pattern = (spec['pattern']! as List<Object?>).cast<String>();
+    canvas.drawColor(parseColor(spec['gutterColor']! as String), BlendMode.src);
+    final rows = (size.height / cellSize).ceil();
+    final columns = (size.width / cellSize).ceil();
+    for (var row = 0; row < rows; row++) {
+      final patternRow = pattern[row % pattern.length];
+      for (var column = 0; column < columns; column++) {
+        final code = patternRow[column % patternRow.length];
+        canvas.drawRect(
+          Rect.fromLTWH(
+            column * cellSize,
+            row * cellSize,
+            cellSize - gutter,
+            cellSize - gutter,
+          ),
+          Paint()..color = palette[code]!,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(TileGridPainter oldDelegate) => oldDelegate.spec != spec;
 }
 
 class RgbwGridPainter extends CustomPainter {

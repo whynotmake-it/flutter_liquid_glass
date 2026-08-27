@@ -27,7 +27,7 @@ from apple_match.hotloop import (  # noqa: E402
 )
 from apple_match.metrics import write_diagnostics  # noqa: E402
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 SCENES = ("toolbar_capsule", "small_capsule", "large_capsule")
 GEOMETRY_KEYS = (
     "shapeWidth",

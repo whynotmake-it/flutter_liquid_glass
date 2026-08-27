@@ -557,8 +557,6 @@ selection treatment; shipped callers still provide their own child content.
 | `contourStrength` | Dark dielectric contour strength | White-background toolbar + capsule |
 | `contourWidth` | Contour width in logical pixels | White-background toolbar + capsule |
 | `contourTransmittance` | Backdrop transmission retained under the material contour | Black/white toolbar + capsule |
-| `faceGradientStrength` | Directional face-lighting gradient beneath the rim | Black/white toolbar + capsule |
-| `faceGradientDepth` | Inward reach of the directional face gradient | Black/white toolbar + capsule |
 | `bevelShadowStrength` | Ambient shadow beneath the inner bevel | White toolbar + capsule |
 | `bevelShadowDepth` | Inward reach of the inner-bevel shadow | White toolbar + capsule |
 

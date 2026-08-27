@@ -64,6 +64,57 @@ void main() {
     }, skip: expectFlutterGpuFallback);
 
     testWidgets(
+      'refreshes grouped shadows without rebuilding the geometry path',
+      (tester) async {
+        var shadows = const <BoxShadow>[];
+        late StateSetter update;
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: LiquidGlassLayer(
+              settings: const LiquidGlassSettings(thickness: 30),
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  update = setState;
+                  return LiquidGlassBlendGroup(
+                    child: LiquidGlass.grouped(
+                      shadows: shadows,
+                      shape: const LiquidOval(),
+                      child: const SizedBox.square(dimension: 100),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final renderObject = tester.allRenderObjects
+            .whereType<RenderLiquidGlassBlendGroup>()
+            .firstWhere(
+              (renderObject) => renderObject.geometry?.shapes.length == 1,
+            );
+        final originalPath = renderObject.geometry!.path;
+        expect(renderObject.geometry!.shapes.single.shadows, isEmpty);
+
+        update(() {
+          shadows = const [
+            BoxShadow(
+              color: Color(0x20000000),
+              offset: Offset(0, 4),
+              blurRadius: 8,
+            ),
+          ];
+        });
+        await tester.pump();
+
+        expect(renderObject.geometry!.path, same(originalPath));
+        expect(renderObject.geometry!.shapes.single.shadows, shadows);
+      },
+      skip: expectFlutterGpuFallback,
+    );
+
+    testWidgets(
       'keeps transformed grouped shapes in local primitive space',
       (
         tester,

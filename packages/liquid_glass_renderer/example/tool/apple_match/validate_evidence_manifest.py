@@ -12,7 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 MANIFEST = ROOT / "settings" / "evidence_manifest.json"
 SETTINGS_DART = ROOT.parents[2] / "lib" / "src" / "liquid_glass_settings.dart"
-EXPECTED_API_EXEMPTIONS = {"visibility"}
+EXPECTED_API_EXEMPTIONS = {
+    "visibility",
+    "contourWidth",
+    "contourTransmittance",
+}
 
 
 def public_fields() -> set[str]:

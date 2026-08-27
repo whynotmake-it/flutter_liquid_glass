@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_setters_without_getters
 
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -302,6 +301,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @visibleForTesting
   BackdropFilterLayer? get debugBackdropFilterLayer => _shaderHandle.layer;
 
+  /// The most recent layer-local clip used by the native glass filter.
+  ///
+  /// This intentionally excludes exterior-shadow support, which is painted in
+  /// a separate canvas layer before the clipped filter pass.
+  @visibleForTesting
+  Rect? debugFilterBounds;
+
   @override
   // Geometry is encoded in this layer's local coordinate space. Ancestor
   // transforms are applied once by Flutter when the completed layer is
@@ -324,6 +330,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     }
   }
 
+  @override
   void onCompositing() {
     if (!attached) return;
     var dirty = false;
@@ -349,7 +356,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   ) {
     if (!attached) return;
     final filterBounds = boundingBox.expandToPixelBuckets(devicePixelRatio);
-
+    debugFilterBounds = filterBounds;
     // The engine snapshots this shader's uniforms into the native image
     // filter at creation, so the composed filter can only be reused while
     // every snapshotted input is unchanged. Repaints with identical shader
@@ -358,22 +365,12 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final snapshot = shaderInputSnapshot;
     var shaderFilter = _cachedFilter;
     if (shaderFilter == null || _cachedFilterSnapshot != snapshot) {
-      // Apple keeps the material vector stable while its smaller controls
-      // visibly retain more backdrop detail. Normalize the blur radius by the
-      // rendered control height, clamped at the canonical 94 logical-pixel
-      // toolbar height. This is a derived compositor scalar, not a scene
-      // setting, and avoids over-softening small capsules without adding a
-      // pass or per-frame work.
-      final materialHeight = shapes.length == 1
-          ? shapes.first.$2.bounds.height
-          : boundingBox.height;
-      final sizeNormalizedFrost =
-          settings.effectiveFrost * math.min(1.0, materialHeight / 94.0);
-      final blurFilter = sizeNormalizedFrost > 0
+      final frostSigma = settings.effectiveFrost;
+      final blurFilter = frostSigma > 0
           ? ImageFilter.blur(
               tileMode: TileMode.mirror,
-              sigmaX: sizeNormalizedFrost,
-              sigmaY: sizeNormalizedFrost,
+              sigmaX: frostSigma,
+              sigmaY: frostSigma,
             )
           : null;
       shaderFilter = switch (blurFilter) {

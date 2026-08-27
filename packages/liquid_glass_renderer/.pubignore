@@ -1,33 +1,17 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-.mason/
-migrate_working_dir/
+# Repository-only validation and measurement artifacts.
+coverage/
+example/coverage/
+example/integration_test/
+example/test/
+example/tool/
+example/macos/DerivedData/
+test/src/failures/
+test/src/goldens/
+**/.snaptest/
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# See https://www.dartlang.org/guides/libraries/private-files
-
-# Files and directories created by pub
-.dart_tool/
-.packages
-build/
-pubspec.lock
-pubspec_overrides.yaml
-.flutter-plugins
-.flutter-plugins-dependencies
-
+# Legacy media is retained in the repository but no longer referenced by the
+# package README. The generated showcase and pub.dev screenshot remain.
+doc/clock.gif
 doc/showcase.gif
 doc/example.gif
 doc/shapes.png

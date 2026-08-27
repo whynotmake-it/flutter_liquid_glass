@@ -23,7 +23,7 @@ from apple_match.hotloop.evaluate import (
 from apple_match.metrics import WEIGHTS, read_rgb, verify_background_registration, write_diagnostics
 
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 TRAINING_SCENES = ("small_capsule", "large_capsule")
 HOLDOUT_SCENE = "tab_bar_holdout"
 

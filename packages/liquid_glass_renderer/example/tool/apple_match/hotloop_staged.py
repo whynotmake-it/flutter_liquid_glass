@@ -29,7 +29,7 @@ from apple_match.metrics import (  # noqa: E402
     write_diagnostics,
 )
 
-REFERENCE_SET = "ios27-iphone17pro-light"
+REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 RECORDED_BASELINE = ROOT / "out/stages/refinement/candidates/003"
 
 STAGES = {
@@ -125,14 +125,6 @@ STAGES = {
         "outerContourAlpha": [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4],
         "outerContourLuminance": [0],
     },
-    "faceShading": {
-        "faceShadingStrength": [
-            0.0, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04
-        ],
-        "faceShadingDepth": [
-            12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0
-        ],
-    },
     "innerShadow": {
         "innerShadowStrength": [
             0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.06, 0.08, 0.12
@@ -195,8 +187,6 @@ STAGES = {
         "bleedStrength": [0.0, 0.25, 0.5, 0.75],
     },
     "layeredBevel": {
-        "faceShadingStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
-        "faceShadingDepth": [12.0, 20.0, 28.0, 36.0, 40.0],
         "innerShadowStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
         "innerShadowDepth": [6.0, 8.0, 12.0, 16.0, 20.0, 24.0],
     },
@@ -223,7 +213,6 @@ def diagnostic_stage_name(stage_name):
         "outline": "highlight",
         "toneResponse": "tintColor",
         "vibrancy": "tintColor",
-        "faceShading": "highlight",
         "innerShadow": "highlight",
         "ambientRim": "highlight",
         "darkOutline": "highlight",
@@ -294,16 +283,6 @@ def optimization_objective(stage_name, result):
             "whiteBackgroundDarkRimMeanAbsoluteError8Bit",
             residuals["D"]["outerContour"]["meanAbsoluteError8Bit"],
         )
-    if stage_name == "faceShading":
-        top = sum(
-            residuals[probe]["topFace"]["meanAbsoluteError8Bit"]
-            for probe in "CD"
-        ) / 2.0
-        bottom = sum(
-            residuals[probe]["bottomFace"]["meanAbsoluteError8Bit"]
-            for probe in "CD"
-        ) / 2.0
-        return "directionalFaceMeanAbsoluteError8Bit", top + bottom * 0.25
     if stage_name == "innerShadow":
         white = residuals["D"]
         face = (
@@ -510,8 +489,7 @@ def main() -> None:
     parser.add_argument(
         "--stages",
         default=(
-            "shape,refraction,tintColor,highlight,outline,"
-            "faceShading,exteriorShadow"
+            "shape,refraction,tintColor,highlight,outline,exteriorShadow"
         ),
         help="Comma-separated ordered stage names.",
     )
@@ -684,22 +662,6 @@ def main() -> None:
                 seed_loss, initial = min(seeded, key=lambda item: item[0])
                 if transparent_loss <= seed_loss:
                     initial = transparent
-
-            if stage_name == "faceShading":
-                unshaded = dict(initial)
-                unshaded_loss = evaluate(unshaded)
-                seeded = []
-                for strength in (0.0075, 0.015, 0.025, 0.04):
-                    for depth in (20.0, 28.0, 36.0, 40.0):
-                        candidate = {
-                            **initial,
-                            "faceShadingStrength": strength,
-                            "faceShadingDepth": depth,
-                        }
-                        seeded.append((evaluate(candidate), candidate))
-                seed_loss, initial = min(seeded, key=lambda item: item[0])
-                if unshaded_loss <= seed_loss:
-                    initial = unshaded
 
             result = coordinate_descent(
                 evaluate,

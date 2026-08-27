@@ -165,7 +165,30 @@ float getShapeSDF(
 struct SceneSample {
     float distance;
     float halfMinor;
+    float curvatureFactor;
 };
+
+float getShapeCurvatureFactor(
+    float type,
+    vec2 localPoint,
+    vec2 size,
+    float rawRadius
+) {
+    if (type == 2.0) { // ellipse
+        return 1.0;
+    }
+    vec2 halfSize = size * 0.5;
+    float radius = min(rawRadius, min(halfSize.x, halfSize.y));
+    if (radius <= 1e-4) {
+        return 0.0;
+    }
+    // Rounded rectangles, capsules, and Flutter's continuous rounded
+    // superellipse all share the same straight-to-corner support. A signed
+    // one-pixel transition avoids a hard lighting cutoff at the join while
+    // leaving the exact distance implementation unchanged.
+    vec2 cornerPosition = abs(localPoint) - (halfSize - radius);
+    return smoothstep(-1.0, 1.0, min(cornerPosition.x, cornerPosition.y));
+}
 
 float getShapeDistanceFromArray(int index, vec2 p) {
     int baseIndex = index * 3;
@@ -204,6 +227,13 @@ SceneSample getShapeSampleFromArray(int index, vec2 p) {
     // it beside the SDF avoids a second traversal and lets optical spread be
     // shape-relative rather than thickness-relative.
     resultSample.halfMinor = 0.5 * min(primitive.y, primitive.z) * placement.z;
+    // Lighting depth is shape-class aware but constant within a primitive.
+    // Per-fragment rounded-rect curvature regions expose their medial/sector
+    // boundaries as rectangular or V-shaped shading seams. Ellipses need the
+    // deeper size response observed in the circle holdout; rounded and
+    // continuous-superellipse primitives use the shallower response. Smooth
+    // unions interpolate this value below.
+    resultSample.curvatureFactor = primitive.x == 2.0 ? 1.0 : 0.0;
     return resultSample;
 }
 
@@ -219,6 +249,11 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
     SceneSample result;
     result.distance = distance;
     result.halfMinor = mix(b.halfMinor, a.halfMinor, weightA);
+    result.curvatureFactor = mix(
+        b.curvatureFactor,
+        a.curvatureFactor,
+        weightA
+    );
     return result;
 }
 
@@ -226,6 +261,7 @@ SceneSample sceneSample(vec2 p, int numShapes) {
     SceneSample empty;
     empty.distance = 1e9;
     empty.halfMinor = 0.0;
+    empty.curvatureFactor = 0.0;
     if (numShapes <= 0) {
         return empty;
     }

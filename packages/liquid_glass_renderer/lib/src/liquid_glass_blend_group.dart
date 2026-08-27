@@ -331,6 +331,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
       shape: shape,
       glassContainsChild: glassContainsChild,
       shapeBounds: blendGroupRect,
+      shadows: renderObject.layerShadows,
       shapeToGeometry: transformToGeometry,
     );
   }

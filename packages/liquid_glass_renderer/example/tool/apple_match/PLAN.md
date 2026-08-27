@@ -2,7 +2,7 @@
 
 Objective: recover and then exceed the last proven Apple lighting match before
 continuing the broader renderer redesign. The immediate target is the clear
-(`frost=0`) black/white material response: directional face gradient, dark
+(`frost=0`) black/white material response: dark
 dielectric contour, highlight-over-contour occlusion, inner bevel shadow, and
 exterior shadow. The weighted headline score is diagnostic only during this
 recovery; no setting or shader simplification may be promoted when the annotated
@@ -83,14 +83,14 @@ composition, example shell, generalization, and non-regressing performance work.
 - `liquid_glass_final_render.frag`: one backdrop sample path for subpixel
   chromatic separation (three channel samples only when the displacement-bound
   CA threshold is exceeded), unified tint/transmission transform, paired
-  directional highlights, and SDF-derived contour, directional face gradient,
-  and inner-bevel shadow layers. Lighting recovery adds uniform-coherent ALU
+  directional highlights, and SDF-derived contour and inner-bevel shadow
+  layers. Lighting recovery adds uniform-coherent ALU
   only: no texture sample, backdrop capture, saveLayer, or CPU solve.
 - `LiquidGlassSettings` exposes the evidence-gated vector: visibility, tint,
   thickness, edgeRefraction, refractionSpread, frost, chromaticAberration,
   saturation, transmissionGamma, vibrancy, highlight, contourStrength, and
-  contourWidth, contourTransmittance, faceGradientStrength/Depth, and
-  bevelShadowStrength/Depth. Independent rim RGB weights are not shipped.
+  contourWidth, contourTransmittance, and bevelShadowStrength/Depth.
+  Independent rim RGB weights are not shipped.
 
 ## Execution order
 - [x] Fast fitting backend: macOS Impeller/Flutter-GPU golden A/B/C/D capture,

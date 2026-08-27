@@ -9,13 +9,13 @@
   },
   "shape": {
     "kind": "capsule",
-    "x": 56,
-    "y": 374.5,
-    "width": 290,
-    "height": 125,
-    "cornerRadius": 62.5,
-    "appleContentInsetX": 25.333,
-    "appleContentInsetY": 21
+    "x": 56.6665,
+    "y": 378,
+    "width": 288.667,
+    "height": 118,
+    "cornerRadius": 59,
+    "appleContentInsetX": 24,
+    "appleContentInsetY": 14
   },
   "appearance": "light",
   "transparency": {

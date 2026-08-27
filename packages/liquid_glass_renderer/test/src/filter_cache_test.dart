@@ -111,8 +111,7 @@ void main() {
 
       final renderObject = findLayer(tester);
       expect(renderObject.debugBackdropFilterLayer, isNotNull);
-      final initialRenders =
-          renderObject.gpuGeometryRenderer!.debugRenderCount;
+      final initialRenders = renderObject.gpuGeometryRenderer!.debugRenderCount;
 
       await tester.pumpWidget(
         glass(settings: const LiquidGlassSettings(visibility: 0)),

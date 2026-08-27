@@ -44,7 +44,7 @@ Material knobs on `LiquidGlassSettings`:
 Removed as public knobs (folded to fixed internals or dropped):
 `lightAngle` (fixed π/2, Apple's top-light), `ambientStrength`,
 `highlightColor`, `edgeColor`, `edgeWidth`, `edgeInset`, `specularWrap`,
-`bleedStrength`, `faceShadingStrength`, `faceShadingDepth`,
+`bleedStrength`,
 `innerShadowStrength`, `innerShadowDepth`, `innerShadowDirectionality`,
 `outerContourColor`, `outerContourWidth`, `refractiveIndex`.
 

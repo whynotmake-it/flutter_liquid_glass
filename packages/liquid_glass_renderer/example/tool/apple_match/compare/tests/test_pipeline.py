@@ -13,6 +13,7 @@ import numpy as np
 from apple_match.metrics import (
     fixed_blur_mix,
     score_images,
+    silhouette,
     verify_background_registration,
 )
 from apple_match.hotloop.evaluate import validate_settings
@@ -67,8 +68,29 @@ class SchemaTests(unittest.TestCase):
             with self.assertRaises(jsonschema.ValidationError):
                 validate_scene(invalid, ROOT / "scenes/schema.json")
 
+    def test_rejects_tile_grid_symbol_missing_from_palette(self):
+        scene_path = ROOT / "scenes/material_capsule.json"
+        scene = json.loads(scene_path.read_text())
+        scene["probes"][0]["background"]["pattern"][0] = "X0112210"
+        with tempfile.TemporaryDirectory() as directory:
+            invalid = Path(directory) / "invalid.json"
+            invalid.write_text(json.dumps(scene))
+            with self.assertRaisesRegex(ValueError, "undefined palette symbols"):
+                validate_scene(invalid, ROOT / "scenes/schema.json")
+
 
 class MetricTests(unittest.TestCase):
+    def test_silhouette_ignores_disconnected_system_chrome(self):
+        image = np.zeros((128, 128, 3), dtype=np.float32)
+        image[40:88, 24:104] = 0.5
+        image[120:123, 50:78] = 1.0
+
+        mask = silhouette(image)
+
+        ys, xs = np.where(mask > 0)
+        self.assertEqual((xs.min(), ys.min(), xs.max(), ys.max()), (24, 40, 103, 87))
+        self.assertFalse(np.any(mask[120:123, 50:78]))
+
     def test_cli_writes_exact_scorecard_and_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

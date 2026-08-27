@@ -28,7 +28,7 @@ Iteration 15 is the retained toolbar candidate. It removes the contact shadow
 entirely and keeps the existing linear RGBA8 displacement codec. The material
 contour is widened inside the final shader and fit as the coupled vector
 `strength=.22`, `width=1.5`, `transmittance=.80`.
-Directional face gradient remains `.015/40` and inner bevel shadow `.025/12`.
+Inner bevel shadow remains `.025/12`.
 The full annotated comparison is [`iteration 15`](out/annotated-comparisons/lighting-recovery-15-annotated.png)
 and the nearest-neighbor outline crops are [`iteration 15 zoom`](out/annotated-comparisons/lighting-recovery-15-outline-zoom.png).
 
@@ -128,7 +128,6 @@ refraction or blur regression.
 | chromaticAberration | .005 |
 | highlight | .5 |
 | contourStrength / width / transmittance | .22 / 1.5 px / .90 |
-| face gradient strength / depth | .015 / 40 px |
 | bevel shadow strength / depth | .025 / 12 px |
 
 The current cross-scene table treats `thickness` as a recovered

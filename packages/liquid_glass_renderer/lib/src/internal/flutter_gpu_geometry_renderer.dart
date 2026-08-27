@@ -37,6 +37,7 @@ class FlutterGpuGeometryRenderer {
     _offsetUOffset = resources.offsetUOffset;
     _offsetUTextureSize = resources.offsetUTextureSize;
     _offsetOpticalProps = resources.offsetOpticalProps;
+    _offsetContourProps = resources.offsetContourProps;
     _offsetShapeData = resources.offsetShapeData;
     _offsetRseData = resources.offsetRseData;
     _vertexBuffer = resources.vertexBuffer;
@@ -90,7 +91,7 @@ class FlutterGpuGeometryRenderer {
       final renderer = FlutterGpuGeometryRenderer._fromShared(resources);
       _resolvedAssetResources[assetKey] = resources;
       if (identical(_assetResources[assetKey], resourcesFuture)) {
-        _assetResources.remove(assetKey);
+        unawaited(_assetResources.remove(assetKey));
       }
       return renderer;
     } on Object {
@@ -163,6 +164,7 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetUOffset;
   late final int _offsetUTextureSize;
   late final int _offsetOpticalProps;
+  late final int _offsetContourProps;
   late final int _offsetShapeData;
   late final int _offsetRseData;
   late final ByteData _uniformData;
@@ -238,6 +240,8 @@ class FlutterGpuGeometryRenderer {
         _uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
     _offsetOpticalProps =
         _uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
+    _offsetContourProps =
+        _uniformSlot.getMemberOffsetInBytes('uContourProps') ?? 0;
     _offsetShapeData = _uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
     _offsetRseData = _uniformSlot.getMemberOffsetInBytes('uRseData') ?? 0;
   }
@@ -269,11 +273,12 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required int numShapes,
     required double opticalIndex,
-    double refractionSpread = 0.0,
-    double? displacementScale,
     required double thickness,
     required double offsetX,
     required double offsetY,
+    double refractionSpread = 0.0,
+    double? displacementScale,
+    double contourExtent = 0.5,
     List<double> rseData = const <double>[],
   }) {
     assert(() {
@@ -327,6 +332,7 @@ class FlutterGpuGeometryRenderer {
                 math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
           ),
       thickness: thickness,
+      contourExtent: contourExtent,
       geometryAaHalfWidth: _geometryAaHalfWidth,
       numShapes: numShapes.toDouble(),
       shapeData: shapeData,
@@ -367,6 +373,7 @@ class FlutterGpuGeometryRenderer {
     required double refractionSpread,
     required double displacementScale,
     required double thickness,
+    required double contourExtent,
     required double geometryAaHalfWidth,
     required double numShapes,
     required List<double> shapeData,
@@ -391,6 +398,12 @@ class FlutterGpuGeometryRenderer {
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
     floatData[opticalPropsIndex + 2] = thickness;
     floatData[opticalPropsIndex + 3] = numShapes;
+
+    final contourPropsIndex = _offsetContourProps ~/ 4;
+    floatData[contourPropsIndex] = math.max(0.5, contourExtent);
+    floatData[contourPropsIndex + 1] = 0;
+    floatData[contourPropsIndex + 2] = 0;
+    floatData[contourPropsIndex + 3] = 0;
 
     final shapeDataStartIndex = _offsetShapeData ~/ 4;
     final shapeFloats = shapeData.length < 192 ? shapeData.length : 192;
@@ -439,6 +452,8 @@ class _SharedGeometryResources {
         uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
     offsetOpticalProps =
         uniformSlot.getMemberOffsetInBytes('uOpticalProps') ?? 0;
+    offsetContourProps =
+        uniformSlot.getMemberOffsetInBytes('uContourProps') ?? 0;
     offsetShapeData = uniformSlot.getMemberOffsetInBytes('uShapeData') ?? 0;
     offsetRseData = uniformSlot.getMemberOffsetInBytes('uRseData') ?? 0;
     final vertices = Float32List.fromList([
@@ -463,6 +478,7 @@ class _SharedGeometryResources {
   late final int offsetUOffset;
   late final int offsetUTextureSize;
   late final int offsetOpticalProps;
+  late final int offsetContourProps;
   late final int offsetShapeData;
   late final int offsetRseData;
   late final gpu.DeviceBuffer vertexBuffer;

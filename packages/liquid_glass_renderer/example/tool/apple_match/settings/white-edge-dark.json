@@ -20,8 +20,6 @@
   "bleedStrength": 0.5,
   "transmissionGamma": 0.9,
   "vibrancy": 0.15,
-  "faceShadingStrength": 0.015,
-  "faceShadingDepth": 40.0,
   "innerShadowStrength": 0.01,
   "innerShadowDepth": 12.0,
   "innerShadowDirectionality": 0.0,

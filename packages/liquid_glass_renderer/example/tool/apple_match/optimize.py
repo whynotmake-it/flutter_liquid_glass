@@ -86,7 +86,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--udid", default=os.environ.get("IOS_27_UDID"))
     parser.add_argument("--scene", type=Path, default=ROOT / "scenes/toolbar_capsule.json")
-    parser.add_argument("--reference-set", default="ios27-iphone17pro-light")
+    parser.add_argument("--reference-set", default="ios27-iphone17pro-ground-truth-v2/slider-000")
     parser.add_argument("--baseline", type=Path, default=ROOT / "settings/baseline.json")
     parser.add_argument("--axes", type=Path, help="JSON object of axis -> ordered values")
     parser.add_argument("--max-iters", type=int, default=8)

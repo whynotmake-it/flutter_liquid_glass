@@ -22,6 +22,7 @@
         "toolbar_capsule",
         "small_capsule",
         "large_capsule",
+        "material_shape",
         "tab_bar_holdout",
         "loupe"
       ]
@@ -50,7 +51,9 @@
         "appleContentInsetY"
       ],
       "properties": {
-        "kind": {"const": "capsule"},
+        "kind": {
+          "enum": ["capsule", "circle", "roundedSuperellipse"]
+        },
         "x": {"type": "number", "minimum": 0},
         "y": {"type": "number", "minimum": 0},
         "width": {"type": "number", "exclusiveMinimum": 0},
@@ -85,10 +88,11 @@
             "additionalProperties": false,
             "required": ["kind"],
             "properties": {
-              "kind": {"enum": ["rgbwGrid", "solid"]},
+              "kind": {"enum": ["rgbwGrid", "tileGrid", "solid"]},
               "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
               "cellSize": {"type": "integer", "minimum": 4},
               "gutter": {"type": "integer", "minimum": 0},
+              "sampleInset": {"type": "integer", "minimum": 0},
               "gutterColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
               "layout": {"enum": ["primary", "holdout"]},
               "colors": {
@@ -108,6 +112,24 @@
                 "type": "array",
                 "minItems": 2,
                 "items": {"type": "string", "pattern": "^[RGBW]+$"}
+              },
+              "palette": {
+                "type": "object",
+                "minProperties": 2,
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "propertyNames": {"pattern": "^[A-Z0-9]$"}
+              },
+              "pattern": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "string",
+                  "minLength": 2,
+                  "pattern": "^[A-Z0-9]+$"
+                }
               }
             },
             "allOf": [
@@ -127,6 +149,18 @@
                     "markerColumn",
                     "markerRow",
                     "marker"
+                  ]
+                }
+              },
+              {
+                "if": {"properties": {"kind": {"const": "tileGrid"}}},
+                "then": {
+                  "required": [
+                    "cellSize",
+                    "gutter",
+                    "gutterColor",
+                    "palette",
+                    "pattern"
                   ]
                 }
               }

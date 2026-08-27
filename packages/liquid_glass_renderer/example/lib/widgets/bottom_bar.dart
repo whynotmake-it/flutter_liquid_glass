@@ -6,7 +6,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
-/// Creates a jelly transform matrix based on velocity for organic squash and stretch effect
+/// Creates a velocity-based transform for an organic squash-and-stretch
+/// effect.
 Matrix4 buildJellyTransform({
   required Offset velocity,
   double maxDistortion = 0.7,
@@ -38,26 +39,22 @@ Matrix4 buildJellyTransform({
   final scaleY = squashY * stretchY;
 
   // Build the transformation matrix
-  final matrix = Matrix4.identity();
-
-  // Apply scale transformation
-  matrix.scale(scaleX, scaleY);
+  final matrix = Matrix4.identity()..scale(scaleX, scaleY);
 
   return matrix;
 }
 
 class LiquidGlassBottomBar extends StatefulWidget {
   const LiquidGlassBottomBar({
-    super.key,
     required this.tabs,
     required this.selectedIndex,
     required this.onTabSelected,
+    super.key,
     this.extraButton,
     this.spacing = 8,
     this.horizontalPadding = 20,
     this.bottomPadding = 20,
     this.barHeight = 64,
-    this.glassSettings,
     this.showIndicator = true,
     this.indicatorColor,
     this.fake = false,
@@ -71,7 +68,6 @@ class LiquidGlassBottomBar extends StatefulWidget {
   final double horizontalPadding;
   final double bottomPadding;
   final double barHeight;
-  final LiquidGlassSettings? glassSettings;
   final bool showIndicator;
   final Color? indicatorColor;
   final bool fake;
@@ -83,8 +79,7 @@ class LiquidGlassBottomBar extends StatefulWidget {
 class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
   @override
   Widget build(BuildContext context) {
-    final glassSettings =
-        widget.glassSettings ?? const LiquidGlassSettings.ios27ToolbarLight();
+    const glassSettings = LiquidGlassSettings.ios27ToolbarLight();
 
     return LiquidGlassLayer(
       settings: glassSettings,
@@ -116,7 +111,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       height: widget.barHeight,
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           for (var i = 0; i < widget.tabs.length; i++)
                             Expanded(
@@ -205,7 +199,6 @@ class _BottomBarTab extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -295,7 +288,10 @@ class _ExtraButtonState extends State<_ExtraButton> {
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
     final loupeMagnification = widget.config.loupeMagnification;
-    assert(loupeMagnification >= 1.0);
+    assert(
+      loupeMagnification >= 1.0,
+      'Loupe magnification cannot shrink its source.',
+    );
     final icon = Center(
       child: Icon(
         widget.config.icon,
@@ -307,47 +303,12 @@ class _ExtraButtonState extends State<_ExtraButton> {
     final button = loupeMagnification > 1.0
         ? SizedBox.square(
             dimension: widget.config.size,
-            child: Stack(
-              children: [
-                RawMagnifier(
-                  size: Size.square(widget.config.size),
-                  magnificationScale: loupeMagnification,
-                  decoration: const MagnifierDecoration(
-                    opacity: 1,
-                    shape: CircleBorder(),
-                  ),
-                  clipBehavior: Clip.hardEdge,
-                ),
-                // A shared grouped pass cannot sample a sibling magnifier.
-                // Keep this explicit loupe composition independent, and use
-                // the bar's material settings with blur disabled so the
-                // magnifier's clipped backdrop does not bleed at the rim.
-                LiquidGlass.withOwnLayer(
-                  fake: widget.fake,
-                  settings:
-                      LiquidGlassSettings.of(
-                        context,
-                      ).copyWith(
-                        visibility: 1,
-                        tint: const Color.fromARGB(0, 255, 255, 255),
-                        frost: 0,
-                        refractionSpread: 0,
-                        saturation: 1,
-                        transmissionGamma: 1,
-                        vibrancy: 0,
-                        // A clear loupe has no face fill; retain only a subtle
-                        // edge rim around the pre-shader magnified backdrop.
-                        highlight: 0.25,
-                        contourStrength: 0.08,
-                        contourWidth: 0.75,
-                      ),
-                  shape: const LiquidOval(),
-                  // Do not put the icon in a glow layer here. A loupe is a
-                  // clear pre-shader magnifier; the icon should stay crisp and
-                  // the only material treatment should be the thin glass rim.
-                  child: icon,
-                ),
-              ],
+            child: LiquidGlass.grouped(
+              shape: const LiquidOval(),
+              // Do not put the icon in a glow layer here. A loupe is a
+              // clear pre-shader magnifier; the icon should stay crisp and
+              // the only material treatment should be the thin glass rim.
+              child: icon,
             ),
           )
         : LiquidGlass.grouped(
@@ -420,7 +381,7 @@ class _TabIndicatorState extends State<_TabIndicator>
   }
 
   double _getAlignmentFromGlobalPostition(Offset globalPosition) {
-    final box = context.findRenderObject() as RenderBox;
+    final box = context.findRenderObject()! as RenderBox;
     final localPosition = box.globalToLocal(globalPosition);
 
     // Calculate the effective draggable range
@@ -455,9 +416,8 @@ class _TabIndicatorState extends State<_TabIndicator>
 
   // Apply rubber band resistance similar to iOS scroll views
   double _applyRubberBandResistance(double value) {
-    const double resistance = 0.4; // Lower values = more resistance
-    const double maxOverdrag =
-        0.3; // Maximum overdrag as fraction of normal range
+    const resistance = 0.4; // Lower values = more resistance
+    const maxOverdrag = 0.3; // Maximum overdrag as fraction of normal range
 
     if (value < 0) {
       // Overdrag to the left
@@ -481,7 +441,7 @@ class _TabIndicatorState extends State<_TabIndicator>
       _isDown = false;
     });
 
-    final box = context.findRenderObject() as RenderBox;
+    final box = context.findRenderObject()! as RenderBox;
     final currentRelativeX = (xAlign + 1) / 2; // Convert from -1:1 to 0:1
     final tabWidth = 1.0 / widget.tabCount;
 
@@ -562,7 +522,7 @@ class _TabIndicatorState extends State<_TabIndicator>
         _isDown = false;
       }),
       child: VelocityMotionBuilder(
-        converter: SingleMotionConverter(),
+        converter: const SingleMotionConverter(),
         value: xAlign,
         motion: _isDragging
             ? const Motion.interactiveSpring(snapToEnd: true)
@@ -609,7 +569,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass.withOwnLayer(
-                        shadows: [
+                        shadows: const [
                           BoxShadow(
                             color: Color.from(
                               alpha: 0.1,
@@ -624,14 +584,18 @@ class _TabIndicatorState extends State<_TabIndicator>
                         settings: LiquidGlassSettings(
                           visibility: thickness,
                           edgeRefraction: 40,
+                          backdropScale: .92,
+                          refractionSpread: .5,
+                          chromaticAberration: .1,
                           frost: 0,
-                          contourStrength: .2,
+                          highlight: .4,
+                          contourStrength: .1,
                           contourWidth: 1,
                         ),
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: 64,
                         ),
-                        child: GlassGlow(child: const SizedBox.expand()),
+                        child: const GlassGlow(child: SizedBox.expand()),
                       ),
                     ),
                 ],
@@ -683,8 +647,8 @@ class _IndicatorTransform extends StatelessWidget {
             Positioned.fromRelativeRect(
               rect: rect!,
               child: SingleMotionBuilder(
-                motion: Motion.bouncySpring(
-                  duration: const Duration(milliseconds: 600),
+                motion: const Motion.bouncySpring(
+                  duration: Duration(milliseconds: 600),
                 ),
                 value: velocity,
                 builder: (context, velocity, child) {

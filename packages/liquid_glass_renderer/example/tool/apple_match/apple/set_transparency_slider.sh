@@ -33,8 +33,8 @@ if abs(wanted - actual) > 0.001:
     raise SystemExit(f"UIViewGlassTintAmount readback {actual} != {wanted}")
 PY
 
-# Fresh processes pick the default up at launch. capture.sh relaunches AppleMatch.
-xcrun simctl terminate "$IOS_27_UDID" com.apple.Preferences >/dev/null 2>&1 || true
+# Fresh AppleMatch processes pick the default up at launch. Do not terminate
+# Settings or any other user-owned app on the shared simulator.
 xcrun simctl terminate "$IOS_27_UDID" dev.liquidglass.applematch >/dev/null 2>&1 || true
 
 echo "LIQUID_GLASS_TINT_POSITION=$POSITION"

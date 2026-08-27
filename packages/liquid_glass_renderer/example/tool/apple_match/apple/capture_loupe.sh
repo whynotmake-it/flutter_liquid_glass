@@ -58,8 +58,6 @@ xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceMotionEnabled -bool YES
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceTransparencyEnabled -bool NO
-xcrun simctl terminate "$IOS_27_UDID" com.apple.Preferences >/dev/null 2>&1 || true
-
 cleanup() {
   agent-device close --platform ios --udid "$IOS_27_UDID" \
     --session "$AD_SESSION" >/dev/null 2>&1 || true

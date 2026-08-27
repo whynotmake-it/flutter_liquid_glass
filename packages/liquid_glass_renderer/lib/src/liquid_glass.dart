@@ -259,6 +259,7 @@ class LiquidGlass extends StatelessWidget {
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       shape: shape,
       glassContainsChild: glassContainsChild,
+      layerShadows: blendGroupLink == null ? const [] : shadows,
       child: OptimizedClip(
         shape: shape,
         clipBehavior: clipBehavior,
@@ -270,7 +271,7 @@ class LiquidGlass extends StatelessWidget {
         ),
       ),
     );
-    if (shadows.isEmpty) {
+    if (shadows.isEmpty || blendGroupLink != null) {
       return content;
     }
     return GlassShadow(
@@ -293,6 +294,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required super.child,
     required this.shape,
     required this.glassContainsChild,
+    required this.layerShadows,
     required this.blendGroupLink,
     required this.renderLink,
     required this.settings,
@@ -302,6 +304,8 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   final LiquidShape shape;
 
   final bool glassContainsChild;
+
+  final List<BoxShadow> layerShadows;
 
   final GlassGroupLink? blendGroupLink;
 
@@ -316,6 +320,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     return RenderLiquidGlass(
       shape: shape,
       glassContainsChild: glassContainsChild,
+      layerShadows: layerShadows,
       blendGroupLink: blendGroupLink,
       renderLink: renderLink,
       settings: settings,
@@ -331,6 +336,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     renderObject
       ..shape = shape
       ..glassContainsChild = glassContainsChild
+      ..layerShadows = layerShadows
       ..settings = settings
       ..devicePixelRatio = devicePixelRatio
       ..bindLinks(
@@ -346,6 +352,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
   RenderLiquidGlass({
     required this._shape,
     required this._glassContainsChild,
+    required this._layerShadows,
     required super.settings,
     required super.devicePixelRatio,
     this._blendGroupLink,
@@ -368,6 +375,16 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
     if (_glassContainsChild == value) return;
     _glassContainsChild = value;
     _onShapeConfigurationChanged();
+  }
+
+  List<BoxShadow> _layerShadows;
+  @override
+  List<BoxShadow> get layerShadows => _layerShadows;
+  set layerShadows(List<BoxShadow> value) {
+    if (_layerShadows == value) return;
+    _layerShadows = value;
+    _blendGroupLink?.notifyShapeLayoutChanged(this);
+    markNeedsPaint();
   }
 
   GlassGroupLink? _blendGroupLink;
@@ -500,6 +517,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
       shape: shape,
       glassContainsChild: glassContainsChild,
       shapeBounds: Offset.zero & size,
+      shadows: layerShadows,
     );
     final cached = geometry?.shapes ?? const <ShapeGeometry>[];
     final changed =

@@ -302,7 +302,6 @@ Candidate removals/fold-ins:
 - `edgeColor`, `edgeWidth`, `edgeInset`
 - `outerContourColor`, `outerContourWidth`
 - `specularWrap`, `bleedStrength`
-- `faceShadingStrength`, `faceShadingDepth`
 - entire `innerShadow*` trio
 
 Do not merely bake scene-specific workaround constants into shaders. If a

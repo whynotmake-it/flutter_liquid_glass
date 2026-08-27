@@ -66,14 +66,13 @@ SUPPORTED_SETTINGS = frozenset(
         "bleedStrength",
         "transmissionGamma",
         "vibrancy",
-        "faceShadingStrength",
-        "faceShadingDepth",
         "innerShadowStrength",
         "innerShadowDepth",
         "innerShadowDirectionality",
         "refractiveIndex",
         "edgeRefraction",
         "refractionSpread",
+        "backdropScale",
         "saturation",
         "chromaticAberration",
         "shadowLuminance",
@@ -177,10 +176,12 @@ def ensure_pinned_simulator(udid: str, *, simctl_fn=simctl) -> None:
     simctl_fn("bootstatus", PINNED_DEVICE_UDID, "-b")
 
 
-def prepare_simulator(udid: str) -> None:
+def prepare_simulator(udid: str, appearance: str = "light") -> None:
     """Enforce the deterministic environment on the pinned reference device."""
     ensure_pinned_simulator(udid)
-    simctl("ui", udid, "appearance", "light")
+    if appearance not in ("light", "dark"):
+        raise ValueError(f"Unsupported appearance: {appearance!r}")
+    simctl("ui", udid, "appearance", appearance)
     simctl("ui", udid, "content_size", "large")
     simctl("ui", udid, "increase_contrast", "disabled")
     simctl(
@@ -246,7 +247,8 @@ class CaptureSession:
     def __enter__(self) -> "CaptureSession":
         started = time.monotonic()
         self.work_dir.mkdir(parents=True, exist_ok=True)
-        prepare_simulator(self.udid)
+        scene = json.loads(self.scene_path.read_text())
+        prepare_simulator(self.udid, scene["appearance"])
         scene_b64 = base64.b64encode(self.scene_path.read_bytes()).decode()
         command = [
             self.flutter_bin,

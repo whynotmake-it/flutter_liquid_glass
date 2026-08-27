@@ -197,12 +197,16 @@ void main() {
       final bytes = await result.image.toByteData();
       expect(bytes, isNotNull);
 
-      int alphaAt(int x, int y) =>
-          bytes!.getUint8((y * result.width + x) * 4 + 3);
+      int signedDistanceAt(int x, int y) =>
+          bytes!.getUint8((y * result.width + x) * 4 + 2);
 
-      expect(alphaAt(10, 16), 0, reason: 'top row must stay narrow');
       expect(
-        alphaAt(10, 48),
+        signedDistanceAt(10, 16),
+        0,
+        reason: 'top row must stay narrow',
+      );
+      expect(
+        signedDistanceAt(10, 48),
         greaterThan(0),
         reason: 'bottom row must be wide',
       );

@@ -1,9 +1,38 @@
-## Unreleased
+## 0.2.0-dev.5
 
- - **FIX**: keep the named `ios27ToolbarLight` preset on the last user-accepted
-   optical values while the harness-only fit remains under visual and
-   generalization review. Existing generic settings and user-saved presets are
-   unchanged.
+> Note: This release has breaking changes.
+
+- **BREAKING**: replace the old `LiquidGlassSettings` material model:
+  - `glassColor` is now `tint`.
+  - `blur` is now `frost` and is an absolute logical-pixel sigma.
+  - `lightIntensity` is now `highlight`.
+  - `refractiveIndex` is replaced by the observable `edgeRefraction` peak.
+  - `lightAngle` and `ambientStrength` are removed.
+  - Add refraction reach/scale, transmission, paired-highlight, contour,
+    curvature-lighting, inner-shadow, and size-response controls.
+- **BREAKING**: remove the experimental `Glassify` API and its arbitrary-shape
+  shader path. The supported shapes are `LiquidRoundedSuperellipse`,
+  `LiquidRoundedRectangle`, and `LiquidOval`.
+- **BREAKING**: the full renderer now requires Flutter GPU in addition to
+  Impeller. `LiquidGlassLayer` automatically uses `FakeGlass` when the full
+  path is unavailable instead of failing to render.
+- **BREAKING**: `FakeGlass` now follows the shared tint, frost, contour,
+  highlight, inner-shadow, visibility, and exterior-shadow settings. Optical
+  refraction and transmission-only controls remain full-renderer-only.
+- **FEAT**: add `LiquidGlassSettings.ios27ToolbarLight` as a documented,
+  toolbar-sized light-material starting point.
+- **FEAT**: add explicit `backdropKey` support and consistent
+  `useBackdropGroup` behavior to real and fake layers.
+- **FEAT**: paint per-shape shadows below blended glass with a material cutout.
+- **PERF**: cache geometry mattes, coordinate mappings, composed native image
+  filters, and static transforms; clip the final shader to material bounds.
+- **PERF**: compose FakeGlass blur and color work into one backdrop-filter pass
+  and skip inactive effects.
+- **FIX**: preserve the full Gaussian tail in standalone and layer-owned shadow
+  paint bounds without expanding the clipped refraction pass.
+- **FIX**: restore glow behavior after the renderer rewrite.
+- **DOCS**: generate the README showcase from a Snaptest renderer test and
+  publish it to `doc/generated` after successful test runs.
 
 ## 0.2.0-dev.4
 

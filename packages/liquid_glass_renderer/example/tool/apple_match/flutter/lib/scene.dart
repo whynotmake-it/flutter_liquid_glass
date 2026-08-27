@@ -5,10 +5,12 @@ import 'package:flutter/widgets.dart';
 class MatchScene {
   MatchScene({
     required this.profile,
+    required this.appearance,
     required this.width,
     required this.height,
     required this.scale,
     required this.shapeRect,
+    required this.shapeKind,
     required this.cornerRadius,
     required this.probes,
   });
@@ -24,6 +26,7 @@ class MatchScene {
     }
     return MatchScene(
       profile: json['profile']! as String,
+      appearance: json['appearance']! as String,
       width: (canvas['logicalWidth']! as num).toDouble(),
       height: (canvas['logicalHeight']! as num).toDouble(),
       scale: canvas['scale']! as int,
@@ -33,6 +36,7 @@ class MatchScene {
         (shape['width']! as num).toDouble(),
         (shape['height']! as num).toDouble(),
       ),
+      shapeKind: shape['kind']! as String,
       cornerRadius: (shape['cornerRadius']! as num).toDouble(),
       probes: probes,
     );
@@ -44,9 +48,11 @@ class MatchScene {
 
   final double width;
   final String profile;
+  final String appearance;
   final double height;
   final int scale;
   final Rect shapeRect;
+  final String shapeKind;
   final double cornerRadius;
   final Map<String, Map<String, Object?>> probes;
 }
