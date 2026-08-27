@@ -102,6 +102,6 @@ void main() {
           }
         }
       }
-    });
+    }, tags: 'golden');
   });
 }

@@ -19,7 +19,10 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     config: AlchemistConfig(
       ciGoldensConfig: const CiGoldensConfig(enabled: false),
       platformGoldensConfig: PlatformGoldensConfig(
-        platforms: {HostPlatform.macOS},
+        // Flutter 3.44 validates test variants before applying tag filters.
+        // Include Linux so the non-golden CI lane can discover (then exclude)
+        // golden tests without Alchemist producing an empty variant.
+        platforms: {HostPlatform.macOS, HostPlatform.linux},
       ),
     ),
     run: testMain,

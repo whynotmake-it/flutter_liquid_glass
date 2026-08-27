@@ -7,8 +7,9 @@
 #version 460 core
 precision mediump float;
 
+#define MAX_SHAPES 16
+
 #include <flutter/runtime_effect.glsl>
-#include "sdf.glsl"
 #include "displacement_encoding.glsl"
 
 layout(location = 0) uniform vec2 uSize;
@@ -19,6 +20,8 @@ layout(location = 3) uniform float uShapeData[MAX_SHAPES * 6];
 float uThickness = uOpticalProps.z;
 float uRefractiveIndex = uOpticalProps.x;
 float uBlend = uOpticalProps.w;
+
+#include "sdf.glsl"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -31,7 +34,7 @@ void main() {
         vec2 screenUV = vec2(fragCoord.x / uSize.x, fragCoord.y / uSize.y);
     #endif
     
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uShapeData, uBlend);
+    float sd = sceneSDF(fragCoord);
     
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
     if (foregroundAlpha < 0.01) {
@@ -39,8 +42,20 @@ void main() {
         return;
     }
     
+#ifdef SKIA_GRAPHICS_BACKEND
+    const float epsilon = 1.0;
+    float dx = 0.5 * (
+        sceneSDF(fragCoord + vec2(epsilon, 0.0))
+            - sceneSDF(fragCoord - vec2(epsilon, 0.0))
+    );
+    float dy = 0.5 * (
+        sceneSDF(fragCoord + vec2(0.0, epsilon))
+            - sceneSDF(fragCoord - vec2(0.0, epsilon))
+    );
+#else
     float dx = dFdx(sd);
     float dy = dFdy(sd);
+#endif
     
     float n_cos = max(uThickness + sd, 0.0) / uThickness;
     float n_sin = sqrt(max(0.0, 1.0 - n_cos * n_cos));

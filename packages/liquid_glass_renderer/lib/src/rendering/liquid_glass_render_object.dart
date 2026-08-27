@@ -18,15 +18,12 @@ import 'package:meta/meta.dart';
 @internal
 abstract class LiquidGlassRenderObject extends RenderProxyBox {
   LiquidGlassRenderObject({
-    required GeometryRenderLink link,
+    required this._link,
     required this.renderShader,
-    required LiquidGlassSettings settings,
-    required double devicePixelRatio,
-    required BackdropKey? backdropKey,
-  })  : _settings = settings,
-        _devicePixelRatio = devicePixelRatio,
-        _backdropKey = backdropKey,
-        _link = link {
+    required LiquidGlassSettings this._settings,
+    required this._devicePixelRatio,
+    required this._backdropKey,
+  }) {
     _updateShaderSettings();
   }
 
@@ -130,8 +127,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @nonVirtual
   void paint(PaintingContext context, Offset offset) {
-    logger.finest('$hashCode Painting liquid glass with '
-        '${link._shapeGeometries.length} shapes.');
+    logger.finest(
+      '$hashCode Painting liquid glass with '
+      '${link._shapeGeometries.length} shapes.',
+    );
 
     final shapesWithGeometry =
         <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
@@ -311,8 +310,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
     final size = boundsInMatteSpace.size * devicePixelRatio;
 
-    final buffer = StringBuffer('$hashCode Built geometry image with '
-        '${geometries.length} shapes at size ${size.width}x${size.height}:\n');
+    final buffer = StringBuffer(
+      '$hashCode Built geometry image with '
+      '${geometries.length} shapes at size ${size.width}x${size.height}:\n',
+    );
 
     final recorder = ui.PictureRecorder();
 

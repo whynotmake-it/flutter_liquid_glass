@@ -12,10 +12,9 @@
 precision mediump float;
 
 #define DEBUG_NORMALS 0
+#define MAX_SHAPES 16
 
 #include <flutter/runtime_effect.glsl>
-#include "shared.glsl"
-#include "sdf.glsl"
 
 // Optimized uniform layout - grouped into vectors for better performance
 layout(location = 0) uniform vec2 uSize;                    // width, height
@@ -37,8 +36,13 @@ float uSaturation = uLightConfig.w;
 layout(location = 5) uniform float uNumShapes;             // numShapes  
 layout(location = 6) uniform float uShapeData[MAX_SHAPES * 6];
 
+#include "sdf.glsl"
+
 uniform sampler2D uBlurredTexture;
 layout(location = 0) out vec4 fragColor;
+
+#define BACKGROUND_TEXTURE uBlurredTexture
+#include "shared.glsl"
 
 void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
@@ -52,7 +56,7 @@ void main() {
     #endif
     
     // Generate shape and calculate normal using shader-specific method
-    float sd = sceneSDF(fragCoord, int(uNumShapes), uShapeData, uBlend);
+    float sd = sceneSDF(fragCoord);
     float foregroundAlpha = 1.0 - smoothstep(-2.0, 0.0, sd);
 
     // Early discard for pixels outside glass shapes to reduce overdraw
@@ -62,7 +66,7 @@ void main() {
         return;
     }
 
-    vec3 normal = getNormal(sd, uThickness);
+    vec3 normal = getNormal(fragCoord, sd, uThickness);
     
     // Use shared rendering pipeline
     fragColor = renderLiquidGlass(
@@ -77,7 +81,6 @@ void main() {
         uLightDirection, 
         uLightIntensity, 
         uAmbientStrength, 
-        uBlurredTexture, 
         normal,
         foregroundAlpha,
         0.0,
