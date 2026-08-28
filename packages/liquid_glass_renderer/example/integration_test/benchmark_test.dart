@@ -20,6 +20,10 @@ const _defaultMeasureSeconds = int.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS',
   defaultValue: 8,
 );
+const _defaultRepetition = int.fromEnvironment(
+  'LIQUID_GLASS_BENCHMARK_REPETITION',
+  defaultValue: 1,
+);
 final _benchmarkBackdropScale =
     double.tryParse(
       const String.fromEnvironment(
@@ -50,7 +54,8 @@ Future<void> main() async {
       nativeConfiguration['measureSeconds'] as int? ?? _defaultMeasureSeconds;
   final traceMeasureMilliseconds =
       nativeConfiguration['traceMeasureMilliseconds'] as int? ?? 500;
-  final repetition = nativeConfiguration['repetition'] as int? ?? 1;
+  final repetition =
+      nativeConfiguration['repetition'] as int? ?? _defaultRepetition;
   final isTraceRun = nativeConfiguration['traceRun'] as bool? ?? false;
   final traceStartGate = nativeConfiguration['traceStartGate'] as String?;
   final timings = <FrameTiming>[];
@@ -163,7 +168,49 @@ Future<void> main() async {
         ? cooldownStability.slopeMbPerSecond
         : null,
   };
+  debugPrint(
+    'LIQUID_GLASS_BENCHMARK_SUMMARY:${jsonEncode(<String, Object?>{
+      'scenario': scenario.name,
+      'repetition': repetition,
+      'frameCount': timings.length,
+      'buildP95Micros': _timingPercentile(
+        timings,
+        .95,
+        (t) => t.buildDuration,
+      ),
+      'rasterP50Micros': _timingPercentile(
+        timings,
+        .5,
+        (t) => t.rasterDuration,
+      ),
+      'rasterP95Micros': _timingPercentile(
+        timings,
+        .95,
+        (t) => t.rasterDuration,
+      ),
+      'rasterP99Micros': _timingPercentile(
+        timings,
+        .99,
+        (t) => t.rasterDuration,
+      ),
+      'totalP95Micros': _timingPercentile(timings, .95, (t) => t.totalSpan),
+    })}',
+  );
   debugPrint('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
+}
+
+int? _timingPercentile(
+  List<FrameTiming> timings,
+  double percentile,
+  Duration Function(FrameTiming timing) select,
+) {
+  if (timings.isEmpty) return null;
+  final values =
+      timings
+          .map((timing) => select(timing).inMicroseconds)
+          .toList(growable: false)
+        ..sort();
+  return values[((values.length - 1) * percentile).round()];
 }
 
 /// Starts the native in-process GPU timing session (Metal command-buffer
@@ -340,14 +387,23 @@ enum BenchmarkScenario {
   baselineMotion,
   staticSingle,
   plainStatic,
+  realLightingOnly,
+  realBlurOnly,
+  realSaturationOnly,
+  realBlurSaturation,
+  realToolbarMaterial,
   fakeLightingOnly,
   fakeBlurOnly,
   fakeSaturationOnly,
   fakeBlurSaturation,
+  fakeToolbarMaterial,
+  realToFakeTransition,
   translatedSingle,
   ancestorTranslatedLayer,
   scaledRotatedSingle,
   grouped4Motion,
+  fakeGrouped4Motion,
+  fakeUngrouped4Motion,
   grouped8Motion,
   grouped16Motion,
   litGrouped16Motion,
@@ -459,10 +515,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     BenchmarkScenario.staticSingle ||
     BenchmarkScenario.largeStatic ||
     BenchmarkScenario.plainStatic ||
-    BenchmarkScenario.fakeLightingOnly ||
-    BenchmarkScenario.fakeBlurOnly ||
-    BenchmarkScenario.fakeSaturationOnly ||
-    BenchmarkScenario.fakeBlurSaturation ||
     BenchmarkScenario.fakeStatic ||
     BenchmarkScenario.fakeLarge => false,
     _ => true,
@@ -497,11 +549,45 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         ),
       ),
       BenchmarkScenario.plainStatic => Center(child: _tile(0)),
+      BenchmarkScenario.realLightingOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          saturation: 1,
+        ),
+        t,
+      ),
+      BenchmarkScenario.realBlurOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          saturation: 1,
+          highlight: 0,
+        ),
+        t,
+      ),
+      BenchmarkScenario.realSaturationOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          highlight: 0,
+        ),
+        t,
+      ),
+      BenchmarkScenario.realBlurSaturation => _realLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
+        ),
+        t,
+      ),
+      BenchmarkScenario.realToolbarMaterial => _realLayer(
+        const LiquidGlassSettings.ios27ToolbarLight(),
+        t,
+      ),
       BenchmarkScenario.fakeLightingOnly => _fakeLayer(
         const LiquidGlassSettings(
           frost: 0,
           saturation: 1,
         ),
+        t,
       ),
       BenchmarkScenario.fakeBlurOnly => _fakeLayer(
         const LiquidGlassSettings(
@@ -509,18 +595,32 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           saturation: 1,
           highlight: 0,
         ),
+        t,
       ),
       BenchmarkScenario.fakeSaturationOnly => _fakeLayer(
         const LiquidGlassSettings(
           frost: 0,
           highlight: 0,
         ),
+        t,
       ),
       BenchmarkScenario.fakeBlurSaturation => _fakeLayer(
         const LiquidGlassSettings(
           frost: 15,
           highlight: 0,
         ),
+        t,
+      ),
+      BenchmarkScenario.fakeToolbarMaterial => _fakeLayer(
+        const LiquidGlassSettings.ios27ToolbarLight(),
+        t,
+      ),
+      BenchmarkScenario.realToFakeTransition => _RealThenFakeScenario(
+        t: t,
+        retirementDelay:
+            widget.traceStartGate == null || widget.traceStartGate!.isEmpty
+            ? const Duration(milliseconds: 1500)
+            : const Duration(seconds: 5),
       ),
       BenchmarkScenario.translatedSingle => LiquidGlassLayer(
         settings: settings,
@@ -566,6 +666,20 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         settings: settings,
         count: 4,
         t: t,
+      ),
+      BenchmarkScenario.fakeGrouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+        fake: true,
+        shareBackdrop: true,
+      ),
+      BenchmarkScenario.fakeUngrouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+        blend: 0,
+        fake: true,
       ),
       BenchmarkScenario.grouped8Motion => _groupedGrid(
         settings: settings,
@@ -696,13 +810,29 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ),
   );
 
-  Widget _fakeLayer(LiquidGlassSettings settings) => LiquidGlassLayer(
+  Widget _realLayer(LiquidGlassSettings settings, double t) => LiquidGlassLayer(
+    settings: settings,
+    child: Center(
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * t, 0),
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
+        ),
+      ),
+    ),
+  );
+
+  Widget _fakeLayer(LiquidGlassSettings settings, double t) => LiquidGlassLayer(
     settings: settings,
     fake: true,
     child: Center(
-      child: LiquidGlass(
-        shape: const LiquidRoundedSuperellipse(borderRadius: 32),
-        child: _tile(0),
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * t, 0),
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
+        ),
       ),
     ),
   );
@@ -737,11 +867,15 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     required int count,
     required double t,
     double blend = 24,
+    bool fake = false,
+    bool shareBackdrop = false,
   }) {
     // Keep total glass area approximately constant across the count ladder.
     final tileSize = 72 * math.sqrt(16 / count);
     return LiquidGlassLayer(
       settings: settings,
+      fake: fake,
+      useBackdropGroup: shareBackdrop,
       child: Center(
         child: Transform.translate(
           offset: Offset(30 * math.sin(t * math.pi * 2), 0),
@@ -867,6 +1001,52 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         alpha: .35,
       ),
       child: Center(child: Text('glass $index')),
+    ),
+  );
+}
+
+class _RealThenFakeScenario extends StatefulWidget {
+  const _RealThenFakeScenario({required this.t, required this.retirementDelay});
+
+  final double t;
+  final Duration retirementDelay;
+
+  @override
+  State<_RealThenFakeScenario> createState() => _RealThenFakeScenarioState();
+}
+
+class _RealThenFakeScenarioState extends State<_RealThenFakeScenario> {
+  Timer? _retirementTimer;
+  bool _fake = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _retirementTimer = Timer(widget.retirementDelay, () {
+      if (!mounted) return;
+      setState(() => _fake = true);
+      debugPrint('LIQUID_GLASS_BENCHMARK_REAL_RENDERER_RETIRED');
+    });
+  }
+
+  @override
+  void dispose() {
+    _retirementTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LiquidGlassLayer(
+    fake: _fake,
+    settings: const LiquidGlassSettings.ios27ToolbarLight(),
+    child: Center(
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * widget.t, 0),
+        child: const LiquidGlass(
+          shape: LiquidRoundedSuperellipse(borderRadius: 32),
+          child: SizedBox.square(dimension: 240),
+        ),
+      ),
     ),
   );
 }

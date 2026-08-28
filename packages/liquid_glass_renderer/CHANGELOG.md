@@ -19,15 +19,25 @@
 - **BREAKING**: `FakeGlass` now follows the shared tint, frost, contour,
   highlight, inner-shadow, visibility, and exterior-shadow settings. Optical
   refraction and transmission-only controls remain full-renderer-only.
-- **FEAT**: add `LiquidGlassSettings.ios27ToolbarLight` as a documented,
-  toolbar-sized light-material starting point.
+- **FEAT**: add documented `LiquidGlassSettings.ios27ToolbarLight` and
+  `ios27ToolbarDark` presets fitted to toolbar-sized materials; the example
+  follows platform appearance and bundles both presets. The
+  `LiquidGlassSettings.ios27Toolbar` factory selects the independently fitted
+  material from a Flutter `Brightness`.
 - **FEAT**: add explicit `backdropKey` support and consistent
   `useBackdropGroup` behavior to real and fake layers.
 - **FEAT**: paint per-shape shadows below blended glass with a material cutout.
 - **PERF**: cache geometry mattes, coordinate mappings, composed native image
   filters, and static transforms; clip the final shader to material bounds.
 - **PERF**: compose FakeGlass blur and color work into one backdrop-filter pass
-  and skip inactive effects.
+  and render each shape with a lightweight analytic material shader, skipping
+  inactive effects. In repeated matched Pixel 10 toolbar measurements this cut
+  raster p95 by 20.8%, total-frame p95 by 17.0%, and PSS by 3.9% versus the
+  full renderer; results remain workload-dependent.
+- **FIX**: keep FakeGlass foreground ordering aligned with the full layer and
+  fit its contour, highlight, frost, and bevel response to shared settings.
+- **FIX**: refit dark transmission across eight guarded hues, removing blue,
+  green, and cyan blowout from the earlier dark toolbar preset.
 - **FIX**: preserve the full Gaussian tail in standalone and layer-owned shadow
   paint bounds without expanding the clipped refraction pass.
 - **FIX**: restore glow behavior after the renderer rewrite.

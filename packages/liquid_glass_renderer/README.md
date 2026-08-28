@@ -18,7 +18,8 @@
 > - Read [Limitations](#limitations) and [Performance](#performance).
 > - Verify that the full renderer is active where refraction is required.
 > - Profile representative screens on physical target devices.
-> - Treat `FakeGlass` as a compatibility fallback, not a fast mode.
+> - Treat `FakeGlass` as a narrower compatibility fallback and profile the
+>   exact screen; its simpler path can be faster, but that is workload-dependent.
 
 
 
@@ -94,7 +95,7 @@ This package provides several widgets to create the glass effect:
 | `LiquidGlass`             | Adds one shape to the nearest `LiquidGlassLayer`.                                           |
 | `LiquidGlass.auto`        | Automatically uses a parent `LiquidGlassLayer` if available, or creates its own.           |
 | `LiquidGlassBlendGroup`   | Groups multiple `LiquidGlass.grouped` shapes to blend them together seamlessly.            |
-| `FakeGlass`               | Portable glass fallback without refraction. Profile it; it is not inherently faster.       |
+| `FakeGlass`               | Portable no-refraction fallback with a simpler material shader. Profile representative screens. |
 | `GlassGlow`               | Add touch-responsive glow effects to glass surfaces.                                       |
 | `LiquidStretch`           | Add interactive squash and stretch effects to glass widgets.                               |
 
@@ -116,10 +117,13 @@ The full effect has two distinct costs: an SDF geometry texture that is cached
 while shapes are unchanged, and a clipped backdrop/refraction pass over the
 visible glass pixels. In device testing, backdrop blur is usually the most
 expensive material feature because it filters and samples a large pixel area.
-`FakeGlass` skips geometry encoding and refraction, but still pays for that
-blur, plus tint/saturation, lighting, shadows, and Flutter compositing. It is a
-compatibility fallback, not a performance preset, and has measured slower than
-the full renderer on Android hardware. Profile the exact effect on each target.
+`FakeGlass` skips geometry encoding and refraction, but still pays for backdrop
+blur, tint, lighting, shadows, and Flutter compositing. In repeated matched
+toolbar measurements on a Pixel 10, it reduced raster p95 by 20.8%, total-frame
+p95 by 17.0%, and PSS by 3.9% versus the full renderer. That is evidence for
+that scene rather than a universal promise: blur area, overlap, animation, and
+device GPU can change the result. See the
+[measurement report](example/tool/PR152_PIXEL10_COMPARISON.md).
 
 The renderer caches static geometry and clips the final material pass to its
 paint bounds. Actual cost still depends on covered pixels, frost, animation,
@@ -135,9 +139,8 @@ Practical controls with predictable impact:
   transforms that do not alter the shape can reuse cached renderer state.
 - **Large soft shadows process more pixels.** Keep blur radii proportional to
   the control rather than to the full screen.
-- **Profile `FakeGlass` independently.** It removes refraction but retains
-  backdrop blur and compositing; on tested Android hardware it has been slower
-  than the full renderer.
+- **Profile `FakeGlass` independently.** It removes refraction and uses a
+  simpler material shader, but retains backdrop blur and compositing.
 
 ---
 
@@ -281,26 +284,32 @@ You can have multiple `LiquidGlass` widgets in a `LiquidGlassLayer` without blen
 
 You can customize the appearance of the glass by providing `LiquidGlassSettings` to a `LiquidGlassLayer`, `LiquidGlass.withOwnLayer()`, or `LiquidGlass.auto()`. All glass widgets within that layer will share these settings.
 
-For the closest validated match to the light iOS 27 toolbar material, start
-with the size-specific preset and tune it for your control:
+For the closest validated match to the iOS 27 toolbar material, select the
+size-specific preset for the current appearance and tune it for your control:
 
 ```dart
 const LiquidGlassSettings.ios27ToolbarLight()
+const LiquidGlassSettings.ios27ToolbarDark()
 ```
 
-The preset is deliberately not the universal default. Apple's material varies
-with control size and appearance; this fit targets a toolbar-sized capsule in
-light appearance.
+These presets are deliberately not universal defaults. Apple's material varies
+with control size and appearance; these fits target a toolbar-sized capsule.
 
 ```dart
+final brightness = MediaQuery.platformBrightnessOf(context);
+
 LiquidGlassLayer(
-  settings: const LiquidGlassSettings.ios27ToolbarLight(),
+  settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
   child: LiquidGlassBlendGroup(
     blend: 40, // blend is now on LiquidGlassBlendGroup, not settings
     child: // ... your LiquidGlass.grouped widgets
   ),
 )
 ```
+
+`ios27Toolbar` selects the independently fitted light or dark transmission
+curve. It does not derive dark appearance by inverting or recoloring the light
+material.
 
 Here's a breakdown of the key settings:
 
@@ -390,8 +399,9 @@ Shadows work with all `LiquidGlass` constructors (`.grouped()`, `.withOwnLayer()
 
 Use `FakeGlass` when Flutter GPU shader filters are unavailable, or when you
 intentionally need a portable no-refraction path. It preserves the material's
-blur, tint, lighting, contour, and shadow, but is not a fast mode: backdrop blur
-remains, and the fallback has measured slower than the full renderer on Android.
+blur, tint, lighting, contour, and shadow. Its analytic per-shape material
+shader is simpler than the full refraction pipeline, but backdrop blur remains
+the dominant cost in many scenes, so measure it on target hardware.
 
 ![Full liquid glass and the portable FakeGlass fallback](doc/generated/rendererfallback.png)
 

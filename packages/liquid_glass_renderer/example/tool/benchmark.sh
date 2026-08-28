@@ -50,7 +50,7 @@ TRACE_WAIT_FOR_READY="${LIQUID_GLASS_BENCHMARK_TRACE_WAIT_FOR_READY:-true}"
 REPETITIONS="${LIQUID_GLASS_BENCHMARK_REPETITIONS:-3}"
 ENFORCE_THRESHOLDS="${LIQUID_GLASS_BENCHMARK_ENFORCE:-false}"
 SKIP_BUILD="${LIQUID_GLASS_BENCHMARK_SKIP_BUILD:-false}"
-SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion grouped8Motion grouped16Motion independent4Motion independent8Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
+SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle realLightingOnly fakeLightingOnly realBlurOnly fakeBlurOnly realSaturationOnly fakeSaturationOnly realBlurSaturation fakeBlurSaturation realToolbarMaterial fakeToolbarMaterial realToFakeTransition translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion fakeGrouped4Motion fakeUngrouped4Motion grouped8Motion grouped16Motion independent4Motion independent8Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize fakeStatic fakeLarge}"
 # Metal tracing is opt-in for on-demand attribution: the kdebug rolling
 # buffer retains a fixed event count, not a fixed duration, so xctrace GPU
 # capture density varies per run by design and cannot gate. Default runs
@@ -135,6 +135,13 @@ wait_for_file() {
 process_is_running() {
   local pid="$1"
   kill -0 "$pid" 2>/dev/null
+}
+
+log_has_runtime_failure() {
+  local log_file="$1"
+  [[ -f "$log_file" ]] && grep -Eq \
+    '══╡ EXCEPTION CAUGHT|Unhandled exception:|\[ERROR:flutter/runtime/|Dart Error:' \
+    "$log_file"
 }
 
 start_trace_watchdog() {
@@ -344,6 +351,11 @@ capture_trace_attempt() {
   ACTIVE_RUN_PID=""
   wait "$ACTIVE_NOTIFICATION_PID" 2>/dev/null || true
   ACTIVE_NOTIFICATION_PID=""
+  if log_has_runtime_failure "$trace_drive_log"; then
+    printf 'Target logged a Flutter/Dart runtime failure during tracing.\n' \
+      >>"$trace_log"
+    return 1
+  fi
   if ((trace_status != 0)); then
     printf 'xctrace exited unsuccessfully with status %s.\n' "$trace_status" >>"$trace_log"
     return 1
@@ -421,6 +433,11 @@ capture_metrics_attempt() {
   terminate_tree "$run_pid"
   wait "$run_pid" 2>/dev/null || true
   ACTIVE_RUN_PID=""
+  if log_has_runtime_failure "$drive_log"; then
+    printf 'Target logged a Flutter/Dart runtime failure; rejecting its timings.\n' \
+      >>"$drive_log"
+    return 1
+  fi
   if [[ -z "$benchmark_json" ]]; then
     return 1
   fi

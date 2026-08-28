@@ -48,9 +48,7 @@ void main(List<String> arguments) {
     },
     'scenarioRuns': reports.map(
       (report) {
-        final baselineName = report.scenario.startsWith('fake')
-            ? 'fakeStatic'
-            : 'baselineMotion';
+        final baselineName = _comparisonScenario(report.scenario);
         final matchedBaseline = reports
             .where(
               (candidate) =>
@@ -1019,9 +1017,10 @@ String _markdown(
     for (final report in reports.where(
       (r) => r != baseline && r != fakeBaseline,
     )) {
-      final comparison = report.scenario.startsWith('fake')
-          ? fakeBaseline
-          : baseline;
+      final comparisonName = _comparisonScenario(report.scenario);
+      final comparison = reports
+          .where((candidate) => candidate.scenario == comparisonName)
+          .firstOrNull;
       if (comparison == null) continue;
       final rasterDelta = report.p95Raster - comparison.p95Raster;
       final memoryDelta = report.peakFootprint - comparison.peakFootprint;
@@ -1071,6 +1070,18 @@ String _markdown(
   }
   return out.toString();
 }
+
+String _comparisonScenario(String scenario) => switch (scenario) {
+  'fakeLightingOnly' => 'realLightingOnly',
+  'fakeBlurOnly' => 'realBlurOnly',
+  'fakeSaturationOnly' => 'realSaturationOnly',
+  'fakeBlurSaturation' => 'realBlurSaturation',
+  'fakeToolbarMaterial' => 'realToolbarMaterial',
+  'fakeGrouped4Motion' => 'grouped4Motion',
+  'fakeUngrouped4Motion' => 'fakeGrouped4Motion',
+  _ when scenario.startsWith('fake') => 'fakeStatic',
+  _ => 'baselineMotion',
+};
 
 /// Enforced gates: raster p95/p99, native footprint (peak, retained delta,
 /// per-sample step), raster/footprint repeatability, and run completeness.

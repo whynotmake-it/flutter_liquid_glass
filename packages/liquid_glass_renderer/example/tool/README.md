@@ -113,6 +113,21 @@ local counter profiles.
   Metal texture allocation spikes and delayed retirement.
 - `fakeStatic` and `fakeLarge`: FakeGlass on Impeller, providing a baseline and
   a 2048×2048 stress case without the Flutter-GPU geometry pass.
+- `realLightingOnly` / `fakeLightingOnly`, `realBlurOnly` / `fakeBlurOnly`,
+  `realSaturationOnly` / `fakeSaturationOnly`, and `realBlurSaturation` /
+  `fakeBlurSaturation`: moving, same-settings pairs that attribute FakeGlass
+  lighting, backdrop blur, saturation, and composed-filter costs directly.
+- `realToolbarMaterial` / `fakeToolbarMaterial`: the moving Basic App default
+  iOS 27 toolbar preset, including its blur, tint, saturation, and lighting.
+- `realToFakeTransition`: mounts the real toolbar material, then switches the
+  same layer to fake before measurement. It catches real geometry or coordinate
+  textures retained by mode switching and is the focused Metal-resource trace
+  scenario for measurement contamination.
+- `grouped4Motion`, `fakeGrouped4Motion`, and `fakeUngrouped4Motion`: the
+  four-shape real renderer, the fake renderer with one shared backdrop
+  capture, and the historical independent-capture case. This
+  separates retained shape lighting from the dominant multi-shape backdrop
+  cost.
 
 Use environment variables to shorten or focus local runs, for example:
 
