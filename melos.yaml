@@ -3,6 +3,7 @@ name: liquid_glass_workspace_workspace
 packages:
   - packages/*
   - "packages/**/example/"
+  - "packages/**/tool/apple_match/flutter/"
 
 command:
   version:

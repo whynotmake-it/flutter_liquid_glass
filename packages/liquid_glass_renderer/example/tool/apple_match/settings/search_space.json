@@ -1,0 +1,29 @@
+{
+  "maxCandidates": 24,
+  "candidates": [
+    {"thickness": 12.0, "blur": 12.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.35, "ambientStrength": 0.0, "glassAlpha": 0.45, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 12.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.35, "ambientStrength": 0.05, "glassAlpha": 0.55, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 12.0, "lightAngle": 2.356194490192345, "lightIntensity": 0.35, "ambientStrength": 0.1, "glassAlpha": 0.65, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 18.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.5, "ambientStrength": 0.05, "glassAlpha": 0.45, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 18.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.5, "ambientStrength": 0.05, "glassAlpha": 0.55, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 18.0, "lightAngle": 2.356194490192345, "lightIntensity": 0.5, "ambientStrength": 0.05, "glassAlpha": 0.65, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 24.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.65, "ambientStrength": 0.1, "glassAlpha": 0.45, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 24.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.65, "ambientStrength": 0.1, "glassAlpha": 0.55, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 24.0, "lightAngle": 2.356194490192345, "lightIntensity": 0.65, "ambientStrength": 0.1, "glassAlpha": 0.65, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 9.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.35, "ambientStrength": 0.0, "glassAlpha": 0.55, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 18.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.5, "ambientStrength": 0.1, "glassAlpha": 0.6, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 24.0, "lightAngle": 2.356194490192345, "lightIntensity": 0.65, "ambientStrength": 0.05, "glassAlpha": 0.55, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 8.0, "blur": 8.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.25, "ambientStrength": 0.03, "glassAlpha": 0.52, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 8.0, "blur": 10.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.3, "ambientStrength": 0.03, "glassAlpha": 0.54, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 8.0, "blur": 14.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.3, "ambientStrength": 0.03, "glassAlpha": 0.56, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 8.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.25, "ambientStrength": 0.0, "glassAlpha": 0.52, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 10.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.3, "ambientStrength": 0.03, "glassAlpha": 0.54, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 14.0, "lightAngle": 2.356194490192345, "lightIntensity": 0.4, "ambientStrength": 0.05, "glassAlpha": 0.56, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 10.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.25, "ambientStrength": 0.0, "glassAlpha": 0.54, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 14.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.35, "ambientStrength": 0.05, "glassAlpha": 0.56, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 8.0, "blur": 4.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.25, "ambientStrength": 0.03, "glassAlpha": 0.52, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 12.0, "blur": 5.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.3, "ambientStrength": 0.03, "glassAlpha": 0.53, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 20.0, "blur": 5.0, "lightAngle": 0.7853981633974483, "lightIntensity": 0.25, "ambientStrength": 0.0, "glassAlpha": 0.54, "refractiveIndex": 1.2, "saturation": 1.5},
+    {"thickness": 28.0, "blur": 6.0, "lightAngle": 1.5707963267948966, "lightIntensity": 0.25, "ambientStrength": 0.0, "glassAlpha": 0.53, "refractiveIndex": 1.2, "saturation": 1.5}
+  ]
+}

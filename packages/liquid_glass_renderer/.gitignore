@@ -30,8 +30,3 @@ pubspec_overrides.yaml
 
 # Alchemist writes diagnostic images here when a golden comparison fails.
 test/src/failures/
-
-# The visual-fitting harness is reviewed and maintained on a separate stacked
-# branch from the publishable renderer.
-example/tool/apple_match/
-example/macos/DerivedData/

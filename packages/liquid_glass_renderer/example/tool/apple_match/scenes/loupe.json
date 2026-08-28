@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "loupe",
+  "profile": "loupe",
+  "canvas": {
+    "logicalWidth": 402,
+    "logicalHeight": 874,
+    "scale": 3
+  },
+  "shape": {
+    "kind": "capsule",
+    "x": 142.7,
+    "y": 502,
+    "width": 116.3,
+    "height": 85.7,
+    "cornerRadius": 36,
+    "appleContentInsetX": 0,
+    "appleContentInsetY": 0
+  },
+  "appearance": "light",
+  "transparency": {
+    "reduceTransparency": false,
+    "appleSliderMapped": false
+  },
+  "probes": [
+    {
+      "id": "A",
+      "background": {
+        "kind": "rgbwGrid",
+        "cellSize": 12,
+        "gutter": 1,
+        "gutterColor": "#101010",
+        "layout": "primary",
+        "colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF"],
+        "markerColumn": 2,
+        "markerRow": 3,
+        "marker": [
+          "RGBWWBRG",
+          "WRBGRGBW",
+          "BGWWRBRG",
+          "RRGWBBGW"
+        ]
+      }
+    },
+    {
+      "id": "B",
+      "background": {
+        "kind": "rgbwGrid",
+        "cellSize": 12,
+        "gutter": 1,
+        "gutterColor": "#101010",
+        "layout": "holdout",
+        "colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF"],
+        "markerColumn": 23,
+        "markerRow": 56,
+        "marker": [
+          "WGBRRWBG",
+          "BRWWGGRB",
+          "RWBGBWRG",
+          "GGRBWWBR"
+        ]
+      }
+    },
+    {
+      "id": "C",
+      "background": {
+        "kind": "solid",
+        "color": "#000000"
+      }
+    },
+    {
+      "id": "D",
+      "background": {
+        "kind": "solid",
+        "color": "#FFFFFF"
+      }
+    }
+  ]
+}
