@@ -1,0 +1,329 @@
+# Performance audit
+
+This is the prioritized backlog for the native benchmark harness. Every change
+should be compared against the relevant control scenario on the same runner;
+visual output and native `phys_footprint` remain regression gates.
+
+## Current measured state (2026-08-11)
+
+A stabilized three-repetition macOS profile run used profile-mode
+Impeller/Metal and native Mach `phys_footprint` sampling. A separate rolling
+Metal System Trace validated exact, process-filtered GPU attribution.
+
+- Right-sizing each Flutter GPU uniform host buffer removed about 66 MB from
+  the sixteen-independent-layer case and reduced raster p95 from roughly
+  12.05 ms to 6.82 ms in matched runs.
+- Sixteen independent animated layers still use about 588 MB peak native
+  footprint, versus about 365 MB for one static glass. Their latest raster p95
+  median is 6.57 ms, with a 19.2% CV and one 8.95 ms outlier, so this workload
+  is not yet a reliable production result.
+- Sixteen shapes in one layer remain dramatically cheaper (about 386 MB and
+  1.59 ms raster p95 in the matched run). Sharing only the backdrop capture
+  across sixteen independent layers barely changed memory, attributing the
+  remaining growth to per-layer Flutter/Metal filter state.
+- A validated static-single Metal trace used an exact 0.897 s target-process
+  window: 1,512 GPU intervals, 162.8 ms unioned busy time (18.1%), and 0.64 ms
+  interval p95. The enforced parser accepted the trace with no missing-data
+  fallback.
+
+These results support prioritizing independent-layer filter/driver state. The
+geometry matte is small after host-buffer right-sizing, and shared backdrop
+capture does not account for the remaining per-layer footprint.
+
+## Implemented in the API audit
+
+- Whole-layer ancestor transforms reuse the local geometry matte. The
+  `ancestorTranslatedLayer` scenario distinguishes this fast path from moving
+  a shape relative to its layer.
+- Fake glass composes blur, saturation, and tint into one backdrop-filter pass
+  instead of nesting blur and saturation captures.
+- Static benchmark scenarios no longer rebuild under the global animation
+  controller.
+- `BackdropKey` sharing is explicit, opt-in, supported by both rendering paths,
+  and independent from liquid geometry blend groups.
+- Geometry mattes grow in 64-physical-pixel buckets and retain their high-water
+  allocation, while larger backdrop-filter bounds use non-retaining buckets.
+  Native controls showed that replacing a matte during rotation reintroduced a
+  167.5 MB step, while exact saveLayer bounds churned every frame. The policy is
+  differentiated internally rather than exposed in the consumer API.
+- Metal GPU intervals are PID-filtered and clipped to at least 450 ms of exact
+  overlap between a timestamped app workload interval and Xcode's retained
+  rolling timeline. Allocation/free events are counted only inside that
+  interval; peak-live/retained labels are withheld until cross-window resource
+  identities and lifetimes can be matched correctly.
+- Mach memory/frame metrics and Metal traces run in separate fresh processes;
+  combined collection made Instruments add and reclaim roughly 160–180 MB in
+  the target, creating false native-memory spikes.
+- Frame timing uses real engine vsync in a dedicated profile entry point. Mach
+  sampling runs on a native timer, followed by a five-second cooldown whose
+  final-window median and slope determine whether memory actually settled.
+- Scenarios run three times by default. Enforced results require the requested
+  count and reject raster/GPU/footprint coefficients of variation above 15%.
+- The final runtime-effect shader uses a fixed half-pixel edge feather because
+  Flutter runtime effects do not expose `fwidth`, including under Impeller.
+  This removes derivative work but can reduce edge stability under local
+  scaling; transformed visual cases remain a regression gate.
+
+## Next measurements
+
+1. **Cull sparse shape layers.** Compare dense and window-spanning layouts at
+   1/2/4/8/16 shapes. Add conservative AABB rejection or spatial bins only if
+   the comparison isolates shape evaluation as a material part of the frame;
+   a spread or density delta by itself is not proof of an SDF bottleneck.
+2. **Cache real-path filters and transformed clip paths.** Benchmark a static
+   layer repainted by unrelated foreground animation, then cache by settings
+   and geometry revision if raster CPU/allocation remains material.
+3. **Reuse uniform packing buffers.** A fixed `ByteData`/`Float32List` staging
+   buffer can reduce Dart allocation during 16-shape stretch churn.
+4. **Evaluate singular-shape specialization last.** A one-shape pipeline removes
+   loop and group-marker overhead, but static geometry is already cached and the
+   final backdrop/refraction pass may dominate. Measure dynamic oval, rounded
+   rectangle, and superellipse cases separately before adding shader variants.
+
+The next looks-first probe is the shared `chromaticAberration` axis:
+
+```bash
+cd packages/liquid_glass_renderer/example/tool/apple_match
+IOS_27_UDID="$IOS_27_UDID" PYTHONPATH=compare compare/.venv/bin/python material_attribution_scan.py \
+  --axis chromaticAberration --repetitions 1 \
+  --out out/material-attribution-chromaticAberration
+```
+
+It compares the current `.005` default with zero (the one-backdrop-sample
+path) and values up to `.1` across toolbar, small, and large capsules. The
+upper values are diagnostic: they test whether the relative-displacement
+parameterization is merely too weak to see. The scan must pass the existing
+two-scene attribution and regression checks before any default or shader policy
+change is considered. It is a visual-fit probe, not a substitute for the later
+same-runner performance gate.
+
+## Required comparisons
+
+- `baselineMotion` versus `ancestorTranslatedLayer`
+- `translatedSingle` versus `scaledRotatedSingle`
+- fake 1/4/8/16 shape ladders with blur-only, saturation-only, and combined
+  filtering, both grouped and ungrouped
+- dense versus sparse 1/2/4/8/16 real shapes at constant total shape area
+- small and 1024→2048 resizing under the internal bucketing heuristic
+
+All scenarios, including fake glass, run on Impeller so backend startup and
+process baselines remain comparable. Attribute deltas within the same scenario
+family; fake glass intentionally bypasses only the Flutter-GPU geometry pass.
+
+## Current redesign audit status (2026-08-25)
+
+Platform smoke gates currently pass with Flutter 3.47.1:
+
+- `flutter build apk --debug` succeeds with Android Impeller and Flutter GPU
+  manifest flags enabled.
+- `flutter build macos --profile` succeeds with the macOS Impeller and Flutter
+  GPU plist flags enabled.
+- The focused example widget/YAML/loupe tests and the full non-golden workflow
+  pass.
+
+The final performance ratio is intentionally still open. Existing three-run
+artifacts are useful historical controls, but they were captured across
+different renderer/perf revisions and cannot be presented as a clean
+before/after pair for the final state. A final same-runner macOS profile
+comparison is required before claiming the ≤5% gate; the Android build is a
+platform smoke check, not a substitute for that timing evidence.
+
+The macOS build initially failed because the generated workspace omitted
+`Pods/Pods.xcodeproj`; Xcode consequently never produced the
+`path_provider_foundation` framework imported by the generated plugin
+registrant. Regenerating the workspace with `pod install` restored that project
+reference, and a clean Xcode-derived-data Profile build passed. This is a build
+integration repair, not a renderer change.
+
+On 2026-08-26, a focused three-repetition `grouped16Motion` trace using only
+the GPU and Metal Application instruments produced repeatable app metrics
+(raster-p95 CV 1.9%, in-process GPU CV 10.7%, footprint CV 0.8%), but all three
+native exports were rejected because most retained windows contained zero GPU
+intervals. A one-run Metal-Application-only probe produced no GPU table, so the
+GPU instrument cannot simply be removed to solve the problem. These captures
+are retained as diagnostic evidence; no native Metal gate is claimed.
+
+The trace harness now uses its existing start-gate handshake: the app waits for
+the xctrace readiness notification before emitting its measured windows. The
+benchmark app also keeps the expensive scene out of the render loop until that
+gate file appears; normal frame/memory runs and production code are unchanged.
+After that change, a targeted 8-second grouped capture passed every retained
+half-second-window check (58.1% traced GPU utilization, 4.83 ms/frame). Three
+repetitions then passed with traced-GPU utilization 55.9/60.7/63.1% (CV 6.1%),
+raster-p95 CV 3.2%, in-process GPU/frame CV 7.3%, and footprint-peak CV 1.7%.
+The trace result is now sound attribution evidence for this scenario; it is not
+a production performance gate or proof that the SDF is the bottleneck.
+
+The focused final-state probe on 2026-08-26 also established a harness detail:
+passing xctrace `--window 21s` can produce a one-second trace whose retained
+timeline ends before the gated workload starts, so the parser correctly reports
+no overlap. Omitting `--window` produced a valid current grouped trace
+(35.3% traced GPU utilization, 2.93 ms/frame). The benchmark script therefore
+defaults `TRACE_WINDOW_SECONDS` to `0` for opt-in traces. Independent16 still
+exceeded the 308-second finalization watchdog in two fresh attempts even with
+the complete-trace mode; this is recorded as unresolved Instruments event
+density, not as a renderer or SDF regression.
+
+For short high-density probes, `TRACE_WAIT_FOR_READY=false` waits for the
+app's post-warmup measurement marker before attaching xctrace. In a
+three-repetition independent16 probe, one trace passed (51.4% traced GPU
+utilization, 4.31 ms/frame) and two were rejected for event loss; the matching
+grouped16 probe had two valid traces and one rejection. These are repeatability
+diagnostics, not the final cross-revision performance gate.
+
+The pinned loupe composition scan is now also runnable and truthful: the
+`RawMagnifier` owns enlargement, so the 12-candidate grid varies only
+`thickness` and `edgeRefraction`; clear-material overrides are recorded rather
+than searched. The best fresh pinned score is 13.5557 in
+`out/loupe-scorecard-effective/final/scorecard.json`. The harness reproduces
+the reference Dynamic Island outside the scored crop and excludes that known
+device chrome plus the rounded top-left simulator corner from full-frame
+registration; all remaining RGBW control pixels match exactly.
+
+## 2026-08-25 renderer optimization experiments (rejected)
+
+Two focused measurements evaluated candidates; neither is part of the current
+renderer and neither is the final gate audit.
+
+- A conservative smooth-union AABB lower bound was evaluated to skip exact
+  superellipse evaluation only when `boxLowerBound >= currentDistance + blend`.
+  Its first implementation used an unsigned inside-box distance; after fixing
+  that correctness issue, there was still no valid end-to-end proof of a win.
+  The cull was reverted and its grouped timings are historical only.
+- A shared coordinate atlas replaced one 2×1 texture overwrite per animated
+  layer with one overwrite per atlas page. The valid three-repetition
+  independent16 run produced raster p95 5.20/5.23/5.28 ms (median 5.23 ms,
+  CV 0.7%), peak footprints 1036.9/1047.8/1055.5 MB (median 1047.8 MB,
+  CV 0.9%), and about 97,269 command-buffer submissions in the one completed
+  retry. The pre-atlas focused control was about 111,760 submissions and
+  1,061 MB peak. This is a meaningful attribution signal, not a passed ≤5%
+  before/after gate. Raster p95 did not improve and the atlas introduced extra
+  reader lifecycle/per-frame preparation work, so it was reverted.
+
+The atlas implementation and its focused identity/row test were removed from
+the current renderer; no atlas texture, reader registry, or coordinate-row
+uniform remains in shipped code.
+
+The focused no-trace audit in `build/benchmark-final-focused-current` measured
+median per-run raster means of 1.27 ms (`baselineMotion`), 1.36 ms
+(`grouped16Motion`), 3.33 ms (`independent16Motion`), and 1.48 ms
+(`layerChurn`); corresponding median raster p95 values were 1.53, 1.91, 5.28,
+and 2.08 ms. All four scenario families exceeded the repeatability limit, so
+these values are diagnostic only. Independent16 peak footprint remained
+approximately 0.93–1.12 GB, and no final ≤5% before/after claim is made.
+
+The transparency harness now enforces the same no-hidden-work discipline for
+material fitting: baseline tint RGB is copied exactly, and only `tintAlpha`
+and `frost` may vary by slider position. Its structural constraint audit is
+recorded alongside the fit scorecards.
+
+## SDF and shader-branch decision (2026-08-26)
+
+Flutter 3.47.1's Impeller `uber_sdf.frag` contains an opt-in rounded-
+superellipse SDF path with the same six-step bounded superellipse solve used
+by this package. Ordinary Flutter does not always take that path: the canvas
+selects UberSDF only when SDFs are enabled and the shape is compatible,
+otherwise it uses tessellated rounded-superellipse geometry. The shader also
+branches for RSE octant selection and the circular-arc versus superellipse
+section. Therefore a branchless rewrite is not an optimization assumption:
+per-fragment branches may diverge, while evaluating both sides of a `mix`
+can cost more. Keep the branches that select the mathematically required
+piecewise SDF.
+
+In the shipped geometry shader, `hasFaceSpread` is a draw-uniform fast path,
+but it only avoids the extra `halfMinor` bookkeeping in `sceneSample`; both
+paths still evaluate each shape once. The near-zero-chromatic-aberration path
+and coverage early returns avoid texture/downstream work and are the more
+credible fast paths. The SDF matte is persistent and is rebuilt only when
+geometry or settings are dirty, so no SDF bottleneck claim is justified
+without a targeted geometry-pass A/B measurement.
+
+The final shader's chromatic path now uses one backdrop read whenever the
+maximum encoded displacement multiplied by `abs(chromaticAberration)` is below
+0.25 source pixels. This is a coherent uniform branch that removes two texture
+reads for the fitted values while preserving the three-sample path for larger
+refraction surfaces. The pinned three-scene scan (`out/material-attribution-
+chromaticAberration-cutoff/summary.json`) found byte-identical A captures for
+0 through `.01`; values above that boundary changed at most a few pixels and
+did not improve the score. This is a looks-safe optimization candidate, not a
+completed before/after performance gate.
+
+## Shared refraction-spread probe (2026-08-26)
+
+The existing `refractionSpread` axis was tested before adding any new shader
+knob. `spread_grid.py` freshly rendered all three recovered geometries on the
+pinned iOS 27 simulator for `{0,.0625,.125,.25,.5}`, with two repetitions per
+value and a persistent capture session per scene. The toolbar was re-rendered
+for every candidate; its settings were not reused as a stale scorecard.
+
+| spread | toolbar combined / score | small combined / score | large combined / score |
+|---:|---:|---:|---:|
+| 0 | .033417 / 91.7814 | .063668 / 85.2647 | .027357 / 89.4927 |
+| .0625 | .033431 / 91.7909 | .063588 / 85.2699 | .027362 / 89.5177 |
+| .125 | .033428 / 91.7978 | .063545 / 85.2737 | .027357 / 89.5211 |
+| .25 | .033426 / 91.7941 | .063511 / 85.2796 | .027357 / 89.5198 |
+| .5 | .033413 / 91.7896 | .063514 / 85.2831 | .027356 / 89.5150 |
+
+The tiny small-capsule improvement at `.25` is only 0.25% and remains 1.90x
+the toolbar error (the stated <=1.25x gate); all candidates also miss the
+recorded 86.3452 small-capsule pre-change score. This rejects the current
+spread axis as the generalization fix. The complete raw rows, repeatability,
+and pinned metadata are recorded in
+`apple_match/out/spread-grid-current/summary.json`. The final `.5` small
+capture is available as [spread-grid candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/spread-grid-current/small_capsule/live/A.png), with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png).
+
+## Coupled spread/thickness probe (2026-08-26)
+
+Because spread and thickness enter the shader's reach, slope, and
+thickness-derived optical index together, `coupled_spread_scan.py` tested the
+existing model jointly: shared spread `{0,.25,.5,.75,1}` and independently
+selected thickness `{2,4,6,8,10,12,16}` for each recovered geometry. Every
+candidate was freshly rendered once on the pinned simulator and its four probe
+captures were retained under `out/coupled-spread-scan/<scene>/candidates/`.
+Selection used the existing optics loss (flow plus combined error), never the
+cross-scene ratio.
+
+The scan still rejected the model as a generalization fix. The best selected
+rows were:
+
+| shared spread | toolbar (thickness / score) | small (thickness / score / combined) | large (thickness / score) |
+|---:|---:|---:|---:|
+| 0 | 2 / 92.1894 | 2 / 85.6538 / .063231 | 2 / 89.2351 |
+| .25 | 2 / 92.2049 | 2 / 85.6319 / .063221 | 2 / 89.2551 |
+| .5 | 2 / 92.2069 | 4 / 85.6234 / .063242 | 2 / 89.2459 |
+| .75 | 2 / 92.2009 | 4 / 85.6216 / .063287 | 2 / 89.2409 |
+| 1 | 2 / 92.1974 | 2 / 85.6428 / .063239 | 2 / 89.2411 |
+
+Small remains about 2.01x the same-spread toolbar error and below the recorded
+86.3452 capsule gate at every candidate. No public setting or shader change is
+justified by this result. A representative retained image is [coupled candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/coupled-spread-scan/small_capsule/candidates/spread-1/thickness-2/rep-1/A.png); compare it with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full numeric rows and selection details are in `out/coupled-spread-scan/summary.json`.
+
+## Shared material attribution probes (2026-08-26)
+
+After the spread/thickness rejection, the existing material vector was tested
+one shared scalar at a time on freshly rendered toolbar, small, and large
+capsules. Geometry, spread, and every other material field stayed fixed; each
+row retained A–D PNGs and diagnostics under its own directory. The probe is
+reproducible with:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py \
+  --axis frost --out out/material-attribution-frost
+```
+
+Frost `{3,4,5,6,7,8,9}` was rejected: small's best score was 86.4094 at 5,
+but flow worsened from .036286 to .049595 and combined error worsened from
+.063668 to .064354; large only improved at values that regressed toolbar.
+Gamma `{.80,.85,.875,.90,.925,.95,1}` was also rejected: small's best
+combined error was .063416 at .85 (0.4% better) with no flow improvement, far
+below the required attribution threshold. Edge refraction `{0,8,12,18.3,24,32}`
+was effectively flat: small's best was .063659/.036182 at 8 versus
+.063668/.036286 at the default 18.3, while larger values regressed.
+Vibrancy `{0,.075,.15,.225,.30}` reached .063137/.035494 at .30, only a
+0.8%/2.2% movement and below the attribution threshold. Tint alpha
+`{.48,.505,.53,.555,.58}` reached .063272/.035099 at .555, but reduced the
+toolbar/large scores and conflicts with the transparency contract.
+
+These controls therefore remain at their validated defaults; no renderer
+change is inferred from sub-threshold movement. Representative pairs are the
+[frost candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-frost/small_capsule/candidates/frost-5/rep-1/A.png), [gamma candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-gamma/small_capsule/candidates/transmissionGamma-0p85/rep-1/A.png), and [edge candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-edge/small_capsule/candidates/edgeRefraction-8/rep-1/A.png), each compared against the pinned [Apple small-capsule reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full rows are in the corresponding `out/material-attribution-*` summaries.
