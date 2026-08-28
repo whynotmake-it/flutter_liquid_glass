@@ -69,6 +69,9 @@ def _objective(
     response_mae = float(np.mean(response_errors))
     luminance_mae = float(np.mean(luminance_errors))
     saturation_mae = float(np.mean(saturation_errors))
+    worst_response_mae = float(np.max(response_errors))
+    worst_luminance_mae = float(np.max(luminance_errors))
+    worst_saturation_mae = float(np.max(saturation_errors))
     color_mae = response_mae * 0.55 + luminance_mae * 0.25 + saturation_mae * 0.20
     lighting = metrics["lighting"]
     transmission_mae = lighting["decomposition"]["transmissionResidual"][
@@ -84,6 +87,9 @@ def _objective(
         "paletteMeanResponseMae8Bit": response_mae,
         "paletteMeanLuminanceMae8Bit": luminance_mae,
         "paletteMeanSaturationMae8Bit": saturation_mae,
+        "paletteWorstResponseMae8Bit": worst_response_mae,
+        "paletteWorstLuminanceMae8Bit": worst_luminance_mae,
+        "paletteWorstSaturationMae8Bit": worst_saturation_mae,
         "solidTransmissionFaceMae8Bit": transmission_mae,
         "solidEmissionFaceMae8Bit": emission_mae,
         "blackFaceMae8Bit": black_mae,
@@ -92,13 +98,30 @@ def _objective(
     # Patch colors and solid transmission are primary. Black emission guards
     # tint/opacity fits from matching white solely by adding a constant wash.
     score = (
-        color_mae * 0.45
+        color_mae * 0.30
+        + worst_response_mae * 0.075
+        + worst_luminance_mae * 0.05
+        + worst_saturation_mae * 0.025
         + transmission_mae * 0.25
         + emission_mae * 0.15
         + black_mae * 0.075
         + white_mae * 0.075
     )
     return score, components
+
+
+def _validate_color_coverage(metrics: dict, scene: dict) -> None:
+    color_spec = next(
+        probe["background"] for probe in scene["probes"] if probe["id"] == "B"
+    )
+    declared_symbols = set(
+        color_spec["palette"] if "palette" in color_spec else "RGBW"
+    )
+    missing_symbols = declared_symbols - set(metrics["color"])
+    if missing_symbols:
+        raise ValueError(
+            f"color objective is missing declared hues: {sorted(missing_symbols)}"
+        )
 
 
 def _crop(image: Image.Image, scene: dict) -> Image.Image:
@@ -184,6 +207,15 @@ def main() -> None:
     raw_scene = json.loads(args.scene.read_text())
     base = json.loads(args.base_settings.read_text())
     scene = apply_settings_geometry(raw_scene, base)
+    # Keep samples away from tile transitions while ensuring every declared
+    # hue is represented inside the material face. The former 18px inset
+    # silently omitted cyan and yellow from the dark color-card objective.
+    color_probe = next(
+        probe for probe in scene["probes"] if probe["id"] == "B"
+    )
+    color_probe["background"]["sampleInset"] = min(
+        float(color_probe["background"].get("sampleInset", 0)), 6.0
+    )
     configs = args.out / "configs"
     candidates = args.out / "candidates"
     configs.mkdir(parents=True, exist_ok=True)
@@ -230,6 +262,7 @@ def main() -> None:
                 stdout=subprocess.DEVNULL,
             )
         metrics = measure(args.reference, candidate_dir, scene)
+        _validate_color_coverage(metrics, scene)
         score, components = _objective(metrics, objective_symbols)
         all_symbols = set(metrics["color"])
         holdout_symbols = all_symbols - (objective_symbols or all_symbols)
@@ -258,7 +291,8 @@ def main() -> None:
         "schemaVersion": 1,
         "capturePlatform": "macos-host-golden-metal",
         "probes": ["A", "B", "C", "D"],
-        "frostPolicy": "fixed-zero-until-lighting-and-color-freeze",
+        "frostPolicy": "fixed-at-base-settings",
+        "fixedFrost": base.get("frost", 0),
         "axis": args.axis,
         "objectiveSymbols": sorted(objective_symbols) if objective_symbols else None,
         "candidates": rows,

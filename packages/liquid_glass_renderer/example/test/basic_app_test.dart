@@ -7,6 +7,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/basic_app.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
 import 'package:liquid_glass_renderer_example/shared.dart';
+import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
 
 const _useTestBackground = bool.fromEnvironment(
   'LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND',
@@ -15,6 +16,7 @@ const _useTestBackground = bool.fromEnvironment(
 void main() {
   const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
   setUp(() {
+    settingsNotifier.value = exampleDefaultGlassSettings;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           pathProviderChannel,
@@ -41,6 +43,30 @@ void main() {
 
   test('example default glass uses the fitted frosted preset', () {
     expect(exampleDefaultGlassSettings.frost, 7);
+  });
+
+  testWidgets('example follows platform dark appearance', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(
+      tester.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+
+    await tester.pumpWidget(
+      const CupertinoApp(home: BasicApp(backgroundOverride: 'grid')),
+    );
+    await tester.pump();
+
+    expect(
+      settingsNotifier.value,
+      const LiquidGlassSettings.ios27ToolbarDark(),
+    );
+    final layer = tester.widget<LiquidGlassLayer>(
+      find.descendant(
+        of: find.byType(LiquidGlassBottomBar),
+        matching: find.byType(LiquidGlassLayer),
+      ),
+    );
+    expect(layer.settings, const LiquidGlassSettings.ios27ToolbarDark());
   });
 
   testWidgets('settings has one close action and persistent preset controls', (
@@ -93,6 +119,17 @@ void main() {
       find.ancestor(of: find.text('Done'), matching: find.byType(SafeArea)),
       findsOneWidget,
     );
+
+    final vibrancy = tester.widget<CupertinoSlider>(
+      find.byKey(const ValueKey('settings-slider-Vibrancy')),
+    );
+    final saturation = tester.widget<CupertinoSlider>(
+      find.byKey(const ValueKey('settings-slider-Saturation')),
+    );
+    expect(vibrancy.min, 0);
+    expect(vibrancy.max, 1);
+    expect(saturation.min, 0);
+    expect(saturation.max, 4);
 
     await tester.tap(find.text('Matched toolbar'));
     expect(settingsNotifier.value.frost, 7);
@@ -195,6 +232,9 @@ void main() {
     final toolbar = File(
       'assets/presets/ios27-toolbar-light.yaml',
     ).readAsStringSync();
+    final darkToolbar = File(
+      'assets/presets/ios27-toolbar-dark.yaml',
+    ).readAsStringSync();
     final neutral = File(
       'assets/presets/neutral-default.yaml',
     ).readAsStringSync();
@@ -206,6 +246,10 @@ void main() {
     expect(
       PresetStore.fromYaml(toolbar).toJson(),
       const LiquidGlassSettings.ios27ToolbarLight().toJson(),
+    );
+    expect(
+      PresetStore.fromYaml(darkToolbar).toJson(),
+      const LiquidGlassSettings.ios27ToolbarDark().toJson(),
     );
   });
 }

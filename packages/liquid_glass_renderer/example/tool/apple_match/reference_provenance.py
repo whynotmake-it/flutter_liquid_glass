@@ -229,8 +229,17 @@ def validate_reference(
     ]
     if sorted(hashes) != sorted(required_files):
         raise ValueError("probe/frame checksum manifest is incomplete or has extra files")
+    # Raw median inputs are useful capture evidence but are intentionally not
+    # required in a portable checkout. Their immutable hashes remain in the
+    # manifest; the four committed median probes are the scored artifacts.
+    # When raw frames are present, still verify every one of them.
+    available_files = [
+        relative
+        for relative in required_files
+        if (capture_dir / relative).exists() or not relative.startswith("frames/")
+    ]
     image_shape = None
-    for relative in required_files:
+    for relative in available_files:
         path = capture_dir / relative
         if not path.exists() or sha256(path) != hashes[relative]:
             raise ValueError(f"missing or checksum-mismatched asset: {path}")

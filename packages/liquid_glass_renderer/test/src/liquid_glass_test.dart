@@ -2,6 +2,7 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
@@ -10,6 +11,29 @@ import 'shared.dart';
 
 void main() {
   group('LiquidGlass', () {
+    testWidgets('fake layer retains its painted subtree', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: LiquidGlassLayer(
+            fake: true,
+            child: LiquidGlass(
+              shape: LiquidOval(),
+              child: SizedBox.square(dimension: 80),
+            ),
+          ),
+        ),
+      );
+
+      final scope = tester.element(find.byType(LiquidGlassRenderScope));
+      Element? parent;
+      scope.visitAncestorElements((ancestor) {
+        parent = ancestor;
+        return false;
+      });
+
+      expect(parent!.widget, isA<RepaintBoundary>());
+    });
+
     testWidgets(
       'standalone shapes share a layer without a dummy blend group',
       (tester) async {
@@ -79,17 +103,18 @@ void main() {
           ),
         );
 
-        expect(
-          tester
-              .widget<LiquidGlassRenderScope>(
-                find.byType(LiquidGlassRenderScope),
-              )
-              .useFake,
-          isTrue,
+        final initialScope = tester.widget<LiquidGlassRenderScope>(
+          find.byType(LiquidGlassRenderScope),
         );
-
-        await tester.pump();
-        await tester.pump();
+        if (initialScope.useFake) {
+          // Shader-bundle I/O completes on the host event loop rather than the
+          // fake clock advanced by pump durations. A warm cache may already
+          // have selected the real renderer during pumpWidget.
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(seconds: 1)),
+          );
+          await tester.pump();
+        }
 
         expect(
           tester
@@ -98,6 +123,125 @@ void main() {
               )
               .useFake,
           isFalse,
+        );
+      },
+      skip: expectFlutterGpuFallback,
+    );
+
+    testWidgets(
+      'reuses real textures and releases them when switching to fake',
+      (tester) async {
+        final fake = ValueNotifier(false);
+        final revision = ValueNotifier(0);
+        addTearDown(fake.dispose);
+        addTearDown(revision.dispose);
+        final initialRenderers =
+            FlutterGpuGeometryRenderer.debugActiveRendererCount;
+        final initialGeometryTextures =
+            FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount;
+        final initialCoordinateTextures =
+            FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount;
+
+        Widget app() => MaterialApp(
+          home: AnimatedBuilder(
+            animation: Listenable.merge([fake, revision]),
+            builder: (_, __) => LiquidGlassLayer(
+              fake: fake.value,
+              child: const LiquidGlass(
+                shape: LiquidOval(),
+                child: SizedBox.square(dimension: 100),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpWidget(app());
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(seconds: 1)),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final renderObject = tester.allRenderObjects
+            .whereType<RenderLiquidGlassLayer>()
+            .last;
+        final renderer = renderObject.gpuGeometryRenderer!;
+        final renderShader = renderObject.renderShader;
+        final renderCount = renderer.debugRenderCount;
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveRendererCount,
+          initialRenderers + 1,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
+          initialGeometryTextures + 1,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
+          initialCoordinateTextures + 1,
+        );
+
+        // An unchanged real layer keeps both persistent textures and does not
+        // submit another geometry pass. Rebuilding with an equivalent shader
+        // asset list must also retain the same shader instance.
+        revision.value++;
+        await tester.pump();
+        expect(renderer.debugRenderCount, renderCount);
+        expect(renderObject.renderShader, same(renderShader));
+        expect(renderShader.debugDisposed, isFalse);
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
+          initialGeometryTextures + 1,
+        );
+
+        fake.value = true;
+        await tester.pump();
+        await tester.pump();
+        expect(renderer.debugDisposed, isTrue);
+        expect(renderShader.debugDisposed, isTrue);
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveRendererCount,
+          initialRenderers,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
+          initialGeometryTextures,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
+          initialCoordinateTextures,
+        );
+
+        // A later real selection gets a fresh owner; fake mode never keeps the
+        // retired real texture around merely to make this transition cheaper.
+        fake.value = false;
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(seconds: 1)),
+        );
+        await tester.pump();
+        await tester.pump();
+        final replacementRenderObject = tester.allRenderObjects
+            .whereType<RenderLiquidGlassLayer>()
+            .last;
+        final replacement = replacementRenderObject.gpuGeometryRenderer!;
+        final replacementShader = replacementRenderObject.renderShader;
+        expect(replacement, isNot(same(renderer)));
+
+        await tester.pumpWidget(const SizedBox());
+        expect(replacement.debugDisposed, isTrue);
+        expect(replacementShader.debugDisposed, isTrue);
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveRendererCount,
+          initialRenderers,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
+          initialGeometryTextures,
+        );
+        expect(
+          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
+          initialCoordinateTextures,
         );
       },
       skip: expectFlutterGpuFallback,

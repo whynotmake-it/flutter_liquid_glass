@@ -31,6 +31,52 @@ void main() {
     expect(settings.exteriorShadowSizeResponse, 1);
   });
 
+  test('iOS 27 dark toolbar preset preserves the fitted material', () {
+    const settings = LiquidGlassSettings.ios27ToolbarDark();
+    expect(settings.tint.r, closeTo(57.142857 / 255, .001));
+    expect(settings.tint.g, closeTo(57.142857 / 255, .001));
+    expect(settings.tint.b, closeTo(57.142857 / 255, .001));
+    expect(settings.tint.a, closeTo(.56, .001));
+    expect(settings.thickness, 12);
+    expect(settings.frost, 5);
+    expect(settings.edgeRefraction, closeTo(27.42, .01));
+    expect(settings.saturation, 2.3);
+    expect(settings.transmissionGamma, .58);
+    expect(settings.vibrancy, .1);
+    expect(settings.highlight, .25);
+    expect(settings.highlightWidth, 0);
+    expect(settings.contourStrength, .25);
+    expect(settings.contourWidth, .5);
+    expect(settings.contourOffset, 0);
+    expect(settings.bevelShadowStrength, .04);
+    expect(settings.exteriorShadowSizeResponse, 0);
+  });
+
+  test(
+    'brightness-aware toolbar factory selects independently fitted looks',
+    () {
+      expect(
+        LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
+        const LiquidGlassSettings.ios27ToolbarLight(),
+      );
+      expect(
+        LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
+        const LiquidGlassSettings.ios27ToolbarDark(),
+      );
+      expect(
+        LiquidGlassSettings.ios27Toolbar(
+          brightness: Brightness.dark,
+          visibility: .5,
+          frost: 3,
+        ),
+        const LiquidGlassSettings.ios27ToolbarDark(
+          visibility: .5,
+          frost: 3,
+        ),
+      );
+    },
+  );
+
   test('visibility fades strengths without shrinking material support', () {
     const settings = LiquidGlassSettings(
       visibility: .5,

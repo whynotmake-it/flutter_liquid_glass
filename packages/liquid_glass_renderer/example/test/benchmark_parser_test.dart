@@ -736,6 +736,27 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
     final markdown = File('${fixture.path}/summary.md').readAsStringSync();
     expect(markdown, contains('Scenario failures'));
   });
+
+  test('pairs fake material scenarios with equivalent real controls', () async {
+    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+    addTearDown(() => fixture.deleteSync(recursive: true));
+    _writeScenario(fixture, scenario: 'baselineMotion');
+    _writeScenario(fixture, scenario: 'fakeStatic');
+    _writeScenario(fixture, scenario: 'realToolbarMaterial');
+    _writeScenario(fixture, scenario: 'fakeToolbarMaterial');
+
+    final result = await _runParser(fixture, enforce: false);
+
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final markdown = File('${fixture.path}/summary.md').readAsStringSync();
+    expect(
+      markdown,
+      contains(
+        '`fakeToolbarMaterial`: raster p95 +0.00 ms, GPU busy unavailable, '
+        'and peak native footprint +0.0 MB versus `realToolbarMaterial`.',
+      ),
+    );
+  });
 }
 
 Future<ProcessResult> _runParser(

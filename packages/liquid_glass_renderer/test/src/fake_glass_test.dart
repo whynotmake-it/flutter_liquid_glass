@@ -5,11 +5,39 @@ import 'package:alchemist/alchemist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/fake_glass.dart';
 
 import 'shared.dart';
 
 void main() {
   group('FakeGlass', () {
+    for (final shape in <LiquidShape>[
+      const LiquidOval(),
+      const LiquidRoundedRectangle(borderRadius: 24),
+      const LiquidRoundedSuperellipse(borderRadius: 24),
+    ]) {
+      testWidgets('loads one analytic surface shader for $shape', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: FakeGlass(
+              shape: shape,
+              settings: const LiquidGlassSettings(frost: 0),
+              child: const SizedBox.square(dimension: 80),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final surface = tester.renderObject<RenderFakeGlass>(
+          find.byType(RawFakeGlass),
+        );
+        expect(surface.surfaceShader, isNotNull);
+      });
+    }
+
     testWidgets('shadow paint bounds retain blur support outside the shape', (
       tester,
     ) async {
@@ -197,7 +225,67 @@ void main() {
         ],
       ),
     );
+
+    goldenTest(
+      'matches RealGlass lighting with identical settings',
+      skip: skipGoldenTests,
+      fileName: _backendGolden('fake_glass_real_comparison'),
+      pumpBeforeTest: pumpOnce,
+      builder: () => GoldenTestGroup(
+        scenarioConstraints: testScenarioConstraints,
+        children: [
+          for (final fake in [false, true])
+            GoldenTestScenario(
+              name: fake ? 'FAKE — same settings' : 'REAL — reference',
+              child: buildWithGridPaper(_comparisonSurface(fake: fake)),
+            ),
+        ],
+      ),
+    );
   });
+}
+
+Widget _comparisonSurface({required bool fake}) {
+  const shadows = [
+    BoxShadow(
+      color: Color.from(alpha: 0.03, red: 0, green: 0, blue: 0),
+      offset: Offset(0, 6),
+      blurRadius: 12,
+      spreadRadius: -1,
+    ),
+  ];
+  return Center(
+    child: LiquidGlassLayer(
+      fake: fake,
+      settings: const LiquidGlassSettings.ios27ToolbarLight(),
+      child: LiquidGlassBlendGroup(
+        blend: 10,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 16,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 16,
+              children: [
+                for (var index = 0; index < 2; index++)
+                  const LiquidGlass.auto(
+                    shadows: shadows,
+                    shape: LiquidRoundedSuperellipse(borderRadius: 20),
+                    child: GlassGlow(child: SizedBox.square(dimension: 100)),
+                  ),
+              ],
+            ),
+            const LiquidGlass.auto(
+              shadows: shadows,
+              shape: LiquidRoundedSuperellipse(borderRadius: 9000),
+              child: GlassGlow(child: SizedBox(width: 400, height: 64)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 final glassShadowBlurSupportForTest =

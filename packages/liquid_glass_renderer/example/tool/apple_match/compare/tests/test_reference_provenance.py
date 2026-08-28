@@ -88,6 +88,17 @@ class ReferenceProvenanceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checksum-mismatched"):
                 validate_reference(capture, scene, source_path=source, capture_script=script)
 
+    def test_committed_medians_validate_without_raw_frames(self):
+        with tempfile.TemporaryDirectory() as directory:
+            capture, scene, source, script = self.make_capture(Path(directory))
+            for frame in (capture / "frames").iterdir():
+                frame.unlink()
+            metadata = validate_reference(
+                capture, scene, source_path=source, capture_script=script,
+                max_mean_frame_deviation=2.0,
+            )
+            self.assertEqual(metadata["medianFrameCount"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

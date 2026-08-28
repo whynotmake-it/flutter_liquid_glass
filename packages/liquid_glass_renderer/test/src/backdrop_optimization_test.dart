@@ -45,6 +45,39 @@ void main() {
     );
   }
 
+  testWidgets('fake layer creates a local backdrop group when requested', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const CupertinoApp(
+        home: LiquidGlassLayer(
+          fake: true,
+          useBackdropGroup: true,
+          child: Row(
+            children: [
+              LiquidGlass(
+                shape: LiquidOval(),
+                child: SizedBox.square(dimension: 80),
+              ),
+              LiquidGlass(
+                shape: LiquidOval(),
+                child: SizedBox.square(dimension: 80),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final raw = tester
+        .widgetList<RawFakeGlass>(find.byType(RawFakeGlass))
+        .toList(growable: false);
+    expect(raw, hasLength(2));
+    expect(raw.first.backdropKey, isNotNull);
+    expect(raw.last.backdropKey, same(raw.first.backdropKey));
+  });
+
   testWidgets('backdrop sharing is opt-in and independent of blend groups', (
     tester,
   ) async {

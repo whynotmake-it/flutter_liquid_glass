@@ -10,7 +10,6 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   isLocalTest = true;
 
   await MultiShaderBuilder.precacheShaders([
-    ShaderKeys.fakeGlassColor,
     if (ImageFilter.isShaderFilterSupported) ...[
       ShaderKeys.liquidGlassRender,
     ],
