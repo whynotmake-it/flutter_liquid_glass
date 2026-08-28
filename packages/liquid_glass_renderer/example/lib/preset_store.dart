@@ -63,7 +63,11 @@ class PresetStore {
 
   Future<void> seed() async {
     if ((await names()).isEmpty) {
-      for (final name in ['ios27-toolbar-light', 'neutral-default']) {
+      for (final name in [
+        'ios27-toolbar-light',
+        'ios27-toolbar-dark',
+        'neutral-default',
+      ]) {
         final yaml = await rootBundle.loadString('assets/presets/$name.yaml');
         final directory = await _directory();
         await File('${directory.path}/$name.yaml').writeAsString(yaml);

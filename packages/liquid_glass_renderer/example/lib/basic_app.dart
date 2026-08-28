@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
@@ -18,6 +22,9 @@ const _useTestBackground = bool.fromEnvironment(
 const _testBlur = int.fromEnvironment(
   'LIQUID_GLASS_EXAMPLE_TEST_BLUR',
 );
+const _enablePerformanceProbe = bool.fromEnvironment(
+  'LIQUID_GLASS_EXAMPLE_PERFORMANCE_PROBE',
+);
 const _testBackgroundColors = [
   Color(0xffff595e),
   Color(0xff8ac926),
@@ -31,12 +38,17 @@ const _testBackgroundColors = [
 /// the explicit clear-glass/loupe examples.
 const exampleDefaultGlassSettings = LiquidGlassSettings.ios27ToolbarLight();
 
+LiquidGlassSettings exampleDefaultGlassSettingsForBrightness(
+  Brightness brightness,
+) {
+  final settings = LiquidGlassSettings.ios27Toolbar(brightness: brightness);
+  return _useTestBackground
+      ? settings.copyWith(frost: _testBlur.toDouble())
+      : settings;
+}
+
 final settingsNotifier = ValueNotifier(
-  _useTestBackground
-      ? LiquidGlassSettings.ios27ToolbarLight(
-          frost: _testBlur.toDouble(),
-        )
-      : exampleDefaultGlassSettings,
+  exampleDefaultGlassSettingsForBrightness(Brightness.light),
 );
 
 final blendNotifier = ValueNotifier<double>(10);
@@ -61,6 +73,13 @@ class BasicApp extends HookWidget {
       PresetStore().seed();
       return null;
     }, const []);
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    useEffect(() {
+      settingsNotifier.value = exampleDefaultGlassSettingsForBrightness(
+        brightness,
+      );
+      return null;
+    }, [brightness]);
 
     final visibility = useState(true);
     final visibilityValue = useSingleMotion(
@@ -274,6 +293,8 @@ class BasicApp extends HookWidget {
               ),
             ),
           ),
+        if (_enablePerformanceProbe)
+          _BasicAppPerformanceProbe(fake: fake.value),
       ],
     );
 
@@ -293,6 +314,105 @@ class BasicApp extends HookWidget {
       ),
     );
   }
+}
+
+class _BasicAppPerformanceProbe extends StatefulWidget {
+  const _BasicAppPerformanceProbe({required this.fake});
+
+  final bool fake;
+
+  @override
+  State<_BasicAppPerformanceProbe> createState() =>
+      _BasicAppPerformanceProbeState();
+}
+
+class _BasicAppPerformanceProbeState extends State<_BasicAppPerformanceProbe> {
+  final _timings = <FrameTiming>[];
+  Timer? _timer;
+  var _window = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    SchedulerBinding.instance.addTimingsCallback(_collect);
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _flush());
+    _logMode();
+  }
+
+  @override
+  void didUpdateWidget(_BasicAppPerformanceProbe oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fake == widget.fake) return;
+    _flush();
+    _window = 0;
+    _logMode();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    SchedulerBinding.instance.removeTimingsCallback(_collect);
+    _flush();
+    super.dispose();
+  }
+
+  void _collect(List<FrameTiming> timings) => _timings.addAll(timings);
+
+  void _logMode() {
+    debugPrint(
+      'LIQUID_GLASS_BASIC_APP_MODE:${widget.fake ? 'fake' : 'real'}',
+    );
+  }
+
+  void _flush() {
+    final timings = List<FrameTiming>.of(_timings);
+    _timings.clear();
+    if (timings.isEmpty) return;
+    _window += 1;
+    debugPrint(
+      'LIQUID_GLASS_BASIC_APP_WINDOW:${jsonEncode(<String, Object?>{
+        'implementation': widget.fake ? 'fake' : 'real',
+        'window': _window,
+        'frameCount': timings.length,
+        'buildP95Micros': _framePercentile(
+          timings,
+          .95,
+          (timing) => timing.buildDuration,
+        ),
+        'rasterP50Micros': _framePercentile(
+          timings,
+          .5,
+          (timing) => timing.rasterDuration,
+        ),
+        'rasterP95Micros': _framePercentile(
+          timings,
+          .95,
+          (timing) => timing.rasterDuration,
+        ),
+        'rasterP99Micros': _framePercentile(
+          timings,
+          .99,
+          (timing) => timing.rasterDuration,
+        ),
+      })}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+int _framePercentile(
+  List<FrameTiming> timings,
+  double percentile,
+  Duration Function(FrameTiming timing) select,
+) {
+  final values =
+      timings
+          .map((timing) => select(timing).inMicroseconds)
+          .toList(growable: false)
+        ..sort();
+  return values[((values.length - 1) * percentile).round()];
 }
 
 class Blink extends StatelessWidget {

@@ -79,7 +79,9 @@ class LiquidGlassBottomBar extends StatefulWidget {
 class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
   @override
   Widget build(BuildContext context) {
-    const glassSettings = LiquidGlassSettings.ios27ToolbarLight();
+    final glassSettings = LiquidGlassSettings.ios27Toolbar(
+      brightness: MediaQuery.platformBrightnessOf(context),
+    );
 
     return LiquidGlassLayer(
       settings: glassSettings,
@@ -514,6 +516,8 @@ class _TabIndicatorState extends State<_TabIndicator>
     final targetAlignment = computeXAlignmentForTab(widget.tabIndex);
 
     return GestureDetector(
+      key: const ValueKey('bottom-bar-drag-region'),
+      behavior: HitTestBehavior.opaque,
       onHorizontalDragDown: _onDragDown,
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
@@ -553,6 +557,9 @@ class _TabIndicatorState extends State<_TabIndicator>
                         duration: const Duration(milliseconds: 120),
                         opacity: widget.visible && thickness <= .2 ? 1 : 0,
                         child: DecoratedBox(
+                          key: const ValueKey(
+                            'bottom-bar-selection-indicator',
+                          ),
                           decoration: BoxDecoration(
                             color: indicatorColor,
                             borderRadius: BorderRadius.circular(64),
@@ -561,14 +568,15 @@ class _TabIndicatorState extends State<_TabIndicator>
                         ),
                       ),
                     ),
-                  child!,
-                  if (thickness > 0)
+                  if (!widget.fake) child!,
+                  if (widget.fake || thickness > 0)
                     _IndicatorTransform(
                       velocity: velocity,
                       tabCount: widget.tabCount,
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass.withOwnLayer(
+                        key: const ValueKey('bottom-bar-drag-glass'),
                         shadows: const [
                           BoxShadow(
                             color: Color.from(
@@ -598,6 +606,7 @@ class _TabIndicatorState extends State<_TabIndicator>
                         child: const GlassGlow(child: SizedBox.expand()),
                       ),
                     ),
+                  if (widget.fake) child!,
                 ],
               );
             },

@@ -29,6 +29,9 @@ const _clearLoupeSettings = LiquidGlassSettings(
   contourWidth: 0.75,
 );
 
+LiquidGlassSettings _matchedToolbarSettings(Brightness brightness) =>
+    LiquidGlassSettings.ios27Toolbar(brightness: brightness);
+
 class VerticalStripes extends StatelessWidget {
   const VerticalStripes({super.key, this.stripeThickness = 100.0});
 
@@ -324,8 +327,9 @@ class SettingsSheet extends HookWidget {
                         Expanded(
                           child: CupertinoButton.tinted(
                             onPressed: () {
-                              const matchedToolbar =
-                                  LiquidGlassSettings.ios27ToolbarLight();
+                              final matchedToolbar = _matchedToolbarSettings(
+                                MediaQuery.platformBrightnessOf(context),
+                              );
                               settingsNotifier.value = matchedToolbar;
                               blendNotifier.value = 10;
                               outerShadowAlphaNotifier.value = .03;
@@ -541,7 +545,7 @@ class SettingsSheet extends HookWidget {
                       label: 'Saturation',
                       value: settings.saturation,
                       min: 0,
-                      max: 2,
+                      max: 4,
                       onChanged: (value) => settingsNotifier.value = settings
                           .copyWith(saturation: value),
                     ),
@@ -745,6 +749,7 @@ class _SettingsSlider extends StatelessWidget {
                 ],
               ),
               CupertinoSlider(
+                key: ValueKey('settings-slider-$label'),
                 value: sliderValue,
                 min: min,
                 max: max,
