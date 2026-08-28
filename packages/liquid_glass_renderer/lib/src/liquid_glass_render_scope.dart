@@ -9,6 +9,7 @@ class LiquidGlassRenderScope extends InheritedWidget {
     required this.settings,
     required super.child,
     this.useFake = false,
+    this.backdropKey,
     super.key,
   });
 
@@ -16,9 +17,12 @@ class LiquidGlassRenderScope extends InheritedWidget {
 
   final bool useFake;
 
+  /// The backdrop capture shared by glass effects in this scope, if any.
+  final BackdropKey? backdropKey;
+
   static LiquidGlassRenderScope of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
     assert(
       scope != null,
       'No liquid glass renderer found in context. '
@@ -45,6 +49,7 @@ class LiquidGlassRenderScope extends InheritedWidget {
   bool updateShouldNotify(covariant InheritedWidget oldWidget) {
     return oldWidget is! LiquidGlassRenderScope ||
         oldWidget.settings != settings ||
-        oldWidget.useFake != useFake;
+        oldWidget.useFake != useFake ||
+        oldWidget.backdropKey != backdropKey;
   }
 }

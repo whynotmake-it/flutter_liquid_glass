@@ -1,12 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
 import 'package:meta/meta.dart';
 
 /// A widget that groups multiple liquid glass shapes for blending.
@@ -78,16 +74,11 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
 
     return _InheritedLiquidGlassBlendGroup(
       link: _geometryLink,
-      child: ShaderBuilder(
-        (context, shader, child) => _RawLiquidGlassBlendGroup(
-          blend: widget.blend,
-          shader: shader,
-          link: _geometryLink,
-          renderLink: InheritedGeometryRenderLink.of(context)!,
-          settings: LiquidGlassRenderScope.of(context).settings,
-          child: child,
-        ),
-        assetKey: ShaderKeys.blendedGeometry,
+      child: _RawLiquidGlassBlendGroup(
+        blend: widget.blend,
+        link: _geometryLink,
+        renderLink: InheritedGeometryRenderLink.of(context)!,
+        settings: LiquidGlassRenderScope.of(context).settings,
         child: widget.child,
       ),
     );
@@ -117,7 +108,6 @@ class _InheritedLiquidGlassBlendGroup extends InheritedWidget {
 class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
   const _RawLiquidGlassBlendGroup({
     required this.blend,
-    required this.shader,
     required this.renderLink,
     required this.link,
     required this.settings,
@@ -125,7 +115,6 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
   });
 
   final double blend;
-  final FragmentShader shader;
   final GeometryRenderLink renderLink;
   final GlassGroupLink link;
   final LiquidGlassSettings settings;
@@ -135,7 +124,6 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
     return RenderLiquidGlassBlendGroup(
       renderLink: renderLink,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      geometryShader: shader,
       settings: settings,
       link: link,
       blend: blend,
@@ -157,17 +145,14 @@ class _RawLiquidGlassBlendGroup extends SingleChildRenderObjectWidget {
 
 @visibleForTesting
 @internal
-class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
-    with TransformTrackingRenderObjectMixin {
+class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
   RenderLiquidGlassBlendGroup({
     required super.renderLink,
     required super.devicePixelRatio,
-    required super.geometryShader,
     required super.settings,
-    required GlassGroupLink link,
-    required double blend,
-  })  : _link = link,
-        _blend = blend {
+    required this._link,
+    required this._blend,
+  }) {
     link.addListener(_onLinkUpdate);
   }
 
@@ -189,10 +174,12 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   set blend(double value) {
     if (_blend == value) return;
     _blend = value;
-    updateShaderWithSettings(settings, devicePixelRatio);
     markGeometryNeedsUpdate(force: true);
     markNeedsPaint();
   }
+
+  @override
+  double get geometryBlend => blend;
 
   void _onLinkUpdate() {
     // One of the shapes might have changed.
@@ -200,52 +187,36 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
     markNeedsPaint();
   }
 
-  @override
-  void onTransformChanged() {
-    markGeometryNeedsUpdate();
-    markNeedsPaint();
-  }
+  List<Matrix4?> _lastShapeTransforms = const [];
 
   @override
-  void updateShaderWithSettings(
-    LiquidGlassSettings settings,
-    double devicePixelRatio,
-  ) {
-    geometryShader.setFloatUniforms(initialIndex: 2, (value) {
-      value.setFloats([
-        settings.refractiveIndex,
-        settings.effectiveChromaticAberration,
-        settings.effectiveThickness,
-        blend * devicePixelRatio,
-      ]);
-    });
-  }
-
-  @override
-  void updateGeometryShaderShapes(
-    List<ShapeGeometry> shapes,
-  ) {
-    if (shapes.length > LiquidGlassBlendGroup.maxShapesPerLayer) {
-      throw UnsupportedError(
-        'Only ${LiquidGlassBlendGroup.maxShapesPerLayer} shapes are supported '
-        'at the moment!',
-      );
+  bool pollChildShapeTransforms() {
+    final entries = link.shapeEntries;
+    if (_lastShapeTransforms.length != entries.length) {
+      _lastShapeTransforms = List<Matrix4?>.filled(entries.length, null);
+      for (var i = 0; i < entries.length; i++) {
+        final shape = entries[i].key;
+        if (shape.attached && shape.parent != this) {
+          _lastShapeTransforms[i] = shape.getTransformTo(this);
+        }
+      }
+      return false;
     }
 
-    geometryShader.setFloatUniforms(initialIndex: 6, (value) {
-      value.setFloat(shapes.length.toDouble());
-      for (final shape in shapes) {
-        final center = shape.shapeBounds.center;
-        final size = shape.shapeBounds.size;
-        value
-          ..setFloat(shape.rawShapeType.shaderIndex)
-          ..setFloat((center.dx) * devicePixelRatio)
-          ..setFloat((center.dy) * devicePixelRatio)
-          ..setFloat(size.width * devicePixelRatio)
-          ..setFloat(size.height * devicePixelRatio)
-          ..setFloat(shape.rawCornerRadius * devicePixelRatio);
+    var changed = false;
+    for (var i = 0; i < entries.length; i++) {
+      final shape = entries[i].key;
+      if (!shape.attached || shape.parent == this) continue;
+      final transform = shape.getTransformTo(this);
+      if (!MatrixUtils.matrixEquals(transform, _lastShapeTransforms[i])) {
+        _lastShapeTransforms[i] = transform;
+        changed = true;
       }
-    });
+    }
+    if (changed) {
+      markGeometryNeedsUpdate();
+    }
+    return changed;
   }
 
   @override
@@ -263,8 +234,9 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
           MapEntry(
             key: renderObject,
             value: (shape, glassContainsChild),
-          )
-        ) in link.shapeEntries.indexed) {
+          ),
+        )
+        in link.shapeEntries.indexed) {
       if (!renderObject.attached || !renderObject.hasSize) continue;
 
       try {
@@ -275,16 +247,22 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
         );
         shapes.add(shapeData);
 
-        layerBounds = layerBounds?.expandToInclude(shapeData.shapeBounds) ??
+        layerBounds =
+            layerBounds?.expandToInclude(shapeData.shapeBounds) ??
             shapeData.shapeBounds;
 
-        final existingShape =
-            cachedShapes.length > index ? cachedShapes[index] : null;
+        final existingShape = cachedShapes.length > index
+            ? cachedShapes[index]
+            : null;
 
         if (existingShape == null) {
           anyShapeChangedInLayer = true;
         } else if (existingShape.shapeBounds != shapeData.shapeBounds ||
-            existingShape.shape != shapeData.shape) {
+            existingShape.shape != shapeData.shape ||
+            !MatrixUtils.matrixEquals(
+              existingShape.shapeToGeometry,
+              shapeData.shapeToGeometry,
+            )) {
           anyShapeChangedInLayer = true;
         }
       } catch (e) {
@@ -322,7 +300,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
   }
 
   ShapeGeometry _computeShapeInfo(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape,
     bool glassContainsChild,
   ) {
@@ -353,6 +331,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
       shape: shape,
       glassContainsChild: glassContainsChild,
       shapeBounds: blendGroupRect,
+      shadows: renderObject.layerShadows,
       shapeToGeometry: transformToGeometry,
     );
   }
@@ -367,40 +346,58 @@ class GlassGroupLink with ChangeNotifier {
   GlassGroupLink();
 
   /// Information about a shape registered with this link.
-  final Map<RenderLiquidGlass, (LiquidShape shape, bool glassContainsChild)>
-      _shapes = {};
+  final Map<
+    LiquidGlassShapeRenderObject,
+    (LiquidShape shape, bool glassContainsChild)
+  >
+  _shapes = {};
 
   List<
-      MapEntry<RenderLiquidGlass,
-          (LiquidShape shape, bool glassContainsChild)>> get shapeEntries =>
-      _shapes.entries.toList();
+    MapEntry<
+      LiquidGlassShapeRenderObject,
+      (LiquidShape shape, bool glassContainsChild)
+    >
+  >?
+  _shapeEntriesCache;
+
+  List<
+    MapEntry<
+      LiquidGlassShapeRenderObject,
+      (LiquidShape shape, bool glassContainsChild)
+    >
+  >
+  get shapeEntries =>
+      _shapeEntriesCache ??= _shapes.entries.toList(growable: false);
 
   /// Check if any shapes are registered.
   bool get hasShapes => _shapes.isNotEmpty;
 
   /// Register a shape with this link.
   void registerShape(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape, {
     required bool glassContainsChild,
   }) {
     _shapes[renderObject] = (shape, glassContainsChild);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
   /// Unregister a shape from this link.
-  void unregisterShape(RenderLiquidGlass renderObject) {
+  void unregisterShape(LiquidGlassShapeRenderObject renderObject) {
     _shapes.remove(renderObject);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
   /// Update the shape properties for a registered render object.
   void updateShape(
-    RenderLiquidGlass renderObject,
+    LiquidGlassShapeRenderObject renderObject,
     LiquidShape shape, {
     required bool glassContainsChild,
   }) {
     _shapes[renderObject] = (shape, glassContainsChild);
+    _shapeEntriesCache = null;
     notifyListeners();
   }
 
@@ -414,6 +411,7 @@ class GlassGroupLink with ChangeNotifier {
   @override
   void dispose() {
     _shapes.clear();
+    _shapeEntriesCache = null;
     super.dispose();
   }
 }

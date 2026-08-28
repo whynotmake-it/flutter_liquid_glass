@@ -12,6 +12,10 @@ mixin TransformTrackingRepaintBoundaryMixin on RenderProxyBox {
   @override
   bool get isRepaintBoundary => true;
 
+  /// Transform compared across frames to decide whether [onTransformChanged]
+  /// should fire. Defaults to the world transform.
+  Matrix4 trackedTransform() => getTransformTo(null);
+
   @override
   OffsetLayer updateCompositedLayer({
     covariant GeometryTransformTrackingLayer? oldLayer,
@@ -21,9 +25,15 @@ mixin TransformTrackingRepaintBoundaryMixin on RenderProxyBox {
     // ignore: cascade_invocations
     layer
       ..renderObject = this
+      ..trackedTransform = trackedTransform
       ..onTransformChanged = () {
         if (attached) {
           onTransformChanged();
+        }
+      }
+      ..onCompositing = () {
+        if (attached) {
+          onCompositing();
         }
       };
 
@@ -38,6 +48,10 @@ mixin TransformTrackingRepaintBoundaryMixin on RenderProxyBox {
   }
 
   void onTransformChanged();
+
+  /// Runs every time this tracking layer is composited, including frames where
+  /// the tracked transform is unchanged.
+  void onCompositing() {}
 }
 
 @internal
@@ -53,6 +67,10 @@ mixin TransformTrackingRenderObjectMixin on RenderProxyBox {
   @override
   bool get alwaysNeedsCompositing => true;
 
+  /// Transform compared across frames to decide whether [onTransformChanged]
+  /// should fire. Defaults to the world transform.
+  Matrix4 trackedTransform() => getTransformTo(null);
+
   @mustCallSuper
   @override
   void paint(PaintingContext context, ui.Offset offset) {
@@ -64,14 +82,24 @@ mixin TransformTrackingRenderObjectMixin on RenderProxyBox {
   GeometryTransformTrackingLayer setUpLayer(Offset offset) {
     return (layer ??= GeometryTransformTrackingLayer())
       ..renderObject = this
+      ..trackedTransform = trackedTransform
       ..onTransformChanged = () {
         if (attached) {
           onTransformChanged();
+        }
+      }
+      ..onCompositing = () {
+        if (attached) {
+          onCompositing();
         }
       };
   }
 
   void onTransformChanged();
+
+  /// Runs every time this tracking layer is composited, including frames where
+  /// the tracked transform is unchanged.
+  void onCompositing() {}
 }
 
 @internal
@@ -79,7 +107,9 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
   GeometryTransformTrackingLayer();
 
   RenderObject? renderObject;
+  Matrix4 Function()? trackedTransform;
   VoidCallback? onTransformChanged;
+  VoidCallback? onCompositing;
   Matrix4? _lastTransform;
 
   @override
@@ -87,10 +117,12 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
 
   @override
   void addToScene(ui.SceneBuilder builder) {
-    final currentTransform = renderObject?.getTransformTo(null);
+    final currentTransform =
+        trackedTransform?.call() ?? renderObject?.getTransformTo(null);
     if (!MatrixUtils.matrixEquals(currentTransform, _lastTransform)) {
       onTransformChanged?.call();
       _lastTransform = currentTransform;
     }
+    onCompositing?.call();
   }
 }
