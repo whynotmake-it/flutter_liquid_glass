@@ -91,7 +91,7 @@ void main() {
     testWidgets('uses custom settings when creating own layer', (tester) async {
       const customSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(
@@ -118,7 +118,7 @@ void main() {
       );
       const autoSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(
@@ -142,5 +142,58 @@ void main() {
       );
       expect(layer.settings, equals(parentSettings));
     });
+
+    testWidgets(
+      'sibling autos under one layer share that sample without a blend group',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: LiquidGlassLayer(
+              child: Row(
+                children: [
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+        expect(find.byType(LiquidGlassBlendGroup), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'sibling autos without a layer each create their own sample',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: Row(
+              children: [
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
+      },
+    );
   });
 }
