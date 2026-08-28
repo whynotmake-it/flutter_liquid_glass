@@ -1,0 +1,485 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "captures": [
+    {
+      "slider": 0.0,
+      "scene": "small_capsule",
+      "appearance": "light",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/small_capsule/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "toolbar_capsule",
+      "appearance": "light",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "large_capsule",
+      "appearance": "light",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0001340164744760841,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 2.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/large_capsule/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "material_capsule",
+      "appearance": "light",
+      "api": "SwiftUI View.glassEffect(_:in:)",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_capsule/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "material_circle",
+      "appearance": "light",
+      "api": "SwiftUI View.glassEffect(_:in:)",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 4.416851152200252e-05,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 2.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_circle/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "material_card",
+      "appearance": "light",
+      "api": "SwiftUI View.glassEffect(_:in:)",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "toolbar_capsule_dark",
+      "appearance": "dark",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule_dark/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "material_card_dark",
+      "appearance": "dark",
+      "api": "SwiftUI View.glassEffect(_:in:)",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card_dark/metadata.json"
+    },
+    {
+      "slider": 0.0,
+      "scene": "tab_bar_holdout",
+      "appearance": "light",
+      "api": "SwiftUI TabView system tab bar",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/tab_bar_holdout/metadata.json"
+    },
+    {
+      "slider": 0.5,
+      "scene": "toolbar_capsule",
+      "appearance": "light",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule/metadata.json"
+    },
+    {
+      "slider": 0.5,
+      "scene": "toolbar_capsule_dark",
+      "appearance": "dark",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule_dark/metadata.json"
+    },
+    {
+      "slider": 1.0,
+      "scene": "toolbar_capsule",
+      "appearance": "light",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule/metadata.json"
+    },
+    {
+      "slider": 1.0,
+      "scene": "toolbar_capsule_dark",
+      "appearance": "dark",
+      "api": "SwiftUI PrimitiveButtonStyle.glass",
+      "frameStability": {
+        "A": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "B": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "C": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        },
+        "D": {
+          "meanAbsoluteDeviation8Bit": 0.0,
+          "p99AbsoluteDeviation8Bit": 0.0,
+          "maxAbsoluteDeviation8Bit": 0.0
+        }
+      },
+      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule_dark/metadata.json"
+    }
+  ],
+  "crossChecks": [
+    {
+      "scene": "toolbar_capsule",
+      "probe": "A",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule",
+      "probe": "B",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule",
+      "probe": "C",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule",
+      "probe": "D",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule",
+      "probe": "A",
+      "check": "slider changes glass pixels",
+      "meanAbsoluteDifference8Bit": [
+        23.456430435180664,
+        42.291748046875
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule_dark",
+      "probe": "A",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule_dark",
+      "probe": "B",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule_dark",
+      "probe": "C",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule_dark",
+      "probe": "D",
+      "check": "outside-glass background invariant across slider",
+      "meanAbsoluteError8Bit": [
+        0.0,
+        0.0
+      ],
+      "status": "passed"
+    },
+    {
+      "scene": "toolbar_capsule_dark",
+      "probe": "A",
+      "check": "slider changes glass pixels",
+      "meanAbsoluteDifference8Bit": [
+        18.647903442382812,
+        41.11690139770508
+      ],
+      "status": "passed"
+    }
+  ]
+}
