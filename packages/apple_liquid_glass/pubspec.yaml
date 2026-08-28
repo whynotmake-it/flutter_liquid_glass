@@ -6,8 +6,8 @@ homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/apple_liquid_glass
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0 <3.48.0"
 
 dependencies:
   flutter:

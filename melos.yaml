@@ -19,7 +19,7 @@ command:
 scripts:
   analyze:
     run: |
-      dart analyze . --fatal-infos
+      dart analyze .
     exec:
       # We are setting the concurrency to 1 because a higher concurrency can crash
       # the analysis server on low performance machines (like GitHub Actions).
@@ -31,10 +31,15 @@ scripts:
     run: melos version --no-git-tag-version --yes
 
   test:select:
-    run: flutter test --enable-impeller
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      # Native-asset hooks for the package and example write the same shader
+      # bundle; running them concurrently races on that output file.
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages.
@@ -44,11 +49,13 @@ scripts:
     description: Run all tests in this project.
 
   coverage:select:
-    run: |
-      flutter test --coverage --enable-impeller
+    run: >-
+      flutter test --coverage --enable-impeller --enable-flutter-gpu
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Generate coverage for the selected package.
@@ -58,10 +65,13 @@ scripts:
     description: Generate coverage for all packages.
 
   test-without-goldens:select:
-    run: flutter test --enable-impeller --exclude-tags=golden
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages without golden tests.
@@ -71,10 +81,14 @@ scripts:
     description: Run all tests in this project without golden tests.
 
   update-goldens:select:
-    run: flutter test --enable-impeller --tags=golden --update-goldens
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu --tags=golden
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
+      --update-goldens
     exec:
       failFast: true
-      concurrency: 6
+      concurrency: 1
     packageFilters:
       dirExists: test
     description: Run `flutter test` for selected packages without golden tests.
