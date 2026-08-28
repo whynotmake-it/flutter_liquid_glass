@@ -95,7 +95,7 @@ class _SingleTestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = const LiquidGlassSettings(thickness: 40, blur: 20);
+    final settings = const LiquidGlassSettings(thickness: 40, frost: 20);
     final content = Container(
       width: 200,
       height: 200,
@@ -150,9 +150,8 @@ class _MultiTestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const settings = LiquidGlassSettings(
       thickness: 30,
-      blur: 15,
-      lightIntensity: 0.5,
-      ambientStrength: 0.3,
+      frost: 15,
+      highlight: 0.5,
       chromaticAberration: 0.02,
     );
 
