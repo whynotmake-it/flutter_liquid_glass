@@ -947,7 +947,7 @@ class _ShaderInputSnapshot {
 class GeometryRenderLink {
   final List<RenderLiquidGlassGeometry> _shapeGeometries = [];
 
-  UnmodifiableListView<RenderLiquidGlassGeometry> get shapes =>
+  late final UnmodifiableListView<RenderLiquidGlassGeometry> shapes =
       UnmodifiableListView(_shapeGeometries);
 
   bool _dirty = false;

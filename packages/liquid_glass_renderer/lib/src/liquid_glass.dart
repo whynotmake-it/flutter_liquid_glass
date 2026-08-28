@@ -194,18 +194,20 @@ class LiquidGlass extends StatelessWidget {
 
     if (ownLayerConfig case final config?) {
       if (config.fake) {
-        return FakeGlass(
-          shape: shape,
-          settings: config.settings,
-          shadows: shadows,
-          useBackdropGroup: config.useBackdropGroup,
-          backdropKey: config.backdropKey,
-          child: child,
+        return RepaintBoundary(
+          child: FakeGlass(
+            settings: config.settings,
+            shape: shape,
+            shadows: shadows,
+            backdropKey: config.backdropKey,
+            useBackdropGroup: config.useBackdropGroup,
+            child: child,
+          ),
         );
       }
-
       return LiquidGlassLayer(
         settings: config.settings,
+        fake: config.fake,
         useBackdropGroup: config.useBackdropGroup,
         backdropKey: config.backdropKey,
         child: Builder(builder: _buildGlass),
@@ -237,10 +239,12 @@ class LiquidGlass extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context, GlassGroupLink? blendGroupLink) {
-    final settings = LiquidGlassSettings.of(context);
+    final scope = LiquidGlassRenderScope.of(context);
+    final settings = scope.settings;
 
-    if (LiquidGlassRenderScope.of(context).useFake ||
-        !ImageFilter.isShaderFilterSupported) {
+    if (scope.useFake ||
+        (!ImageFilter.isShaderFilterSupported &&
+            !scope.consolidatesFakeBackdrop)) {
       return FakeGlass.inLayer(
         shape: shape,
         shadows: shadows,
@@ -252,26 +256,39 @@ class LiquidGlass extends StatelessWidget {
         ? InheritedGeometryRenderLink.of(context)
         : null;
 
+    final registeredChild = scope.consolidatesFakeBackdrop
+        ? FakeGlass.inLayer(
+            shape: shape,
+            backdropHandledByLayer: true,
+            child: child,
+          )
+        : OptimizedClip(
+            shape: shape,
+            clipBehavior: clipBehavior,
+            child: _maybeFade(
+              settings.visibility,
+              GlassGlowLayer(
+                child: child,
+              ),
+            ),
+          );
     final content = _RawLiquidGlass(
       blendGroupLink: blendGroupLink,
       renderLink: renderLink,
       settings: settings,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      paintChildNormally:
+          scope.consolidatesFakeBackdrop && !glassContainsChild,
       shape: shape,
       glassContainsChild: glassContainsChild,
-      layerShadows: blendGroupLink == null ? const [] : shadows,
-      child: OptimizedClip(
-        shape: shape,
-        clipBehavior: clipBehavior,
-        child: _maybeFade(
-          settings.visibility,
-          GlassGlowLayer(
-            child: child,
-          ),
-        ),
-      ),
+      layerShadows: scope.consolidatesFakeBackdrop || blendGroupLink != null
+          ? shadows
+          : const [],
+      child: registeredChild,
     );
-    if (shadows.isEmpty || blendGroupLink != null) {
+    if (shadows.isEmpty ||
+        blendGroupLink != null ||
+        scope.consolidatesFakeBackdrop) {
       return content;
     }
     return GlassShadow(
@@ -299,6 +316,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required this.renderLink,
     required this.settings,
     required this.devicePixelRatio,
+    required this.paintChildNormally,
   });
 
   final LiquidShape shape;
@@ -315,6 +333,8 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
 
   final double devicePixelRatio;
 
+  final bool paintChildNormally;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return RenderLiquidGlass(
@@ -325,6 +345,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
       renderLink: renderLink,
       settings: settings,
       devicePixelRatio: devicePixelRatio,
+      paintChildNormally: paintChildNormally,
     );
   }
 
@@ -339,6 +360,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
       ..layerShadows = layerShadows
       ..settings = settings
       ..devicePixelRatio = devicePixelRatio
+      ..paintChildNormally = paintChildNormally
       ..bindLinks(
         blendGroupLink: blendGroupLink,
         renderLink: renderLink,
@@ -355,11 +377,20 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
     required this._layerShadows,
     required super.settings,
     required super.devicePixelRatio,
+    required this._paintChildNormally,
     this._blendGroupLink,
     super.renderLink,
   });
 
+  bool _paintChildNormally;
+  set paintChildNormally(bool value) {
+    if (_paintChildNormally == value) return;
+    _paintChildNormally = value;
+    markNeedsPaint();
+  }
+
   LiquidShape _shape;
+
   LiquidShape get shape => _shape;
   set shape(LiquidShape value) {
     if (_shape == value) return;
@@ -468,8 +499,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
   @override
   // ignore: must_call_super
   void paint(PaintingContext context, Offset offset) {
-    // Contents are painted by the parent liquid glass layer via
-    // [paintFromLayer]. This node only occupies layout space.
+    if (_paintChildNormally) super.paint(context, offset);
   }
 
   @override

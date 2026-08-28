@@ -122,6 +122,61 @@ class LiquidGlassSettings with Equatable {
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 1.0;
 
+  /// A dark-appearance preset fitted to an iOS 27 toolbar-sized capsule.
+  ///
+  /// Use this alongside [LiquidGlassSettings.ios27ToolbarLight] when the
+  /// surrounding application follows the platform brightness.
+  const LiquidGlassSettings.ios27ToolbarDark({
+    this.visibility = 1.0,
+    this.frost = 5.0,
+  }) : tint = const Color.from(
+         alpha: 0.56,
+         red: 57.142857 / 255,
+         green: 57.142857 / 255,
+         blue: 57.142857 / 255,
+       ),
+       thickness = 12.0,
+       edgeRefraction = 27.42,
+       refractionSpread = 0.0,
+       backdropScale = 1.0,
+       chromaticAberration = 0.005,
+       saturation = 2.3,
+       transmissionGamma = 0.58,
+       vibrancy = 0.1,
+       highlight = 0.25,
+       highlightWidth = 0.0,
+       highlightWrap = 0.25,
+       highlightOppositeStrength = 0.5,
+       curvatureLighting = 0.0,
+       contourStrength = 0.25,
+       contourWidth = 0.5,
+       contourOffset = 0.0,
+       contourTransmittance = 0.8,
+       bevelShadowStrength = 0.04,
+       bevelShadowDepth = 18.0,
+       bevelShadowOffset = 4.0,
+       bevelShadowDirectionality = 0.75,
+       bevelShadowSizeResponse = 0.0,
+       exteriorShadowSizeResponse = 0.0;
+
+  /// Creates the fitted iOS 27 toolbar material for [brightness].
+  ///
+  /// The light and dark appearances have independently fitted transmission
+  /// curves; dark appearance is not a simple inversion of the light tint.
+  factory LiquidGlassSettings.ios27Toolbar({
+    required Brightness brightness,
+    double visibility = 1.0,
+    double? frost,
+  }) => brightness == Brightness.dark
+      ? LiquidGlassSettings.ios27ToolbarDark(
+          visibility: visibility,
+          frost: frost ?? 5.0,
+        )
+      : LiquidGlassSettings.ios27ToolbarLight(
+          visibility: visibility,
+          frost: frost ?? 7.0,
+        );
+
   /// Creates settings from Figma-style percentage controls.
   ///
   /// [refraction] and [dispersion] use a `0` to `100` scale. [depth] and

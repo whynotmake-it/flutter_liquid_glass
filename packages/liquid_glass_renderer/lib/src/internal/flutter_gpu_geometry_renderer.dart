@@ -28,6 +28,10 @@ class FlutterGpuGeometryRenderer {
     _createVertexBuffer();
     _uniformData = ByteData(_uniformSize);
     _initCoordinateTexture();
+    assert(() {
+      _debugActiveRendererCount++;
+      return true;
+    }(), 'Track live geometry renderers in debug builds.');
   }
 
   FlutterGpuGeometryRenderer._fromShared(_SharedGeometryResources resources) {
@@ -44,6 +48,10 @@ class FlutterGpuGeometryRenderer {
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
     _initCoordinateTexture();
+    assert(() {
+      _debugActiveRendererCount++;
+      return true;
+    }(), 'Track live geometry renderers in debug builds.');
   }
 
   // Harness-only rasterization probe. The default exactly matches Flutter's
@@ -120,6 +128,21 @@ class FlutterGpuGeometryRenderer {
 
   static const int _hostBufferSlotsPerFrame = 32;
 
+  static int _debugActiveRendererCount = 0;
+  static int _debugActiveGeometryTextureCount = 0;
+  static int _debugActiveCoordinateTextureCount = 0;
+
+  @visibleForTesting
+  static int get debugActiveRendererCount => _debugActiveRendererCount;
+
+  @visibleForTesting
+  static int get debugActiveGeometryTextureCount =>
+      _debugActiveGeometryTextureCount;
+
+  @visibleForTesting
+  static int get debugActiveCoordinateTextureCount =>
+      _debugActiveCoordinateTextureCount;
+
   static gpu.HostBuffer _hostBufferForUniformSize(int uniformSize) {
     final alignment = gpu.gpuContext.minimumUniformByteAlignment;
     final alignedSize =
@@ -157,6 +180,11 @@ class FlutterGpuGeometryRenderer {
   /// Number of geometry command buffers submitted by this renderer.
   @visibleForTesting
   int debugRenderCount = 0;
+
+  @visibleForTesting
+  bool get debugDisposed => _disposed;
+
+  bool _disposed = false;
 
   // Uniform slot reflection.
   late final gpu.UniformSlot _uniformSlot;
@@ -230,6 +258,10 @@ class FlutterGpuGeometryRenderer {
       throw StateError('LiquidGlass coordinate mapping texture is invalid.');
     }
     _coordinateImage = _coordinateTexture!.asImage();
+    assert(() {
+      _debugActiveCoordinateTextureCount++;
+      return true;
+    }(), 'Track live coordinate textures in debug builds.');
   }
 
   void _bindUniformLayout(gpu.Shader fragmentShader) {
@@ -297,6 +329,18 @@ class FlutterGpuGeometryRenderer {
     if (_texture == null ||
         allocatedWidth != _textureWidth ||
         allocatedHeight != _textureHeight) {
+      if (_texture != null) {
+        // Drop every wrapper which can retain the old texture before replacing
+        // it. Metal may keep an in-flight command-buffer reference briefly,
+        // but this renderer no longer owns the old allocation afterwards.
+        _renderTarget = null;
+        _image = null;
+        _texture = null;
+        assert(() {
+          _debugActiveGeometryTextureCount--;
+          return true;
+        }(), 'Track replaced geometry textures in debug builds.');
+      }
       _texture = gpu.gpuContext.createTexture(
         gpu.StorageMode.devicePrivate,
         allocatedWidth,
@@ -313,6 +357,10 @@ class FlutterGpuGeometryRenderer {
           loadAction: gpu.LoadAction.dontCare,
         ),
       );
+      assert(() {
+        _debugActiveGeometryTextureCount++;
+        return true;
+      }(), 'Track live geometry textures in debug builds.');
     }
 
     _packUniformData(
@@ -428,11 +476,29 @@ class FlutterGpuGeometryRenderer {
 
   /// Releases the persistent textures.
   void dispose() {
-    _texture = null;
-    _image = null;
+    if (_disposed) return;
+    _disposed = true;
     _renderTarget = null;
-    _coordinateTexture = null;
+    _image = null;
+    if (_texture != null) {
+      assert(() {
+        _debugActiveGeometryTextureCount--;
+        return true;
+      }(), 'Track disposed geometry textures in debug builds.');
+    }
+    _texture = null;
     _coordinateImage = null;
+    if (_coordinateTexture != null) {
+      assert(() {
+        _debugActiveCoordinateTextureCount--;
+        return true;
+      }(), 'Track disposed coordinate textures in debug builds.');
+    }
+    _coordinateTexture = null;
+    assert(() {
+      _debugActiveRendererCount--;
+      return true;
+    }(), 'Track disposed geometry renderers in debug builds.');
   }
 }
 

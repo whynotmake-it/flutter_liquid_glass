@@ -17,8 +17,8 @@ abstract class ShaderKeys {
   static final liquidGlassRender =
       '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
 
-  static final String fakeGlassColor =
-      '${_shadersRoot}lib/assets/shaders/fake_glass_color.frag';
+  static final fakeGlassSurface =
+      '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';
 
   static final String gpuGeometryShaderBundle =
       '${_shadersRoot}build/shaderbundles/liquid_glass_renderer.shaderbundle';

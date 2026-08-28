@@ -13,6 +13,7 @@ import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
+import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
@@ -93,12 +94,12 @@ class LiquidGlassLayer extends StatefulWidget {
   /// [FakeGlass] effects.
   final bool fake;
 
-  /// Whether to share the nearest ancestor [BackdropGroup]'s capture for
-  /// backdrop effects.
+  /// Whether to share a [BackdropGroup] capture for backdrop effects.
   ///
-  /// If you have multiple [LiquidGlassLayer]s in a subtree that use the same
-  /// background blur, setting this to true can improve performance by sharing
-  /// the same backdrop.
+  /// The nearest ancestor group is used when one exists. Otherwise this layer
+  /// creates a local group so its FakeGlass shapes can share backdrop capture
+  /// work. Multiple [LiquidGlassLayer]s need a common ancestor group or an
+  /// explicit shared [backdropKey] to share across layer boundaries.
   ///
   /// This applies consistently to real and fake glass and is independent from
   /// [LiquidGlassBlendGroup], which only controls geometry blending.
@@ -126,11 +127,16 @@ class LiquidGlassLayer extends StatefulWidget {
 
 class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     with SingleTickerProviderStateMixin {
+  static final List<String> _fakeSurfaceShaderAssets = [
+    ShaderKeys.fakeGlassSurface,
+  ];
+
   late final GeometryRenderLink _link = GeometryRenderLink();
 
   late final logger = Logger(LgrLogNames.layer);
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
+  final List<FlutterGpuGeometryRenderer> _retiredGpuGeometryRenderers = [];
   bool _triedGpuGeometryRenderer = false;
   bool _gpuInitializationScheduled = false;
   bool _loggedFallback = false;
@@ -153,7 +159,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );
-        if (!mounted) {
+        if (!mounted || widget.fake) {
           renderer.dispose();
           return;
         }
@@ -170,14 +176,50 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   }
 
   @override
+  void didUpdateWidget(covariant LiquidGlassLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.fake && widget.fake) {
+      final renderer = _gpuGeometryRenderer;
+      _gpuGeometryRenderer = null;
+      _triedGpuGeometryRenderer = false;
+      if (renderer != null) {
+        // The old real render subtree is removed during this rebuild. Retire
+        // its textures after that frame so it cannot contaminate subsequent
+        // fake-only measurements, without invalidating a sampler still used by
+        // the outgoing subtree.
+        _retiredGpuGeometryRenderers.add(renderer);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_retiredGpuGeometryRenderers.remove(renderer)) return;
+          renderer.dispose();
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _gpuGeometryRenderer?.dispose();
+    for (final renderer in _retiredGpuGeometryRenderers) {
+      renderer.dispose();
+    }
+    _retiredGpuGeometryRenderers.clear();
     _link.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.backdropKey == null &&
+        widget.useBackdropGroup &&
+        BackdropGroup.of(context) == null) {
+      return BackdropGroup(
+        child: Builder(builder: _buildLayer),
+      );
+    }
+    return _buildLayer(context);
+  }
+
+  Widget _buildLayer(BuildContext context) {
     final backdropKey =
         widget.backdropKey ??
         (widget.useBackdropGroup
@@ -201,14 +243,9 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         );
       }
 
-      return LiquidGlassRenderScope(
-        settings: widget.settings,
-        useFake: true,
+      return _buildFakeLayer(
         backdropKey: backdropKey,
-        child: InheritedGeometryRenderLink(
-          link: _link,
-          child: widget.child,
-        ),
+        child: widget.child,
       );
     }
 
@@ -236,6 +273,42 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFakeLayer({
+    required BackdropKey? backdropKey,
+    required Widget child,
+  }) {
+    // Match the full renderer's retained subtree boundary. FakeGlass paints
+    // several contour-following canvas bands; without this boundary an
+    // ancestor/compositor transform can make every band record again even
+    // though neither the shape nor material changed.
+    Widget buildFakeSurfaceLayer(FragmentShader? surfaceShader) {
+      return RepaintBoundary(
+        child: LiquidGlassRenderScope(
+          settings: widget.settings,
+          consolidatesFakeBackdrop: true,
+          consolidatesFakeSurface: true,
+          backdropKey: backdropKey,
+          child: InheritedGeometryRenderLink(
+            link: _link,
+            child: ConsolidatedFakeGlassLayer(
+              link: _link,
+              settings: widget.settings,
+              backdropKey: backdropKey,
+              surfaceShader: surfaceShader,
+              child: child,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return MultiShaderBuilder(
+      assetKeys: _fakeSurfaceShaderAssets,
+      (_, shaders, _) => buildFakeSurfaceLayer(shaders.single),
+      child: buildFakeSurfaceLayer(null),
     );
   }
 }
