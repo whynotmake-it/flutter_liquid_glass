@@ -25,6 +25,20 @@ def expected_rgb(scene: dict, probe_id: str, physical_x: int, physical_y: int):
     scale = scene["canvas"]["scale"]
     x = physical_x / scale
     y = physical_y / scale
+    if spec["kind"] == "linearGradient":
+        width = float(scene["canvas"]["logicalWidth"])
+        height = float(scene["canvas"]["logicalHeight"])
+        axis = spec["axis"]
+        if axis == "vertical":
+            position = y / max(height - 1.0, 1.0)
+        elif axis == "diagonal":
+            position = (x / max(width - 1.0, 1.0) + y / max(height - 1.0, 1.0)) * 0.5
+        else:
+            position = x / max(width - 1.0, 1.0)
+        position = min(max(position, 0.0), 1.0)
+        start = np.array(_rgb(spec["startColor"]), dtype=np.float32)
+        end = np.array(_rgb(spec["endColor"]), dtype=np.float32)
+        return tuple(np.rint(start + (end - start) * position).astype(np.int16))
     cell = spec["cellSize"]
     column = int(x // cell)
     row = int(y // cell)
@@ -70,7 +84,17 @@ def main() -> None:
         expected = expected_rgb(scene, probe, physical_x, physical_y)
         actual_bgr = tuple(int(value) for value in image[physical_y, physical_x])
         actual = tuple(reversed(actual_bgr))
-        if max(abs(a - b) for a, b in zip(actual, expected)) > 16:
+        probe_kind = next(
+            item["background"]["kind"]
+            for item in scene["probes"]
+            if item["id"] == probe
+        )
+        # SwiftUI's UnitPoint gradient projection is implementation-defined
+        # at the corners (the line is not a simple x/y average). A generous
+        # bound still rejects a stale/solid frame while allowing that valid
+        # projection; exact solid/grid probes retain the strict bound.
+        tolerance = 110 if probe_kind == "linearGradient" else 16
+        if max(abs(a - b) for a, b in zip(actual, expected)) > tolerance:
             raise SystemExit(1)
 
     # Confirm that the glass itself is present. Sample the declared shape box

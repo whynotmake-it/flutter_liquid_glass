@@ -113,6 +113,125 @@ composition, example shell, generalization, and non-regressing performance work.
 - [ ] 10. Gate audit vs contract → complete_goal
 
 ## Progress log
+- 2026-08-31: recaptured the expanded frost-free light/dark solid-palette
+  references with 14 declared probes (hues, neutral ramp, black/white) and
+  passed the stability/provenance gate. Added bounded normalized SPSA fitting
+  for coupled host-golden evaluations. The first dark joint scalar fit reduced
+  palette mean error 11.12→9.25 but worsened worst hue 15.77→16.52; the light
+  fit similarly worsened neutral guards. A luminance-centered vibrancy shader
+  candidate improved light saturation but regressed dark mean 11.12→16.00 and
+  was reverted. No unproven color model has been promoted.
+- 2026-08-31: added same-API toolbar solid palettes and a mixed-color gradient
+  holdout. The Apple gradient capture passed repeated-frame stability after
+  allowing the documented SwiftUI/Flutter interpolation difference in the
+  registration gate; solid/grid registration remains strict. A short coupled
+  SPSA fit over toolbar solids plus the gradient improved the host score only
+  89.10→89.94 with gamma 1.30→1.2655, so it remains diagnostic rather than a
+  public-default change. The lower-error alpha/gamma/saturation candidate still
+  produced an over-bright rim on the gradient (score ~61.9) and was rejected.
+  A shader-order experiment that saturated transmission before tint mixing was
+  also rejected (worst solid hue and gradient edge error regressed) and fully
+  reverted. Annotated evidence is under `out/color-model/toolbar-*`.
+- 2026-08-31: tested removing the post-saturation clamp as a possible source of
+  blue/cyan loss. The toolbar solid metrics and gradient score were byte-identical
+  to the clamped baseline for the current settings, so the experiment was
+  reverted and no extra shader path was retained.
+- 2026-08-31: measured the shipped light preset (`saturation=.9`,
+  `transmissionGamma=.9`) separately from the fitting vector: its gradient
+  score is 93.83 but solid-palette mean/worst transmission error is
+  31.56/52.68. A fixed `saturation=1.9`, `gamma=1.25` vector improves those
+  solids to 12.15/20.23 and the gradient to 90.24, but is not a public-default
+  change until dark and mixed-scene gates agree. A luminance-adaptive
+  saturation experiment improved the light solid worst hue to 18.65 but
+  regressed the dark palette (12.29/15.79 → 12.92/16.83), so it was reverted.
+- 2026-08-31: tested a chroma-adaptive boost that preserved the shipped
+  low-chroma gradient response while increasing saturation only for vivid light
+  swatches. It was effectively neutral on the gradient (93.83) and only a
+  marginal solid improvement (31.56/52.68 → 30.48/51.42); the dark capture did
+  not improve. The hidden boost was reverted rather than adding an unproven
+  public control.
+- 2026-08-31: tested decoupling the contour/bevel input from the saturated face
+  color. It produced no measurable change in the toolbar gradient or solid
+  metrics (the rim residual is not caused by the bevel luminance input), so the
+  extra shader plumbing was reverted.
+- 2026-08-31: tested a stronger chroma-adaptive saturation boost against the
+  shipped light preset. It reduced numeric solid error (27.25/45.61 in the
+  palette objective) while leaving the gradient score unchanged at 93.83, but
+  the annotated atlas visibly over-saturated cyan/green/purple faces and did
+  not improve dark evidence. It was reverted; the numeric gain is not accepted
+  without a perceptual/held-out match.
+- 2026-08-31: re-ran the chroma-adaptive model after fixing shader-include cache
+  invalidation (both the capture app and path-dependent package must be cleaned).
+  With the current frost-free corpus, a smooth chroma boost of 0.4 lowered light
+  palette mean/worst transmission error from 14.95/25.63 to 12.36/19.92 and
+  dark mean/worst from 11.24/15.79 to 10.93/15.49. Neutral, black, and white
+  guards were unchanged; the held-out gradient score was effectively unchanged
+  (89.0959 → 89.0945). The annotated atlases are retained under
+  `out/color-model/toolbar-chroma-adaptive04/` and
+  `out/color-model/material-dark-chroma-adaptive04/`. Promotion remains gated
+  on a same-runner profile A/B and Real/Fake overlap review because FakeGlass's
+  native affine color filter cannot express a per-pixel chroma-dependent gain.
+- 2026-08-31: fixed compact profile benchmark collection: long JSON reports
+  were emitted through `debugPrint`, which chunks them before the shell parser
+  can read a complete record. Machine-readable summary/JSON lines now use
+  `stdout.writeln`; a regression test locks this contract. A compact adaptive
+  profile run captured 247 baseline frames (raster p95 1.739 ms) and 234
+  real-saturation frames (raster p95 1.847 ms, GPU busy 1.49 ms/frame); it was
+  intentionally a short diagnostic repetition, not the full performance gate.
+- 2026-08-31: captured a matching one-repetition stable-binary control for
+  `realSaturationOnly`: 246 frames, raster p95/p99 2.06/2.69 ms, total p95
+  3.11 ms, in-process GPU 1.71 ms/frame, and 415.6 MB footprint peak. The
+  adaptive run was 234 frames at 1.847/2.373 ms raster p95/p99 and 1.49 ms
+  GPU/frame, but these are separate short runs rather than a repeated paired
+  gate; no performance regression is indicated, while the required paired
+  repetitions remain open.
+- 2026-08-31: tested applying the same +0.4 vivid-saturation midpoint to
+  FakeGlass's existing affine filter. Light solid error was unchanged at the
+  worst hue and slightly regressed in mean (20.00 → 20.19); neutral/black/white
+  guards were unchanged. The approximation was reverted; RealGlass keeps the
+  measured per-pixel boost while FakeGlass retains its cheaper affine contract.
+- 2026-08-31: replaced the smooth chroma weight with an equivalent linear clamp
+  to remove polynomial work from the hot fragment pass. The linear candidate
+  scored light/dark solid mean/worst 12.33/20.25 and 10.47/14.92, with held-out
+  gradient score 89.085 (smooth: 89.095); neutral, black, and white guards were
+  unchanged. Two interleaved four-second profile pairs measured linear raster
+  p95 median 2.194 ms versus stable 2.169 ms (+1.2%), within the 2% gate; GPU
+  busy/frame was lower for linear (1.438 vs 1.640 ms). Keep the linear model;
+  retain the smooth candidate only as diagnostic evidence.
+- 2026-08-31: marked the example bottom-bar pixel tests with the repository's
+  `golden` tag so `melos run test-without-goldens` no longer executes image
+  comparisons accidentally. The pinned 3.47.1 non-golden workspace suite now
+  passes (122 tests), package Impeller/Flutter-GPU tests pass (105 tests), the
+  analyzer is clean across all four packages, and the comparator suite passes
+  (69 tests, one expected simulator skip). The dedicated example golden job
+  initially reported renderer-dependent pixel drift and occasional
+  `flutter_tester` SIG-10 finalization failures; the bounded warm-up and
+  teardown fix below addresses the example cases without hiding fixture drift.
+- 2026-08-31: made the fake-surface golden helper wait four bounded frames after
+  shader publication, eliminating the first-frame fallback capture. The real
+  and fake drag tests now dispose their GPU-backed subtree before finalization;
+  all three example goldens pass in one process. Their images remain separate
+  regression fixtures and are not used as color-fit evidence.
+- 2026-08-31: the example bottom-bar synchronization/teardown fix was then
+  verified end-to-end: all three tagged goldens pass in one process. The
+  package's separate `--tags=golden`-only invocation still trips Flutter 3.47's
+  `flutter_tester` SIG-10 during the Alchemist fake-glass variant suite, while
+  the normal Impeller/Flutter-GPU package run remains green (105 tests).
+- 2026-08-31: recorded the current work in JJ as
+  `fix: fit color transmission and stabilize GPU goldens`, directly on top of
+  `codex/fake-glass-fallback`. Added the example failure-output ignore and
+  raised the local JJ snapshot ceiling only enough to retain the validated
+  1206×2622 gradient reference probes; no remote bookmark or push was changed.
+- 2026-08-31: tested max-channel-anchored saturation for the high-saturation
+  vector, based on Apple's dominant-channel plateau. It worsened both the
+  toolbar solid objective (19.49/33.68) and gradient score (89.11), so the
+  Rec.709 luminance-pivot implementation remains unchanged.
+- 2026-08-31: fit a constrained 3×3 affine transform offline across light/dark
+  solid and gradient pixels. Although the post-hoc image transform lowered
+  several offline errors, inserting it before the shader lighting stage caused
+  a real host score collapse to 43.96, confirming that output-space fits cannot
+  be promoted without modeling the pre-lighting color stage. The matrix was
+  reverted.
 - 2026-08-25: goal activated; env verified; venv built; orientation reads done.
 - 2026-08-25: clear loupe example composition verified in both entry points;
   focused example tests/analyzer pass. Simulator service remains unavailable,
@@ -301,3 +420,29 @@ composition, example shell, generalization, and non-regressing performance work.
   explicit `--fit-thickness` diagnostic. Summaries emit the formal small/
   toolbar combined-error ratio and policy, preventing a per-geometry fit from
   being mislabeled as frozen-parameter evidence. No simulator rerun was done.
+- 2026-08-31: tested a max-channel saturation pivot in the one-pass material
+  shader. It reduced the light toolbar solid-palette transmission mean from
+  14.79 to 10.47 code points, but the held-out gradient score fell from 93.83
+  to 86.06 and red/green/purple hues regressed; it was rejected. A
+  chroma-gated pivot preserved neutral guards but produced severe saturated
+  hue blowouts (palette mean 32.23), and an HSL/lightness pivot regressed the
+  palette to 20.45. All experimental pivots and settings were removed; the
+  Rec.709 luminance-pivot implementation remains the active baseline.
+- 2026-08-31: found and repaired a host-harness correctness issue: Flutter's
+  runtime-effect cache could retain a compiled shader when only an included
+  `.glsl` file changed. `flutter/host_capture.sh` now hashes all renderer
+  shader sources and runs `flutter clean` for both the generated capture app
+  and its path-dependent renderer package when that digest changes. A clean
+  rebuild reproduced the stable Rec.709 baseline; future fitting results are
+  no longer trusted from stale include binaries.
+- 2026-08-31: reran the compact four-iteration scalar SPSA fit after cache
+  repair. The best probe lowered light solid-palette mean error 15.08→13.40,
+  but worsened the held-out gradient score 89.10→87.02 and neutral-ramp error
+  12.67→14.98, so no defaults changed. Fixed the SPSA summary to report the
+  actual minimum evaluation (including rejected probes) rather than the last
+  accepted iterate's internal loss.
+- 2026-08-31: reran the linear-light saturation candidate after invalidating
+  both app and package shader caches. It improved the light solid palette
+  (mean 14.95→9.08, worst 25.63→19.24) but lowered the fresh gradient score
+  89.10→88.70 and left neutral-ramp error at 12.74; the candidate was
+  rejected and the Rec.709 shader restored.

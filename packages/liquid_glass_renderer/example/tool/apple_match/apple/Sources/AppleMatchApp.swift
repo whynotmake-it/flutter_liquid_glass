@@ -176,6 +176,17 @@ struct ProbeBackground: View {
     var body: some View {
         if spec.kind == "solid" {
             Color(srgbHex: spec.color!)
+        } else if spec.kind == "linearGradient" {
+            let (startPoint, endPoint): (UnitPoint, UnitPoint) = switch spec.axis {
+            case "vertical": (.top, .bottom)
+            case "diagonal": (.topLeading, .bottomTrailing)
+            default: (.leading, .trailing)
+            }
+            LinearGradient(
+                colors: [Color(srgbHex: spec.startColor!), Color(srgbHex: spec.endColor!)],
+                startPoint: startPoint,
+                endPoint: endPoint
+            )
         } else if spec.kind == "tileGrid" {
             Canvas { context, size in
                 let cell = Double(spec.cellSize!)

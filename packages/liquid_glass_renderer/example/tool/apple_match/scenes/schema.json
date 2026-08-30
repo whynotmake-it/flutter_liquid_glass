@@ -73,23 +73,47 @@
         "appleSliderMapped": {"const": false}
       }
     },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "refraction": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "palette": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "uniqueItems": true
+        },
+        "luminance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "uniqueItems": true
+        },
+        "black": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "white": {"type": "string", "pattern": "^[A-Z0-9]$"}
+      }
+    },
     "probes": {
       "type": "array",
       "minItems": 4,
-      "maxItems": 4,
+      "maxItems": 16,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "background"],
         "properties": {
-          "id": {"enum": ["A", "B", "C", "D"]},
+          "id": {"type": "string", "pattern": "^[A-Z0-9]$"},
           "background": {
             "type": "object",
             "additionalProperties": false,
             "required": ["kind"],
             "properties": {
-              "kind": {"enum": ["rgbwGrid", "tileGrid", "solid"]},
+              "kind": {"enum": ["rgbwGrid", "tileGrid", "solid", "linearGradient"]},
               "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "startColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "endColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "axis": {"enum": ["horizontal", "vertical", "diagonal"]},
               "cellSize": {"type": "integer", "minimum": 4},
               "gutter": {"type": "integer", "minimum": 0},
               "sampleInset": {"type": "integer", "minimum": 0},
@@ -162,6 +186,12 @@
                     "palette",
                     "pattern"
                   ]
+                }
+              },
+              {
+                "if": {"properties": {"kind": {"const": "linearGradient"}}},
+                "then": {
+                  "required": ["startColor", "endColor", "axis"]
                 }
               }
             ]

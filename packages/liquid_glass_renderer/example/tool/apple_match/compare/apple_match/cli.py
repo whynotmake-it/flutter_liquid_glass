@@ -92,6 +92,15 @@ def main() -> None:
                 (0, 0, 4, 4),
                 (width - 4, 0, 4, 4),
             )
+    gradient_registration_tolerance = 2.0 / 255.0
+    if args.scene and any(
+        probe["background"].get("kind") == "linearGradient"
+        for probe in scene["probes"]
+    ):
+        # SwiftUI and Flutter use slightly different interpolation spaces for
+        # gradients. Keep solid/grid registration exact, but allow the known
+        # few-level gradient transfer difference so the shape is still scored.
+        gradient_registration_tolerance = 16.0 / 255.0
     full_reference = load_probes(args.reference)
     full_candidate = load_probes(args.candidate)
     registration = verify_background_registration(
@@ -99,6 +108,7 @@ def main() -> None:
         full_candidate["A"],
         registration_rect or (0, 0, 0, 0),
         registration_exclusions,
+        maximum_residual=gradient_registration_tolerance,
     )
     reference = load_probes(args.reference, crop)
     candidate = load_probes(args.candidate, crop)

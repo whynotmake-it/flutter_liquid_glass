@@ -114,6 +114,68 @@ short GPU-golden test process per probe. The first retained calibration took
 14–20 seconds for all four probes, versus roughly 42 seconds for the existing
 three-frame simulator validation.
 
+The wrapper hashes every renderer `.frag`/`.glsl` source before a capture. If
+an included shader changes, it cleans both the capture app and its local path
+dependency before rebuilding; this avoids silently fitting against a stale
+compiled include.
+
+Use this host golden path for every fitting epoch. It runs the same
+`MatchSceneView` subtree through macOS Impeller/Metal, so parameter updates can
+be scored without booting iOS or recapturing SwiftUI. The pinned iOS capture is
+the authoritative target and is intentionally used only to create immutable
+references and to promote a host winner; it is not rerun for each optimizer
+epoch. Widget goldens cannot replace that final check because they cannot render
+Apple's SwiftUI control or validate the iOS system-compositing/color-management
+path, but they are the correct fast loop for Flutter-side tuning.
+
+For color-transfer fitting, use the isolated solid-palette scenes. They declare
+one full-face solid probe for each hue plus black/white guards, so the face
+measurement is not mixed with blur or a neighboring tile:
+
+```bash
+SCENE_FILE="$PWD/scenes/material_solid_palette_dark.json" \
+SETTINGS_FILE="$PWD/settings/color-model-dark.json" \
+CANDIDATE_OUT="$PWD/out/color-model/dark-solids" \
+CAPTURE_PROBES='X R O Y G C B P N K W' \
+bash flutter/host_capture.sh
+
+python3 solid_color_metrics.py \
+  --scene "$SCENE_FILE" \
+  --reference references/ios27-iphone17pro-ground-truth-v2/slider-000/material_solid_palette_dark \
+  --candidate "$CANDIDATE_OUT" \
+  --settings "$SETTINGS_FILE" \
+  --output "$CANDIDATE_OUT/metrics.json"
+```
+
+`solid_color_fit.py` runs a small one-axis sweep over those probes. Its
+objective uses black-subtracted transmission, mean/worst hue error, and
+luminance/saturation guards. Apple references must capture every probe declared
+by the scene; subset captures are for the macOS host path only.
+
+For coupled color experiments, `host_spsa_color_fit.py` runs the same probe set
+through macOS Impeller/Metal and jointly updates `tintAlpha`, `saturation`,
+`transmissionGamma`, and `vibrancy`. It uses two-sided bounded perturbations,
+normalizes parameter ranges before each update, and records every candidate in
+`summary.json`. A candidate is not promoted unless both mean and worst-hue
+errors improve in light and dark captures and the neutral guards remain stable.
+The iOS reference is used to define the target only; it is not rerun for each
+epoch.
+
+To test generalization rather than isolated swatches, add
+`--holdout-scene scenes/toolbar_gradient_holdout.json` and the matching
+`--holdout-reference` to the SPSA command. The holdout objective measures the
+full-color interior of horizontal/diagonal gradients while leaving the rim
+metrics intact. SwiftUI and Flutter differ by a few code points in gradient
+interpolation, so only gradient registration allows a 16/255 outside tolerance;
+solid and grid probes retain the strict 2/255 gate.
+
+The retained transmission model uses Rec.709 luminance plus a small linear
+chroma lift in the RealGlass fragment pass. It improves the guarded vivid hues
+without changing neutral, black, or white behavior. FakeGlass intentionally
+keeps its affine native color filter: applying the same lift there was measured
+and slightly worsened its solid-palette error, and a true per-pixel equivalent
+would require changing the fallback's cost model.
+
 The retained same-settings host/iOS comparison scores 99.4155. The adjacent
 contour-transmittance ranking was preserved: `.80` beat `.90` by `.00394` on
 macOS and `.00471` on iOS. The remaining platform residual is concentrated at
@@ -185,6 +247,21 @@ reload is dropped it retries once and escalates to a single hot restart
 paths afterwards (a restart can reinstall the app and rotate the container).
 Screenshots are single frames after a fixed settle countdown; re-validate any
 winner with `run.py` (3-frame median) before trusting it.
+
+For coupled continuous fits, opt into the bounded SPSA path:
+
+```bash
+IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python optimize.py \
+  --scene scenes/toolbar_capsule.json \
+  --optimizer spsa --max-iters 12 --learning-rate 0.1 --perturbation 0.02
+```
+
+SPSA estimates a two-sided finite-difference gradient with two perturbation
+renders per iteration, independent of parameter count, and backtracks rejected
+steps. It is deterministic for a given `--seed`; use it for a bounded
+exploratory fit, then verify promoted settings with the multi-frame capture
+and host-golden paths. Coordinate descent remains useful for cheap single-axis
+diagnostics and is not evidence that the color model is correctly specified.
 
 References stay immutable: the optimizer never captures SwiftUI references and
 refuses to run when the reference set's pinned UDID does not match

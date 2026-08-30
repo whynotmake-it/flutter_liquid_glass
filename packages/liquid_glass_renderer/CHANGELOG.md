@@ -38,6 +38,25 @@
   fit its contour, highlight, frost, and bevel response to shared settings.
 - **FIX**: refit dark transmission across eight guarded hues, removing blue,
   green, and cyan blowout from the earlier dark toolbar preset.
+- **FIX**: use the fitted Rec.709 luminance basis for real and FakeGlass color
+  transfer and retune the dark preset saturation to 2.6; isolated solid-face
+  probes lower the guarded dark transmission error without adding shader work.
+- **FIX**: apply a measured, one-pass chroma-aware saturation lift to RealGlass
+  transmission using a linear clamp (no extra samples or passes); the matching
+  frost-free light/dark corpus improves vivid blue, cyan, and green transfer
+  while preserving neutral and black/white guards. FakeGlass retains its affine
+  fallback because a per-pixel chroma lift is not expressible there without
+  changing its cheaper filter contract.
+- **TEST**: extend the Apple-match harness with dynamic, provenance-checked
+  full-face solid hue probes and black/white emission guards.
+- **TEST**: add normalized bounded SPSA fitting and annotated all-probe solid
+  color atlases so coupled color experiments run on macOS GPU goldens instead
+  of repeatedly recapturing iOS references.
+- **FIX**: invalidate both host-capture and path-dependent renderer shader
+  caches when an included runtime-effect source changes, preventing stale
+  shader binaries from contaminating color-fit measurements.
+- **FIX**: emit compact benchmark reports with unchunked stdout records so
+  profile frame and memory measurements are parsed reliably.
 - **FIX**: preserve the full Gaussian tail in standalone and layer-owned shadow
   paint bounds without expanding the clipped refraction pass.
 - **FIX**: restore glow behavior after the renderer rewrite.

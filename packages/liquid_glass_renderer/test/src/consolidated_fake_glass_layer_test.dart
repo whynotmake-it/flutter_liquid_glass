@@ -303,7 +303,7 @@ void main() {
     expect(layer.debugBackdropFilterLayer!.filter, same(initialFilter));
   });
 
-  test('native color matrix matches tint-then-saturation algebra', () {
+  test('native color matrix matches Rec.709 tint-then-saturation algebra', () {
     const tint = Color.fromARGB(104, 220, 240, 255);
     const saturation = 0.8;
     final matrix = fakeGlassColorMatrix(
@@ -323,7 +323,8 @@ void main() {
       background.$2 * (1 - tint.a) + tint.g * tint.a,
       background.$3 * (1 - tint.a) + tint.b * tint.a,
     );
-    final luminance = mixed.$1 * 0.299 + mixed.$2 * 0.587 + mixed.$3 * 0.114;
+    final luminance =
+        mixed.$1 * 0.2126 + mixed.$2 * 0.7152 + mixed.$3 * 0.0722;
     final expected = (
       luminance + (mixed.$1 - luminance) * saturation,
       luminance + (mixed.$2 - luminance) * saturation,

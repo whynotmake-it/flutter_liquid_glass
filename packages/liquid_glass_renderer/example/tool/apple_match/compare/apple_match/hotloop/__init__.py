@@ -10,7 +10,7 @@ from .evaluate import (
     prepare_simulator,
     scene_crop,
 )
-from .optimize import DEFAULT_AXES, coordinate_descent, neighbor_values
+from .optimize import DEFAULT_AXES, coordinate_descent, neighbor_values, spsa_descent
 from .session import (
     FlutterRunSession,
     SessionError,
@@ -34,4 +34,5 @@ __all__ = [
     "neighbor_values",
     "prepare_simulator",
     "scene_crop",
+    "spsa_descent",
 ]

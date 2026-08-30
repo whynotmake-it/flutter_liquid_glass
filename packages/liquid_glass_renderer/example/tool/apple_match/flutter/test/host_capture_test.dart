@@ -57,7 +57,11 @@ void main() {
         .where((probe) => probe.isNotEmpty)
         .toList(growable: false);
     expect(probes, isNotEmpty);
-    expect(probes, everyElement(isIn(const {'A', 'B', 'C', 'D'})));
+    expect(
+      probes,
+      everyElement(isIn(scene.probes.keys)),
+      reason: 'capture requests must name probes declared by the scene',
+    );
 
     // Widget tests disable MaskFilter shadows globally. This harness is
     // explicitly fitting those pixels, so enable them while the display list

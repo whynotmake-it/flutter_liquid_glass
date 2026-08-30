@@ -40,7 +40,7 @@ void main() {
     expect(settings.thickness, 12);
     expect(settings.frost, 5);
     expect(settings.edgeRefraction, closeTo(27.42, .01));
-    expect(settings.saturation, 2.3);
+    expect(settings.saturation, 2.6);
     expect(settings.transmissionGamma, .58);
     expect(settings.vibrancy, .1);
     expect(settings.highlight, .25);

@@ -31,6 +31,7 @@ from apple_match.hotloop import (  # noqa: E402
     coordinate_descent,
     load_reference_probes,
     scene_crop,
+    spsa_descent,
 )
 from apple_match.hotloop.evaluate import simctl  # noqa: E402
 from apple_match.schema import validate_scene  # noqa: E402
@@ -90,6 +91,15 @@ def main():
     parser.add_argument("--baseline", type=Path, default=ROOT / "settings/baseline.json")
     parser.add_argument("--axes", type=Path, help="JSON object of axis -> ordered values")
     parser.add_argument("--max-iters", type=int, default=8)
+    parser.add_argument(
+        "--optimizer",
+        choices=("coordinate", "spsa"),
+        default="coordinate",
+        help="coordinate probes (default) or bounded continuous SPSA descent",
+    )
+    parser.add_argument("--learning-rate", type=float, default=0.1)
+    parser.add_argument("--perturbation", type=float, default=0.02)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--settle-frames", type=int, default=4)
     parser.add_argument("--out", type=Path, default=ROOT / "out/optimize")
     args = parser.parse_args()
@@ -165,9 +175,30 @@ def main():
                 flush=True,
             )
 
-        result = coordinate_descent(
-            timed_evaluate, baseline, axes, max_iters=args.max_iters, on_step=on_step
-        )
+        if args.optimizer == "spsa":
+            bounds = {
+                axis: (min(values), max(values))
+                for axis, values in axes.items()
+                if axis in baseline and values
+            }
+            result = spsa_descent(
+                timed_evaluate,
+                baseline,
+                bounds,
+                max_iters=args.max_iters,
+                learning_rate=args.learning_rate,
+                perturbation=args.perturbation,
+                seed=args.seed,
+                on_step=on_step,
+            )
+        else:
+            result = coordinate_descent(
+                timed_evaluate,
+                baseline,
+                axes,
+                max_iters=args.max_iters,
+                on_step=on_step,
+            )
 
         # Re-render the best params into out/optimize/best for evidence and a
         # full comparator scorecard.

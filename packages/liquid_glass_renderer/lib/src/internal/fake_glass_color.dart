@@ -13,9 +13,10 @@ List<double> fakeGlassColorMatrix({
   required Color tint,
   double transmissionGamma = 1,
 }) {
-  const luminanceRed = 0.299;
-  const luminanceGreen = 0.587;
-  const luminanceBlue = 0.114;
+  // Match the final shader's fitted Rec.709 saturation basis.
+  const luminanceRed = 0.2126;
+  const luminanceGreen = 0.7152;
+  const luminanceBlue = 0.0722;
   final inverseSaturation = 1 - saturation;
   final saturationRows = <(double, double, double)>[
     (

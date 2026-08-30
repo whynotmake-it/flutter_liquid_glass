@@ -31,6 +31,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+/test/failures/
 /build/
 
 # Symbolication related

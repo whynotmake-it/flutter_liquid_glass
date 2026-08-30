@@ -485,6 +485,31 @@ class ProbeBackground extends StatelessWidget {
     if (spec['kind'] == 'tileGrid') {
       return CustomPaint(painter: TileGridPainter(spec: spec));
     }
+    if (spec['kind'] == 'linearGradient') {
+      final axis = spec['axis']! as String;
+      final begin = switch (axis) {
+        'vertical' => Alignment.topCenter,
+        'diagonal' => Alignment.topLeft,
+        _ => Alignment.centerLeft,
+      };
+      final end = switch (axis) {
+        'vertical' => Alignment.bottomCenter,
+        'diagonal' => Alignment.bottomRight,
+        _ => Alignment.centerRight,
+      };
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: begin,
+            end: end,
+            colors: [
+              parseColor(spec['startColor']! as String),
+              parseColor(spec['endColor']! as String),
+            ],
+          ),
+        ),
+      );
+    }
     return CustomPaint(painter: RgbwGridPainter(spec: spec));
   }
 }

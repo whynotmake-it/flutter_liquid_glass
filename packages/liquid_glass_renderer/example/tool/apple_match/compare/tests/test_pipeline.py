@@ -56,7 +56,10 @@ class SchemaTests(unittest.TestCase):
         for path in scene_paths:
             with self.subTest(scene=path.stem):
                 scene = validate_scene(path, ROOT / "scenes/schema.json")
-                self.assertEqual([p["id"] for p in scene["probes"]], list("ABCD"))
+                if "roles" in scene:
+                    self.assertGreaterEqual(len(scene["probes"]), 4)
+                else:
+                    self.assertEqual([p["id"] for p in scene["probes"]], list("ABCD"))
 
     def test_rejects_missing_probe(self):
         scene_path = ROOT / "scenes/toolbar_capsule.json"
@@ -77,6 +80,25 @@ class SchemaTests(unittest.TestCase):
             invalid.write_text(json.dumps(scene))
             with self.assertRaisesRegex(ValueError, "undefined palette symbols"):
                 validate_scene(invalid, ROOT / "scenes/schema.json")
+
+
+class HarnessTests(unittest.TestCase):
+    def test_host_capture_invalidates_shader_include_cache(self):
+        script = (ROOT / "flutter/host_capture.sh").read_text()
+        self.assertIn("SHADER_ROOT=", script)
+        self.assertIn("PACKAGE_ROOT=", script)
+        self.assertIn("shasum", script)
+        self.assertIn("SHADER_MARKER=", script)
+        self.assertGreaterEqual(script.count('"$FLUTTER_BIN" clean'), 2)
+
+    def test_profile_benchmark_keeps_machine_report_on_one_stdout_line(self):
+        source = (
+            ROOT.parents[1] / "integration_test" / "benchmark_test.dart"
+        ).read_text()
+        self.assertIn(
+            "stdout.writeln('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}')",
+            source,
+        )
 
 
 class MetricTests(unittest.TestCase):
@@ -251,6 +273,23 @@ class MetricTests(unittest.TestCase):
             candidate,
             (40, 40, 48, 48),
             ((0, 0, 4, 4), (124, 0, 4, 4)),
+        )
+        self.assertTrue(details["passed"])
+
+    def test_registration_supports_explicit_gradient_tolerance(self):
+        reference = synthetic()["A"]
+        candidate = reference.copy()
+        # A cross-platform gradient can differ by a few code points while
+        # retaining the same geometry and phase; solid/grid captures remain
+        # strict because they use the default tolerance.
+        candidate[:, :, :] = np.clip(candidate + 10.0 / 255.0, 0.0, 1.0)
+        with self.assertRaises(ValueError):
+            verify_background_registration(reference, candidate, (40, 40, 48, 48))
+        details = verify_background_registration(
+            reference,
+            candidate,
+            (40, 40, 48, 48),
+            maximum_residual=16.0 / 255.0,
         )
         self.assertTrue(details["passed"])
 

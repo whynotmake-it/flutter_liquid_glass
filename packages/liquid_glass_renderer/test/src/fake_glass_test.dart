@@ -6,11 +6,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
+import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 
 import 'shared.dart';
 
 void main() {
   group('FakeGlass', () {
+    test('uses the real renderer fallback for highlight width', () {
+      expect(
+        fakeGlassHighlightBandWidth(
+          const LiquidGlassSettings.ios27ToolbarDark(),
+        ),
+        .5,
+      );
+      expect(
+        fakeGlassHighlightBandWidth(
+          const LiquidGlassSettings.ios27ToolbarLight(),
+        ),
+        .75,
+      );
+      expect(
+        fakeGlassHighlightBandWidth(
+          const LiquidGlassSettings(),
+        ),
+        0,
+      );
+    });
+
     for (final shape in <LiquidShape>[
       const LiquidOval(),
       const LiquidRoundedRectangle(borderRadius: 24),

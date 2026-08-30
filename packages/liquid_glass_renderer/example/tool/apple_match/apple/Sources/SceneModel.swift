@@ -22,6 +22,9 @@ struct Scene: Decodable {
         struct Background: Decodable {
             let kind: String
             let color: String?
+            let startColor: String?
+            let endColor: String?
+            let axis: String?
             let cellSize: Int?
             let gutter: Int?
             let gutterColor: String?

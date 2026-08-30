@@ -17,7 +17,7 @@ from apple_match.hotloop.evaluate import (
     PINNED_DEVICE_UDID,
     ensure_pinned_simulator,
 )
-from apple_match.hotloop.optimize import coordinate_descent, neighbor_values
+from apple_match.hotloop.optimize import coordinate_descent, neighbor_values, spsa_descent
 from apple_match.hotloop.session import (
     FlutterRunSession,
     SettleTimeout,
@@ -82,6 +82,31 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(result["bestParams"], {"x": 0.0, "y": 0.0})
         self.assertEqual(result["bestLoss"], 1.0)
         self.assertEqual(max(row["iteration"] for row in result["history"]), 1)
+
+    def test_spsa_moves_coupled_continuous_parameters(self):
+        # The optimum is deliberately coupled: changing either axis alone
+        # leaves a shallow valley, while the simultaneous gradient estimate
+        # can move both values toward the minimum.
+        def loss(params):
+            return (
+                (params["x"] + params["y"] - 3.0) ** 2
+                + 0.25 * (params["x"] - 1.25) ** 2
+                + 0.25 * (params["y"] - 1.75) ** 2
+            )
+
+        result = spsa_descent(
+            loss,
+            {"x": 0.0, "y": 0.0},
+            {"x": (-2.0, 4.0), "y": (-2.0, 4.0)},
+            max_iters=30,
+            learning_rate=0.2,
+            perturbation=0.01,
+            seed=7,
+        )
+        self.assertLess(result["bestLoss"], loss({"x": 0.0, "y": 0.0}))
+        self.assertAlmostEqual(result["bestParams"]["x"], 1.25, delta=0.25)
+        self.assertAlmostEqual(result["bestParams"]["y"], 1.75, delta=0.25)
+        self.assertTrue(any(row["accepted"] for row in result["history"][1:]))
 
     def test_wall_requires_consecutive_sub_threshold_stages(self):
         summaries = {

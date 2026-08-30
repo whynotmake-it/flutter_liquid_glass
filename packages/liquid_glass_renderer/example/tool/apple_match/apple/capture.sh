@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to the pinned iOS 27 simulator UDID}"
 : "${REFERENCE_SET:=ios27-iphone17pro-ground-truth-v2/slider-000}"
 : "${CAPTURE_FRAMES:=3}"
+: "${CAPTURE_FRAME_DELAY:=0.25}"
 : "${SCENE_ID:=toolbar_capsule}"
 : "${LIQUID_GLASS_TINT_POSITION:?Set the exact Liquid Glass slider position (0...1)}"
 : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
@@ -14,6 +15,23 @@ export SCENE_ID CAPTURE_FRAMES IOS_27_UDID
 export LIQUID_GLASS_TINT_POSITION LIQUID_GLASS_TINT_CONTROL_METHOD
 SCENE="$ROOT/scenes/$SCENE_ID.json"
 [[ -f "$SCENE" ]] || { echo "Unknown scene: $SCENE_ID" >&2; exit 2; }
+# Most scenes use the canonical A/B/C/D roles, but isolated color-transfer
+# scenes can declare one full-face solid probe per hue. Apple references must
+# always capture the complete declared set; use host_capture.sh for subsets.
+if [[ -n "${CAPTURE_PROBES:-}" ]]; then
+  echo "CAPTURE_PROBES subsets are not valid Apple references; use host_capture.sh" >&2
+  exit 2
+fi
+if [[ -z "${CAPTURE_PROBES:-}" ]]; then
+  CAPTURE_PROBES="$(python3 - "$SCENE" <<'PY'
+import json
+import sys
+scene = json.load(open(sys.argv[1]))
+print(" ".join(probe["id"] for probe in scene["probes"]))
+PY
+)"
+fi
+export CAPTURE_PROBES
 FINAL_OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
 API="SwiftUI PrimitiveButtonStyle.glass"
 [[ "$SCENE_ID" == "tab_bar_holdout" ]] && API="SwiftUI TabView system tab bar"
@@ -74,13 +92,13 @@ screenshot_frame() {
   return 5
 }
 
-for probe in A B C D; do
+for probe in $CAPTURE_PROBES; do
   xcrun simctl launch --terminate-running-process "$IOS_27_UDID" \
     dev.liquidglass.applematch --args --scene-id "$SCENE_ID" --probe "$probe"
   sleep 1
   for frame in $(seq 1 "$CAPTURE_FRAMES"); do
     screenshot_frame "$probe" "$OUT/frames/${probe}_$frame.png"
-    sleep 0.1
+    sleep "$CAPTURE_FRAME_DELAY"
   done
   xcrun simctl terminate "$IOS_27_UDID" dev.liquidglass.applematch
   sleep 0.5

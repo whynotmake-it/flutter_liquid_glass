@@ -15,6 +15,33 @@ if [[ ! -x "$FLUTTER_BIN" ]]; then
   exit 4
 fi
 
+# Flutter's asset compiler historically keyed the runtime-effect cache on the
+# top-level .frag file and ignored changes in its #include'd .glsl files. That
+# makes a host golden silently execute stale shader code during fitting. Keep
+# a digest of every renderer shader source and invalidate only this generated
+# capture app when any source changes. The marker lives under ignored `out/`;
+# no source or user data is removed.
+SHADER_ROOT="$ROOT/../../../lib/assets/shaders"
+PACKAGE_ROOT="$ROOT/../../../"
+SHADER_MARKER="$ROOT/out/.host_shader_sources.sha256"
+shader_digest="$({
+  find "$SHADER_ROOT" -type f \( -name '*.frag' -o -name '*.glsl' \) -print | sort
+} | while IFS= read -r shader; do
+  shasum "$shader"
+done | shasum | awk '{print $1}')"
+if [[ ! -f "$SHADER_MARKER" ]] || [[ "$(<"$SHADER_MARKER")" != "$shader_digest" ]]; then
+  # The path dependency has its own generated unit-test asset bundle. Cleaning
+  # only the capture app leaves that package-level shader binary stale, so
+  # invalidate both build roots when an include changes.
+  "$FLUTTER_BIN" clean
+  (
+    cd "$PACKAGE_ROOT"
+    "$FLUTTER_BIN" clean
+  )
+  mkdir -p "$(dirname "$SHADER_MARKER")"
+  printf '%s\n' "$shader_digest" > "$SHADER_MARKER"
+fi
+
 (
   cd "$ROOT/flutter"
   "$FLUTTER_BIN" test \

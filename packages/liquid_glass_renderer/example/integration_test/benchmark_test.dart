@@ -168,7 +168,7 @@ Future<void> main() async {
         ? cooldownStability.slopeMbPerSecond
         : null,
   };
-  debugPrint(
+  stdout.writeln(
     'LIQUID_GLASS_BENCHMARK_SUMMARY:${jsonEncode(<String, Object?>{
       'scenario': scenario.name,
       'repetition': repetition,
@@ -196,7 +196,7 @@ Future<void> main() async {
       'totalP95Micros': _timingPercentile(timings, .95, (t) => t.totalSpan),
     })}',
   );
-  debugPrint('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
+  stdout.writeln('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
 }
 
 int? _timingPercentile(

@@ -67,9 +67,11 @@ def expected_construction(profile: str) -> str:
     return "Button{Color.clear.frame(shape-insets)}.buttonStyle(.glass)"
 
 
-def frame_stability(capture_dir: Path, frame_count: int) -> dict:
+def frame_stability(
+    capture_dir: Path, frame_count: int, probe_ids: list[str]
+) -> dict:
     result: dict[str, dict[str, float]] = {}
-    for probe in "ABCD":
+    for probe in probe_ids:
         frames = [
             read_png(capture_dir / "frames" / f"{probe}_{index}.png")
             for index in range(1, frame_count + 1)
@@ -104,6 +106,11 @@ def build_metadata(
     frame_count: int,
 ) -> dict:
     scene = json.loads(scene_path.read_text())
+    probe_ids = [
+        probe["id"] for probe in scene.get("probes", [{"id": p} for p in "ABCD"])
+    ]
+    if not probe_ids:
+        raise ValueError("scene must declare at least one probe")
     profile = scene["profile"]
     apple_root = source_path.parent.parent
     scene_model_path = source_path.parent / "SceneModel.swift"
@@ -115,7 +122,7 @@ def build_metadata(
         str(path.relative_to(capture_dir)): sha256(path)
         for path in sorted(capture_dir.rglob("*.png"))
     }
-    first = read_png(capture_dir / "A.png")
+    first = read_png(capture_dir / f"{probe_ids[0]}.png")
     return {
         "schemaVersion": SCHEMA_VERSION,
         "status": "validated-ground-truth",
@@ -140,6 +147,7 @@ def build_metadata(
         "apiConstruction": expected_construction(profile),
         "scene": scene["id"],
         "sceneProfile": profile,
+        "probeIds": probe_ids,
         "sceneSha256": sha256(scene_path),
         "appleSourceSha256": sha256(source_path),
         "sceneModelSha256": sha256(scene_model_path),
@@ -149,7 +157,7 @@ def build_metadata(
         "frameValidatorSha256": sha256(frame_validator_path),
         "provenanceToolSha256": sha256(provenance_tool_path),
         "probeAndFrameSha256": files,
-        "frameStability": frame_stability(capture_dir, frame_count),
+        "frameStability": frame_stability(capture_dir, frame_count, probe_ids),
     }
 
 
@@ -166,6 +174,16 @@ def validate_reference(
         raise ValueError(f"missing metadata: {metadata_path}")
     metadata = json.loads(metadata_path.read_text())
     scene = json.loads(scene_path.read_text())
+    scene_probe_ids = [
+        probe["id"] for probe in scene.get("probes", [{"id": p} for p in "ABCD"])
+    ]
+    # Older references predate dynamic probe IDs and remain valid for the
+    # canonical A/B/C/D scenes. New captures record their declared IDs.
+    probe_ids = metadata.get("probeIds", ["A", "B", "C", "D"])
+    if probe_ids != scene_probe_ids:
+        raise ValueError(
+            f"reference probe ids do not match scene: {probe_ids} != {scene_probe_ids}"
+        )
     required = (
         "schemaVersion", "status", "runtime", "runtimeIdentifier", "udid",
         "device", "appearance", "captureEncoding", "pixelWidth", "pixelHeight",
@@ -222,9 +240,9 @@ def validate_reference(
     if metadata["medianFrameCount"] < 3:
         raise ValueError("medianFrameCount must be at least 3")
     hashes = metadata["probeAndFrameSha256"]
-    required_files = [f"{probe}.png" for probe in "ABCD"] + [
+    required_files = [f"{probe}.png" for probe in probe_ids] + [
         f"frames/{probe}_{index}.png"
-        for probe in "ABCD"
+        for probe in probe_ids
         for index in range(1, metadata["medianFrameCount"] + 1)
     ]
     if sorted(hashes) != sorted(required_files):

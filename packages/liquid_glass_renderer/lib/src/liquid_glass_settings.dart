@@ -140,7 +140,7 @@ class LiquidGlassSettings with Equatable {
        refractionSpread = 0.0,
        backdropScale = 1.0,
        chromaticAberration = 0.005,
-       saturation = 2.3,
+       saturation = 2.6,
        transmissionGamma = 0.58,
        vibrancy = 0.1,
        highlight = 0.25,

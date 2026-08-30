@@ -61,6 +61,8 @@ def verify_background_registration(
     candidate: np.ndarray,
     excluded_rect: Tuple[int, int, int, int],
     extra_excluded_rects: Tuple[Tuple[int, int, int, int], ...] = (),
+    *,
+    maximum_residual: float = 2.0 / 255.0,
 ) -> Dict[str, object]:
     """Fail when control pixels outside the glass disagree."""
     if reference.shape != candidate.shape:
@@ -94,7 +96,7 @@ def verify_background_registration(
         "passed": bool(
             abs(shift[0]) <= 0.51
             and abs(shift[1]) <= 0.51
-            and maximum <= 2.0 / 255.0
+            and maximum <= maximum_residual
         ),
     }
     if not details["passed"]:
