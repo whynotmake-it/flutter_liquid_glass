@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "metricRevision": "score_images-v1",
+  "referenceSet": "ios27-iphone17pro-ground-truth-v2/slider-000",
+  "qualification": {
+    "minimumImprovingScenes": 2,
+    "holdoutRegressionAllowed": false,
+    "strictMode": "pending and rejected entries fail"
+  },
+  "settings": {
+    "visibility": {
+      "status": "exempt",
+      "reason": "Transition utility; not a material-fit knob.",
+      "evidence": []
+    },
+    "tint": {
+      "status": "pending",
+      "reason": "Tint is represented by the tintAlpha attribution scan; no two-scene promotion has been accepted.",
+      "evidence": [{
+        "axis": "tintAlpha",
+        "baseline": 0.53,
+        "candidate": 0.555,
+        "scenes": ["small_capsule"],
+        "delta": {"combined": -0.0004, "score": -0.54},
+        "artifact": "out/material-attribution-tint/summary.json"
+      }]
+    },
+    "thickness": {
+      "status": "pending",
+      "reason": "Recovered per-geometry values (12 px toolbar, 8 px capsules) are not a frozen shared-parameter proof.",
+      "evidence": [{
+        "axis": "geometry-generalization",
+        "baseline": "frozen RI",
+        "candidate": "per-geometry thickness",
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"smallToToolbarCombinedRatio": 1.9},
+        "artifact": "out/generalization-toolbar-vector/summary.json"
+      }]
+    },
+    "edgeRefraction": {
+      "status": "pending",
+      "reason": "The retained edge scan moves by less than the promotion threshold and does not justify changing the shipped named preset.",
+      "evidence": [{
+        "axis": "edgeRefraction",
+        "baseline": 18.3,
+        "candidate": 8.0,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"note": "small movement within noise; no accepted promotion"},
+        "artifact": "out/material-attribution-edge/summary.json"
+      }]
+    },
+    "refractionSpread": {
+      "status": "rejected",
+      "reason": "No shared spread value closes the capsule generalization gap; the best coupled row remains about 2.01x toolbar combined error.",
+      "evidence": [{
+        "axis": "refractionSpread",
+        "baseline": 0.0,
+        "candidate": 0.25,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"smallCombinedRelativeImprovement": 0.0025, "smallToToolbarRatio": 1.9},
+        "artifact": "out/spread-grid-current/summary.json"
+      }]
+    },
+    "backdropScale": {
+      "status": "pending",
+      "reason": "The C1 contour-safe control is retained as an opt-in material axis, but the pinned tab-bar holdout prefers neutral 1.0, so no Apple preset is changed.",
+      "evidence": [{
+        "axis": "backdropScale",
+        "baseline": 1.0,
+        "candidate": 0.97,
+        "scenes": ["tab_bar_holdout"],
+        "delta": {"flowObjective": [6.405573, 6.472731], "note": "neutral default retained"},
+        "artifact": "out/backdrop-scale-smart/tabbar-c1-final/comparison-grid.png"
+      }]
+    },
+    "frost": {
+      "status": "pending",
+      "reason": "Scene optima disagree (small 5, toolbar 7, large 8); the clear 0-2 endpoint scan is still required.",
+      "evidence": [{
+        "axis": "frost",
+        "baseline": 7.0,
+        "candidate": 5.0,
+        "scenes": ["small_capsule"],
+        "delta": {"score": 1.14, "combined": -0.0007, "flow": 0.0133},
+        "artifact": "out/material-attribution-frost/summary.json"
+      }]
+    },
+    "chromaticAberration": {
+      "status": "rejected",
+      "reason": "Values 0 through 0.01 are byte-identical in all three scenes; larger values do not improve score.",
+      "evidence": [{
+        "axis": "chromaticAberration",
+        "baseline": 0.005,
+        "candidate": 0.0,
+        "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
+        "delta": {"byteIdenticalThrough": 0.01},
+        "artifact": "out/material-attribution-chromaticAberration-cutoff/summary.json"
+      }]
+    },
+    "saturation": {
+      "status": "pending",
+      "reason": "No retained two-scene attribution row is present in the current ledger.",
+      "evidence": []
+    },
+    "transmissionGamma": {
+      "status": "pending",
+      "reason": "Gamma movement is small and no cross-scene promotion has been accepted.",
+      "evidence": [{
+        "axis": "transmissionGamma",
+        "baseline": 0.9,
+        "candidate": 0.925,
+        "scenes": ["small_capsule", "large_capsule"],
+        "delta": {"note": "small combined movement; toolbar regresses"},
+        "artifact": "out/material-attribution-gamma/summary.json"
+      }]
+    },
+    "vibrancy": {
+      "status": "pending",
+      "reason": "The small-scene candidate does not establish a retained shared-vector improvement.",
+      "evidence": [{
+        "axis": "vibrancy",
+        "baseline": 0.15,
+        "candidate": 0.225,
+        "scenes": ["small_capsule", "toolbar_capsule"],
+        "delta": {"note": "sub-threshold movement; no promotion"},
+        "artifact": "out/material-attribution-vibrancy/summary.json"
+      }]
+    },
+    "highlight": {
+      "status": "qualified",
+      "reason": "Highlight 0.4 improves the frost-zero bevel objective on all three shapes and is the toolbar/card optimum in the measured sweep.",
+      "evidence": [{
+        "axis": "highlight",
+        "baseline": 0.5,
+        "candidate": 0.4,
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarObjective": [4.8290, 4.6865], "capsuleObjective": [4.9700, 4.6891], "cardObjective": [2.0193, 1.9635]},
+        "artifact": "out/clear-lighting-106"
+      }]
+    },
+    "highlightOppositeStrength": {
+      "status": "pending",
+      "reason": "The opposing highlight lobe is implemented and covered by renderer tests, but its independent multi-shape visual fit has not been retained as a standalone harness artifact.",
+      "evidence": []
+    },
+    "highlightWidth": {
+      "status": "qualified",
+      "reason": "An independent 0.75 px highlight band improves the retained lighting fit without coupling highlight placement to the darker contour width or adding a pass or texture sample.",
+      "evidence": [{
+        "axis": "highlightWidth",
+        "baseline": 0.65,
+        "candidate": 0.75,
+        "scenes": ["material_capsule", "material_circle", "material_card"],
+        "delta": {"note": "Retained shared width from the lighting-reset-49 sweep."},
+        "artifact": "out/lighting-reset-49/highlight-width-fit"
+      }]
+    },
+    "highlightWrap": {
+      "status": "qualified",
+      "reason": "Zero wrap improves the toolbar and capsule bevel objectives and is pixel-neutral on the rounded card at frost zero.",
+      "evidence": [{
+        "axis": "highlightWrap",
+        "baseline": 0.25,
+        "candidate": 0.0,
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {
+          "toolbarObjective": [5.0196, 4.8930],
+          "capsuleObjectiveAtDirectionality0p5": [5.3148, 5.3040],
+          "card": "pixel-neutral"
+        },
+        "artifact": "out/clear-lighting-103"
+      }]
+    },
+    "curvatureLighting": {
+      "status": "qualified",
+      "reason": "A cached analytic curvature field reduces mechanically uniform straight-section lighting on the capsule and rounded-superellipse card without changing the circle or adding a texture sample/pass.",
+      "evidence": [{
+        "axis": "curvatureLighting",
+        "baseline": 0.0,
+        "candidate": 0.375,
+        "scenes": ["material_capsule", "material_card", "material_circle"],
+        "delta": {
+          "capsuleBlackOuterContourMae8Bit": [33.5566, 27.2892],
+          "cardBlackOuterContourMae8Bit": [5.2189, 2.6848],
+          "circle": "unchanged by construction"
+        },
+        "artifact": "out/host-curvature-light23/final"
+      }]
+    },
+    "contourStrength": {
+      "status": "qualified",
+      "reason": "The shared 0.2 contour strength improves the frost-zero boundary objective over 0.05 on toolbar, capsule, and card; larger strength is shape-sensitive and is not promoted.",
+      "evidence": [{
+        "axis": "contourStrength",
+        "baseline": 0.05,
+        "candidate": 0.2,
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarObjective": [5.8808, 4.9680], "capsuleObjective": [13.0741, 12.2020], "cardObjective": [9.2884, 7.5261]},
+        "artifact": "out/clear-lighting-101"
+      }]
+    },
+    "contourWidth": {
+      "status": "exempt",
+      "reason": "Explicit geometry-tuning utility: iteration 102 proves incompatible width optima across compact toolbar, capsule, and card, so the control must remain configurable and 0.5 remains the conservative shared default.",
+      "evidence": [{
+        "axis": "contourWidth",
+        "baseline": 0.5,
+        "candidate": "shape-specific",
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarOptimum": 0.75, "capsuleOptimumAtOffset0p25": 0.35, "cardOptimumAtOffset0p25": 0.75},
+        "artifact": "out/clear-lighting-102"
+      }]
+    },
+    "contourOffset": {
+      "status": "qualified",
+      "reason": "Signed-distance placement moves the attached contour outside the mathematical path and improves white-boundary error on circle, capsule, and card with all canvas shadows disabled.",
+      "evidence": [{
+        "axis": "contourOffset",
+        "baseline": 0.0,
+        "candidate": 0.333,
+        "scenes": ["material_circle", "material_capsule", "material_card"],
+        "delta": {
+          "circleWhiteInnerContourMae8Bit": [10.4311, 2.9808],
+          "capsuleWhiteInnerContourMae8Bit": [8.8321, 5.1903],
+          "cardWhiteInnerContourMae8Bit": [4.5821, 1.2233]
+        },
+        "artifact": "out/host-contour-offset22"
+      }]
+    },
+    "contourTransmittance": {
+      "status": "exempt",
+      "reason": "Explicit material-tuning utility: compact toolbar glass prefers lower contour transmission while both larger material shapes prefer higher transmission; 0.8 remains the no-toolbar-sacrifice compromise.",
+      "evidence": [{
+        "axis": "contourTransmittance",
+        "baseline": 0.8,
+        "candidate": "shape-specific",
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarOptimum": 0.4, "capsuleOptimum": 1.0, "cardOptimum": 1.0},
+        "artifact": "out/clear-lighting-107"
+      }]
+    },
+    "bevelShadowStrength": {
+      "status": "qualified",
+      "reason": "Strength 0.02 paired with the fitted 16px depth improves the frost-zero bevel objective across toolbar, capsule, and card.",
+      "evidence": [{
+        "axis": "bevelShadowStrength",
+        "baseline": 0.025,
+        "candidate": 0.02,
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarObjective": [4.8642, 4.8290], "capsuleObjective": [5.2915, 4.9700], "cardObjective": [2.0970, 2.0193]},
+        "artifact": "out/clear-lighting-105"
+      }]
+    },
+    "bevelShadowDepth": {
+      "status": "qualified",
+      "reason": "A 16px SDF-following band paired with strength 0.02 improves all three frost-zero shape objectives.",
+      "evidence": [{
+        "axis": "bevelShadowDepth",
+        "baseline": 12.0,
+        "candidate": 16.0,
+        "scenes": ["toolbar_capsule", "material_capsule", "material_card"],
+        "delta": {"toolbarObjective": [4.8387, 4.8290], "capsuleObjectiveAtStrength0p01": [4.7521, 4.7370], "cardObjectiveAtStrength0p01": [1.9726, 1.9493]},
+        "artifact": "out/clear-lighting-105"
+      }]
+    },
+    "bevelShadowOffset": {
+      "status": "qualified",
+      "reason": "A 4 px directional offset makes the SDF-following inner shadow visible on the opposite-light face while preserving the contour-following band.",
+      "evidence": [{
+        "axis": "bevelShadowOffset",
+        "baseline": 0.0,
+        "candidate": 4.0,
+        "scenes": ["material_capsule", "material_circle", "material_card"],
+        "delta": {"note": "Retained from the lighting-reset-47 directional inner-shadow fit."},
+        "artifact": "out/lighting-reset-47/inner-shadow-fit"
+      }]
+    },
+    "bevelShadowSizeResponse": {
+      "status": "qualified",
+      "reason": "The validated card sweep rejects size-dependent bevel energy for the current model; the iOS preset therefore keeps this control neutral at zero.",
+      "evidence": [{
+        "axis": "bevelShadowSizeResponse",
+        "baseline": 0.25,
+        "candidate": 0.0,
+        "scenes": ["material_card", "material_circle"],
+        "delta": {
+          "cardObjective": [2.0800, 2.0388],
+          "circleObjective": [2.6212, 2.6211]
+        },
+        "artifacts": [
+          "out/lighting-reset-78/card-size-response",
+          "out/lighting-reset-79/circle-size-response-guard"
+        ]
+      }]
+    },
+    "exteriorShadowSizeResponse": {
+      "status": "pending",
+      "reason": "Size-aware caller shadow growth is exposed, but it has not completed the independent two-scene visual evidence gate.",
+      "evidence": []
+    },
+    "bevelShadowDirectionality": {
+      "status": "qualified",
+      "reason": "A 0.75-directional bevel improves the validated frost-zero inner-shadow objective on circle, capsule, and card without changing transmission, frost, contour, or highlight.",
+      "evidence": [{
+        "axis": "bevelShadowDirectionality",
+        "baseline": 1.0,
+        "candidate": 0.75,
+        "scenes": ["material_circle", "material_capsule", "material_card"],
+        "delta": {
+          "circleObjective": [2.7483, 2.6212],
+          "capsuleObjective": [4.9181, 4.8092],
+          "cardObjective": [2.2137, 2.0800]
+        },
+        "artifacts": [
+          "out/lighting-reset-75/circle-directionality-confirm",
+          "out/lighting-reset-73/capsule-bevel-crosscheck",
+          "out/lighting-reset-74/card-directionality-crosscheck"
+        ]
+      }]
+    }
+  }
+}
