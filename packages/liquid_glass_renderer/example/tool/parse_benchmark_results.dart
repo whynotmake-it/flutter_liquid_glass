@@ -1034,7 +1034,7 @@ String _markdown(
   }
   out
     ..writeln(
-      '- `resizeAnimated` measures the internal grow-only, bucketed matte heuristic under continuous size changes. `largeResize` amplifies retained-memory and allocation-step signals.',
+      '- `resizeAnimated` measures immutable, bucketed matte generations under continuous size changes. `largeResize` amplifies in-flight memory and allocation-step signals.',
     )
     ..writeln(
       '- `layerChurn` isolates layer/renderer lifetime; growth without matching resize growth points to lifecycle retention.',
