@@ -34,7 +34,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
       
       - name: Ⓜ️ Set up Melos
@@ -51,7 +51,7 @@ jobs:
   check_generation:
     name: Check Code Generation
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos
@@ -86,7 +86,7 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos
