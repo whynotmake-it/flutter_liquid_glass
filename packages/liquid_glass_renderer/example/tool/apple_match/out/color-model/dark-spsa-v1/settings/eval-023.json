@@ -1,0 +1,21 @@
+{
+  "thickness": 12,
+  "edgeRefraction": 27.42,
+  "refractionSpread": 0,
+  "frost": 0,
+  "tintRed": 57.142857,
+  "tintGreen": 57.142857,
+  "tintBlue": 57.142857,
+  "tintAlpha": 0.2,
+  "saturation": 3.5,
+  "transmissionGamma": 1.6,
+  "vibrancy": 0.0,
+  "chromaticAberration": 0,
+  "highlight": 0,
+  "contourStrength": 0,
+  "contourWidth": 0,
+  "contourTransmittance": 1,
+  "bevelShadowStrength": 0,
+  "shadowAlpha": 0,
+  "contactShadowAlpha": 0
+}

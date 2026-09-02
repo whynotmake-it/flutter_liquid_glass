@@ -1,12 +1,7 @@
-import 'dart:ui';
-
 import 'package:equatable/equatable.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
@@ -30,33 +25,48 @@ enum LiquidGlassGeometryState {
   needsUpdate,
 }
 
+/// A render object that contributes one glass shape to a geometry pass.
+@internal
+mixin LiquidGlassShapeRenderObject on RenderBox {
+  /// The shape's path in its own local coordinates.
+  Path shapePath();
+
+  /// Whether this shape's child is painted inside the glass.
+  bool get glassContainsChild;
+
+  /// Shadows painted by the parent layer before grouped glass shading.
+  List<BoxShadow> get layerShadows;
+
+  /// Resolved color and materialization controls for this shape.
+  LiquidGlassAppearance get appearance;
+
+  /// Paints this shape's child from the layer's paint context.
+  void paintFromLayer(
+    PaintingContext context,
+    Matrix4 transform,
+    Offset offset,
+  );
+}
+
 /// A base class for any render object that represents liquid glass geometry.
 ///
-/// This will paint to the screen normally, but use a [GlassGroupLink] to gather
-/// shape information and generate a geometry matte using the provided
-/// [geometryShader].
+/// Standalone shapes and blend groups both register with a
+/// [GeometryRenderLink] so the parent layer can pack them into one sample.
 @internal
 abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
-  /// Creates a new [RenderLiquidGlassGeometry] with the given
-  /// [geometryShader].
   RenderLiquidGlassGeometry({
-    required GeometryRenderLink renderLink,
-    required this.geometryShader,
     required LiquidGlassSettings settings,
     required double devicePixelRatio,
-  })  : _renderLink = renderLink,
-        _settings = settings,
-        _devicePixelRatio = devicePixelRatio {
-    updateShaderWithSettings(settings, devicePixelRatio);
+    this._renderLink,
+  }) {
+    _settings = settings;
+    _devicePixelRatio = devicePixelRatio;
   }
 
   /// The logger for liquid glass geometry.
   final Logger logger = Logger(LgrLogNames.geometry);
 
-  /// The shader that generates the geometry matte.
-  final FragmentShader geometryShader;
-
-  LiquidGlassSettings? _settings;
+  late LiquidGlassSettings? _settings;
 
   /// The settings used for liquid glass rendering.
   ///
@@ -72,11 +82,10 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     }
 
     _settings = value;
-    updateShaderWithSettings(value, _devicePixelRatio);
     markNeedsPaint();
   }
 
-  double _devicePixelRatio;
+  late double _devicePixelRatio;
 
   /// The device pixel ratio used for rendering.
   ///
@@ -86,7 +95,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     if (_devicePixelRatio == value) return;
     _devicePixelRatio = value;
     markGeometryNeedsUpdate(force: true);
-    updateShaderWithSettings(settings, value);
     markNeedsPaint();
   }
 
@@ -127,7 +135,41 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         LiquidGlassGeometryState.needsUpdate,
       _ => LiquidGlassGeometryState.mightNeedUpdate,
     };
+    _renderLink?.markDirty();
   }
+
+  Matrix4? _lastTransformToLayer;
+
+  /// Detects motion of this geometry relative to [layer].
+  ///
+  /// Called from the layer's paint and compositing hooks so descendant glass
+  /// does not need its own always-composite tracking layers. Returns true when
+  /// geometry must be rebuilt.
+  bool pollRelativeTransforms(RenderObject layer) {
+    if (!attached || !layer.attached || !hasSize) return false;
+
+    var changed = false;
+    final toLayer = getTransformTo(layer);
+    if (_lastTransformToLayer == null) {
+      _lastTransformToLayer = toLayer;
+    } else if (!MatrixUtils.matrixEquals(toLayer, _lastTransformToLayer)) {
+      _lastTransformToLayer = toLayer;
+      changed = true;
+    }
+
+    if (pollChildShapeTransforms()) {
+      changed = true;
+    } else if (changed) {
+      markGeometryNeedsUpdate();
+    }
+    return changed;
+  }
+
+  /// Detects motion of registered shapes relative to this geometry node.
+  ///
+  /// Direct children can skip this: their offset changes go through layout.
+  @protected
+  bool pollChildShapeTransforms() => false;
 
   @override
   @mustCallSuper
@@ -152,17 +194,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     super.dispose();
   }
 
-  /// Updates the shader with the current settings and device pixel ratio.
-  void updateShaderWithSettings(
-    LiquidGlassSettings settings,
-    double devicePixelRatio,
-  );
-
-  /// Uploads shape data to geometry shader in screen space coordinates
-  void updateGeometryShaderShapes(
-    List<ShapeGeometry> shapes,
-  );
-
   /// Paints the contents of all shapes to the given [context] at the given
   /// [offset].
   void paintShapeContents(
@@ -178,7 +209,8 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     Rect bounds,
     List<ShapeGeometry> geometries,
     bool needsUpdate,
-  ) gatherShapeData();
+  )
+  gatherShapeData();
 
   Path getPath(
     List<ShapeGeometry> geometries,
@@ -186,13 +218,16 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     final path = Path();
     for (final shape in geometries) {
       path.addPath(
-        shape.renderObject.getPath(),
+        shape.renderObject.shapePath(),
         Offset.zero,
         matrix4: shape.shapeToGeometry?.storage,
       );
     }
     return path;
   }
+
+  /// Smooth-union radius for shapes owned by this geometry node.
+  double get geometryBlend => 0;
 
   /// Should be called from within [paint] to maybe rebuild the [geometry].
   GeometryCache? maybeRebuildGeometry() {
@@ -206,10 +241,18 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !anyShapeChangedInLayer &&
         geometry != null) {
       logger.finer('$hashCode Skipping geometry rebuild.');
-      renderLink?.markRebuilt(this);
+      // Paint-only shape metadata (currently grouped shadows) must still
+      // refresh even when the SDF inputs and cached vector path are reusable.
+      // This keeps interactive shadow controls live without re-encoding the
+      // Flutter-GPU geometry texture.
+      geometry = GeometryCache(
+        bounds: geometry!.bounds,
+        shapes: shapes,
+        path: geometry!.path,
+        blend: geometry!.blend,
+      );
+      renderLink?.markDirty();
 
-      // Only render once we are done building
-      geometry = geometry!.render();
       geometryState = LiquidGlassGeometryState.updated;
       return geometry;
     }
@@ -225,188 +268,36 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     }
 
     final snappedBounds = layerBounds.snapToPixels(devicePixelRatio);
-    final matteBounds = Rect.fromLTWH(
-      snappedBounds.left * devicePixelRatio,
-      snappedBounds.top * devicePixelRatio,
-      snappedBounds.width * devicePixelRatio,
-      snappedBounds.height * devicePixelRatio,
-    ).snapToPixels(1);
-
-    // Set the new geometry
-    final newGeo = geometry = UnrenderedGeometryCache(
-      matte: _buildGeometryPicture(snappedBounds, shapes),
+    final newGeo = geometry = GeometryCache(
       bounds: snappedBounds,
-      matteBounds: matteBounds,
       shapes: shapes,
       path: getPath(shapes),
+      blend: geometryBlend,
     );
 
     // We have updated the geometry.
-    _renderLink?.markRebuilt(this);
+    _renderLink?.markDirty();
     return newGeo;
-  }
-
-  Picture _buildGeometryPicture(
-    Rect geometryBounds,
-    List<ShapeGeometry> shapes,
-  ) {
-    final bounds = geometryBounds.snapToPixels(devicePixelRatio);
-
-    final width = (bounds.width * devicePixelRatio).ceil();
-    final height = (bounds.height * devicePixelRatio).ceil();
-
-    geometryShader.setFloatUniforms((value) {
-      value
-        ..setFloat(width.toDouble())
-        ..setFloat(height.toDouble());
-    });
-
-    updateGeometryShaderShapes(shapes);
-
-    final recorder = PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()..shader = geometryShader;
-
-    final leftPixel = (geometryBounds.left * devicePixelRatio).roundToDouble();
-    final topPixel = (geometryBounds.top * devicePixelRatio).roundToDouble();
-
-    canvas
-      // This translation might seem redundant, but we do it to ensure pixel
-      // snapping
-      ..translate(-leftPixel, -topPixel)
-      ..drawRect(
-        Rect.fromLTWH(
-          leftPixel,
-          topPixel,
-          width.toDouble(),
-          height.toDouble(),
-        ),
-        paint,
-      );
-
-    return recorder.endRecording();
   }
 }
 
+/// CPU-side geometry metadata consumed by the Flutter GPU pass.
 @immutable
 @internal
-sealed class GeometryCache {
+class GeometryCache {
   const GeometryCache({
-    required this.matteBounds,
     required this.bounds,
     required this.shapes,
     required this.path,
+    required this.blend,
   });
 
-  /// The bounds of the geometry in the coordinate space of its
-  /// [RenderLiquidGlassGeometry] parent.
   final Rect bounds;
-
-  /// The bounds of the matte image in physical pixels.
-  final Rect matteBounds;
-
   final List<ShapeGeometry> shapes;
-
   final Path path;
+  final double blend;
 
-  /// Ensure that this geometry is rendered and potentially dispose this
-  /// instance.
-  ///
-  /// Using this object isn't safe after calling this method.
-  /// Make sure to only use the returned object after calling this.
-  ///
-  /// If this is a [UnrenderedGeometryCache], this will produce a
-  /// [RenderedGeometryCache].
-  ///
-  /// If this is already rendered, it will return itself.
-  RenderedGeometryCache render();
-
-  Future<RenderedGeometryCache> renderAsync();
-
-  void dispose();
-}
-
-/// Represents a current snapshot of the geometry used for liquid glass
-/// rendering.
-@immutable
-@internal
-class UnrenderedGeometryCache extends GeometryCache {
-  const UnrenderedGeometryCache({
-    required this.matte,
-    required super.matteBounds,
-    required super.bounds,
-    required super.shapes,
-    required super.path,
-  });
-
-  /// The matte image representing the geometry.
-  final Picture matte;
-
-  @override
-  Future<RenderedGeometryCache> renderAsync() async {
-    final image = await matte.toImage(
-      matteBounds.width.ceil(),
-      matteBounds.height.ceil(),
-    );
-    return RenderedGeometryCache(
-      matte: image,
-      matteBounds: matteBounds,
-      bounds: bounds,
-      shapes: shapes,
-      path: path,
-    );
-  }
-
-  @override
-  RenderedGeometryCache render() {
-    final image = matte.toImageSync(
-      matteBounds.width.ceil(),
-      matteBounds.height.ceil(),
-    );
-    dispose();
-    return RenderedGeometryCache(
-      matte: image,
-      matteBounds: matteBounds,
-      bounds: bounds,
-      shapes: shapes,
-      path: path,
-    );
-  }
-
-  /// Disposes of the resources used by the geometry.
-  @override
-  void dispose() {
-    matte.dispose();
-  }
-}
-
-/// Represents a current snapshot of the geometry used for liquid glass
-/// rendering.
-@immutable
-@internal
-class RenderedGeometryCache extends GeometryCache {
-  const RenderedGeometryCache({
-    required this.matte,
-    required super.matteBounds,
-    required super.bounds,
-    required super.shapes,
-    required super.path,
-  });
-
-  /// The matte image representing the geometry.
-  final Image matte;
-
-  @override
-  RenderedGeometryCache render() => this;
-
-  @override
-  Future<RenderedGeometryCache> renderAsync() => Future.value(this);
-
-  /// Disposes of the resources used by the geometry.
-  @override
-  void dispose() {
-    matte.dispose();
-  }
+  void dispose() {}
 }
 
 extension on LiquidGlassSettings {
@@ -414,7 +305,10 @@ extension on LiquidGlassSettings {
     if (other == null) return false;
 
     return effectiveThickness != other.effectiveThickness ||
-        refractiveIndex != other.refractiveIndex;
+        edgeRefraction != other.edgeRefraction ||
+        refractionSpread != other.refractionSpread ||
+        contourWidth != other.contourWidth ||
+        contourOffset != other.contourOffset;
   }
 }
 
@@ -452,9 +346,11 @@ class ShapeGeometry extends Equatable {
     required this.shape,
     required this.glassContainsChild,
     required this.shapeBounds,
+    required this.appearance,
+    this.shadows = const [],
     this.shapeToGeometry,
-  })  : rawCornerRadius = _getRadiusFromGlassShape(shape),
-        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
+  }) : rawCornerRadius = _getRadiusFromGlassShape(shape),
+       rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
 
   static double _getRadiusFromGlassShape(LiquidShape shape) {
     switch (shape) {
@@ -467,7 +363,7 @@ class ShapeGeometry extends Equatable {
     }
   }
 
-  final RenderLiquidGlass renderObject;
+  final LiquidGlassShapeRenderObject renderObject;
 
   final LiquidShape shape;
 
@@ -477,16 +373,23 @@ class ShapeGeometry extends Equatable {
 
   final bool glassContainsChild;
 
+  final LiquidGlassAppearance appearance;
+
   /// Bounds in geometry-local coordinates (for painting)
   final Rect shapeBounds;
+
+  final List<BoxShadow> shadows;
 
   final Matrix4? shapeToGeometry;
 
   @override
   List<Object?> get props => [
-        renderObject,
-        shape,
-        glassContainsChild,
-        shapeBounds,
-      ];
+    renderObject,
+    shape,
+    glassContainsChild,
+    appearance,
+    shapeBounds,
+    shadows,
+    shapeToGeometry,
+  ];
 }

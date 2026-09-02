@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "scene": "material_color_card_dark",
+  "shapeKind": "roundedSuperellipse",
+  "stage": "color",
+  "captureEncoding": "SDR tone-mapped 8-bit PNG",
+  "reference": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_color_card_dark",
+  "candidate": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/gamma-fine/candidates/transmissionGamma-0p58",
+  "atlas": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/final-color-atlas.png",
+  "regions": [
+    {
+      "name": "whole color chart",
+      "probe": "B",
+      "boxPixels": [
+        246,
+        1044,
+        960,
+        1578
+      ],
+      "zoom": 1
+    },
+    {
+      "name": "light-facing color response",
+      "probe": "B",
+      "boxPixels": [
+        427,
+        1071,
+        779,
+        1239
+      ],
+      "zoom": 3
+    },
+    {
+      "name": "interior color response",
+      "probe": "B",
+      "boxPixels": [
+        477,
+        1221,
+        729,
+        1401
+      ],
+      "zoom": 3
+    }
+  ]
+}

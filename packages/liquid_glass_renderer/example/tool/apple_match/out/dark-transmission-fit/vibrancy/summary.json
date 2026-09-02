@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "capturePlatform": "macos-host-golden-metal",
+  "probes": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "frostPolicy": "fixed-zero-until-lighting-and-color-freeze",
+  "axis": "vibrancy",
+  "objectiveSymbols": null,
+  "candidates": [
+    {
+      "id": "vibrancy-0p1",
+      "axis": "vibrancy",
+      "value": 0.1,
+      "objective": 6.564464751076303,
+      "components": {
+        "paletteTransferObjective8Bit": 10.519450331120364,
+        "paletteMeanResponseMae8Bit": 10.28158788693448,
+        "paletteMeanLuminanceMae8Bit": 7.745720878243446,
+        "paletteMeanSaturationMae8Bit": 14.640733868727693,
+        "paletteWorstResponseMae8Bit": 16.518609046936035,
+        "paletteWorstLuminanceMae8Bit": 14.416635513305664,
+        "paletteWorstSaturationMae8Bit": 28.7193301320076,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0p1"
+    },
+    {
+      "id": "vibrancy-0p05",
+      "axis": "vibrancy",
+      "value": 0.05,
+      "objective": 6.824624740871368,
+      "components": {
+        "paletteTransferObjective8Bit": 11.391337810018255,
+        "paletteMeanResponseMae8Bit": 11.95999694118897,
+        "paletteMeanLuminanceMae8Bit": 7.759463086724281,
+        "paletteMeanSaturationMae8Bit": 14.367368603416253,
+        "paletteWorstResponseMae8Bit": 16.837282200654347,
+        "paletteWorstLuminanceMae8Bit": 13.995296955108643,
+        "paletteWorstSaturationMae8Bit": 28.549737632274628,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0p05"
+    },
+    {
+      "id": "vibrancy-0p15",
+      "axis": "vibrancy",
+      "value": 0.15,
+      "objective": 7.899921355118859,
+      "components": {
+        "paletteTransferObjective8Bit": 11.625225266137084,
+        "paletteMeanResponseMae8Bit": 10.71378657470147,
+        "paletteMeanLuminanceMae8Bit": 11.273040864616632,
+        "paletteMeanSaturationMae8Bit": 14.571912169485586,
+        "paletteWorstResponseMae8Bit": 24.14385763804118,
+        "paletteWorstLuminanceMae8Bit": 23.013856410980225,
+        "paletteWorstSaturationMae8Bit": 28.798107504844666,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0p15"
+    },
+    {
+      "id": "vibrancy-0",
+      "axis": "vibrancy",
+      "value": 0.0,
+      "objective": 8.719345899077599,
+      "components": {
+        "paletteTransferObjective8Bit": 15.010936483003512,
+        "paletteMeanResponseMae8Bit": 16.185393494864307,
+        "paletteMeanLuminanceMae8Bit": 12.717332497239113,
+        "paletteMeanSaturationMae8Bit": 14.648184682591818,
+        "paletteWorstResponseMae8Bit": 23.0418265859286,
+        "paletteWorstLuminanceMae8Bit": 20.720463275909424,
+        "paletteWorstSaturationMae8Bit": 28.83943408727646,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0"
+    },
+    {
+      "id": "vibrancy-0p2",
+      "axis": "vibrancy",
+      "value": 0.2,
+      "objective": 10.195363430085708,
+      "components": {
+        "paletteTransferObjective8Bit": 15.703289316852656,
+        "paletteMeanResponseMae8Bit": 15.29593534519275,
+        "paletteMeanLuminanceMae8Bit": 17.432351738214493,
+        "paletteMeanSaturationMae8Bit": 14.662184712215094,
+        "paletteWorstResponseMae8Bit": 32.75918102264404,
+        "paletteWorstLuminanceMae8Bit": 31.6187162399292,
+        "paletteWorstSaturationMae8Bit": 28.62333208322525,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0p2"
+    },
+    {
+      "id": "vibrancy-0p3",
+      "axis": "vibrancy",
+      "value": 0.3,
+      "objective": 15.532806388445897,
+      "components": {
+        "paletteTransferObjective8Bit": 26.33212426978086,
+        "paletteMeanResponseMae8Bit": 28.500066834191482,
+        "paletteMeanLuminanceMae8Bit": 30.91177086532116,
+        "paletteMeanSaturationMae8Bit": 14.645723973226268,
+        "paletteWorstResponseMae8Bit": 49.973204930623375,
+        "paletteWorstLuminanceMae8Bit": 48.8150691986084,
+        "paletteWorstSaturationMae8Bit": 28.540253341197968,
+        "solidTransmissionFaceMae8Bit": 2.2118520736694336,
+        "solidEmissionFaceMae8Bit": 0.06592072546482086,
+        "blackFaceMae8Bit": 0.06592072546482086,
+        "whiteFaceMae8Bit": 2.174983501434326
+      },
+      "objectiveSymbols": [
+        "B",
+        "C",
+        "G",
+        "N",
+        "O",
+        "P",
+        "R",
+        "Y"
+      ],
+      "holdout": null,
+      "candidateDir": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/dark-transmission-fit/vibrancy/candidates/vibrancy-0p3"
+    }
+  ]
+}

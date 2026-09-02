@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "scene": "toolbar_solid_palette",
+  "shapeKind": "capsule",
+  "frostPolicy": "frost-free-solid-probes",
+  "color": {
+    "R": {
+      "sourceRGB8Bit": [
+        239.0,
+        68.0,
+        68.0
+      ],
+      "referenceResponseRGB8Bit": [
+        15.999999046325684,
+        56.575801849365234,
+        56.573150634765625
+      ],
+      "candidateResponseRGB8Bit": [
+        14.77410888671875,
+        56.4818115234375,
+        57.333587646484375
+      ],
+      "referenceTransmissionRGB8Bit": [
+        153.2490997314453,
+        22.824941635131836,
+        22.8222599029541
+      ],
+      "candidateTransmissionRGB8Bit": [
+        151.14747619628906,
+        22.08684730529785,
+        22.706951141357422
+      ],
+      "transmissionMae8Bit": 0.9850135445594788,
+      "meanAbsoluteError8Bit": 0.768650233745575,
+      "referenceLuminanceDelta8Bit": 48.0769157409668,
+      "candidateLuminanceDelta8Bit": 47.81772994995117,
+      "referenceSaturationDelta": -0.15974688529968262,
+      "candidateSaturationDelta": -0.16382759809494019
+    },
+    "O": {
+      "sourceRGB8Bit": [
+        249.0,
+        115.0,
+        22.0
+      ],
+      "referenceResponseRGB8Bit": [
+        5.999999523162842,
+        46.56553649902344,
+        30.78456687927246
+      ],
+      "candidateResponseRGB8Bit": [
+        4.706275463104248,
+        61.99945831298828,
+        15.939918518066406
+      ],
+      "referenceTransmissionRGB8Bit": [
+        153.2490997314453,
+        59.814674377441406,
+        -48.96632766723633
+      ],
+      "candidateTransmissionRGB8Bit": [
+        151.0796356201172,
+        74.6044921875,
+        -64.68672943115234
+      ],
+      "transmissionMae8Bit": 10.893228530883789,
+      "meanAbsoluteError8Bit": 10.521486282348633,
+      "referenceLuminanceDelta8Bit": 36.862274169921875,
+      "candidateLuminanceDelta8Bit": 46.58277130126953,
+      "referenceSaturationDelta": -0.09752529859542847,
+      "candidateSaturationDelta": -0.04371213912963867
+    },
+    "Y": {
+      "sourceRGB8Bit": [
+        234.0,
+        179.0,
+        8.0
+      ],
+      "referenceResponseRGB8Bit": [
+        20.999998092651367,
+        33.514793395996094,
+        5.727415561676025
+      ],
+      "candidateResponseRGB8Bit": [
+        19.622207641601562,
+        52.95528030395508,
+        29.928691864013672
+      ],
+      "referenceTransmissionRGB8Bit": [
+        153.2490997314453,
+        110.76393127441406,
+        -88.02347564697266
+      ],
+      "candidateTransmissionRGB8Bit": [
+        150.99557495117188,
+        129.560302734375,
+        -64.69795227050781
+      ],
+      "transmissionMae8Bit": 14.791812896728516,
+      "meanAbsoluteError8Bit": 15.001874923706055,
+      "referenceLuminanceDelta8Bit": 28.77262306213379,
+      "candidateLuminanceDelta8Bit": 44.23617172241211,
+      "referenceSaturationDelta": 0.059797704219818115,
+      "candidateSaturationDelta": -0.04001009464263916
+    },
+    "G": {
+      "sourceRGB8Bit": [
+        34.0,
+        197.0,
+        94.0
+      ],
+      "referenceResponseRGB8Bit": [
+        22.753616333007812,
+        49.73310089111328,
+        32.573524475097656
+      ],
+      "candidateResponseRGB8Bit": [
+        -0.9517767429351807,
+        56.66556930541992,
+        39.616607666015625
+      ],
+      "referenceTransmissionRGB8Bit": [
+        -44.997276306152344,
+        144.98223876953125,
+        24.8226318359375
+      ],
+      "candidateTransmissionRGB8Bit": [
+        -69.57841491699219,
+        151.27061462402344,
+        30.989967346191406
+      ],
+      "transmissionMae8Bit": 12.345616340637207,
+      "meanAbsoluteError8Bit": 12.381487846374512,
+      "referenceLuminanceDelta8Bit": 43.14198684692383,
+      "candidateLuminanceDelta8Bit": 43.25177001953125,
+      "referenceSaturationDelta": 0.10731852054595947,
+      "candidateSaturationDelta": 0.2265017032623291
+    },
+    "C": {
+      "sourceRGB8Bit": [
+        6.0,
+        182.0,
+        212.0
+      ],
+      "referenceResponseRGB8Bit": [
+        22.826574325561523,
+        52.4244499206543,
+        42.999996185302734
+      ],
+      "candidateResponseRGB8Bit": [
+        29.960533142089844,
+        61.68933868408203,
+        41.664005279541016
+      ],
+      "referenceTransmissionRGB8Bit": [
+        -72.92431640625,
+        132.673583984375,
+        153.2490997314453
+      ],
+      "candidateTransmissionRGB8Bit": [
+        -66.66610717773438,
+        141.2943878173828,
+        151.03736877441406
+      ],
+      "transmissionMae8Bit": 5.696915149688721,
+      "meanAbsoluteError8Bit": 5.88162899017334,
+      "referenceLuminanceDelta8Bit": 45.43303680419922,
+      "candidateLuminanceDelta8Bit": 53.534751892089844,
+      "referenceSaturationDelta": 0.07889693975448608,
+      "candidateSaturationDelta": 0.046358346939086914
+    },
+    "B": {
+      "sourceRGB8Bit": [
+        59.0,
+        130.0,
+        246.0
+      ],
+      "referenceResponseRGB8Bit": [
+        44.571475982666016,
+        57.09436798095703,
+        8.999999046325684
+      ],
+      "candidateResponseRGB8Bit": [
+        53.14636993408203,
+        59.98145294189453,
+        7.721626281738281
+      ],
+      "referenceTransmissionRGB8Bit": [
+        1.820581078529358,
+        85.34351348876953,
+        153.2490997314453
+      ],
+      "candidateTransmissionRGB8Bit": [
+        9.51972770690918,
+        87.58649444580078,
+        151.09498596191406
+      ],
+      "transmissionMae8Bit": 4.032083034515381,
+      "meanAbsoluteError8Bit": 4.1637983322143555,
+      "referenceLuminanceDelta8Bit": 51.157527923583984,
+      "candidateLuminanceDelta8Bit": 54.771751403808594,
+      "referenceSaturationDelta": -0.14011794328689575,
+      "candidateSaturationDelta": -0.17854797840118408
+    },
+    "P": {
+      "sourceRGB8Bit": [
+        168.0,
+        85.0,
+        247.0
+      ],
+      "referenceResponseRGB8Bit": [
+        68.73091125488281,
+        54.554046630859375,
+        7.999999523162842
+      ],
+      "candidateResponseRGB8Bit": [
+        58.16179275512695,
+        55.65157699584961,
+        6.732706546783447
+      ],
+      "referenceTransmissionRGB8Bit": [
+        134.9800262451172,
+        37.803184509277344,
+        153.2490997314453
+      ],
+      "candidateTransmissionRGB8Bit": [
+        123.53515625,
+        38.256614685058594,
+        151.10606384277344
+      ],
+      "transmissionMae8Bit": 4.680444240570068,
+      "meanAbsoluteError8Bit": 4.410313129425049,
+      "referenceLuminanceDelta8Bit": 54.2449836730957,
+      "candidateLuminanceDelta8Bit": 52.50969314575195,
+      "referenceSaturationDelta": -0.1823475956916809,
+      "candidateSaturationDelta": -0.19070494174957275
+    },
+    "N": {
+      "sourceRGB8Bit": [
+        115.0,
+        115.0,
+        115.0
+      ],
+      "referenceResponseRGB8Bit": [
+        59.5885009765625,
+        59.572662353515625,
+        59.57950210571289
+      ],
+      "candidateResponseRGB8Bit": [
+        41.48759460449219,
+        40.4536247253418,
+        41.48759460449219
+      ],
+      "referenceTransmissionRGB8Bit": [
+        72.83760833740234,
+        72.8218002319336,
+        72.82861328125
+      ],
+      "candidateTransmissionRGB8Bit": [
+        53.86095428466797,
+        53.058658599853516,
+        53.86095428466797
+      ],
+      "transmissionMae8Bit": 19.235816955566406,
+      "meanAbsoluteError8Bit": 18.349164962768555,
+      "referenceLuminanceDelta8Bit": 59.409297943115234,
+      "candidateLuminanceDelta8Bit": 40.7262077331543,
+      "referenceSaturationDelta": 6.086275607231073e-05,
+      "candidateSaturationDelta": 0.0034663386177271605
+    },
+    "L": {
+      "sourceRGB8Bit": [
+        51.0,
+        51.0,
+        51.0
+      ],
+      "referenceResponseRGB8Bit": [
+        83.8683090209961,
+        83.86622619628906,
+        83.8673095703125
+      ],
+      "candidateResponseRGB8Bit": [
+        70.35575103759766,
+        69.51929473876953,
+        70.35575103759766
+      ],
+      "referenceTransmissionRGB8Bit": [
+        33.11741256713867,
+        33.115360260009766,
+        33.11640930175781
+      ],
+      "candidateTransmissionRGB8Bit": [
+        18.729103088378906,
+        18.12432861328125,
+        18.729103088378906
+      ],
+      "transmissionMae8Bit": 14.588881492614746,
+      "meanAbsoluteError8Bit": 13.353381156921387,
+      "referenceLuminanceDelta8Bit": 83.62135314941406,
+      "candidateLuminanceDelta8Bit": 69.92851257324219,
+      "referenceSaturationDelta": 8.033170161070302e-06,
+      "candidateSaturationDelta": 0.003491410054266453
+    },
+    "M": {
+      "sourceRGB8Bit": [
+        153.0,
+        153.0,
+        153.0
+      ],
+      "referenceResponseRGB8Bit": [
+        44.04576110839844,
+        44.03720474243164,
+        44.040714263916016
+      ],
+      "candidateResponseRGB8Bit": [
+        27.3421630859375,
+        27.03705406188965,
+        27.3421630859375
+      ],
+      "referenceTransmissionRGB8Bit": [
+        95.29487609863281,
+        95.28634643554688,
+        95.28982543945312
+      ],
+      "candidateTransmissionRGB8Bit": [
+        77.71553039550781,
+        77.64208984375,
+        77.71553039550781
+      ],
+      "transmissionMae8Bit": 17.599300384521484,
+      "meanAbsoluteError8Bit": 17.080669403076172,
+      "referenceLuminanceDelta8Bit": 44.241268157958984,
+      "candidateLuminanceDelta8Bit": 27.049510955810547,
+      "referenceSaturationDelta": 4.9401445721741766e-05,
+      "candidateSaturationDelta": 0.0011731241829693317
+    },
+    "H": {
+      "sourceRGB8Bit": [
+        221.0,
+        221.0,
+        221.0
+      ],
+      "referenceResponseRGB8Bit": [
+        13.860637664794922,
+        13.853311538696289,
+        13.855941772460938
+      ],
+      "candidateResponseRGB8Bit": [
+        6.840195178985596,
+        5.655221462249756,
+        6.840195178985596
+      ],
+      "referenceTransmissionRGB8Bit": [
+        133.1097412109375,
+        133.10244750976562,
+        133.10504150390625
+      ],
+      "candidateTransmissionRGB8Bit": [
+        125.21355438232422,
+        124.26025390625,
+        125.21355438232422
+      ],
+      "transmissionMae8Bit": 8.20995807647705,
+      "meanAbsoluteError8Bit": 7.772589206695557,
+      "referenceLuminanceDelta8Bit": 14.294777870178223,
+      "candidateLuminanceDelta8Bit": 6.189939975738525,
+      "referenceSaturationDelta": 4.433593130670488e-05,
+      "candidateSaturationDelta": 0.0034382224548608065
+    },
+    "K": {
+      "sourceRGB8Bit": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "referenceResponseRGB8Bit": [
+        101.75089263916016,
+        101.75086212158203,
+        101.75089263916016
+      ],
+      "candidateResponseRGB8Bit": [
+        102.62664031982422,
+        102.39496612548828,
+        102.62664031982422
+      ],
+      "referenceTransmissionRGB8Bit": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidateTransmissionRGB8Bit": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transmissionMae8Bit": 0.0,
+      "meanAbsoluteError8Bit": 0.909752607345581,
+      "referenceLuminanceDelta8Bit": 101.8980712890625,
+      "candidateLuminanceDelta8Bit": 102.6127700805664,
+      "referenceSaturationDelta": 1.0233337377485441e-07,
+      "candidateSaturationDelta": 0.0009138370514847338
+    },
+    "W": {
+      "sourceRGB8Bit": [
+        255.0,
+        255.0,
+        255.0
+      ],
+      "referenceResponseRGB8Bit": [
+        -2.936695098876953,
+        -2.944887638092041,
+        -2.9443860054016113
+      ],
+      "candidateResponseRGB8Bit": [
+        -2.6091527938842773,
+        -2.8820085525512695,
+        -2.6091527938842773
+      ],
+      "referenceTransmissionRGB8Bit": [
+        150.31240844726562,
+        150.3042449951172,
+        150.30471801757812
+      ],
+      "candidateTransmissionRGB8Bit": [
+        149.7642059326172,
+        149.72303771972656,
+        149.7642059326172
+      ],
+      "transmissionMae8Bit": 0.5566447973251343,
+      "meanAbsoluteError8Bit": 1.2207832336425781,
+      "referenceLuminanceDelta8Bit": -2.6706509590148926,
+      "candidateLuminanceDelta8Bit": -2.289294481277466,
+      "referenceSaturationDelta": 3.351418490638025e-05,
+      "candidateSaturationDelta": 0.0009302871185354888
+    }
+  },
+  "objective": {
+    "paletteMeanFaceMae8Bit": 9.082616336643696,
+    "paletteWorstFaceMae8Bit": 19.235816955566406,
+    "paletteMeanLuminanceMae8Bit": 7.210916757583618,
+    "paletteMeanSaturationMae8Bit": 11.462769680090332,
+    "luminanceMeanFaceMae8Bit": 12.735546588897705
+  },
+  "guards": {
+    "blackFaceMae8Bit": 0.909752607345581,
+    "whiteFaceMae8Bit": 1.2207832336425781,
+    "luminanceMeanFaceMae8Bit": 12.735546588897705
+  }
+}
