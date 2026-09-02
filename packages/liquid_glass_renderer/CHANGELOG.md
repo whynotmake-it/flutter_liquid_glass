@@ -1,3 +1,74 @@
+## 0.3.0-dev.1
+
+This experimental prerelease contains breaking API and rendering changes.
+
+### Breaking changes
+
+- Rebuild the full renderer on Flutter GPU. Full refraction now requires both
+  Impeller and Flutter GPU. Unsupported paths use `FakeGlass` automatically.
+- Replace the old settings model. `glassColor` becomes per-shape `tint`,
+  `blur` becomes `frost`, `lightIntensity` becomes `highlight`, and
+  `refractiveIndex` becomes the observable `edgeRefraction` displacement.
+  Remove `lightAngle` and `ambientStrength`.
+- Remove the experimental `Glassify` API. Supported shapes are
+  `LiquidRoundedSuperellipse`, `LiquidRoundedRectangle`, and `LiquidOval`.
+- Move per-shape color and materialization into `LiquidGlassAppearance`.
+- Remove visibility from `LiquidGlassSettings`. Use
+  `LiquidGlassAppearance.visibility` for one shape or
+  `LiquidGlassVisibility` for a descendant subtree.
+
+### Added
+
+- Add fitted regular-material and toolbar appearances for light, dark, and
+  brightness-aware construction.
+- Add a sealed `LiquidGlassColorModel` API. The iOS 27 model derives a
+  backdrop-luminance-conditioned tonal tint from one color and its opacity;
+  the direct model retains unrestricted manual gamma, saturation, vibrancy,
+  and tint control.
+- Add per-shape tint, saturation, transmission gamma, vibrancy, and visibility.
+  Blended shapes interpolate adjacent appearances without another backdrop
+  capture. Uniform layers retain the smaller shader path.
+- Add paired highlights, SDF contours, directional bevel shading, explicit
+  refraction reach, and size-aware shadow controls.
+- Add `backdropKey` and `useBackdropGroup` to supported real and fake paths.
+- Add per-shape shadows below blended glass with a material cutout.
+
+### Changed
+
+- Consolidate `FakeGlass` at layer level so its foreground order matches full
+  glass. It preserves frost, tint, color response, lighting, contours, bevel
+  shading, visibility, and exterior shadows, but does not refract.
+- Fit light and dark transmission against provenance-checked iOS 27 references.
+  The dark preset no longer overdrives blue, green, and cyan backgrounds.
+- Use one measured chroma-aware transfer in full glass. `FakeGlass` keeps an
+  affine approximation to preserve its portable filter contract.
+
+### Performance
+
+- Cache geometry mattes, coordinate mappings, native image filters, and static
+  transforms. Clip fragment work to material bounds.
+- Compose FakeGlass blur and color work into one backdrop filter and skip
+  inactive work.
+- In one matched Pixel 10 toolbar workload, FakeGlass reduced raster p95 by
+  20.8%, total-frame p95 by 17.0%, and PSS by 3.9%. Results depend on blur area,
+  overlap, animation, and device hardware.
+- Reject the experimental mixed clear/blur architecture. At 16 shapes it more
+  than doubled Pixel 10 total-frame p95 and increased settled memory.
+
+### Fixed
+
+- Preserve shadow blur tails without expanding the refraction pass.
+- Restore glow behavior and consistent real/fake foreground ordering.
+- Invalidate shader caches when included shader sources change.
+- Make device benchmark output complete and reliably parseable.
+
+### Validation
+
+- Add real/fake constructor-permutation tests, renderer lifecycle tests,
+  platform goldens, provenance checks, Apple comparison captures, bounded SPSA
+  fitting, and compact device benchmarks.
+- Generate README images from executable renderer tests.
+
 ## 0.2.0-dev.4
 
 > Note: This release has breaking changes.
@@ -27,6 +98,7 @@
  - **FEAT**: cache geometry images as well to make sure we only run the geometry shader when absolutely necessary.
  - **DOCS**: mention Impeller requirement earlier in README.
  - **DOCS**: update README with newest changes and performance tips.
+ - **BREAKING** **REFACTOR**: remove the unsupported experimental widget API.
  - **BREAKING** **REFACTOR**: renamed many constructors and default `LiquidGlass` to not creating its own layer.
 
     Please read the README to understand how to use this package.
@@ -86,13 +158,6 @@
     are static on screen. Moving glass elements will still induce the same
     performance cost as before.
 
-
-## 0.1.1-dev.21
-
-> Note: This release has breaking changes.
-
- - **BREAKING** **FIX**: drop support for blur in `Glassify` for significant performance gains (#90).
-
 ## 0.1.1-dev.20
 
  - **FIX**: `resistance` parameter didn't actually get used.
@@ -106,7 +171,6 @@
  - **FEAT**: allow customizing `resistance` in `LiquidStretch`.
  - **FEAT**: expose `RawLiquidStretch` for custom pixel-based stretching.
  - **FEAT**: expose `Offset.withResistance` extension method.
- - **BREAKING** **REFACTOR**: move `Glassify` to an `experimental.dart` import.
  - **BREAKING** **FEAT**: `LiquidStretch` now bases its stretch on the child's size.
 
 ## 0.1.1-dev.18
@@ -176,7 +240,6 @@
 
 ## 0.1.1-dev.8
 
- - **FEAT**: added experimental `Glassify` widget that turns any child shape into liquid glass.
  - **FIX**: glass now also renders when blend is set to 0.
  - **FIX**: sharper glass edges whithout background shining through.
  - **FEAT**: added refractive index to settings and show values in example.
