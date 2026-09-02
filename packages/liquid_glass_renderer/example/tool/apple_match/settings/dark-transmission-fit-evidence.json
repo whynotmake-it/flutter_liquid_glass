@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "reference": "ios27-iphone17pro-ground-truth-v2/slider-000/material_color_card_dark",
+  "capturePlatform": "macos-host-golden-metal",
+  "captureEncoding": "SDR tone-mapped 8-bit PNG",
+  "objectiveHues": ["R", "O", "Y", "G", "C", "B", "P", "N"],
+  "fixed": {
+    "frost": 5.0,
+    "tintRed": 57.142857,
+    "tintGreen": 57.142857,
+    "tintBlue": 57.142857,
+    "tintAlpha": 0.56,
+    "vibrancy": 0.1
+  },
+  "previous": {
+    "saturation": 3.5,
+    "transmissionGamma": 0.45,
+    "guardedObjective": 11.351669,
+    "blueSignedLuminanceError8Bit": 12.118143,
+    "greenSignedLuminanceError8Bit": 22.874954,
+    "cyanSignedLuminanceError8Bit": 34.145855
+  },
+  "winner": {
+    "saturation": 2.3,
+    "transmissionGamma": 0.58,
+    "guardedObjective": 6.282453,
+    "blueSignedLuminanceError8Bit": -0.202,
+    "greenSignedLuminanceError8Bit": 5.919,
+    "cyanSignedLuminanceError8Bit": 10.001
+  },
+  "relativeObjectiveImprovement": 0.4466,
+  "limitation": "Apple mixes clear and frosted backdrops; one saturation/gamma curve cannot exactly match every hue in the single-pass renderer."
+}

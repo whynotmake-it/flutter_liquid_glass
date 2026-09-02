@@ -1,0 +1,73 @@
+{
+  "shape": [
+    {"shapeWidth": 222.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 92.0, "shapeOffsetY": 0.0, "cornerRadius": 46.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": -1.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 1.0, "cornerRadius": 48.0, "shapeProfile": "roundedRectangle"},
+    {"shapeWidth": 222.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 226.0, "shapeHeight": 94.0, "shapeOffsetY": 0.0, "cornerRadius": 47.0, "shapeProfile": "superellipse"},
+    {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 0.0, "cornerRadius": 48.0, "shapeProfile": "superellipse"}
+  ],
+  "refraction": [
+    {"thickness": 4.0, "edgeRefraction": 10.25, "chromaticAberration": 0.0},
+    {"thickness": 6.0, "edgeRefraction": 19.6, "chromaticAberration": 0.0},
+    {"thickness": 8.0, "edgeRefraction": 29.3, "chromaticAberration": 0.0},
+    {"thickness": 10.0, "edgeRefraction": 36.6, "chromaticAberration": 0.0},
+    {"thickness": 12.0, "edgeRefraction": 54.5, "chromaticAberration": 0.0},
+    {"thickness": 16.0, "edgeRefraction": 72.7, "chromaticAberration": 0.01},
+    {"thickness": 20.0, "edgeRefraction": 106.1, "chromaticAberration": 0.01},
+    {"thickness": 24.0, "edgeRefraction": 127.3, "chromaticAberration": 0.01}
+  ],
+  "blurMtf": [
+    {"frost": 1.0},
+    {"frost": 2.0},
+    {"frost": 3.0},
+    {"frost": 4.0},
+    {"frost": 5.0},
+    {"frost": 6.0},
+    {"frost": 8.0},
+    {"frost": 10.0}
+  ],
+  "tintColor": [
+    {"tintAlpha": 0.54, "saturation": 1.0, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.60, "saturation": 1.6, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.62, "saturation": 1.8, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.64, "saturation": 2.0, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"tintAlpha": 0.60, "saturation": 1.8, "tintRed": 255, "tintGreen": 250, "tintBlue": 250},
+    {"tintAlpha": 0.60, "saturation": 1.8, "tintRed": 250, "tintGreen": 255, "tintBlue": 252},
+    {"tintAlpha": 0.60, "saturation": 1.8, "tintRed": 250, "tintGreen": 250, "tintBlue": 255}
+  ],
+  "highlight": [
+    {"highlight": 0.0},
+    {"highlight": 0.10},
+    {"highlight": 0.20},
+    {"highlight": 0.30},
+    {"highlight": 0.40},
+    {"highlight": 0.50},
+    {"highlight": 0.60},
+    {"highlight": 0.80}
+  ],
+  "refinement": [
+    {"thickness": 4.0, "edgeRefraction": 10.25, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 4.0, "edgeRefraction": 10.25, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 12.0, "edgeRefraction": 54.5, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 12.0, "edgeRefraction": 54.5, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 9.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255}
+  ]
+}

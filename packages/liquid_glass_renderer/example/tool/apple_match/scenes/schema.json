@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquid-glass-renderer.dev/apple-match/scene.schema.json",
+  "title": "Apple liquid glass match scene",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "profile",
+    "canvas",
+    "shape",
+    "appearance",
+    "transparency",
+    "probes"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+    "profile": {
+      "enum": [
+        "toolbar_capsule",
+        "small_capsule",
+        "large_capsule",
+        "material_shape",
+        "tab_bar_holdout",
+        "loupe"
+      ]
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logicalWidth", "logicalHeight", "scale"],
+      "properties": {
+        "logicalWidth": {"type": "integer", "minimum": 100},
+        "logicalHeight": {"type": "integer", "minimum": 100},
+        "scale": {"type": "integer", "enum": [2, 3]}
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "width",
+        "height",
+        "cornerRadius",
+        "appleContentInsetX",
+        "appleContentInsetY"
+      ],
+      "properties": {
+        "kind": {
+          "enum": ["capsule", "circle", "roundedSuperellipse"]
+        },
+        "x": {"type": "number", "minimum": 0},
+        "y": {"type": "number", "minimum": 0},
+        "width": {"type": "number", "exclusiveMinimum": 0},
+        "height": {"type": "number", "exclusiveMinimum": 0},
+        "cornerRadius": {"type": "number", "minimum": 0},
+        "appleContentInsetX": {"type": "number", "minimum": 0},
+        "appleContentInsetY": {"type": "number", "minimum": 0}
+      }
+    },
+    "appearance": {"enum": ["light", "dark"]},
+    "transparency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reduceTransparency", "appleSliderMapped"],
+      "properties": {
+        "reduceTransparency": {"const": false},
+        "appleSliderMapped": {"const": false}
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "refraction": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "palette": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "uniqueItems": true
+        },
+        "luminance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "uniqueItems": true
+        },
+        "black": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "white": {"type": "string", "pattern": "^[A-Z0-9]$"}
+      }
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "background"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z0-9]$"},
+          "background": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": {"enum": ["rgbwGrid", "tileGrid", "solid", "linearGradient"]},
+              "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "startColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "endColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "axis": {"enum": ["horizontal", "vertical", "diagonal"]},
+              "cellSize": {"type": "integer", "minimum": 4},
+              "gutter": {"type": "integer", "minimum": 0},
+              "sampleInset": {"type": "integer", "minimum": 0},
+              "gutterColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "layout": {"enum": ["primary", "holdout"]},
+              "colors": {
+                "type": "array",
+                "prefixItems": [
+                  {"const": "#FF0000"},
+                  {"const": "#00FF00"},
+                  {"const": "#0000FF"},
+                  {"const": "#FFFFFF"}
+                ],
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "markerColumn": {"type": "integer", "minimum": 0},
+              "markerRow": {"type": "integer", "minimum": 0},
+              "marker": {
+                "type": "array",
+                "minItems": 2,
+                "items": {"type": "string", "pattern": "^[RGBW]+$"}
+              },
+              "palette": {
+                "type": "object",
+                "minProperties": 2,
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "propertyNames": {"pattern": "^[A-Z0-9]$"}
+              },
+              "pattern": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "string",
+                  "minLength": 2,
+                  "pattern": "^[A-Z0-9]+$"
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {"properties": {"kind": {"const": "solid"}}},
+                "then": {"required": ["color"]}
+              },
+              {
+                "if": {"properties": {"kind": {"const": "rgbwGrid"}}},
+                "then": {
+                  "required": [
+                    "cellSize",
+                    "gutter",
+                    "gutterColor",
+                    "layout",
+                    "colors",
+                    "markerColumn",
+                    "markerRow",
+                    "marker"
+                  ]
+                }
+              },
+              {
+                "if": {"properties": {"kind": {"const": "tileGrid"}}},
+                "then": {
+                  "required": [
+                    "cellSize",
+                    "gutter",
+                    "gutterColor",
+                    "palette",
+                    "pattern"
+                  ]
+                }
+              },
+              {
+                "if": {"properties": {"kind": {"const": "linearGradient"}}},
+                "then": {
+                  "required": ["startColor", "endColor", "axis"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
