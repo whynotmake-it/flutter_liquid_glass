@@ -1,6 +1,15 @@
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 include: ../analysis_options.yaml
 
 # No Public Member API Docs
 linter:
   rules:
-    - public_member_api_docs: false
+    public_member_api_docs: false
