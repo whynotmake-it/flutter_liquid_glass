@@ -1,218 +1,1215 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
-// TODO import from experimental once that is done
+const _defaultScenarioName = String.fromEnvironment(
+  'LIQUID_GLASS_BENCHMARK_SCENARIO',
+  defaultValue: 'staticSingle',
+);
+const _defaultWarmupSeconds = int.fromEnvironment(
+  'LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS',
+  defaultValue: 3,
+);
+const _defaultMeasureSeconds = int.fromEnvironment(
+  'LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS',
+  defaultValue: 8,
+);
+const _defaultRepetition = int.fromEnvironment(
+  'LIQUID_GLASS_BENCHMARK_REPETITION',
+  defaultValue: 1,
+);
+final _benchmarkBackdropScale =
+    double.tryParse(
+      const String.fromEnvironment(
+        'LIQUID_GLASS_BENCHMARK_BACKDROP_SCALE',
+        defaultValue: '1',
+      ),
+    ) ??
+    1;
+final _groupShadowAlpha =
+    double.tryParse(
+      const String.fromEnvironment(
+        'LIQUID_GLASS_BENCHMARK_GROUP_SHADOW_ALPHA',
+        defaultValue: '0',
+      ),
+    ) ??
+    0;
+const _native = MethodChannel('dev.liquid_glass_renderer/benchmark');
 
-void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final nativeConfiguration = await _readNativeConfiguration();
+  final scenario = BenchmarkScenario.values.byName(
+    nativeConfiguration['scenario'] as String? ?? _defaultScenarioName,
+  );
+  final warmupSeconds =
+      nativeConfiguration['warmupSeconds'] as int? ?? _defaultWarmupSeconds;
+  final measureSeconds =
+      nativeConfiguration['measureSeconds'] as int? ?? _defaultMeasureSeconds;
+  final traceMeasureMilliseconds =
+      nativeConfiguration['traceMeasureMilliseconds'] as int? ?? 500;
+  final repetition =
+      nativeConfiguration['repetition'] as int? ?? _defaultRepetition;
+  final isTraceRun = nativeConfiguration['traceRun'] as bool? ?? false;
+  final traceStartGate = nativeConfiguration['traceStartGate'] as String?;
+  final timings = <FrameTiming>[];
+  void collectTimings(List<FrameTiming> values) => timings.addAll(values);
 
-  group('Performance Tests', () {
-    const duration = Duration(seconds: 5);
+  runApp(
+    _BenchmarkApp(
+      scenario: scenario,
+      traceStartGate: isTraceRun ? traceStartGate : null,
+    ),
+  );
+  await SchedulerBinding.instance.endOfFrame;
+  await Future<void>.delayed(Duration(seconds: warmupSeconds));
 
-    testWidgets('measures performance of liquid glass rendering', (
-      tester,
-    ) async {
-      await binding.traceAction(() async {
-        await tester.pumpFrames(
-          const _SingleTestApp(withGlass: false),
-          duration,
-        );
-      }, reportKey: 'basic_test_baseline');
+  if (isTraceRun) {
+    if (traceStartGate != null && traceStartGate.isNotEmpty) {
+      debugPrint('LIQUID_GLASS_BENCHMARK_TRACE_READY:${scenario.name}');
+      while (!File(traceStartGate).existsSync()) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+    // Xcode 26 can retain less than a second from a bounded rolling Metal
+    // trace. Emit adjacent half-second windows so every retained timeline has
+    // a sufficiently large exact workload intersection. Each window also
+    // reports its rendered frame count: ProMotion varies the refresh rate
+    // under tracing, so GPU cost is only comparable across runs when
+    // normalized per frame.
+    var windowFrameCount = 0;
+    void countWindowFrames(List<FrameTiming> values) =>
+        windowFrameCount += values.length;
 
-      await binding.traceAction(() async {
-        await tester.pumpFrames(
-          const _SingleTestApp(withGlass: true),
-          duration,
-        );
-      }, reportKey: 'basic_test_with_glass');
-    });
+    SchedulerBinding.instance.addTimingsCallback(countWindowFrames);
+    while (true) {
+      await _startGpuTiming();
+      await _invokeNativeVoid('beginInterval', scenario.name);
+      windowFrameCount = 0;
+      stdout.writeln(
+        'LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}:'
+        '${DateTime.now().microsecondsSinceEpoch}',
+      );
+      await Future<void>.delayed(
+        Duration(milliseconds: traceMeasureMilliseconds),
+      );
+      await SchedulerBinding.instance.endOfFrame;
+      await _invokeNativeVoid('endInterval', scenario.name);
+      final windowGpu = await _stopGpuTiming();
+      // The optional trailing field carries the in-process GPU busy time in
+      // microseconds; the window regex in the parser tolerates its absence.
+      final gpuBusyMillis = windowGpu['busyMilliseconds'];
+      final gpuSuffix = windowGpu['available'] == true && gpuBusyMillis is num
+          ? ':${(gpuBusyMillis * 1000).round()}'
+          : '';
+      stdout.writeln(
+        'LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}:'
+        '${DateTime.now().microsecondsSinceEpoch}:$windowFrameCount$gpuSuffix',
+      );
+      await stdout.flush();
+    }
+  }
 
-    testWidgets('measures performance with multiple liquid glass elements', (
-      tester,
-    ) async {
-      await binding.traceAction(() async {
-        await tester.pumpFrames(
-          const _MultiTestApp(withGlass: false),
-          duration,
-        );
-      }, reportKey: 'multi_test_baseline');
+  final preMeasureStability = await _sampleUntilStable();
+  final preMeasureMemory = _representativeMemory(
+    preMeasureStability.samples,
+  );
+  await _invokeNativeVoid('startMemorySampling');
 
-      await binding.traceAction(() async {
-        await tester.pumpFrames(
-          const _MultiTestApp(withGlass: true, shareLayer: false),
-          duration,
-        );
-      }, reportKey: 'multi_test_with_separate_glass');
+  SchedulerBinding.instance.addTimingsCallback(collectTimings);
+  await _startGpuTiming();
+  await _invokeNativeVoid('beginInterval', scenario.name);
+  debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}');
+  await Future<void>.delayed(Duration(seconds: measureSeconds));
+  await _invokeNativeVoid('endInterval', scenario.name);
+  final commandBufferGpu = await _stopGpuTiming();
+  debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_END:${scenario.name}');
+  SchedulerBinding.instance.removeTimingsCallback(collectTimings);
 
-      await binding.traceAction(() async {
-        await tester.pumpFrames(
-          const _MultiTestApp(withGlass: true, shareLayer: true),
-          duration,
-        );
-      }, reportKey: 'multi_test_with_glass_layer');
-    });
-  });
+  final memory = await _stopMemorySampling();
+  final cooldownStability = await _sampleUntilStable();
+  final cooldownMemory = cooldownStability.samples;
+  final settledMemory = _representativeMemory(cooldownMemory);
+  final report = <String, Object?>{
+    'schemaVersion': 5,
+    'scenario': scenario.name,
+    'repetition': repetition,
+    'warmupSeconds': warmupSeconds,
+    'measureSeconds': measureSeconds,
+    'commandBufferGpu': commandBufferGpu,
+    'frames': timings
+        .map(
+          (timing) => <String, int>{
+            'buildMicros': timing.buildDuration.inMicroseconds,
+            'rasterMicros': timing.rasterDuration.inMicroseconds,
+            'totalMicros': timing.totalSpan.inMicroseconds,
+          },
+        )
+        .toList(),
+    'nativeMemory': memory,
+    'preMeasureNativeMemory': preMeasureMemory,
+    'preMeasureNativeMemorySamples': preMeasureStability.samples,
+    'preMeasureMemoryStable': preMeasureStability.stable,
+    'preMeasureMemorySlopeMbPerSecond':
+        preMeasureStability.slopeMbPerSecond.isFinite
+        ? preMeasureStability.slopeMbPerSecond
+        : null,
+    'settledNativeMemory': settledMemory,
+    'cooldownNativeMemory': cooldownMemory,
+    'cooldownMemoryStable': cooldownStability.stable,
+    'cooldownMemorySlopeMbPerSecond':
+        cooldownStability.slopeMbPerSecond.isFinite
+        ? cooldownStability.slopeMbPerSecond
+        : null,
+  };
+  debugPrint(
+    'LIQUID_GLASS_BENCHMARK_SUMMARY:${jsonEncode(<String, Object?>{
+      'scenario': scenario.name,
+      'repetition': repetition,
+      'frameCount': timings.length,
+      'buildP95Micros': _timingPercentile(
+        timings,
+        .95,
+        (t) => t.buildDuration,
+      ),
+      'rasterP50Micros': _timingPercentile(
+        timings,
+        .5,
+        (t) => t.rasterDuration,
+      ),
+      'rasterP95Micros': _timingPercentile(
+        timings,
+        .95,
+        (t) => t.rasterDuration,
+      ),
+      'rasterP99Micros': _timingPercentile(
+        timings,
+        .99,
+        (t) => t.rasterDuration,
+      ),
+      'totalP95Micros': _timingPercentile(timings, .95, (t) => t.totalSpan),
+    })}',
+  );
+  stdout.writeln('LIQUID_GLASS_BENCHMARK_JSON:${jsonEncode(report)}');
 }
 
-enum RenderMode { filter, layer }
+int? _timingPercentile(
+  List<FrameTiming> timings,
+  double percentile,
+  Duration Function(FrameTiming timing) select,
+) {
+  if (timings.isEmpty) return null;
+  final values =
+      timings
+          .map((timing) => select(timing).inMicroseconds)
+          .toList(growable: false)
+        ..sort();
+  return values[((values.length - 1) * percentile).round()];
+}
 
-/// Grid paper background widget for benchmarks
-class _GridPaperBackground extends StatelessWidget {
-  final Widget child;
+/// Starts the native in-process GPU timing session (Metal command-buffer
+/// completion timestamps). Failures degrade to an unavailable marker so the
+/// benchmark never depends on the channel existing.
+Future<Map<String, Object?>> _startGpuTiming() => _invokeGpuTiming(
+  'startGpuTiming',
+);
 
-  const _GridPaperBackground({required this.child});
+/// Stops the session and returns the native stats map: `busyMilliseconds`
+/// (union of command-buffer GPU intervals), `windowMilliseconds`,
+/// `bufferCount`, and a 100 ms `bucketBusyMilliseconds` series — or
+/// `available: false` with a reason.
+Future<Map<String, Object?>> _stopGpuTiming() => _invokeGpuTiming(
+  'stopGpuTiming',
+);
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFCEC5B4), Color(0xFFF2F0EA)],
-            ),
-          ),
-          child: GridPaper(
-            color: const Color(0xFF0F0B0A).withValues(alpha: 0.2),
-            interval: 100,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        child,
-      ],
-    );
+Future<Map<String, Object?>> _invokeGpuTiming(String method) async {
+  try {
+    final response = await _native.invokeMapMethod<String, Object?>(method);
+    return response ??
+        <String, Object?>{'available': false, 'reason': 'no native response'};
+  } on PlatformException catch (error) {
+    return <String, Object?>{'available': false, 'reason': '$error'};
+  } on MissingPluginException catch (error) {
+    return <String, Object?>{'available': false, 'reason': '$error'};
   }
 }
 
-class _SingleTestApp extends StatelessWidget {
-  const _SingleTestApp({this.withGlass = true});
+Future<Map<String, Object?>> _readNativeConfiguration() async {
+  try {
+    return await _native.invokeMapMethod<String, Object?>('configuration') ??
+        const <String, Object?>{};
+  } on PlatformException {
+    return const <String, Object?>{};
+  } on MissingPluginException {
+    return const <String, Object?>{};
+  }
+}
 
-  final bool withGlass;
+Future<bool> _invokeNativeVoid(String method, [Object? arguments]) async {
+  try {
+    await _native.invokeMethod<void>(method, arguments);
+    return true;
+  } on PlatformException {
+    return false;
+  } on MissingPluginException {
+    return false;
+  }
+}
 
-  @override
-  Widget build(BuildContext context) {
-    final settings = const LiquidGlassSettings(thickness: 40, blur: 20);
-    final content = Container(
-      width: 200,
-      height: 200,
-      child: const Center(
-        child: Text(
-          'Liquid Glass',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
+typedef _MemoryStability = ({
+  List<Map<String, Object?>> samples,
+  bool stable,
+  double slopeMbPerSecond,
+});
+
+Future<_MemoryStability> _sampleUntilStable() async {
+  final samples = <Map<String, Object?>>[];
+  var slope = double.infinity;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (!await _invokeNativeVoid('startMemorySampling')) {
+      return (samples: samples, stable: false, slopeMbPerSecond: slope);
+    }
+    await Future<void>.delayed(const Duration(seconds: 5));
+    samples.addAll(await _stopMemorySampling());
+    slope = _memorySlope(samples);
+    final tail = samples.length <= 20
+        ? samples
+        : samples.sublist(samples.length - 20);
+    final footprints = tail
+        .map((sample) => sample['physicalFootprintBytes'])
+        .whereType<num>()
+        .map((bytes) => bytes / 1048576)
+        .toList();
+    final range = footprints.isEmpty
+        ? double.infinity
+        : footprints.reduce(math.max) - footprints.reduce(math.min);
+    if (slope.abs() <= 2 && range <= 16) {
+      return (samples: samples, stable: true, slopeMbPerSecond: slope);
+    }
+  }
+  return (samples: samples, stable: false, slopeMbPerSecond: slope);
+}
+
+double _memorySlope(List<Map<String, Object?>> samples) {
+  final valid = samples
+      .where(
+        (sample) =>
+            sample['physicalFootprintBytes'] is num &&
+            sample['timestampMicros'] is num,
+      )
+      .toList();
+  if (valid.length < 10) return double.infinity;
+  final tail = valid.length <= 20 ? valid : valid.sublist(valid.length - 20);
+  final window = math.min(5, tail.length ~/ 2);
+  double median(List<double> values) {
+    values.sort();
+    final middle = values.length ~/ 2;
+    return values.length.isOdd
+        ? values[middle]
+        : (values[middle - 1] + values[middle]) / 2;
+  }
+
+  final first = tail.take(window).toList();
+  final last = tail.skip(tail.length - window).toList();
+  final firstMb = median(
+    first
+        .map((sample) => (sample['physicalFootprintBytes']! as num) / 1048576)
+        .toList(),
+  );
+  final lastMb = median(
+    last
+        .map((sample) => (sample['physicalFootprintBytes']! as num) / 1048576)
+        .toList(),
+  );
+  final firstSeconds = median(
+    first
+        .map((sample) => (sample['timestampMicros']! as num) / 1000000)
+        .toList(),
+  );
+  final lastSeconds = median(
+    last
+        .map((sample) => (sample['timestampMicros']! as num) / 1000000)
+        .toList(),
+  );
+  return lastSeconds == firstSeconds
+      ? double.infinity
+      : (lastMb - firstMb) / (lastSeconds - firstSeconds);
+}
+
+Map<String, Object?>? _representativeMemory(
+  List<Map<String, Object?>> samples,
+) {
+  if (samples.isEmpty) return null;
+  final tail = samples.length <= 10
+      ? samples
+      : samples.sublist(samples.length - 10);
+  final result = <String, Object?>{};
+  for (final key in tail.expand((sample) => sample.keys).toSet()) {
+    final values = tail.map((sample) => sample[key]).whereType<num>().toList()
+      ..sort((a, b) => a.compareTo(b));
+    if (values.isEmpty) continue;
+    final middle = values.length ~/ 2;
+    result[key] = values.length.isOdd
+        ? values[middle]
+        : ((values[middle - 1] + values[middle]) / 2).round();
+  }
+  return result;
+}
+
+Future<List<Map<String, Object?>>> _stopMemorySampling() async {
+  try {
+    final values = await _native.invokeListMethod<Object?>(
+      'stopMemorySampling',
     );
-
-    final glass = Center(
-      child: withGlass
-          ? LiquidGlassLayer(
-              settings: settings,
-              child: LiquidGlass(
-                shape: LiquidRoundedSuperellipse(borderRadius: 20),
-                child: Container(
-                  key: const Key('liquid_glass_widget'),
-                  decoration: ShapeDecoration(
-                    shape: LiquidRoundedSuperellipse(borderRadius: 20),
-                  ),
-                  child: content,
-                ),
+    return values
+            ?.whereType<Map<Object?, Object?>>()
+            .map(
+              (value) => value.map(
+                (key, item) => MapEntry(key! as String, item),
               ),
             )
-          : content,
-    );
+            .toList() ??
+        const <Map<String, Object?>>[];
+  } on PlatformException {
+    return const <Map<String, Object?>>[];
+  } on MissingPluginException {
+    return const <Map<String, Object?>>[];
+  }
+}
 
+enum BenchmarkScenario {
+  baselineMotion,
+  staticSingle,
+  coloredSingleStatic,
+  plainStatic,
+  realLightingOnly,
+  realBlurOnly,
+  realHighBlurOnly,
+  realSaturationOnly,
+  realBlurSaturation,
+  realToolbarMaterial,
+  fakeLightingOnly,
+  fakeBlurOnly,
+  fakeHighBlurOnly,
+  fakeSaturationOnly,
+  fakeBlurSaturation,
+  fakeToolbarMaterial,
+  realToFakeTransition,
+  translatedSingle,
+  ancestorTranslatedLayer,
+  scaledRotatedSingle,
+  grouped1Motion,
+  grouped4Motion,
+  coloredGrouped4Motion,
+  grouped4Static,
+  coloredGrouped4Static,
+  fakeGrouped4Motion,
+  fakeUngrouped4Motion,
+  grouped8Motion,
+  grouped16Motion,
+  coloredGrouped16Motion,
+  grouped16Static,
+  coloredGrouped16Static,
+  coloredVisibility16Motion,
+  litGrouped16Motion,
+  independent4Motion,
+  independent8Motion,
+  independent16Motion,
+  litIndependent16Motion,
+  independent16SharedBackdrop,
+  sparse16Motion,
+  relativeBlendMotion,
+  dynamicBlend16,
+  resizeAnimated,
+  layerChurn,
+  largeStatic,
+  largeResize,
+  largeShrinkSettled,
+  fakeStatic,
+  fakeLarge,
+}
+
+class _BenchmarkApp extends StatefulWidget {
+  const _BenchmarkApp({required this.scenario, this.traceStartGate});
+  final BenchmarkScenario scenario;
+  final String? traceStartGate;
+
+  @override
+  State<_BenchmarkApp> createState() => _BenchmarkAppState();
+}
+
+class _BenchmarkAppState extends State<_BenchmarkApp>
+    with TickerProviderStateMixin {
+  late final AnimationController controller;
+  late final AnimationController framePulse;
+  bool traceGateOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    framePulse = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    if (widget.traceStartGate == null || widget.traceStartGate!.isEmpty) {
+      traceGateOpen = true;
+      _startController();
+    } else {
+      unawaited(_waitForTraceGate());
+    }
+  }
+
+  Future<void> _waitForTraceGate() async {
+    final gate = File(widget.traceStartGate!);
+    while (mounted && !gate.existsSync()) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    if (!mounted) return;
+    setState(() => traceGateOpen = true);
+    _startController();
+  }
+
+  void _startController() {
+    if (widget.scenario == BenchmarkScenario.largeShrinkSettled) {
+      controller.forward();
+    } else {
+      controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    framePulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scenario = widget.scenario;
+    // Keep the expensive benchmark scene out of the render loop while
+    // Instruments attaches. The shell supplies this gate only for trace runs;
+    // normal frame/memory measurements and production code are unchanged.
+    final scenarioWidget = !traceGateOpen
+        ? const SizedBox.expand()
+        : _isAnimated(scenario)
+        ? AnimatedBuilder(
+            animation: controller,
+            builder: (_, __) => _buildScenario(controller.value),
+          )
+        : _buildScenario(0);
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: _GridPaperBackground(
-          child: LiquidGlassLayer(settings: settings, child: glass),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const _Background(),
+            scenarioWidget,
+            // Keep static scenarios on real engine vsync without rebuilding
+            // their glass subtree.
+            Positioned(
+              left: 0,
+              top: 0,
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: framePulse,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(framePulse.value, 0),
+                    child: const SizedBox.square(dimension: 1),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-class _MultiTestApp extends StatelessWidget {
-  const _MultiTestApp({this.withGlass = true, this.shareLayer = false});
+  bool _isAnimated(BenchmarkScenario scenario) => switch (scenario) {
+    BenchmarkScenario.staticSingle ||
+    BenchmarkScenario.coloredSingleStatic ||
+    BenchmarkScenario.grouped4Static ||
+    BenchmarkScenario.coloredGrouped4Static ||
+    BenchmarkScenario.grouped16Static ||
+    BenchmarkScenario.coloredGrouped16Static ||
+    BenchmarkScenario.largeStatic ||
+    BenchmarkScenario.plainStatic ||
+    BenchmarkScenario.fakeStatic ||
+    BenchmarkScenario.fakeLarge => false,
+    _ => true,
+  };
 
-  final bool withGlass;
-
-  final bool shareLayer;
-
-  @override
-  Widget build(BuildContext context) {
-    const settings = LiquidGlassSettings(
+  Widget _buildScenario(double t) {
+    final settings = LiquidGlassSettings(
       thickness: 30,
-      blur: 15,
-      lightIntensity: 0.5,
-      ambientStrength: 0.3,
-      chromaticAberration: 0.02,
+      frost: 15,
+      backdropScale: _benchmarkBackdropScale,
+    );
+    const litSettings = LiquidGlassSettings(
+      thickness: 30,
+      frost: 15,
+      contourStrength: .22,
+      contourWidth: 1.5,
+      contourTransmittance: .8,
+      bevelShadowStrength: .025,
+    );
+    final moving = Transform.translate(
+      offset: Offset(-180 + 360 * t, 40 * math.sin(t * math.pi * 2)),
+      child: _tile(0),
     );
 
-    final content = Column(
-      children: List.generate(5, (index) {
-        final listItem = Container(
-          width: 150,
-          height: 100,
-          color: Colors.primaries[index % Colors.primaries.length],
-          child: Center(
-            child: Text(
-              'Item $index',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        );
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: switch ((withGlass, shareLayer)) {
-            (true, true) => LiquidGlass(
-              key: Key('liquid_glass_$index'),
-              shape: LiquidRoundedSuperellipse(borderRadius: 15),
-              child: listItem,
-            ),
-            (true, false) => LiquidGlassLayer(
-              settings: settings,
-              child: LiquidGlass(
-                key: Key('liquid_glass_$index'),
-                shape: LiquidRoundedSuperellipse(borderRadius: 15),
-                child: listItem,
-              ),
-            ),
-
-            (false, _) => listItem,
-          },
-        );
-      }),
-    );
-
-    return switch (shareLayer) {
-      false => MaterialApp(
-        home: Scaffold(
-          body: _GridPaperBackground(child: Center(child: content)),
+    return switch (widget.scenario) {
+      BenchmarkScenario.baselineMotion => Center(child: moving),
+      BenchmarkScenario.staticSingle => Center(
+        child: LiquidGlass.withOwnLayer(
+          settings: settings,
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
         ),
       ),
-
-      true => MaterialApp(
-        home: Scaffold(
-          body: _GridPaperBackground(
-            child: LiquidGlassLayer(
-              settings: settings,
-              child: Center(child: content),
+      BenchmarkScenario.coloredSingleStatic => Center(
+        child: LiquidGlass.withOwnLayer(
+          settings: settings,
+          appearance: const LiquidGlassAppearance(
+            tint: Color(0xAA287DFF),
+            saturation: 1.8,
+            transmissionGamma: .78,
+            vibrancy: .25,
+          ),
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
+        ),
+      ),
+      BenchmarkScenario.plainStatic => Center(child: _tile(0)),
+      BenchmarkScenario.realLightingOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realBlurOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realHighBlurOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 40,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realSaturationOnly => _realLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(saturation: 1.5),
+      ),
+      BenchmarkScenario.realBlurSaturation => _realLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(saturation: 1.5),
+      ),
+      BenchmarkScenario.realToolbarMaterial => _realLayer(
+        const LiquidGlassSettings.ios27ToolbarLight(),
+        t,
+        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+      ),
+      BenchmarkScenario.fakeLightingOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.fakeBlurOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.fakeHighBlurOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 40,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.fakeSaturationOnly => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 0,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(saturation: 1.5),
+      ),
+      BenchmarkScenario.fakeBlurSaturation => _fakeLayer(
+        const LiquidGlassSettings(
+          frost: 15,
+          highlight: 0,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance(saturation: 1.5),
+      ),
+      BenchmarkScenario.fakeToolbarMaterial => _fakeLayer(
+        const LiquidGlassSettings.ios27ToolbarLight(),
+        t,
+        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+      ),
+      BenchmarkScenario.realToFakeTransition => _RealThenFakeScenario(
+        t: t,
+        retirementDelay:
+            widget.traceStartGate == null || widget.traceStartGate!.isEmpty
+            ? const Duration(milliseconds: 1500)
+            : const Duration(seconds: 5),
+      ),
+      BenchmarkScenario.translatedSingle => LiquidGlassLayer(
+        settings: settings,
+        child: Center(
+          child: Transform.translate(
+            offset: Offset(-180 + 360 * t, 0),
+            child: LiquidGlass(
+              shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+              child: _tile(0),
             ),
           ),
         ),
+      ),
+      BenchmarkScenario.ancestorTranslatedLayer => Transform.translate(
+        offset: Offset(-180 + 360 * t, 0),
+        child: LiquidGlassLayer(
+          settings: settings,
+          child: Center(
+            child: LiquidGlass(
+              shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+              child: _tile(0),
+            ),
+          ),
+        ),
+      ),
+      BenchmarkScenario.scaledRotatedSingle => LiquidGlassLayer(
+        settings: settings,
+        child: Center(
+          child: Transform.rotate(
+            angle: t * math.pi * .5,
+            child: Transform.scale(
+              scaleX: .7 + t * .6,
+              scaleY: 1.3 - t * .6,
+              child: LiquidGlass(
+                shape: const LiquidRoundedRectangle(borderRadius: 32),
+                child: _tile(0),
+              ),
+            ),
+          ),
+        ),
+      ),
+      BenchmarkScenario.grouped1Motion => _groupedGrid(
+        settings: settings,
+        count: 1,
+        t: t,
+      ),
+      BenchmarkScenario.grouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+      ),
+      BenchmarkScenario.coloredGrouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+        variedAppearance: true,
+      ),
+      BenchmarkScenario.grouped4Static => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: 0,
+      ),
+      BenchmarkScenario.coloredGrouped4Static => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: 0,
+        variedAppearance: true,
+      ),
+      BenchmarkScenario.fakeGrouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+        fake: true,
+        shareBackdrop: true,
+      ),
+      BenchmarkScenario.fakeUngrouped4Motion => _groupedGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+        blend: 0,
+        fake: true,
+      ),
+      BenchmarkScenario.grouped8Motion => _groupedGrid(
+        settings: settings,
+        count: 8,
+        t: t,
+      ),
+      BenchmarkScenario.grouped16Motion => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: t,
+      ),
+      BenchmarkScenario.coloredGrouped16Motion => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: t,
+        variedAppearance: true,
+      ),
+      BenchmarkScenario.grouped16Static => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: 0,
+      ),
+      BenchmarkScenario.coloredGrouped16Static => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: 0,
+        variedAppearance: true,
+      ),
+      BenchmarkScenario.coloredVisibility16Motion => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: t,
+        variedAppearance: true,
+        animateVisibility: true,
+      ),
+      BenchmarkScenario.litGrouped16Motion => _groupedGrid(
+        settings: litSettings,
+        count: 16,
+        t: t,
+      ),
+      BenchmarkScenario.independent4Motion => _independentGrid(
+        settings: settings,
+        count: 4,
+        t: t,
+      ),
+      BenchmarkScenario.independent8Motion => _independentGrid(
+        settings: settings,
+        count: 8,
+        t: t,
+      ),
+      BenchmarkScenario.independent16Motion => _independentGrid(
+        settings: settings,
+        count: 16,
+        t: t,
+      ),
+      BenchmarkScenario.litIndependent16Motion => _independentGrid(
+        settings: litSettings,
+        count: 16,
+        t: t,
+      ),
+      BenchmarkScenario.independent16SharedBackdrop => BackdropGroup(
+        child: Center(
+          child: Transform.translate(
+            offset: Offset(30 * math.sin(t * math.pi * 2), 0),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: List.generate(
+                16,
+                (index) => LiquidGlass.withOwnLayer(
+                  settings: settings,
+                  useBackdropGroup: true,
+                  shape: LiquidRoundedSuperellipse(
+                    borderRadius: 8.0 + index,
+                  ),
+                  child: _tile(index, size: 72),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      BenchmarkScenario.sparse16Motion => _sparseGroup(
+        settings: settings,
+        t: t,
+      ),
+      BenchmarkScenario.relativeBlendMotion => _relativeBlendGroup(
+        settings: settings,
+        t: t,
+      ),
+      BenchmarkScenario.dynamicBlend16 => _groupedGrid(
+        settings: settings,
+        count: 16,
+        t: t,
+        blend: 2 + 30 * t,
+      ),
+      BenchmarkScenario.resizeAnimated => _resizeLayer(
+        settings: settings,
+        size: 120 + t * 360,
+      ),
+      BenchmarkScenario.layerChurn => Center(
+        child: (t * 20).floor().isEven
+            ? LiquidGlass.withOwnLayer(
+                key: ValueKey((t * 20).floor()),
+                settings: settings,
+                shape: const LiquidOval(),
+                child: _tile(0, size: 260),
+              )
+            : _tile(0, size: 260),
+      ),
+      BenchmarkScenario.largeStatic => _largeLayer(
+        settings: settings,
+        size: 2048,
+      ),
+      BenchmarkScenario.largeResize => _largeLayer(
+        settings: settings,
+        size: 1024 + t * 1024,
+      ),
+      BenchmarkScenario.largeShrinkSettled => _largeLayer(
+        settings: settings,
+        size: 2048 - t * 1792,
+      ),
+      BenchmarkScenario.fakeStatic => LiquidGlassLayer(
+        settings: settings,
+        fake: true,
+        child: Center(
+          child: LiquidGlass(
+            shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+            child: _tile(0),
+          ),
+        ),
+      ),
+      BenchmarkScenario.fakeLarge => _largeLayer(
+        settings: settings,
+        size: 2048,
+        fake: true,
       ),
     };
   }
+
+  Widget _largeLayer({
+    required LiquidGlassSettings settings,
+    required double size,
+    bool fake = false,
+  }) => LiquidGlassLayer(
+    settings: settings,
+    fake: fake,
+    child: Center(
+      child: OverflowBox(
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 96),
+          child: _tile(0, size: size),
+        ),
+      ),
+    ),
+  );
+
+  Widget _realLayer(
+    LiquidGlassSettings settings,
+    double t, {
+    LiquidGlassAppearance? appearance,
+  }) => LiquidGlassLayer(
+    settings: settings,
+    defaultAppearance: appearance,
+    child: Center(
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * t, 0),
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
+        ),
+      ),
+    ),
+  );
+
+  Widget _fakeLayer(
+    LiquidGlassSettings settings,
+    double t, {
+    LiquidGlassAppearance? appearance,
+  }) => LiquidGlassLayer(
+    settings: settings,
+    defaultAppearance: appearance,
+    fake: true,
+    child: Center(
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * t, 0),
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+          child: _tile(0),
+        ),
+      ),
+    ),
+  );
+
+  // Constant per-layer tile size across the count ladder so the scenarios
+  // isolate the cost of each additional independent layer.
+  Widget _independentGrid({
+    required LiquidGlassSettings settings,
+    required int count,
+    required double t,
+  }) => Center(
+    child: Transform.translate(
+      offset: Offset(30 * math.sin(t * math.pi * 2), 0),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        children: List.generate(
+          count,
+          (index) => LiquidGlass.withOwnLayer(
+            settings: settings,
+            shape: LiquidRoundedSuperellipse(
+              borderRadius: 8.0 + index,
+            ),
+            child: _tile(index, size: 72),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _groupedGrid({
+    required LiquidGlassSettings settings,
+    required int count,
+    required double t,
+    double blend = 24,
+    bool fake = false,
+    bool shareBackdrop = false,
+    bool variedAppearance = false,
+    bool animateVisibility = false,
+    LiquidGlassAppearance? defaultAppearance,
+  }) {
+    // Keep total glass area approximately constant across the count ladder.
+    final tileSize = 72 * math.sqrt(16 / count);
+    return LiquidGlassLayer(
+      settings: settings,
+      defaultAppearance: defaultAppearance,
+      fake: fake,
+      useBackdropGroup: shareBackdrop,
+      child: Center(
+        child: Transform.translate(
+          offset: Offset(30 * math.sin(t * math.pi * 2), 0),
+          child: LiquidGlassBlendGroup(
+            blend: blend,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: List.generate(
+                count,
+                (index) => LiquidGlass.grouped(
+                  appearance: variedAppearance
+                      ? LiquidGlassAppearance(
+                          tint: Color.lerp(
+                            const Color(0x99FFFFFF),
+                            const Color(0xAA287DFF),
+                            index / math.max(count - 1, 1),
+                          )!,
+                          saturation: 0.8 + index / count * 1.8,
+                          transmissionGamma: 0.75 + index / count * 0.35,
+                          vibrancy: index / count * 0.25,
+                          visibility: animateVisibility
+                              ? (0.5 + 0.5 * math.sin(t * math.pi * 2 + index))
+                              : 1,
+                        )
+                      : null,
+                  shadows: _groupShadowAlpha > 0
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: _groupShadowAlpha,
+                            ),
+                            offset: const Offset(0, 4),
+                            blurRadius: 8,
+                            spreadRadius: -1,
+                          ),
+                        ]
+                      : const [],
+                  shape: LiquidRoundedSuperellipse(
+                    borderRadius: 8.0 + index,
+                  ),
+                  child: _tile(index, size: tileSize),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sparseGroup({
+    required LiquidGlassSettings settings,
+    required double t,
+  }) => LiquidGlassLayer(
+    settings: settings,
+    child: Center(
+      child: SizedBox(
+        width: 720,
+        height: 480,
+        child: LiquidGlassBlendGroup(
+          blend: 24,
+          child: Stack(
+            children: List.generate(16, (index) {
+              final column = index % 4;
+              final row = index ~/ 4;
+              return Positioned(
+                left: column * 210 + 8 * math.sin(t * math.pi * 2 + index),
+                top: row * 135 + 8 * math.cos(t * math.pi * 2 + index),
+                child: LiquidGlass.grouped(
+                  shape: LiquidRoundedSuperellipse(
+                    borderRadius: 8.0 + index,
+                  ),
+                  child: _tile(index, size: 72),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _relativeBlendGroup({
+    required LiquidGlassSettings settings,
+    required double t,
+  }) => LiquidGlassLayer(
+    settings: settings,
+    child: Center(
+      child: SizedBox(
+        width: 560,
+        height: 300,
+        child: LiquidGlassBlendGroup(
+          blend: 32,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 40 + 260 * t,
+                top: 45,
+                child: LiquidGlass.grouped(
+                  shape: const LiquidRoundedSuperellipse(borderRadius: 36),
+                  child: SizedBox(
+                    width: 100 + 180 * t,
+                    height: 120,
+                    child: _tile(0),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 40 + 180 * t,
+                bottom: 45,
+                child: LiquidGlass.grouped(
+                  shape: const LiquidOval(),
+                  child: _tile(1, size: 140),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _resizeLayer({
+    required LiquidGlassSettings settings,
+    required double size,
+  }) => Center(
+    child: LiquidGlass.withOwnLayer(
+      settings: settings,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+      child: _tile(0, size: size),
+    ),
+  );
+
+  Widget _tile(int index, {double size = 220}) => SizedBox.square(
+    dimension: size,
+    child: ColoredBox(
+      color: Colors.primaries[index % Colors.primaries.length].withValues(
+        alpha: .35,
+      ),
+      child: Center(child: Text('glass $index')),
+    ),
+  );
+}
+
+class _RealThenFakeScenario extends StatefulWidget {
+  const _RealThenFakeScenario({required this.t, required this.retirementDelay});
+
+  final double t;
+  final Duration retirementDelay;
+
+  @override
+  State<_RealThenFakeScenario> createState() => _RealThenFakeScenarioState();
+}
+
+class _RealThenFakeScenarioState extends State<_RealThenFakeScenario> {
+  Timer? _retirementTimer;
+  bool _fake = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _retirementTimer = Timer(widget.retirementDelay, () {
+      if (!mounted) return;
+      setState(() => _fake = true);
+      debugPrint('LIQUID_GLASS_BENCHMARK_REAL_RENDERER_RETIRED');
+    });
+  }
+
+  @override
+  void dispose() {
+    _retirementTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LiquidGlassLayer(
+    fake: _fake,
+    settings: const LiquidGlassSettings.ios27ToolbarLight(),
+    child: Center(
+      child: Transform.translate(
+        offset: Offset(-180 + 360 * widget.t, 0),
+        child: const LiquidGlass(
+          shape: LiquidRoundedSuperellipse(borderRadius: 32),
+          child: SizedBox.square(dimension: 240),
+        ),
+      ),
+    ),
+  );
+}
+
+class _Background extends StatelessWidget {
+  const _Background();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xff182848), Color(0xff4b6cb7)],
+      ),
+    ),
+    child: GridPaper(
+      color: Colors.white.withValues(alpha: .25),
+      interval: 48,
+      child: const SizedBox.expand(),
+    ),
+  );
 }
