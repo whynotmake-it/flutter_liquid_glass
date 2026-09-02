@@ -1,18 +1,18 @@
 name: apple_liquid_glass
-description: Liquid Glass Implementation according to Apple's Guidelines
-version: 0.2.0-dev.4
+description: Adaptive widgets built with iOS 27-style liquid glass for Flutter.
+version: 0.3.0-dev.1
 
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/apple_liquid_glass
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.10.0"
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  liquid_glass_renderer: ^0.2.0-dev.4
+  liquid_glass_renderer: ^0.3.0-dev.1
 
 dev_dependencies:
   flutter_test:
