@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Flutter's macOS build passes multiple architectures to `lipo -verify_arch`.
+# Xcode 27's lipo accepts one architecture per invocation, so verify each
+# architecture separately and pass every other operation through unchanged.
+set -euo pipefail
+
+REAL_LIPO="${DEVELOPER_DIR:?DEVELOPER_DIR is required}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo"
+if [[ "$#" -ge 3 && "$2" == "-verify_arch" ]]; then
+  input="$1"
+  shift 2
+  for architecture in "$@"; do
+    "$REAL_LIPO" "$input" -verify_arch "$architecture"
+  done
+else
+  exec "$REAL_LIPO" "$@"
+fi

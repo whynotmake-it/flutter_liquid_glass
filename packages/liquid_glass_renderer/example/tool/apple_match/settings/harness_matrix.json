@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "hotLoop": {
+    "refraction": {"scenes": ["material_capsule", "material_circle", "material_card"], "probes": ["A"]},
+    "color": {"scenes": ["material_capsule"], "probes": ["B", "C", "D"]},
+    "lighting": {"scenes": ["material_capsule", "material_circle", "material_card"], "probes": ["B", "C", "D"]}
+  },
+  "clearness": {
+    "canonicalScene": "material_capsule",
+    "canonicalPositions": [0, 0.5, 1],
+    "crossShapeScenes": ["material_circle", "material_card"],
+    "crossShapePositions": [0, 0.5, 1],
+    "positionSemantics": "Measured system slider positions; do not assume either endpoint is clear until sharpness evidence identifies it."
+  },
+  "milestoneOnly": {
+    "appearances": ["light", "dark"],
+    "naturalImageHoldout": true,
+    "actualHdrIntensity": "deferred"
+  },
+  "diagnosticOnly": {
+    "samePrimitiveSizeControl": ["material_capsule", "material_capsule_tall"],
+    "purpose": "Isolate material-size response without changing the SwiftUI or Flutter shape primitive."
+  },
+  "knownModelBoundary": "Apple mixes clear and frosted backdrops. Exact frosted-interior matching is excluded from single-pass optimization; score color, lighting, outline, and refraction separately from that residual."
+}
