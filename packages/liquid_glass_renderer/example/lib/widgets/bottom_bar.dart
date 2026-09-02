@@ -6,7 +6,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
-/// Creates a jelly transform matrix based on velocity for organic squash and stretch effect
+/// Creates a velocity-based transform for an organic squash-and-stretch
+/// effect.
 Matrix4 buildJellyTransform({
   required Offset velocity,
   double maxDistortion = 0.7,
@@ -38,26 +39,22 @@ Matrix4 buildJellyTransform({
   final scaleY = squashY * stretchY;
 
   // Build the transformation matrix
-  final matrix = Matrix4.identity();
-
-  // Apply scale transformation
-  matrix.scale(scaleX, scaleY);
+  final matrix = Matrix4.identity()..scale(scaleX, scaleY);
 
   return matrix;
 }
 
 class LiquidGlassBottomBar extends StatefulWidget {
   const LiquidGlassBottomBar({
-    super.key,
     required this.tabs,
     required this.selectedIndex,
     required this.onTabSelected,
+    super.key,
     this.extraButton,
     this.spacing = 8,
     this.horizontalPadding = 20,
     this.bottomPadding = 20,
     this.barHeight = 64,
-    this.glassSettings,
     this.showIndicator = true,
     this.indicatorColor,
     this.fake = false,
@@ -71,7 +68,6 @@ class LiquidGlassBottomBar extends StatefulWidget {
   final double horizontalPadding;
   final double bottomPadding;
   final double barHeight;
-  final LiquidGlassSettings? glassSettings;
   final bool showIndicator;
   final Color? indicatorColor;
   final bool fake;
@@ -83,76 +79,65 @@ class LiquidGlassBottomBar extends StatefulWidget {
 class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
   @override
   Widget build(BuildContext context) {
-    final brightness = MediaQuery.platformBrightnessOf(context);
-    final isDark = brightness == Brightness.dark;
-
-    final glassSettings =
-        widget.glassSettings ??
-        LiquidGlassSettings(
-          refractiveIndex: 1.21,
-          thickness: 30,
-          blur: 8,
-          saturation: 1.5,
-          lightIntensity: isDark ? .7 : 1,
-          ambientStrength: isDark ? .2 : .5,
-          lightAngle: math.pi / 4,
-          glassColor: CupertinoTheme.of(
-            context,
-          ).barBackgroundColor.withValues(alpha: 0.6),
-        );
-
-    return LiquidGlassLayer(
-      settings: glassSettings,
-      fake: widget.fake,
-      child: LiquidGlassBlendGroup(
-        blend: 10,
-        child: Padding(
-          padding: EdgeInsets.only(
-            right: widget.horizontalPadding,
-            left: widget.horizontalPadding,
-            bottom: widget.bottomPadding,
-            top: widget.bottomPadding,
-          ),
-          child: Row(
-            spacing: widget.spacing,
-            children: [
-              Expanded(
-                child: _TabIndicator(
-                  fake: widget.fake,
-                  visible: widget.showIndicator,
-                  tabIndex: widget.selectedIndex,
-                  tabCount: widget.tabs.length,
-                  indicatorColor: widget.indicatorColor,
-                  onTabChanged: widget.onTabSelected,
-                  child: LiquidGlass.grouped(
-                    clipBehavior: Clip.none,
-                    shape: const LiquidRoundedSuperellipse(borderRadius: 32),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      height: widget.barHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < widget.tabs.length; i++)
-                            Expanded(
-                              child: _BottomBarTab(
-                                tab: widget.tabs[i],
-                                selected: widget.selectedIndex == i,
-                                onTap: () => widget.onTabSelected(i),
-                              ),
+    final glassSettings = LiquidGlassSettings.ios27Toolbar(
+      brightness: MediaQuery.platformBrightnessOf(context),
+    );
+    final content = LiquidGlassBlendGroup(
+      blend: 10,
+      child: Padding(
+        padding: EdgeInsets.only(
+          right: widget.horizontalPadding,
+          left: widget.horizontalPadding,
+          bottom: widget.bottomPadding,
+          top: widget.bottomPadding,
+        ),
+        child: Row(
+          spacing: widget.spacing,
+          children: [
+            Expanded(
+              child: _TabIndicator(
+                fake: widget.fake,
+                visible: widget.showIndicator,
+                tabIndex: widget.selectedIndex,
+                tabCount: widget.tabs.length,
+                indicatorColor: widget.indicatorColor,
+                onTabChanged: widget.onTabSelected,
+                child: LiquidGlass.grouped(
+                  clipBehavior: Clip.none,
+                  shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    height: widget.barHeight,
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < widget.tabs.length; i++)
+                          Expanded(
+                            child: _BottomBarTab(
+                              tab: widget.tabs[i],
+                              selected: widget.selectedIndex == i,
+                              onTap: () => widget.onTabSelected(i),
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              if (widget.extraButton != null)
-                _ExtraButton(config: widget.extraButton!, fake: widget.fake),
-            ],
-          ),
+            ),
+            if (widget.extraButton != null)
+              _ExtraButton(config: widget.extraButton!, fake: widget.fake),
+          ],
         ),
       ),
+    );
+
+    // Reuse an ambient layer when possible. The bar keeps its own blend group,
+    // so sharing the expensive backdrop does not merge it with sibling glass.
+    if (LiquidGlassLayer.existsIn(context)) return content;
+    return LiquidGlassLayer(
+      settings: glassSettings,
+      fake: widget.fake,
+      child: content,
     );
   }
 }
@@ -177,12 +162,20 @@ class LiquidGlassBottomBarExtraButton {
     required this.onTap,
     required this.label,
     this.size = 64,
+    this.loupeMagnification = 1.0,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String label;
   final double size;
+
+  /// Optional example-only backdrop magnification for a loupe button.
+  ///
+  /// The neutral default keeps ordinary bottom-bar buttons in the shared
+  /// grouped glass pass. Values above one opt into a separate pre-shader
+  /// magnifier and glass layer.
+  final double loupeMagnification;
 }
 
 class _BottomBarTab extends StatelessWidget {
@@ -212,7 +205,6 @@ class _BottomBarTab extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -301,28 +293,42 @@ class _ExtraButtonState extends State<_ExtraButton> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
+    final loupeMagnification = widget.config.loupeMagnification;
+    assert(
+      loupeMagnification >= 1.0,
+      'Loupe magnification cannot shrink its source.',
+    );
+    final icon = Center(
+      child: Icon(
+        widget.config.icon,
+        size: 24,
+        color: theme.textTheme.textStyle.color,
+      ),
+    );
+
+    final button = loupeMagnification > 1.0
+        ? SizedBox.square(
+            dimension: widget.config.size,
+            child: LiquidGlass.grouped(
+              shape: const LiquidOval(),
+              // Do not put the icon in a glow layer here. A loupe is a
+              // clear pre-shader magnifier; the icon should stay crisp and
+              // the only material treatment should be the thin glass rim.
+              child: icon,
+            ),
+          )
+        : LiquidGlass.grouped(
+            shape: const LiquidOval(),
+            child: GlassGlow(child: icon),
+          );
+
     return GestureDetector(
       onTap: widget.config.onTap,
       child: LiquidStretch(
         child: Semantics(
           button: true,
           label: widget.config.label,
-          child: LiquidGlass.grouped(
-            shape: const LiquidOval(),
-            child: GlassGlow(
-              child: Container(
-                height: widget.config.size,
-                width: widget.config.size,
-                child: Center(
-                  child: Icon(
-                    widget.config.icon,
-                    size: 24,
-                    color: theme.textTheme.textStyle.color,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: button,
         ),
       ),
     );
@@ -381,7 +387,7 @@ class _TabIndicatorState extends State<_TabIndicator>
   }
 
   double _getAlignmentFromGlobalPostition(Offset globalPosition) {
-    final box = context.findRenderObject() as RenderBox;
+    final box = context.findRenderObject()! as RenderBox;
     final localPosition = box.globalToLocal(globalPosition);
 
     // Calculate the effective draggable range
@@ -416,9 +422,8 @@ class _TabIndicatorState extends State<_TabIndicator>
 
   // Apply rubber band resistance similar to iOS scroll views
   double _applyRubberBandResistance(double value) {
-    const double resistance = 0.4; // Lower values = more resistance
-    const double maxOverdrag =
-        0.3; // Maximum overdrag as fraction of normal range
+    const resistance = 0.4; // Lower values = more resistance
+    const maxOverdrag = 0.3; // Maximum overdrag as fraction of normal range
 
     if (value < 0) {
       // Overdrag to the left
@@ -442,7 +447,7 @@ class _TabIndicatorState extends State<_TabIndicator>
       _isDown = false;
     });
 
-    final box = context.findRenderObject() as RenderBox;
+    final box = context.findRenderObject()! as RenderBox;
     final currentRelativeX = (xAlign + 1) / 2; // Convert from -1:1 to 0:1
     final tabWidth = 1.0 / widget.tabCount;
 
@@ -515,6 +520,8 @@ class _TabIndicatorState extends State<_TabIndicator>
     final targetAlignment = computeXAlignmentForTab(widget.tabIndex);
 
     return GestureDetector(
+      key: const ValueKey('bottom-bar-drag-region'),
+      behavior: HitTestBehavior.opaque,
       onHorizontalDragDown: _onDragDown,
       onHorizontalDragUpdate: _onDragUpdate,
       onHorizontalDragEnd: _onDragEnd,
@@ -523,7 +530,7 @@ class _TabIndicatorState extends State<_TabIndicator>
         _isDown = false;
       }),
       child: VelocityMotionBuilder(
-        converter: SingleMotionConverter(),
+        converter: const SingleMotionConverter(),
         value: xAlign,
         motion: _isDragging
             ? const Motion.interactiveSpring(snapToEnd: true)
@@ -554,6 +561,9 @@ class _TabIndicatorState extends State<_TabIndicator>
                         duration: const Duration(milliseconds: 120),
                         opacity: widget.visible && thickness <= .2 ? 1 : 0,
                         child: DecoratedBox(
+                          key: const ValueKey(
+                            'bottom-bar-selection-indicator',
+                          ),
                           decoration: BoxDecoration(
                             color: indicatorColor,
                             borderRadius: BorderRadius.circular(64),
@@ -562,37 +572,50 @@ class _TabIndicatorState extends State<_TabIndicator>
                         ),
                       ),
                     ),
-                  child!,
-                  if (thickness > 0)
+                  if (!widget.fake) child!,
+                  if (widget.fake || thickness > 0)
                     _IndicatorTransform(
                       velocity: velocity,
                       tabCount: widget.tabCount,
                       alignment: alignment,
                       thickness: thickness,
                       child: LiquidGlass.withOwnLayer(
-                        fake: widget.fake,
-                        settings: LiquidGlassSettings(
+                        key: const ValueKey('bottom-bar-drag-glass'),
+                        // This is a clear selection lens, not another toolbar
+                        // material. Keep its backdrop transmission neutral
+                        // even when the ambient layer uses the fitted iOS tint.
+                        appearance: LiquidGlassAppearance(
                           visibility: thickness,
-                          glassColor: Color.from(
-                            alpha: .1,
-                            red: 1,
-                            green: 1,
-                            blue: 1,
-                          ),
-                          saturation: 1.5,
-                          refractiveIndex: 1.15,
-                          thickness: 20,
-                          lightIntensity: 2,
-                          chromaticAberration: .5,
-                          blur: 0,
                         ),
-
+                        shadows: const [
+                          BoxShadow(
+                            color: Color.from(
+                              alpha: 0.1,
+                              red: 0,
+                              green: 0,
+                              blue: 0,
+                            ),
+                            blurRadius: 30,
+                          ),
+                        ],
+                        fake: widget.fake,
+                        settings: const LiquidGlassSettings(
+                          edgeRefraction: 40,
+                          backdropScale: .92,
+                          refractionSpread: .5,
+                          chromaticAberration: .1,
+                          frost: 0,
+                          highlight: .4,
+                          contourStrength: .1,
+                          contourWidth: 1,
+                        ),
                         shape: const LiquidRoundedSuperellipse(
                           borderRadius: 64,
                         ),
-                        child: GlassGlow(child: const SizedBox.expand()),
+                        child: const GlassGlow(child: SizedBox.expand()),
                       ),
                     ),
+                  if (widget.fake) child!,
                 ],
               );
             },
@@ -642,8 +665,8 @@ class _IndicatorTransform extends StatelessWidget {
             Positioned.fromRelativeRect(
               rect: rect!,
               child: SingleMotionBuilder(
-                motion: Motion.bouncySpring(
-                  duration: const Duration(milliseconds: 600),
+                motion: const Motion.bouncySpring(
+                  duration: Duration(milliseconds: 600),
                 ),
                 value: velocity,
                 builder: (context, velocity, child) {
