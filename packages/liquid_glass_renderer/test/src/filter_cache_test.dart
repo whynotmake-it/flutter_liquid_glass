@@ -1,0 +1,220 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+
+import 'shared.dart';
+
+void main() {
+  RenderLiquidGlassLayer findLayer(WidgetTester tester) {
+    return tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
+  }
+
+  Widget glass({
+    LiquidGlassSettings settings = const LiquidGlassSettings(),
+    LiquidGlassAppearance? appearance,
+    bool glassContainsChild = false,
+  }) {
+    return CupertinoApp(
+      home: LiquidGlassLayer(
+        settings: settings,
+        child: LiquidGlass(
+          shape: const LiquidOval(),
+          appearance: appearance,
+          glassContainsChild: glassContainsChild,
+          child: const SizedBox.square(dimension: 80),
+        ),
+      ),
+    );
+  }
+
+  testWidgets(
+    'reuses the composed filter while shader inputs are unchanged',
+    (tester) async {
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+      expect(firstFilter, isNotNull);
+      expect(
+        renderObject.debugInsideContentsClipLayer,
+        isNull,
+        reason: 'Default children paint above glass and need no clip layer.',
+      );
+
+      // A repaint with identical geometry, transform, and settings must not
+      // allocate new filters: the native filter snapshots the shader uniforms
+      // at creation, so reuse is only valid while all inputs are unchanged.
+      renderObject.markNeedsPaint();
+      await tester.pump();
+
+      expect(
+        renderObject.debugBackdropFilterLayer?.filter,
+        same(firstFilter),
+      );
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'reuses the transformed clip path while geometry is unchanged',
+    (tester) async {
+      await tester.pumpWidget(glass(glassContainsChild: true));
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      final firstPath = renderObject.debugClipPath;
+      expect(firstPath, isNotNull);
+      expect(renderObject.debugInsideContentsClipLayer, isNotNull);
+
+      renderObject.markNeedsPaint();
+      await tester.pump();
+
+      expect(renderObject.debugClipPath, same(firstPath));
+
+      await tester.pumpWidget(
+        glass(
+          settings: const LiquidGlassSettings(frost: 8),
+          glassContainsChild: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        renderObject.debugClipPath,
+        same(firstPath),
+        reason: 'Material-only changes must not rebuild shape geometry.',
+      );
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'rebuilds the filter when settings change the shader uniforms',
+    (tester) async {
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+      expect(firstFilter, isNotNull);
+
+      await tester.pumpWidget(
+        glass(settings: const LiquidGlassSettings(frost: 8)),
+      );
+      await tester.pumpAndSettle();
+
+      final rebuilt = renderObject.debugBackdropFilterLayer?.filter;
+      expect(rebuilt, isNotNull);
+      expect(rebuilt, isNot(same(firstFilter)));
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'reuses the composed filter when an ancestor transform moves the layer',
+    (tester) async {
+      Widget movedGlass(Offset offset) => CupertinoApp(
+        home: Transform.translate(
+          offset: offset,
+          child: glass(),
+        ),
+      );
+
+      await tester.pumpWidget(movedGlass(Offset.zero));
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+      expect(firstFilter, isNotNull);
+
+      await tester.pumpWidget(movedGlass(const Offset(12, 8)));
+      // Ancestor translation is compositor-only. The tracking layer sees the
+      // transform change during compositing and must not rebuild the filter.
+      tester.binding.scheduleFrame();
+      await tester.pump();
+
+      expect(
+        renderObject.debugBackdropFilterLayer?.filter,
+        same(firstFilter),
+      );
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'drops the backdrop filter while the sample is idle',
+    (tester) async {
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      expect(renderObject.debugBackdropFilterLayer, isNotNull);
+      final initialRenders = renderObject.gpuGeometryRenderer!.debugRenderCount;
+
+      await tester.pumpWidget(
+        glass(appearance: const LiquidGlassAppearance(visibility: 0)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(renderObject.debugBackdropFilterLayer, isNull);
+      expect(
+        renderObject.gpuGeometryRenderer!.debugRenderCount,
+        initialRenders,
+      );
+
+      await tester.pumpWidget(glass());
+      await tester.pumpAndSettle();
+
+      expect(renderObject.debugBackdropFilterLayer, isNotNull);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'keeps geometry matte bounds in layer space across ancestor motion',
+    (tester) async {
+      Widget movedGlass(Offset offset) => CupertinoApp(
+        home: Transform.translate(
+          offset: offset,
+          child: glass(),
+        ),
+      );
+
+      await tester.pumpWidget(movedGlass(Offset.zero));
+      await tester.pumpAndSettle();
+      await pumpUntilGlassReady(tester);
+
+      final renderObject = findLayer(tester);
+      final matteBounds = renderObject.debugGeometryMatteBounds;
+      expect(matteBounds, isNot(Rect.zero));
+      expect(
+        MatrixUtils.matrixEquals(
+          renderObject.matteTransform,
+          Matrix4.identity(),
+        ),
+        isTrue,
+      );
+
+      await tester.pumpWidget(movedGlass(const Offset(40, -18)));
+      tester.binding.scheduleFrame();
+      await tester.pump();
+
+      expect(renderObject.debugGeometryMatteBounds, matteBounds);
+      expect(
+        MatrixUtils.matrixEquals(
+          renderObject.matteTransform,
+          Matrix4.identity(),
+        ),
+        isTrue,
+      );
+    },
+    skip: skipProperGlassTests,
+  );
+}

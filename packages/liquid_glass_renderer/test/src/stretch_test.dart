@@ -10,8 +10,9 @@ void main() {
     const buttonKey = Key('button');
 
     group('stretching', () {
-      testWidgets('gestureDetector mode allows nested button to work',
-          (tester) async {
+      testWidgets('gestureDetector mode allows nested button to work', (
+        tester,
+      ) async {
         var buttonPressedCount = 0;
 
         await tester.pumpWidget(
@@ -63,8 +64,8 @@ void main() {
 
           final center = tester.getCenter(find.byKey(buttonKey));
           final gesture = await tester.startGesture(center);
-          // Hold the pointer down while the button's tap recognizer competes 
-          // with the parent pan; onPanStart must not run until the pan wins, 
+          // Hold the pointer down while the button's tap recognizer competes
+          // with the parent pan; onPanStart must not run until the pan wins,
           // so the interaction scale should stay at 1.0.
           await tester.pump(const Duration(milliseconds: 100));
           final scaleFinder = find.descendant(
@@ -111,49 +112,54 @@ void main() {
       }
 
       testWidgets(
-          'elongates horizontally and compresses vertically on horizontal drag',
-          (tester) async {
-        await tester.pumpWidget(build());
+        'elongates horizontally and compresses vertically on horizontal drag',
+        (tester) async {
+          await tester.pumpWidget(build());
 
-        final childFinder = find.byKey(childKey);
-        expect(childFinder, findsOneWidget);
+          final childFinder = find.byKey(childKey);
+          expect(childFinder, findsOneWidget);
 
-        final ro = tester.renderObject<RenderBox>(childFinder);
+          final ro = tester.renderObject<RenderBox>(childFinder);
 
-        expect(
-          MatrixUtils.transformRect(ro.getTransformTo(null), ro.paintBounds)
-              .size,
-          equals(ro.paintBounds.size),
-          reason: 'The child should not be transformed before the gesture.',
-        );
+          expect(
+            MatrixUtils.transformRect(
+              ro.getTransformTo(null),
+              ro.paintBounds,
+            ).size,
+            equals(ro.paintBounds.size),
+            reason: 'The child should not be transformed before the gesture.',
+          );
 
-        // Drag the child to the right by 50 pixels.
-        final gesture =
-            await tester.startGesture(tester.getCenter(childFinder));
-        await gesture.moveBy(const Offset(200, 0));
-        await tester.pumpAndSettle();
+          // Drag the child to the right by 50 pixels.
+          final gesture = await tester.startGesture(
+            tester.getCenter(childFinder),
+          );
+          await gesture.moveBy(const Offset(200, 0));
+          await tester.pumpAndSettle();
 
-        // The child should have stretched to the right, so its width should be
-        // greater than 100.
-        final stretchedSize =
-            MatrixUtils.transformRect(ro.getTransformTo(null), ro.paintBounds)
-                .size;
+          // A rightward drag should stretch the child beyond its base width.
+          final stretchedSize = MatrixUtils.transformRect(
+            ro.getTransformTo(null),
+            ro.paintBounds,
+          ).size;
 
-        expect(stretchedSize.width, greaterThan(100));
-        // The height should not have changed.
-        expect(stretchedSize.height, lessThan(100));
+          expect(stretchedSize.width, greaterThan(100));
+          // The height should not have changed.
+          expect(stretchedSize.height, lessThan(100));
 
-        // End the gesture.
-        await gesture.up();
-        await tester.pumpAndSettle();
+          // End the gesture.
+          await gesture.up();
+          await tester.pumpAndSettle();
 
-        final finalSize =
-            MatrixUtils.transformRect(ro.getTransformTo(null), ro.paintBounds)
-                .size;
+          final finalSize = MatrixUtils.transformRect(
+            ro.getTransformTo(null),
+            ro.paintBounds,
+          ).size;
 
-        // The child should have returned to its original size.
-        expect(finalSize, equals(ro.paintBounds.size));
-      });
+          // The child should have returned to its original size.
+          expect(finalSize, equals(ro.paintBounds.size));
+        },
+      );
 
       testWidgets('can handle unmount while dragging', (tester) async {
         await tester.pumpWidget(build());
@@ -162,8 +168,9 @@ void main() {
         expect(childFinder, findsOneWidget);
 
         // Start dragging the child.
-        final gesture =
-            await tester.startGesture(tester.getCenter(childFinder));
+        final gesture = await tester.startGesture(
+          tester.getCenter(childFinder),
+        );
         await gesture.moveBy(const Offset(200, 0));
         await tester.pumpAndSettle();
 
