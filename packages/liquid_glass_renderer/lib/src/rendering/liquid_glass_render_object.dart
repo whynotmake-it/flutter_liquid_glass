@@ -19,6 +19,19 @@ import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
+@internal
+abstract interface class LiquidGlassLayerRenderObject {}
+
+@internal
+bool hasLiquidGlassLayerAncestor(RenderObject renderObject) {
+  var ancestor = renderObject.parent;
+  while (ancestor != null) {
+    if (ancestor is LiquidGlassLayerRenderObject) return true;
+    ancestor = ancestor.parent;
+  }
+  return false;
+}
+
 /// A render object that can assemble [RenderLiquidGlassGeometry] shapes and
 /// render them to the screen with the liquid glass effect.
 @internal

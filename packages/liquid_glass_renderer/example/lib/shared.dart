@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/preset_store.dart';
+import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
+import 'package:motor/motor.dart';
 
 Animation<double> useRotatingAnimationController() {
   return useAnimationController(
@@ -178,14 +180,122 @@ class LoupeExamplePage extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(child: Grid()),
-          Center(
-            child: ExampleLoupe(
-              settings: _clearLoupeSettings,
-              focalPointOffset: Offset(0, 64),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 120, 20, 120),
+              child: DraggableLoupe(
+                settings: _clearLoupeSettings,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A draggable loupe whose position settles with the same spring family as
+/// the bottom bar. The motion velocity also drives the lens's jelly transform.
+class DraggableLoupe extends StatefulWidget {
+  const DraggableLoupe({
+    required this.settings,
+    super.key,
+    this.size = const Size(120, 88),
+    this.magnificationScale = 1.6,
+  });
+
+  final LiquidGlassSettings settings;
+  final Size size;
+  final double magnificationScale;
+
+  @override
+  State<DraggableLoupe> createState() => _DraggableLoupeState();
+}
+
+class _DraggableLoupeState extends State<DraggableLoupe> {
+  Offset _position = Offset.zero;
+  bool _isDragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bounds = Offset(
+          (constraints.maxWidth - widget.size.width).clamp(
+            0.0,
+            double.infinity,
+          ),
+          (constraints.maxHeight - widget.size.height).clamp(
+            0.0,
+            double.infinity,
+          ),
+        );
+        final position = Offset(
+          _position.dx.clamp(0.0, bounds.dx),
+          _position.dy.clamp(0.0, bounds.dy),
+        );
+
+        return GestureDetector(
+          key: const ValueKey('draggable-loupe-region'),
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (_) => setState(() => _isDragging = true),
+          onPanUpdate: (details) {
+            final next = _position + details.delta;
+            setState(() {
+              _position = Offset(
+                next.dx.clamp(0.0, bounds.dx),
+                next.dy.clamp(0.0, bounds.dy),
+              );
+            });
+          },
+          onPanEnd: (_) => setState(() => _isDragging = false),
+          onPanCancel: () => setState(() => _isDragging = false),
+          child: VelocityMotionBuilder<Offset>(
+            converter: const OffsetMotionConverter(),
+            value: position,
+            motion: _isDragging
+                ? const Motion.interactiveSpring(snapToEnd: true)
+                : const Motion.bouncySpring(snapToEnd: true),
+            builder: (context, value, velocity, child) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: value.dx,
+                    top: value.dy,
+                    child: MotionBuilder<Offset>(
+                      converter: const OffsetMotionConverter(),
+                      motion: const Motion.bouncySpring(
+                        duration: Duration(milliseconds: 600),
+                      ),
+                      value: velocity,
+                      builder: (context, velocity, child) {
+                        return Transform(
+                          alignment: Alignment.center,
+                          transform: buildJellyTransform(
+                            velocity: Offset(velocity.dx, 0),
+                            maxDistortion: .8,
+                            velocityScale: 10,
+                          ),
+                          child: child,
+                        );
+                      },
+                      child: child,
+                    ),
+                  ),
+                ],
+              );
+            },
+            child: ExampleLoupe(
+              key: const ValueKey('draggable-loupe'),
+              settings: widget.settings,
+              size: widget.size,
+              magnificationScale: widget.magnificationScale,
+              alignment: Alignment.topLeft,
+            ),
+          ),
+        );
+      },
     );
   }
 }

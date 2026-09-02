@@ -117,8 +117,10 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
 
   @override
   void addToScene(ui.SceneBuilder builder) {
+    final renderObject = this.renderObject;
+    if (renderObject == null || !renderObject.attached) return;
     final currentTransform =
-        trackedTransform?.call() ?? renderObject?.getTransformTo(null);
+        trackedTransform?.call() ?? renderObject.getTransformTo(null);
     if (!MatrixUtils.matrixEquals(currentTransform, _lastTransform)) {
       onTransformChanged?.call();
       _lastTransform = currentTransform;

@@ -82,7 +82,7 @@ void main() {
       },
     );
 
-    testWidgets('rejects nested glass on the same layer', (tester) async {
+    testWidgets('supports nested glass on the same layer', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: LiquidGlassLayer(
@@ -98,12 +98,8 @@ void main() {
         ),
       );
 
-      final error = tester.takeException();
-      expect(error, isA<FlutterError>());
-      expect(
-        error.toString(),
-        contains('cannot be nested inside another LiquidGlass'),
-      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(LiquidGlassLayer), findsOneWidget);
     });
 
     testWidgets('auto creates a layer when nested glass blocks reuse', (

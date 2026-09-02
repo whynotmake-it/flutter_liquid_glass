@@ -307,6 +307,25 @@ void main() {
     final magnifier = tester.widget<RawMagnifier>(find.byType(RawMagnifier));
     expect(magnifier.decoration.opacity, 1);
     expect(magnifier.clipBehavior, Clip.hardEdge);
+    expect(magnifier.magnificationScale, greaterThan(1));
+    expect(magnifier.focalPointOffset, Offset.zero);
+    expect(find.byType(DraggableLoupe), findsOneWidget);
+  });
+
+  testWidgets('loupe follows a drag with motor motion', (tester) async {
+    await tester.pumpWidget(const CupertinoApp(home: LoupeExamplePage()));
+    await tester.pump();
+
+    final loupeFinder = find.byKey(const ValueKey('draggable-loupe'));
+    final regionFinder = find.byKey(
+      const ValueKey('draggable-loupe-region'),
+    );
+    final before = tester.getTopLeft(loupeFinder);
+    await tester.drag(regionFinder, const Offset(60, 30));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(loupeFinder).dx, greaterThan(before.dx));
+    expect(tester.getTopLeft(loupeFinder).dy, greaterThan(before.dy));
   });
 
   test('all example platforms enable Impeller and Flutter GPU', () {

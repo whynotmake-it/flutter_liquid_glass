@@ -25,9 +25,10 @@ import 'package:meta/meta.dart';
 /// If you only need a single shape with its own settings, you can also use the
 /// [LiquidGlass.withOwnLayer] constructor, which will create its own
 /// [LiquidGlassLayer] internally.
-/// Use that for glass that sits on other glass or needs different settings.
-/// Sibling shapes that share settings should share one [LiquidGlassLayer]
-/// instead — each extra layer is a separate backdrop sample.
+/// Use that for glass that sits on other glass and needs an independent
+/// backdrop sample or different settings. Nested shapes that should share the
+/// parent sample can use the regular constructor; they are painted in tree
+/// order by the containing [LiquidGlassLayer].
 ///
 /// If you don't know whether a [LiquidGlassLayer] ancestor exists, use the
 /// [LiquidGlass.auto] constructor. It will render on a parent layer if one is
@@ -218,10 +219,6 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    assert(
-      _debugCheckLayerNesting(context),
-      'LiquidGlass must not be nested on the same LiquidGlassLayer.',
-    );
     return _buildGlass(context);
   }
 
@@ -238,28 +235,6 @@ class LiquidGlass extends StatelessWidget {
       return result == _LiquidGlassAncestorBoundary.none;
     });
     return result;
-  }
-
-  bool _debugCheckLayerNesting(BuildContext context) {
-    if (_nearestLiquidGlassBoundary(context) !=
-        _LiquidGlassAncestorBoundary.glass) {
-      return true;
-    }
-
-    throw FlutterError.fromParts([
-      ErrorSummary(
-        'LiquidGlass cannot be nested inside another LiquidGlass on the same '
-        'LiquidGlassLayer.',
-      ),
-      ErrorDescription(
-        'Nested glass shapes cannot be composed correctly when they register '
-        'with the same layer.',
-      ),
-      ErrorHint(
-        'Use LiquidGlass.auto or LiquidGlass.withOwnLayer for the nested '
-        'shape, or place a LiquidGlassLayer between the two shapes.',
-      ),
-    ]);
   }
 
   /// Renders this shape on the nearest [LiquidGlassLayer].

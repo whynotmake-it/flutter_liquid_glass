@@ -454,7 +454,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
 
 @internal
 class RenderLiquidGlassLayer extends LiquidGlassRenderObject
-    with TransformTrackingRenderObjectMixin {
+    with TransformTrackingRenderObjectMixin
+    implements LiquidGlassLayerRenderObject {
   RenderLiquidGlassLayer({
     required super.defaultRenderShader,
     required super.materialRenderShader,
@@ -496,6 +497,15 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void onTransformChanged() {
+    if (hasLiquidGlassLayerAncestor(this)) {
+      // A nested layer owns a filter and clip expressed in its own local
+      // coordinates. When an outer liquid-glass layer moves, compositor-only
+      // retention does not update that local retained subtree's paint state.
+      // Repaint only nested layers; a top-level layer keeps the fast path
+      // below for complete-layer motion.
+      markNeedsPaint();
+      return;
+    }
     // Geometry and FlutterFragCoord share this layer's clip space, so ancestor
     // motion is compositor-only. Do not cross the repaint boundary or rebuild
     // the native image filter after the first paint.

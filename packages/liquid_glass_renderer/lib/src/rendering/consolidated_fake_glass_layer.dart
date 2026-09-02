@@ -65,7 +65,8 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
 @visibleForTesting
 @internal
 class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
-    with TransformTrackingRenderObjectMixin {
+    with TransformTrackingRenderObjectMixin
+    implements LiquidGlassLayerRenderObject {
   RenderConsolidatedFakeGlassLayer({
     required this._link,
     required this._settings,
@@ -167,7 +168,14 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   }
 
   @override
-  void onTransformChanged() {}
+  void onTransformChanged() {
+    if (hasLiquidGlassLayerAncestor(this)) {
+      // Keep the fake path's local clip/filter in sync when an outer liquid
+      // glass layer moves, without making complete top-level layer motion
+      // repaint the retained fallback.
+      markNeedsPaint();
+    }
+  }
 
   @override
   void onCompositing() {
