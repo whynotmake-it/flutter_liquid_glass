@@ -5,6 +5,8 @@ import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
+import 'shared.dart';
+
 void main() {
   group('LiquidGlassBlendGroup', () {
     const blendGroupKey = Key('blend-group');
@@ -44,64 +46,119 @@ void main() {
       );
     }
 
-    testWidgets('generates a geometry image', (tester) async {
-      final thicknesses = [10, 20, 30];
-      final refractiveIndices = [1.0, 1.1, 1.2, 1.3];
-      final blendValues = [0.0, 10, 20, 30, 300];
+    testWidgets('generates reusable GPU geometry metadata', (tester) async {
+      await tester.pumpWidget(
+        build(const LiquidGlassSettings(thickness: 30), 24),
+      );
+      await tester.pumpAndSettle();
 
-      Future<void> verifySettings(
-        LiquidGlassSettings settings,
-        double blend,
-      ) async {
-        await tester.pumpWidget(build(settings, blend));
-        await tester.pumpAndSettle();
+      final renderObject = tester.allRenderObjects
+          .whereType<RenderLiquidGlassBlendGroup>()
+          .firstWhere((renderObject) => renderObject.geometryBlend == 24);
+      final geometry = renderObject.geometry;
 
-        final blendGroupFinder = find.byKey(blendGroupKey);
-        expect(blendGroupFinder, findsOneWidget);
+      expect(geometry, isA<GeometryCache>());
+      expect(geometry!.shapes, hasLength(2));
+      expect(geometry.blend, 24);
+      expect(geometry.bounds, isNot(Rect.zero));
+    }, skip: skipProperGlassTests);
 
-        final blendGroup = tester.firstWidget<LiquidGlassBlendGroup>(
-          blendGroupFinder,
-        );
-        final ro = tester.renderObject<RenderLiquidGlassBlendGroup>(
-          find.byWidget(blendGroup),
-        );
-        final geo = ro.geometry;
-        expect(geo, isA<UnrenderedGeometryCache>());
-
-        final renderedGeo = await geo!.renderAsync();
-        final matteImage = renderedGeo.matte;
-
-        await expectLater(
-          matteImage,
-          matchesGoldenFile(
-            'goldens/geometry/liquid_glass_blend_group_geometry_'
-            'thickness${settings.thickness}_'
-            'refractiveIndex${settings.refractiveIndex}_'
-            'blend$blend'
-            '.png',
+    testWidgets(
+      'refreshes grouped shadows without rebuilding the geometry path',
+      (tester) async {
+        var shadows = const <BoxShadow>[];
+        late StateSetter update;
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: LiquidGlassLayer(
+              settings: const LiquidGlassSettings(thickness: 30),
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  update = setState;
+                  return LiquidGlassBlendGroup(
+                    child: LiquidGlass.grouped(
+                      shadows: shadows,
+                      shape: const LiquidOval(),
+                      child: const SizedBox.square(dimension: 100),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         );
-      }
+        await tester.pumpAndSettle();
 
-      await verifySettings(
-        const LiquidGlassSettings(
-          thickness: 0,
-          refractiveIndex: 1.5,
-        ),
-        0,
-      );
-
-      for (final thickness in thicknesses) {
-        for (final refractiveIndex in refractiveIndices) {
-          for (final blend in blendValues) {
-            final settings = LiquidGlassSettings(
-              thickness: thickness.toDouble(),
-              refractiveIndex: refractiveIndex,
+        final renderObject = tester.allRenderObjects
+            .whereType<RenderLiquidGlassBlendGroup>()
+            .firstWhere(
+              (renderObject) => renderObject.geometry?.shapes.length == 1,
             );
-            await verifySettings(settings, blend.toDouble());
-          }
-        }
-      }
-    });
+        final originalPath = renderObject.geometry!.path;
+        expect(renderObject.geometry!.shapes.single.shadows, isEmpty);
+
+        update(() {
+          shadows = const [
+            BoxShadow(
+              color: Color(0x20000000),
+              offset: Offset(0, 4),
+              blurRadius: 8,
+            ),
+          ];
+        });
+        await tester.pump();
+
+        expect(renderObject.geometry!.path, same(originalPath));
+        expect(renderObject.geometry!.shapes.single.shadows, shadows);
+      },
+      skip: skipProperGlassTests,
+    );
+
+    testWidgets(
+      'keeps transformed grouped shapes in local primitive space',
+      (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: LiquidGlassLayer(
+              settings: const LiquidGlassSettings(thickness: 30),
+              child: LiquidGlassBlendGroup(
+                key: blendGroupKey,
+                child: Center(
+                  child: RawLiquidStretch(
+                    stretchPixels: const Offset(50, 0),
+                    child: Transform.rotate(
+                      angle: .35,
+                      child: const LiquidGlass.grouped(
+                        shape: LiquidRoundedRectangle(borderRadius: 18),
+                        child: SizedBox(width: 100, height: 80),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final renderObject = tester.allRenderObjects
+            .whereType<RenderLiquidGlassBlendGroup>()
+            .firstWhere(
+              (renderObject) => renderObject.geometry?.shapes.length == 1,
+            );
+        final shape = renderObject.geometry!.shapes.single;
+
+        // Bounds are allowed to grow with the transform, but the SDF primitive
+        // remains the child's local 100x80 shape. The transform is represented
+        // exactly once by shapeToGeometry.
+        expect(shape.renderObject.size, const Size(100, 80));
+        expect(shape.shapeBounds.size.width, greaterThan(100));
+        expect(shape.shapeToGeometry, isNotNull);
+        expect(shape.shapeToGeometry!.getMaxScaleOnAxis(), greaterThan(1));
+      },
+      skip: skipProperGlassTests,
+    );
   });
 }
