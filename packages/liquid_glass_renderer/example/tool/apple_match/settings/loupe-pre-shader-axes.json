@@ -1,0 +1,12 @@
+{
+  "thickness": [12.0, 20.0, 28.0, 36.0],
+  "edgeRefraction": [180.0, 280.0, 380.0, 520.0, 700.0],
+  "tintAlpha": [0.0, 0.05, 0.1, 0.2, 0.4],
+  "saturation": [0.8, 0.9, 1.0, 1.1],
+  "transmissionGamma": [0.8, 0.9, 1.0, 1.1],
+  "vibrancy": [0.0, 0.1, 0.15, 0.25],
+  "chromaticAberration": [0.0, 0.0025, 0.005, 0.01],
+  "highlight": [0.0, 0.25, 0.5, 0.75, 1.0],
+  "contourStrength": [0.0, 0.1, 0.35, 0.65, 1.0],
+  "contourWidth": [0.5, 1.0, 1.5, 2.0]
+}

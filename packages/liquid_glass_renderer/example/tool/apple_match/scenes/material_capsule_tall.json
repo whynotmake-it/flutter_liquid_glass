@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "material_capsule_tall",
+  "profile": "material_shape",
+  "canvas": {"logicalWidth": 402, "logicalHeight": 874, "scale": 3},
+  "shape": {
+    "kind": "capsule",
+    "x": 91,
+    "y": 362,
+    "width": 220,
+    "height": 150,
+    "cornerRadius": 75,
+    "appleContentInsetX": 0,
+    "appleContentInsetY": 0
+  },
+  "appearance": "light",
+  "transparency": {"reduceTransparency": false, "appleSliderMapped": false},
+  "probes": [
+    {
+      "id": "A",
+      "background": {
+        "kind": "tileGrid",
+        "cellSize": 6,
+        "gutter": 1,
+        "gutterColor": "#404040",
+        "palette": {"0": "#101010", "1": "#F0F0F0", "2": "#808080"},
+        "pattern": ["00112210", "01122100", "11221001", "12210011", "22100112", "21001122", "10011221", "00112210"]
+      }
+    },
+    {
+      "id": "B",
+      "background": {
+        "kind": "tileGrid",
+        "cellSize": 12,
+        "gutter": 1,
+        "gutterColor": "#202020",
+        "palette": {"R": "#EF4444", "O": "#F97316", "Y": "#EAB308", "G": "#22C55E", "C": "#06B6D4", "B": "#3B82F6", "P": "#A855F7", "N": "#737373"},
+        "pattern": ["ROYGCBPN", "CBPNROYG", "YGCBPNRO", "PNROYGCB"]
+      }
+    },
+    {"id": "C", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "D", "background": {"kind": "solid", "color": "#FFFFFF"}}
+  ]
+}
