@@ -7,18 +7,34 @@ class LiquidGlassRenderScope extends InheritedWidget {
   /// Creates a new [LiquidGlassRenderScope].
   const LiquidGlassRenderScope({
     required this.settings,
+    required this.defaultAppearance,
     required super.child,
     this.useFake = false,
+    this.consolidatesFakeBackdrop = false,
+    this.consolidatesFakeSurface = false,
+    this.backdropKey,
     super.key,
   });
 
   final LiquidGlassSettings settings;
 
+  final LiquidGlassAppearance defaultAppearance;
+
   final bool useFake;
 
+  /// Whether fake shapes register with the parent layer while omitting their
+  /// individual backdrop filters.
+  final bool consolidatesFakeBackdrop;
+
+  /// Whether the parent layer paints each registered fake surface.
+  final bool consolidatesFakeSurface;
+
+  /// The backdrop capture shared by glass effects in this scope, if any.
+  final BackdropKey? backdropKey;
+
   static LiquidGlassRenderScope of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
     assert(
       scope != null,
       'No liquid glass renderer found in context. '
@@ -45,6 +61,10 @@ class LiquidGlassRenderScope extends InheritedWidget {
   bool updateShouldNotify(covariant InheritedWidget oldWidget) {
     return oldWidget is! LiquidGlassRenderScope ||
         oldWidget.settings != settings ||
-        oldWidget.useFake != useFake;
+        oldWidget.defaultAppearance != defaultAppearance ||
+        oldWidget.useFake != useFake ||
+        oldWidget.consolidatesFakeBackdrop != consolidatesFakeBackdrop ||
+        oldWidget.consolidatesFakeSurface != consolidatesFakeSurface ||
+        oldWidget.backdropKey != backdropKey;
   }
 }
