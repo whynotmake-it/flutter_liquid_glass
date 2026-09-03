@@ -82,7 +82,7 @@ void main() {
       },
     );
 
-    testWidgets('supports nested glass on the same layer', (tester) async {
+    testWidgets('gives nested glass an ordered material pass', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: LiquidGlassLayer(
@@ -99,7 +99,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(LiquidGlassLayer), findsOneWidget);
+      expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
     });
 
     testWidgets('auto creates a layer when nested glass blocks reuse', (
@@ -203,8 +203,6 @@ void main() {
             FlutterGpuGeometryRenderer.debugActiveRendererCount;
         final initialGeometryTextures =
             FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount;
-        final initialCoordinateTextures =
-            FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount;
 
         Widget app() => MaterialApp(
           home: AnimatedBuilder(
@@ -240,12 +238,8 @@ void main() {
           FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
           initialGeometryTextures + 1,
         );
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
-          initialCoordinateTextures + 1,
-        );
 
-        // An unchanged real layer keeps both persistent textures and does not
+        // An unchanged real layer keeps its geometry texture and does not
         // submit another geometry pass. Rebuilding with an equivalent shader
         // asset list must also retain the same shader instance.
         revision.value++;
@@ -270,10 +264,6 @@ void main() {
         expect(
           FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
           initialGeometryTextures,
-        );
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
-          initialCoordinateTextures,
         );
 
         // A later real selection gets a fresh owner; fake mode never keeps the
@@ -302,10 +292,6 @@ void main() {
         expect(
           FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
           initialGeometryTextures,
-        );
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveCoordinateTextureCount,
-          initialCoordinateTextures,
         );
       },
       skip: skipProperGlassTests,

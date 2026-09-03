@@ -41,7 +41,6 @@ class FlutterGpuGeometryRenderer {
     _bindUniformLayout(fragmentShader);
     _createVertexBuffer();
     _uniformData = ByteData(_uniformSize);
-    _initCoordinateTexture();
     assert(() {
       _debugActiveRendererCount++;
       return true;
@@ -65,7 +64,6 @@ class FlutterGpuGeometryRenderer {
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
-    _initCoordinateTexture();
     assert(() {
       _debugActiveRendererCount++;
       return true;
@@ -158,7 +156,6 @@ class FlutterGpuGeometryRenderer {
   static int _debugActiveRendererCount = 0;
   static int _debugActiveGeometryTextureCount = 0;
   static int _debugActiveMaterialTextureCount = 0;
-  static int _debugActiveCoordinateTextureCount = 0;
 
   @visibleForTesting
   static int get debugActiveRendererCount => _debugActiveRendererCount;
@@ -170,10 +167,6 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   static int get debugActiveMaterialTextureCount =>
       _debugActiveMaterialTextureCount;
-
-  @visibleForTesting
-  static int get debugActiveCoordinateTextureCount =>
-      _debugActiveCoordinateTextureCount;
 
   static gpu.HostBuffer _hostBufferForUniformSize(int uniformSize) {
     final alignment = gpu.gpuContext.minimumUniformByteAlignment;
@@ -251,66 +244,11 @@ class FlutterGpuGeometryRenderer {
   // One sample per 8x8 full-resolution block makes its SDF work 64x smaller.
   static const int materialRasterScale = 8;
 
-  gpu.Texture? _coordinateTexture;
-  ui.Image? _coordinateImage;
-  final ByteData _coordinateData = ByteData(32);
-
   late final gpu.DeviceBuffer _vertexBuffer;
   late final gpu.BufferView _vertexBufferView;
 
-  ui.Image? get coordinateImage => _coordinateImage;
-
   /// Low-resolution contributor map from the latest appearance render.
   ui.Image? get materialImage => _materialImage;
-
-  void updateCoordinateMapping({
-    required double basisXX,
-    required double basisYX,
-    required double basisXY,
-    required double basisYY,
-    required double originX,
-    required double originY,
-  }) {
-    _initCoordinateTexture();
-    final floats = _coordinateData.buffer.asFloat32List();
-    if (floats[0] == basisXX &&
-        floats[1] == basisYX &&
-        floats[2] == basisXY &&
-        floats[3] == basisYY &&
-        floats[4] == originX &&
-        floats[5] == originY) {
-      return;
-    }
-    floats
-      ..[0] = basisXX
-      ..[1] = basisYX
-      ..[2] = basisXY
-      ..[3] = basisYY
-      ..[4] = originX
-      ..[5] = originY
-      ..[6] = 0
-      ..[7] = 0;
-    _coordinateTexture!.overwrite(_coordinateData);
-  }
-
-  void _initCoordinateTexture() {
-    if (_coordinateTexture != null) return;
-    _coordinateTexture = gpu.gpuContext.createTexture(
-      gpu.StorageMode.hostVisible,
-      2,
-      1,
-      format: gpu.PixelFormat.r32g32b32a32Float,
-      enableRenderTargetUsage: false,
-    );
-    if (_coordinateTexture!.isValid != true) {
-      throw StateError('LiquidGlass coordinate mapping texture is invalid.');
-    }
-    _coordinateImage = _coordinateTexture!.asImage();
-    assert(() {
-      _debugActiveCoordinateTextureCount++;
-      return true;
-    }(), 'Track live coordinate textures in debug builds.');
-  }
 
   void _bindUniformLayout(gpu.Shader fragmentShader) {
     _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
@@ -662,14 +600,6 @@ class FlutterGpuGeometryRenderer {
       }(), 'Track disposed geometry textures in debug builds.');
     }
     _texture = null;
-    _coordinateImage = null;
-    if (_coordinateTexture != null) {
-      assert(() {
-        _debugActiveCoordinateTextureCount--;
-        return true;
-      }(), 'Track disposed coordinate textures in debug builds.');
-    }
-    _coordinateTexture = null;
     assert(() {
       _debugActiveRendererCount--;
       return true;

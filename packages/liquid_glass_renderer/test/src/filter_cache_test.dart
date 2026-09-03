@@ -116,7 +116,7 @@ void main() {
   );
 
   testWidgets(
-    'reuses the composed filter when an ancestor transform moves the layer',
+    'snapshots new coordinates without rerendering geometry on ancestor motion',
     (tester) async {
       Widget movedGlass(Offset offset) => CupertinoApp(
         home: Transform.translate(
@@ -133,15 +133,21 @@ void main() {
       final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
       expect(firstFilter, isNotNull);
 
+      final geometryPasses = renderObject.gpuGeometryRenderer!.debugRenderCount;
+
       await tester.pumpWidget(movedGlass(const Offset(12, 8)));
-      // Ancestor translation is compositor-only. The tracking layer sees the
-      // transform change during compositing and must not rebuild the filter.
+      // The geometry stays retained, but each native filter must capture its
+      // own coordinates instead of mutating an older frame's shared texture.
       tester.binding.scheduleFrame();
       await tester.pump();
 
       expect(
         renderObject.debugBackdropFilterLayer?.filter,
-        same(firstFilter),
+        isNot(same(firstFilter)),
+      );
+      expect(
+        renderObject.gpuGeometryRenderer!.debugRenderCount,
+        geometryPasses,
       );
     },
     skip: skipProperGlassTests,

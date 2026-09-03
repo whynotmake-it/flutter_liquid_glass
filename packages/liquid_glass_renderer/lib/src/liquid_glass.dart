@@ -26,9 +26,9 @@ import 'package:meta/meta.dart';
 /// [LiquidGlass.withOwnLayer] constructor, which will create its own
 /// [LiquidGlassLayer] internally.
 /// Use that for glass that sits on other glass and needs an independent
-/// backdrop sample or different settings. Nested shapes that should share the
-/// parent sample can use the regular constructor; they are painted in tree
-/// order by the containing [LiquidGlassLayer].
+/// backdrop sample or different settings. The regular constructor also creates
+/// an independent sample when nested inside another glass shape, inheriting
+/// the containing layer's settings. Siblings still share their parent sample.
 ///
 /// If you don't know whether a [LiquidGlassLayer] ancestor exists, use the
 /// [LiquidGlass.auto] constructor. It will render on a parent layer if one is
@@ -219,6 +219,23 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
+    if (!grouped &&
+        _nearestLiquidGlassBoundary(context) ==
+            _LiquidGlassAncestorBoundary.glass) {
+      final scope = LiquidGlassRenderScope.of(context);
+      // Nested materials need separate backdrop passes. Combining their SDFs
+      // makes the inner shape disappear into the outer shape's interior. Keep
+      // this pass in the child's real paint ancestry so it inherits the outer
+      // shape's clipping and moves with it. Never reuse the outer backdrop key:
+      // these materials overlap and the inner must sample the painted outer.
+      return LiquidGlassLayer(
+        settings: scope.settings,
+        defaultAppearance: scope.defaultAppearance,
+        fake: scope.useFake || scope.consolidatesFakeBackdrop,
+        child: Builder(builder: _buildGlass),
+      );
+    }
+
     return _buildGlass(context);
   }
 
@@ -324,7 +341,7 @@ class LiquidGlass extends StatelessWidget {
       settings: settings,
       appearance: appearance,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      paintChildNormally: scope.consolidatesFakeBackdrop && !glassContainsChild,
+      paintChildNormally: !glassContainsChild,
       shape: shape,
       glassContainsChild: glassContainsChild,
       layerShadows: scope.consolidatesFakeBackdrop || blendGroupLink != null
@@ -574,6 +591,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
     Matrix4 transform,
     Offset offset,
   ) {
+    if (_paintChildNormally) return;
     if (attached) {
       transformLayerHandle.layer = context.pushTransform(
         needsCompositing,
@@ -598,6 +616,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
     Offset offset, {
     required bool insideGlass,
   }) {
+    if (_paintChildNormally) return;
     if (!attached || glassContainsChild != insideGlass) return;
     paintFromLayer(context, getTransformTo(from), offset);
   }

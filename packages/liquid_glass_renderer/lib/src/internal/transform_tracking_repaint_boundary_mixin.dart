@@ -95,6 +95,14 @@ mixin TransformTrackingRenderObjectMixin on RenderProxyBox {
       };
   }
 
+  /// Paints normal children after an override has inserted its tracker.
+  /// Calling this mixin's paint again would move that same tracker behind
+  /// the effect whose retained-rendering dirtiness it must update first.
+  @protected
+  void paintTrackedChild(PaintingContext context, Offset offset) {
+    super.paint(context, offset);
+  }
+
   void onTransformChanged();
 
   /// Runs every time this tracking layer is composited, including frames where
@@ -116,15 +124,24 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
   bool get alwaysNeedsAddToScene => true;
 
   @override
-  void addToScene(ui.SceneBuilder builder) {
+  void updateSubtreeNeedsAddToScene() {
+    // Resolve retained transforms after layout and paint, but before Flutter
+    // propagates retained-rendering dirtiness and submits any engine layers.
+    // Updating an effect from addToScene is too late: a containing layer may
+    // already have been selected for retained rendering.
     final renderObject = this.renderObject;
-    if (renderObject == null || !renderObject.attached) return;
-    final currentTransform =
-        trackedTransform?.call() ?? renderObject.getTransformTo(null);
-    if (!MatrixUtils.matrixEquals(currentTransform, _lastTransform)) {
-      onTransformChanged?.call();
-      _lastTransform = currentTransform;
+    if (renderObject != null && renderObject.attached) {
+      final currentTransform =
+          trackedTransform?.call() ?? renderObject.getTransformTo(null);
+      if (!MatrixUtils.matrixEquals(currentTransform, _lastTransform)) {
+        onTransformChanged?.call();
+        _lastTransform = currentTransform;
+      }
+      onCompositing?.call();
     }
-    onCompositing?.call();
+    super.updateSubtreeNeedsAddToScene();
   }
+
+  @override
+  void addToScene(ui.SceneBuilder builder) {}
 }

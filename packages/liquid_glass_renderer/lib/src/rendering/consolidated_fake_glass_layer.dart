@@ -9,6 +9,7 @@ import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
+import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
@@ -124,6 +125,8 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
 
   final _backdropLayer = LayerHandle<BackdropFilterLayer>();
   final _clipLayer = LayerHandle<ClipPathLayer>();
+  final _effectLayer = LayerHandle<OffsetLayer>();
+  final _ancestorClips = RetainedGlassClip();
   ImageFilter? _cachedFilter;
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
@@ -131,6 +134,13 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   _cachedClipInputs = [];
   Rect _paintBounds = Rect.zero;
   bool _repaintAfterCompositingScheduled = false;
+  Offset _effectTranslation = Offset.zero;
+
+  @visibleForTesting
+  int debugPaintCount = 0;
+
+  @visibleForTesting
+  Offset get debugCompositorTranslation => _effectTranslation;
 
   bool get _hasBlur => settings.effectiveFrost > 0;
   bool get _hasColorTransfer =>
@@ -163,33 +173,43 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   @override
   // ignore: must_call_super
   void paint(PaintingContext context, Offset offset) {
+    assert(() {
+      debugPaintCount++;
+      return true;
+    }(), 'Track consolidated fallback paints in debug builds.');
+    _setEffectTranslation(Offset.zero);
     context.pushLayer(setUpLayer(offset), (_, _) {}, offset);
     _paintLayer(context, offset);
   }
 
   @override
   void onTransformChanged() {
-    if (hasLiquidGlassLayerAncestor(this)) {
-      // Keep the fake path's local clip/filter in sync when an outer liquid
-      // glass layer moves, without making complete top-level layer motion
-      // repaint the retained fallback.
-      markNeedsPaint();
-    }
+    // The clip, backdrop filter, and analytic surface are local to this layer
+    // and therefore move with the retained ancestor tree without repainting.
   }
 
   @override
   void onCompositing() {
     if (!attached) return;
-    var changed = false;
-    for (final geometry in link.shapes) {
-      if (geometry.pollRelativeTransforms(this)) changed = true;
+    _ancestorClips.sync();
+    final motion = _pollCompositorTranslation();
+    if (motion.translation case final translation?) {
+      _setEffectTranslation(translation);
+      return;
     }
-    if (!changed || _repaintAfterCompositingScheduled) return;
+    if (!motion.needsRepaint || _repaintAfterCompositingScheduled) return;
     _repaintAfterCompositingScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _repaintAfterCompositingScheduled = false;
       if (attached) markNeedsPaint();
     });
+  }
+
+  bool _setEffectTranslation(Offset value) {
+    if (_sameOffset(_effectTranslation, value)) return false;
+    _effectTranslation = value;
+    _effectLayer.layer?.offset = value;
+    return true;
   }
 
   void _paintLayer(PaintingContext context, Offset offset) {
@@ -200,19 +220,25 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     final geometries = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
 
     for (final geometryRenderObject in link.shapes) {
-      geometryRenderObject.pollRelativeTransforms(this);
+      final transformPoll = geometryRenderObject.pollRelativeTransforms(this);
       final geometry = geometryRenderObject.maybeRebuildGeometry();
-      if (geometry == null) continue;
-      final transform = geometryRenderObject.getTransformTo(this);
+      final transform = transformPoll.transform;
+      if (geometry == null || transform == null) continue;
       geometries.add((geometryRenderObject, geometry, transform));
     }
 
+    _ancestorClips.update(
+      this,
+      geometries.expand(
+        (entry) => entry.$2.shapes.map((shape) => shape.renderObject),
+      ),
+    );
     if (geometries.isEmpty) {
       debugClipBounds = null;
       _paintBounds = super.paintBounds;
       _clearClipCache();
       _releaseLayers();
-      super.paint(context, offset);
+      paintTrackedChild(context, offset);
       return;
     }
 
@@ -255,7 +281,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       debugClipBounds = null;
       _paintBounds = super.paintBounds;
       _releaseLayers();
-      super.paint(context, offset);
+      paintTrackedChild(context, offset);
       return;
     }
     final clipPath = _cachedClipPath!;
@@ -266,56 +292,77 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       _debugLastPaintStages.add(_FakeGlassPaintStage.shadows);
       return true;
     }(), 'Record shadow composition order.');
-    _paintShadows(context, offset, geometries);
+    final effectLayer = (_effectLayer.layer ??= OffsetLayer())
+      ..offset = _effectTranslation;
+    _ancestorClips.pushLayer(
+      context,
+      effectLayer,
+      (effectContext, effectOffset) {
+        _paintShadows(effectContext, effectOffset, geometries);
 
-    if (_hasBackdropEffect) {
-      assert(() {
-        _debugLastPaintStages.add(_FakeGlassPaintStage.backdrop);
-        return true;
-      }(), 'Record backdrop composition order.');
-      final filter = _cachedFilter ??= _buildBackdropFilter();
-      final backdropLayer = (_backdropLayer.layer ??= BackdropFilterLayer())
-        ..filter = filter
-        ..blendMode = BlendMode.srcOver
-        ..backdropKey = backdropKey;
-      _clipLayer.layer = context.pushClipPath(
-        true,
-        offset,
-        bounds,
-        clipPath,
-        (context, offset) {
-          context.pushLayer(backdropLayer, (_, _) {}, offset);
+        if (_hasBackdropEffect) {
+          assert(() {
+            _debugLastPaintStages.add(_FakeGlassPaintStage.backdrop);
+            return true;
+          }(), 'Record backdrop composition order.');
+          final filter = _cachedFilter ??= _buildBackdropFilter();
+          final backdropLayer = (_backdropLayer.layer ??= BackdropFilterLayer())
+            ..filter = filter
+            ..blendMode = BlendMode.srcOver
+            ..backdropKey = backdropKey;
+          _clipLayer.layer = effectContext.pushClipPath(
+            true,
+            effectOffset,
+            bounds,
+            clipPath,
+            (clipContext, clipOffset) {
+              clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
+              if (_hasShapeContents(geometries, insideGlass: true)) {
+                assert(() {
+                  _debugLastPaintStages.add(
+                    _FakeGlassPaintStage.insideContents,
+                  );
+                  return true;
+                }(), 'Record contained subtree composition order.');
+                _paintShapeContents(
+                  clipContext,
+                  clipOffset,
+                  geometries,
+                  insideGlass: true,
+                );
+              }
+            },
+            oldLayer: _clipLayer.layer,
+          );
+        } else {
+          _releaseGlassLayers();
           if (_hasShapeContents(geometries, insideGlass: true)) {
             assert(() {
               _debugLastPaintStages.add(_FakeGlassPaintStage.insideContents);
               return true;
             }(), 'Record contained subtree composition order.');
-            _paintShapeContents(context, offset, geometries, insideGlass: true);
+            _paintShapeContents(
+              effectContext,
+              effectOffset,
+              geometries,
+              insideGlass: true,
+            );
           }
-        },
-        oldLayer: _clipLayer.layer,
-      );
-    } else {
-      _releaseLayers();
-      if (_hasShapeContents(geometries, insideGlass: true)) {
-        assert(() {
-          _debugLastPaintStages.add(_FakeGlassPaintStage.insideContents);
-          return true;
-        }(), 'Record contained subtree composition order.');
-        _paintShapeContents(context, offset, geometries, insideGlass: true);
-      }
-    }
+        }
 
-    assert(() {
-      _debugLastPaintStages.add(_FakeGlassPaintStage.surfaces);
-      return true;
-    }(), 'Record layer-owned surface composition order.');
-    _paintSurfaces(context.canvas, offset, geometries);
+        assert(() {
+          _debugLastPaintStages.add(_FakeGlassPaintStage.surfaces);
+          return true;
+        }(), 'Record layer-owned surface composition order.');
+        _paintSurfaces(effectContext.canvas, effectOffset, geometries);
+      },
+      offset,
+    );
     assert(() {
       _debugLastPaintStages.add(_FakeGlassPaintStage.contents);
       return true;
     }(), 'Record normal subtree composition order.');
-    super.paint(context, offset);
+    paintTrackedChild(context, offset);
   }
 
   void _paintShapeContents(
@@ -387,6 +434,79 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     }
     return true;
   }
+
+  ({bool needsRepaint, Offset? translation}) _pollCompositorTranslation() {
+    final current = link.shapes;
+    if (current.isEmpty && _cachedClipInputs.isEmpty) {
+      return (needsRepaint: false, translation: Offset.zero);
+    }
+    if (_cachedClipInputs.isEmpty ||
+        current.length != _cachedClipInputs.length) {
+      for (final geometry in current) {
+        geometry.pollRelativeTransforms(this);
+      }
+      return (needsRepaint: true, translation: null);
+    }
+
+    Offset? sharedTranslation;
+    var canTranslate = true;
+    var needsRepaint = false;
+    final translated = <RenderLiquidGlassGeometry>[];
+    for (var index = 0; index < current.length; index++) {
+      final geometry = current[index];
+      final cached = _cachedClipInputs[index];
+      final wasCurrent = geometry.hasCurrentGeometryCache(cached.$2);
+      final poll = geometry.pollRelativeTransforms(this);
+      final transform = poll.transform;
+      if (poll.selfChanged || poll.childChanged) needsRepaint = true;
+      if (!identical(geometry, cached.$1) ||
+          !wasCurrent ||
+          poll.childChanged ||
+          transform == null) {
+        canTranslate = false;
+        needsRepaint = true;
+        continue;
+      }
+
+      final translation = _translationDelta(cached.$3, transform);
+      if (translation == null) {
+        canTranslate = false;
+        needsRepaint = true;
+        continue;
+      }
+      if (sharedTranslation == null) {
+        sharedTranslation = translation;
+      } else if (!_sameOffset(sharedTranslation, translation)) {
+        canTranslate = false;
+        needsRepaint = true;
+      }
+      if (poll.selfChanged) translated.add(geometry);
+    }
+
+    if (!canTranslate) {
+      return (needsRepaint: needsRepaint, translation: null);
+    }
+    for (final geometry in translated) {
+      geometry.acceptCompositorTranslation();
+    }
+    return (
+      needsRepaint: false,
+      translation: sharedTranslation ?? Offset.zero,
+    );
+  }
+
+  static Offset? _translationDelta(Matrix4 before, Matrix4 after) {
+    final a = before.storage;
+    final b = after.storage;
+    for (var index = 0; index < 16; index++) {
+      if (index == 12 || index == 13) continue;
+      if ((a[index] - b[index]).abs() > 1e-6) return null;
+    }
+    return Offset(b[12] - a[12], b[13] - a[13]);
+  }
+
+  static bool _sameOffset(Offset a, Offset b) =>
+      (a.dx - b.dx).abs() <= 1e-6 && (a.dy - b.dy).abs() <= 1e-6;
 
   bool _sameTransform(Matrix4 a, Matrix4 b) {
     final aStorage = a.storage;
@@ -541,13 +661,19 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     }
   }
 
-  void _releaseLayers() {
+  void _releaseGlassLayers() {
     _backdropLayer.layer = null;
     _clipLayer.layer = null;
   }
 
+  void _releaseLayers() {
+    _releaseGlassLayers();
+    _effectLayer.layer = null;
+  }
+
   @override
   void dispose() {
+    _ancestorClips.dispose();
     _repaintAfterCompositingScheduled = false;
     _releaseLayers();
     super.dispose();

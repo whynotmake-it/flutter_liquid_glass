@@ -33,6 +33,10 @@ extension SnapRectToPixels on Rect {
 
 extension on double {
   double snapToPixel({required double devicePixelRatio}) {
-    return (this * devicePixelRatio).roundToDouble() / devicePixelRatio;
+    // Resolve half-pixel ties in the same direction on both sides of zero.
+    // roundToDouble rounds ties away from zero, so moving an antialiased
+    // matte across the origin changes its dimensions by a pixel. A retained
+    // translated matte must match one rasterized at the destination.
+    return (this * devicePixelRatio + 0.5).floorToDouble() / devicePixelRatio;
   }
 }

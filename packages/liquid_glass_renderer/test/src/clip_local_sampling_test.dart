@@ -31,7 +31,9 @@ void main() {
       source,
       contains('geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize'),
     );
-    expect(source, contains('uCoordinateTexture'));
+    expect(source, contains('uniform vec4 uFilterToMatteBasis'));
+    expect(source, contains('uniform vec2 uFilterToMatteOffset'));
+    expect(source, isNot(contains('uCoordinateTexture')));
     expect(
       source,
       contains(

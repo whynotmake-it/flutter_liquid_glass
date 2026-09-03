@@ -68,12 +68,14 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
     if (useFake) {
       return _InheritedLiquidGlassBlendGroup(
         link: _geometryLink,
+        renderLink: InheritedGeometryRenderLink.of(context),
         child: widget.child,
       );
     }
 
     return _InheritedLiquidGlassBlendGroup(
       link: _geometryLink,
+      renderLink: InheritedGeometryRenderLink.of(context),
       child: _RawLiquidGlassBlendGroup(
         blend: widget.blend,
         link: _geometryLink,
@@ -88,20 +90,28 @@ class _LiquidGlassBlendGroupState extends State<LiquidGlassBlendGroup> {
 class _InheritedLiquidGlassBlendGroup extends InheritedWidget {
   const _InheritedLiquidGlassBlendGroup({
     required this.link,
+    required this.renderLink,
     required super.child,
   });
 
   final GlassGroupLink link;
+  final GeometryRenderLink? renderLink;
 
   static _InheritedLiquidGlassBlendGroup? of(BuildContext context) {
-    return context
+    final inherited = context
         .dependOnInheritedWidgetOfExactType<_InheritedLiquidGlassBlendGroup>();
+    // A nested layer owns a different backdrop sample. Its shapes must not
+    // register in a blend group belonging to an outer layer.
+    return inherited?.renderLink == InheritedGeometryRenderLink.of(context)
+        ? inherited
+        : null;
   }
 
   @override
   bool updateShouldNotify(covariant InheritedWidget oldWidget) {
     return oldWidget is! _InheritedLiquidGlassBlendGroup ||
-        oldWidget.link != link;
+        oldWidget.link != link ||
+        oldWidget.renderLink != renderLink;
   }
 }
 

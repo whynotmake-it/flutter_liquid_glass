@@ -31,6 +31,8 @@ uniform vec4 uProfileConfig;
 uniform vec2 uMaterialConfig;
 uniform vec3 uBevelShadowConfig;
 uniform vec3 uAppearanceConfig;
+uniform vec4 uFilterToMatteBasis;
+uniform vec2 uFilterToMatteOffset;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -71,7 +73,6 @@ const float kContourCoverageFeather = 1.0;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
-uniform sampler2D uCoordinateTexture;
 #if SHAPE_APPEARANCE || SHAPE_TINT
 uniform sampler2D uMaterialTexture;
 #endif
@@ -403,17 +404,15 @@ vec3 applySpecularHighlights(
 void main() {
     // Map image-filter fragment coordinates back into the layer-local geometry
     // matte. Apple Metal surfaces expose global filter coordinates, while
-    // other backends may expose clip-local coordinates; this live affine
-    // mapping handles both without rebuilding the native image filter.
+    // other backends may expose clip-local coordinates. These uniforms are
+    // snapshotted with the frame, never overwritten through a shared texture.
     vec2 fragCoord = FlutterFragCoord().xy;
     vec2 screenUV = fragCoord / uSize;
 
-    vec4 filterToMatteBasis = texture(uCoordinateTexture, vec2(0.25, 0.5));
-    vec2 filterToMatteOffset = texture(uCoordinateTexture, vec2(0.75, 0.5)).xy;
     vec2 matteCoord = vec2(
-        dot(filterToMatteBasis.xy, fragCoord),
-        dot(filterToMatteBasis.zw, fragCoord)
-    ) + filterToMatteOffset;
+        dot(uFilterToMatteBasis.xy, fragCoord),
+        dot(uFilterToMatteBasis.zw, fragCoord)
+    ) + uFilterToMatteOffset;
     vec2 geometryUV = (matteCoord - uGeometryOffset) / uGeometrySize;
 
     if (
@@ -596,7 +595,7 @@ void main() {
         float scaleWeight = distanceWeight * refractionComplement;
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
-            filterToMatteBasis
+            uFilterToMatteBasis
         );
         float backdropScale = clamp(uBackdropScale, 0.25, 4.0);
         backdropScaleOffset =

@@ -25,6 +25,14 @@ enum LiquidGlassGeometryState {
   needsUpdate,
 }
 
+/// Result of checking one geometry node against its owning layer.
+@internal
+typedef LiquidGlassTransformPoll = ({
+  bool childChanged,
+  bool selfChanged,
+  Matrix4? transform,
+});
+
 /// A render object that contributes one glass shape to a geometry pass.
 @internal
 mixin LiquidGlassShapeRenderObject on RenderBox {
@@ -145,26 +153,50 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   /// Detects motion of this geometry relative to [layer].
   ///
   /// Called from the layer's paint and compositing hooks so descendant glass
-  /// does not need its own always-composite tracking layers. Returns true when
-  /// geometry must be rebuilt.
-  bool pollRelativeTransforms(RenderObject layer) {
-    if (!attached || !layer.attached || !hasSize) return false;
+  /// does not need its own always-composite tracking layers. The two change
+  /// flags let the layer distinguish a uniformly translated geometry node
+  /// from shapes moving inside a blend group.
+  LiquidGlassTransformPoll pollRelativeTransforms(RenderObject layer) {
+    if (!attached || !layer.attached || !hasSize) {
+      return (childChanged: false, selfChanged: false, transform: null);
+    }
 
-    var changed = false;
     final toLayer = getTransformTo(layer);
+    var selfChanged = false;
     if (_lastTransformToLayer == null) {
       _lastTransformToLayer = toLayer;
     } else if (!MatrixUtils.matrixEquals(toLayer, _lastTransformToLayer)) {
       _lastTransformToLayer = toLayer;
-      changed = true;
+      selfChanged = true;
     }
 
-    if (pollChildShapeTransforms()) {
-      changed = true;
-    } else if (changed) {
+    final childChanged = pollChildShapeTransforms();
+    if (!childChanged && selfChanged) {
       markGeometryNeedsUpdate();
     }
-    return changed;
+    return (
+      childChanged: childChanged,
+      selfChanged: selfChanged,
+      transform: toLayer,
+    );
+  }
+
+  /// Whether [candidate] was current before polling compositor motion.
+  bool hasCurrentGeometryCache(GeometryCache candidate) =>
+      identical(geometry, candidate) &&
+      geometryState == LiquidGlassGeometryState.updated;
+
+  /// Whether the encoded matte revision was current before compositor motion.
+  bool hasCurrentMatteRevision(int revision) =>
+      geometry?.matteRevision == revision &&
+      geometryState == LiquidGlassGeometryState.updated;
+
+  /// Records that a translation was applied to the retained layer instead of
+  /// invalidating this node's local geometry.
+  void acceptCompositorTranslation() {
+    if (geometryState == LiquidGlassGeometryState.mightNeedUpdate) {
+      geometryState = LiquidGlassGeometryState.updated;
+    }
   }
 
   /// Detects motion of registered shapes relative to this geometry node.

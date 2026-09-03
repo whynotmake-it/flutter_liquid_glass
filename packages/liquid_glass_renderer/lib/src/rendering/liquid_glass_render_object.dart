@@ -16,6 +16,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
+import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
@@ -35,7 +36,8 @@ bool hasLiquidGlassLayerAncestor(RenderObject renderObject) {
 /// A render object that can assemble [RenderLiquidGlassGeometry] shapes and
 /// render them to the screen with the liquid glass effect.
 @internal
-abstract class LiquidGlassRenderObject extends RenderProxyBox {
+abstract class LiquidGlassRenderObject extends RenderProxyBox
+    implements LiquidGlassLayerRenderObject {
   LiquidGlassRenderObject({
     required this._link,
     required this.defaultRenderShader,
@@ -334,11 +336,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   _shapesWithGeometry = [];
   final List<_EncodedGeometryInput> _encodedGeometryInputs = [];
   Rect? _encodedGeometryBounds;
+  final _effectLayer = LayerHandle<OffsetLayer>();
+  final _ancestorClips = RetainedGlassClip();
 
-  void _pollRegisteredGeometryTransforms() {
-    for (final geometryRo in link.shapes) {
-      geometryRo.pollRelativeTransforms(this);
-    }
+  @protected
+  void syncAncestorClips() => _ancestorClips.sync();
+  Offset _effectTranslation = Offset.zero;
+
+  /// Translation applied to the retained layer-owned effect since paint.
+  @protected
+  Offset get compositorTranslation => _effectTranslation;
+
+  @visibleForTesting
+  Offset get debugCompositorTranslation => _effectTranslation;
+
+  /// Moves all layer-owned painting without recording it again.
+  @protected
+  bool setCompositorTranslation(Offset value) {
+    if (_nearOffset(_effectTranslation, value)) return false;
+    _effectTranslation = value;
+    _effectLayer.layer?.offset = value;
+    return true;
   }
 
   // MARK: Painting
@@ -354,19 +372,17 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       '$hashCode Painting liquid glass with '
       '${link._shapeGeometries.length} shapes.',
     );
-
-    _pollRegisteredGeometryTransforms();
+    setCompositorTranslation(Offset.zero);
 
     _shapesWithGeometry.clear();
 
     Rect? boundingBox;
 
     for (final geometryRo in link.shapes) {
+      final transformPoll = geometryRo.pollRelativeTransforms(this);
       final geometry = geometryRo.maybeRebuildGeometry();
-
-      if (geometry == null) continue;
-
-      final transform = geometryRo.getTransformTo(this);
+      final transform = transformPoll.transform;
+      if (geometry == null || transform == null) continue;
       _shapesWithGeometry.add((geometryRo, geometry, transform));
 
       final geoBounds = MatrixUtils.transformRect(
@@ -378,9 +394,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           : boundingBox.expandToInclude(geoBounds);
     }
 
+    _ancestorClips.update(
+      this,
+      _shapesWithGeometry.expand(
+        (entry) => entry.$2.shapes.map((shape) => shape.renderObject),
+      ),
+    );
     if (boundingBox == null) {
       _clearGeometryImage();
       releaseCompositorFilter();
+      _effectLayer.layer = null;
       super.paint(context, offset);
       return;
     }
@@ -411,17 +434,23 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       // Keep any existing matte so ancestor motion stays compositor-only.
       // Skip the backdrop filter so idle glass does not sample.
       releaseCompositorFilter();
-      paintShapeContents(
+      _paintRetainedEffect(
         context,
         offset,
-        _shapesWithGeometry,
-        insideGlass: true,
-      );
-      paintShapeContents(
-        context,
-        offset,
-        _shapesWithGeometry,
-        insideGlass: false,
+        (effectContext, effectOffset) {
+          paintShapeContents(
+            effectContext,
+            effectOffset,
+            _shapesWithGeometry,
+            insideGlass: true,
+          );
+          paintShapeContents(
+            effectContext,
+            effectOffset,
+            _shapesWithGeometry,
+            insideGlass: false,
+          );
+        },
       );
       super.paint(context, offset);
       return;
@@ -450,23 +479,23 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       }
     }
 
-    if (debugPaintLiquidGlassGeometry) {
-      _debugPaintGeometry(context, offset);
-      paintShapeContents(
-        context,
-        offset,
-        _shapesWithGeometry,
-        insideGlass: true,
-      );
-      paintShapeContents(
-        context,
-        offset,
-        _shapesWithGeometry,
-        insideGlass: false,
-      );
-    } else {
-      if (_geometryImage case final geometryImage?) {
-        final coordinateImage = syncCoordinateMapping();
+    _paintRetainedEffect(context, offset, (effectContext, effectOffset) {
+      if (debugPaintLiquidGlassGeometry) {
+        _debugPaintGeometry(effectContext, effectOffset);
+        paintShapeContents(
+          effectContext,
+          effectOffset,
+          _shapesWithGeometry,
+          insideGlass: true,
+        );
+        paintShapeContents(
+          effectContext,
+          effectOffset,
+          _shapesWithGeometry,
+          insideGlass: false,
+        );
+      } else if (_geometryImage case final geometryImage?) {
+        syncCoordinateMapping();
         final activeRenderShader = renderShader;
         activeRenderShader
           ..setFloatUniforms(initialIndex: 2, (value) {
@@ -477,20 +506,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           ..setFloatUniforms(initialIndex: 33, (value) {
             value.setOffset(_materialCenterInMatte * devicePixelRatio);
           })
-          ..setImageSampler(1, geometryImage)
-          ..setImageSampler(2, coordinateImage);
+          ..setImageSampler(1, geometryImage);
         if (_materialImage case final materialImage?) {
           if (_usesTintOnlyAppearance) {
             activeRenderShader.setImageSampler(
-              3,
+              2,
               materialImage,
               filterQuality: FilterQuality.low,
             );
           } else {
             activeRenderShader
-              ..setImageSampler(3, materialImage)
+              ..setImageSampler(2, materialImage)
               ..setImageSampler(
-                4,
+                3,
                 materialImage,
                 filterQuality: FilterQuality.low,
               );
@@ -499,22 +527,35 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
         _shaderInputSnapshot = _ShaderInputSnapshot(
           geometryImage: geometryImage,
           materialImage: _materialImage,
-          coordinateImage: coordinateImage,
           matteBounds: _geometryMatteBounds,
           devicePixelRatio: devicePixelRatio,
           settingsRevision: _shaderSettingsRevision,
         );
-        _paintLayerShadows(context, offset, _shapesWithGeometry);
+        _paintLayerShadows(
+          effectContext,
+          effectOffset,
+          _shapesWithGeometry,
+        );
         paintLiquidGlass(
-          context,
-          offset,
+          effectContext,
+          effectOffset,
           _shapesWithGeometry,
           materialPaintBounds,
         );
       }
-    }
+    });
 
     super.paint(context, offset);
+  }
+
+  void _paintRetainedEffect(
+    PaintingContext context,
+    Offset offset,
+    PaintingContextCallback painter,
+  ) {
+    final layer = (_effectLayer.layer ??= OffsetLayer())
+      ..offset = _effectTranslation;
+    _ancestorClips.pushLayer(context, layer, painter, offset);
   }
 
   Rect _expandForLayerShadows(Rect bounds) {
@@ -693,6 +734,71 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     }
   }
 
+  /// Polls retained geometry for a translation that can be applied directly
+  /// to the layer tree before it is submitted to the engine.
+  @protected
+  ({bool needsRepaint, Offset? translation}) pollCompositorTranslation() {
+    final current = link.shapes;
+    if (current.isEmpty && _encodedGeometryInputs.isEmpty) {
+      return (needsRepaint: false, translation: Offset.zero);
+    }
+    if (_encodedGeometryInputs.isEmpty ||
+        current.length != _encodedGeometryInputs.length) {
+      for (final geometry in current) {
+        geometry.pollRelativeTransforms(this);
+      }
+      return (needsRepaint: true, translation: null);
+    }
+
+    Offset? sharedTranslation;
+    var canTranslate = true;
+    var needsRepaint = false;
+    final translated = <RenderLiquidGlassGeometry>[];
+    for (var index = 0; index < current.length; index++) {
+      final geometry = current[index];
+      final encoded = _encodedGeometryInputs[index];
+      final wasCurrent = geometry.hasCurrentMatteRevision(
+        encoded.matteRevision,
+      );
+      final poll = geometry.pollRelativeTransforms(this);
+      final transform = poll.transform;
+      if (poll.selfChanged || poll.childChanged) needsRepaint = true;
+      if (!identical(geometry, encoded.renderObject) ||
+          !wasCurrent ||
+          poll.childChanged ||
+          transform == null) {
+        canTranslate = false;
+        needsRepaint = true;
+        continue;
+      }
+
+      final translation = _translationDelta(encoded.transform, transform);
+      if (translation == null) {
+        canTranslate = false;
+        needsRepaint = true;
+        continue;
+      }
+      if (sharedTranslation == null) {
+        sharedTranslation = translation;
+      } else if (!_nearOffset(sharedTranslation, translation)) {
+        canTranslate = false;
+        needsRepaint = true;
+      }
+      if (poll.selfChanged) translated.add(geometry);
+    }
+
+    if (!canTranslate) {
+      return (needsRepaint: needsRepaint, translation: null);
+    }
+    for (final geometry in translated) {
+      geometry.acceptCompositorTranslation();
+    }
+    return (
+      needsRepaint: false,
+      translation: sharedTranslation ?? Offset.zero,
+    );
+  }
+
   bool _reuseUniformlyTranslatedGeometry(Rect bounds) {
     final oldBounds = _encodedGeometryBounds;
     if (oldBounds == null ||
@@ -755,32 +861,41 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
     Rect boundingBox,
   );
 
+  (double, double, double, double, double, double)? _coordinateMapping;
+
   @protected
-  ui.Image syncCoordinateMapping() {
-    final renderer = _gpuGeometryRenderer;
-    if (renderer == null) {
-      throw StateError('Flutter GPU coordinate renderer is unavailable.');
-    }
+  bool syncCoordinateMapping() {
     final globalToMatte = Matrix4.inverted(shaderCoordinateTransform);
     final origin = MatrixUtils.transformPoint(globalToMatte, Offset.zero);
     final axisX = MatrixUtils.transformPoint(globalToMatte, const Offset(1, 0));
     final axisY = MatrixUtils.transformPoint(globalToMatte, const Offset(0, 1));
-    renderer.updateCoordinateMapping(
-      basisXX: axisX.dx - origin.dx,
-      basisYX: axisY.dx - origin.dx,
-      basisXY: axisX.dy - origin.dy,
-      basisYY: axisY.dy - origin.dy,
-      originX: origin.dx * devicePixelRatio,
-      originY: origin.dy * devicePixelRatio,
+    final mapping = (
+      axisX.dx - origin.dx,
+      axisY.dx - origin.dx,
+      axisX.dy - origin.dy,
+      axisY.dy - origin.dy,
+      origin.dx * devicePixelRatio,
+      origin.dy * devicePixelRatio,
     );
-    return renderer.coordinateImage!;
+    final changed = mapping != _coordinateMapping;
+    _coordinateMapping = mapping;
+    renderShader.setFloatUniforms(initialIndex: 44, (value) {
+      value.setFloats([
+        mapping.$1,
+        mapping.$2,
+        mapping.$3,
+        mapping.$4,
+        mapping.$5,
+        mapping.$6,
+      ]);
+    });
+    return changed;
   }
 
   /// True once geometry has been encoded, so ancestor motion can stay on the
   /// compositor without crossing this layer's repaint boundary.
   @protected
-  bool get hasReusableGeometry =>
-      _geometryImage != null && _gpuGeometryRenderer?.coordinateImage != null;
+  bool get hasReusableGeometry => _geometryImage != null;
 
   /// Drops native backdrop-filter state while this sample is idle.
   @protected
@@ -800,7 +915,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// shader may only be reused across paints while this snapshot compares
   /// equal.
   @protected
-  Object get shaderInputSnapshot => _shaderInputSnapshot;
+  Object get shaderInputSnapshot => (_shaderInputSnapshot, _coordinateMapping);
   late Object _shaderInputSnapshot;
 
   @protected
@@ -847,8 +962,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   @override
   @mustCallSuper
   void dispose() {
+    _ancestorClips.dispose();
     _clearGeometryImage();
     _gpuGeometryRenderer = null;
+    _effectLayer.layer = null;
     super.dispose();
   }
 
@@ -1200,14 +1317,13 @@ final class _EncodedGeometryInput {
 /// image filter snapshots at creation time.
 ///
 /// Geometry images are persistent GPU textures whose wrappers stay stable
-/// while the contents are updated in place. Ancestor transforms are not part
-/// of this key: they are applied by the compositor, not the shader.
+/// while the contents are updated in place. The frame's coordinate mapping
+/// is paired with this key by [LiquidGlassRenderObject.shaderInputSnapshot].
 @immutable
 class _ShaderInputSnapshot {
   const _ShaderInputSnapshot({
     required this.geometryImage,
     required this.materialImage,
-    required this.coordinateImage,
     required this.matteBounds,
     required this.devicePixelRatio,
     required this.settingsRevision,
@@ -1215,7 +1331,6 @@ class _ShaderInputSnapshot {
 
   final ui.Image geometryImage;
   final ui.Image? materialImage;
-  final ui.Image coordinateImage;
   final Rect matteBounds;
   final double devicePixelRatio;
   final int settingsRevision;
@@ -1225,7 +1340,6 @@ class _ShaderInputSnapshot {
     return other is _ShaderInputSnapshot &&
         other.geometryImage == geometryImage &&
         other.materialImage == materialImage &&
-        other.coordinateImage == coordinateImage &&
         other.matteBounds == matteBounds &&
         other.devicePixelRatio == devicePixelRatio &&
         other.settingsRevision == settingsRevision;
@@ -1235,7 +1349,6 @@ class _ShaderInputSnapshot {
   int get hashCode => Object.hash(
     geometryImage,
     materialImage,
-    coordinateImage,
     matteBounds,
     devicePixelRatio,
     settingsRevision,
@@ -1244,7 +1357,6 @@ class _ShaderInputSnapshot {
   @override
   String toString() {
     return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
-        'coordinates: ${identityHashCode(coordinateImage)}, '
         'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
         'settingsRevision: $settingsRevision)';
   }

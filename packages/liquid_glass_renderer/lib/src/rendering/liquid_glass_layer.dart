@@ -493,45 +493,63 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Matrix4 get matteTransform => Matrix4.identity();
 
   @override
-  Matrix4 get shaderCoordinateTransform => getTransformTo(null);
+  Matrix4 get shaderCoordinateTransform {
+    final transform = getTransformTo(null);
+    final translation = compositorTranslation;
+    if (translation != Offset.zero) {
+      transform.multiply(
+        Matrix4.translationValues(translation.dx, translation.dy, 0),
+      );
+    }
+    return transform;
+  }
 
   @override
   void onTransformChanged() {
-    if (hasLiquidGlassLayerAncestor(this)) {
-      // A nested layer owns a filter and clip expressed in its own local
-      // coordinates. When an outer liquid-glass layer moves, compositor-only
-      // retention does not update that local retained subtree's paint state.
-      // Repaint only nested layers; a top-level layer keeps the fast path
-      // below for complete-layer motion.
-      markNeedsPaint();
-      return;
-    }
-    // Geometry and FlutterFragCoord share this layer's clip space, so ancestor
-    // motion is compositor-only. Do not cross the repaint boundary or rebuild
-    // the native image filter after the first paint.
-    if (hasReusableGeometry) {
-      syncCoordinateMapping();
-    } else {
-      markNeedsPaint();
-    }
+    // Synchronize the frame's mapping after retained translation is resolved.
+    if (!hasReusableGeometry) markNeedsPaint();
   }
 
   @override
   void onCompositing() {
     if (!attached) return;
-    var dirty = false;
-    for (final geometry in link.shapes) {
-      if (geometry.pollRelativeTransforms(this)) {
-        dirty = true;
+    syncAncestorClips();
+    final motion = pollCompositorTranslation();
+    if (motion.translation case final translation?) {
+      setCompositorTranslation(translation);
+      if (hasReusableGeometry && syncCoordinateMapping()) {
+        _shaderHandle.layer?.filter = _updateShaderFilter();
       }
+      return;
     }
-    if (dirty) {
-      markNeedsPaint();
-    }
+    if (motion.needsRepaint) markNeedsPaint();
   }
 
   ImageFilter? _cachedFilter;
   Object? _cachedFilterSnapshot;
+
+  ImageFilter _updateShaderFilter() {
+    final snapshot = shaderInputSnapshot;
+    if (_cachedFilter != null && _cachedFilterSnapshot == snapshot) {
+      return _cachedFilter!;
+    }
+    final shader = ImageFilter.shader(renderShader);
+    final frostSigma = settings.effectiveFrost;
+    final filter = frostSigma > 0
+        ? ImageFilter.compose(
+            inner: ImageFilter.blur(
+              tileMode: TileMode.mirror,
+              sigmaX: frostSigma,
+              sigmaY: frostSigma,
+            ),
+            outer: shader,
+          )
+        : shader;
+    _cachedFilter = filter;
+    _cachedFilterSnapshot = snapshot;
+    return filter;
+  }
+
   Path? _cachedClipPath;
   final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
   _cachedClipInputs = [];
@@ -588,27 +606,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // every snapshotted input is unchanged. Repaints with identical shader
     // inputs (for example a static layer invalidated by foreground content)
     // skip all Dart and native filter allocation.
-    final snapshot = shaderInputSnapshot;
-    var shaderFilter = _cachedFilter;
-    if (shaderFilter == null || _cachedFilterSnapshot != snapshot) {
-      final frostSigma = settings.effectiveFrost;
-      final blurFilter = frostSigma > 0
-          ? ImageFilter.blur(
-              tileMode: TileMode.mirror,
-              sigmaX: frostSigma,
-              sigmaY: frostSigma,
-            )
-          : null;
-      shaderFilter = switch (blurFilter) {
-        final blur? => ImageFilter.compose(
-          inner: blur,
-          outer: ImageFilter.shader(renderShader),
-        ),
-        null => ImageFilter.shader(renderShader),
-      };
-      _cachedFilter = shaderFilter;
-      _cachedFilterSnapshot = snapshot;
-    }
+    final shaderFilter = _updateShaderFilter();
 
     final shaderLayer = (_shaderHandle.layer ??= BackdropFilterLayer())
       ..filter = shaderFilter
@@ -666,14 +664,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       (context, offset) {
         context.pushLayer(
           shaderLayer,
-          (context, offset) {
-            paintShapeContents(
-              context,
-              offset,
-              shapes,
-              insideGlass: false,
-            );
-          },
+          (context, offset) {},
           offset,
         );
       },
