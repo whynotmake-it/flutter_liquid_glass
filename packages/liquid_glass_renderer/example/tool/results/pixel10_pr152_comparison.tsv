@@ -1,0 +1,13 @@
+repetition	order	variant	scenario	frames	build_p95_us	raster_p50_us	raster_p95_us	raster_p99_us	total_p95_us	pss_kb	rss_kb	backend
+1	1	current-real	realToolbarMaterial	483	5756	9015	18755	20076	23864	259020	378708	Vulkan
+1	2	pr152-real	realToolbarMaterial	472	3399	8564	13143	15365	26596	260855	380280	Vulkan
+1	3	current-fake	fakeToolbarMaterial	481	3241	10148	14871	17626	19638	236463	355888	Vulkan
+1	4	pr152-fake	fakeToolbarMaterial	379	6175	11133	39330	53448	71269	299227	418652	Vulkan
+2	1	pr152-fake	fakeToolbarMaterial	404	6274	11456	35877	49203	65291	285442	404832	Vulkan
+2	2	current-fake	fakeToolbarMaterial	480	3095	9978	14488	18933	20424	233161	352584	Vulkan
+2	3	pr152-real	realToolbarMaterial	472	3572	8645	13609	16267	26559	287751	407140	Vulkan
+2	4	current-real	realToolbarMaterial	480	5523	9151	18300	19790	23080	245117	364536	Vulkan
+3	1	pr152-real	realToolbarMaterial	461	3348	8909	14237	18155	29825	297363	416748	Vulkan
+3	2	current-real	realToolbarMaterial	480	5216	8556	18297	19733	23650	243827	363288	Vulkan
+3	3	pr152-fake	fakeToolbarMaterial	379	6306	10950	38875	54612	69027	282151	401596	Vulkan
+3	4	current-fake	fakeToolbarMaterial	480	3284	9838	13865	16611	18705	235547	354956	Vulkan
