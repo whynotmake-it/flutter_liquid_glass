@@ -1,0 +1,12 @@
+/out/
+/apple/build/
+/apple/.slider_driver/
+/compare/.venv/
+/references/**/frames/
+!/references/ios27-iphone17pro-light/toolbar_capsule/frames/
+!/references/ios27-iphone17pro-light/toolbar_capsule/frames/**
+/references/.staging/
+/references/**/*.replaced-*/
+/settings/tmp-*.json
+**/__pycache__/
+*.pyc

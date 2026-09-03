@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "toolbar_solid_palette_dark",
+  "profile": "toolbar_capsule",
+  "canvas": {"logicalWidth": 402, "logicalHeight": 874, "scale": 3},
+  "shape": {"kind": "capsule", "x": 88.3335, "y": 386.5, "width": 225.333, "height": 101, "cornerRadius": 50.5, "appleContentInsetX": 25.333, "appleContentInsetY": 21},
+  "appearance": "dark",
+  "transparency": {"reduceTransparency": false, "appleSliderMapped": false},
+  "roles": {"refraction": "X", "palette": ["R", "O", "Y", "G", "C", "B", "P", "N"], "luminance": ["L", "M", "H"], "black": "K", "white": "W"},
+  "probes": [
+    {"id": "X", "background": {"kind": "tileGrid", "cellSize": 72, "gutter": 0, "gutterColor": "#101010", "palette": {"R": "#EF4444", "O": "#F97316", "Y": "#EAB308", "G": "#22C55E", "C": "#06B6D4", "B": "#3B82F6", "P": "#A855F7", "N": "#737373"}, "pattern": ["ROYG", "CBPN", "YGRO", "NPCB"]}},
+    {"id": "R", "background": {"kind": "solid", "color": "#EF4444"}},
+    {"id": "O", "background": {"kind": "solid", "color": "#F97316"}},
+    {"id": "Y", "background": {"kind": "solid", "color": "#EAB308"}},
+    {"id": "G", "background": {"kind": "solid", "color": "#22C55E"}},
+    {"id": "C", "background": {"kind": "solid", "color": "#06B6D4"}},
+    {"id": "B", "background": {"kind": "solid", "color": "#3B82F6"}},
+    {"id": "P", "background": {"kind": "solid", "color": "#A855F7"}},
+    {"id": "N", "background": {"kind": "solid", "color": "#737373"}},
+    {"id": "L", "background": {"kind": "solid", "color": "#333333"}},
+    {"id": "M", "background": {"kind": "solid", "color": "#999999"}},
+    {"id": "H", "background": {"kind": "solid", "color": "#DDDDDD"}},
+    {"id": "K", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "W", "background": {"kind": "solid", "color": "#FFFFFF"}}
+  ]
+}
