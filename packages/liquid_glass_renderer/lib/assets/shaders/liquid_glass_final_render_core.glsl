@@ -310,6 +310,12 @@ vec2 mirrorBackgroundUV(vec2 uv, vec2 inverseTextureSize) {
     // only displaced samples that genuinely leave it. This avoids GLES decal
     // black without clamping Metal samples into stretched edge pixels.
     vec2 mirrored = vec2(1.0) - abs(mod(uv, vec2(2.0)) - vec2(1.0));
+#ifdef IMPELLER_TARGET_OPENGLES
+    // Flutter 3.44 ImageFilter.shader inputs are bottom-up on GLES. Flip only
+    // the final backdrop sample, including its refraction/magnification offset;
+    // geometry and material maps retain their existing coordinate convention.
+    mirrored.y = 1.0 - mirrored.y;
+#endif
     vec2 halfTexel = inverseTextureSize * 0.5;
     return clamp(mirrored, halfTexel, vec2(1.0) - halfTexel);
 }
@@ -737,8 +743,10 @@ void main() {
             #ifdef IMPELLER_TARGET_OPENGLES
             // The GLES runtime stages also emit GLSL ES 1.00, which has no
             // texelFetch. The texel centre is exact under nearest sampling;
-            // bilinear can differ by a few LSB at hard edges.
-            refractColor = texture(uBackgroundTexture, refractedUV);
+            // bilinear can differ by a few LSB at hard edges. Flutter 3.44
+            // ImageFilter.shader inputs are bottom-up on GLES.
+            vec2 fetchUV = vec2(refractedUV.x, 1.0 - refractedUV.y);
+            refractColor = texture(uBackgroundTexture, fetchUV);
             #else
             refractColor = texelFetch(
                 uBackgroundTexture,
