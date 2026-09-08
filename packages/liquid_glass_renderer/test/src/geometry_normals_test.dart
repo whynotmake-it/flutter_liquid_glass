@@ -12,9 +12,9 @@ void main() {
   test(
     'geometry normals are exact per pixel on tight curves',
     () async {
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
+      )!;
       final renderer = FlutterGpuGeometryRenderer(
         vertexShader: library['GeometryVertex']!,
         fragmentShader: library['GeometryFragment']!,
