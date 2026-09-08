@@ -74,7 +74,7 @@ class FlutterGpuGeometryRenderer {
       }
     }
     final resourcesFuture = _assetResources[assetKey] ??= () async {
-      final library = await gpu.ShaderLibrary.fromAsset(assetKey);
+      final library = gpu.ShaderLibrary.fromAsset(assetKey);
       final vertexShader = library?['GeometryVertex'];
       final fragmentShader = library?['GeometryFragment'];
       final materialGradientFragmentShader =
@@ -458,7 +458,7 @@ class FlutterGpuGeometryRenderer {
             ..bindPipeline(_pipeline)
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView);
+            ..bindVertexBuffer(_vertexBufferView, 4);
       _restrictTo(geometryPass, _texture!, passWidth, passHeight);
       if (drawRect != null) {
         geometryPass.setScissor(
@@ -470,7 +470,7 @@ class FlutterGpuGeometryRenderer {
           ),
         );
       }
-      geometryPass.draw(4);
+      geometryPass.draw();
       _submitOrDefer(geometryCommandBuffer);
     }
     if (writeMaterials) {
@@ -488,14 +488,14 @@ class FlutterGpuGeometryRenderer {
             )
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView);
+            ..bindVertexBuffer(_vertexBufferView, 4);
       _restrictTo(
         materialPass,
         _materialTexture!,
         materialWidth,
         materialHeight,
       );
-      materialPass.draw(4);
+      materialPass.draw();
       _submitOrDefer(materialCommandBuffer);
     }
 
