@@ -4,6 +4,19 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('3.44 GLES flips only the final backdrop sampling coordinates', () {
+    final source = File(
+      'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+    ).readAsStringSync();
+    final sampling = source.substring(
+      source.indexOf('vec2 mirrorBackgroundUV('),
+      source.indexOf('vec2 filterDeltaFromMatteDelta('),
+    );
+    expect(sampling, contains('#ifdef IMPELLER_TARGET_OPENGLES'));
+    expect(sampling, contains('mirrored.y = 1.0 - mirrored.y;'));
+    expect(source, isNot(contains('fragCoord.y =')));
+  });
+
   test('uniform appearance compiles contributor work out', () {
     final defaultEntry = File(
       'lib/assets/shaders/liquid_glass_final_render.frag',
