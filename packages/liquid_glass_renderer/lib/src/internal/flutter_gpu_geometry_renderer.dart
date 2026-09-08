@@ -99,7 +99,7 @@ class FlutterGpuGeometryRenderer {
       }
     }
     final resourcesFuture = _assetResources[assetKey] ??= () async {
-      final library = await gpu.ShaderLibrary.fromAsset(assetKey);
+      final library = gpu.ShaderLibrary.fromAsset(assetKey);
       final vertexShader = library?['GeometryVertex'];
       final fragmentShader = library?['GeometryFragment'];
       final materialGradientFragmentShader =
@@ -461,8 +461,8 @@ class FlutterGpuGeometryRenderer {
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(_vertexBufferView)
-      ..draw(4);
+      ..bindVertexBuffer(_vertexBufferView, 4)
+      ..draw();
     geometryCommandBuffer.submit();
     if (GpuAllocationDiagnostics.enabled) {
       GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
@@ -483,8 +483,8 @@ class FlutterGpuGeometryRenderer {
             )
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView)
-            ..draw(4);
+            ..bindVertexBuffer(_vertexBufferView, 4)
+            ..draw();
       materialCommandBuffer.submit();
       if (GpuAllocationDiagnostics.enabled) {
         GpuAllocationDiagnostics.observe('command', materialCommandBuffer);
