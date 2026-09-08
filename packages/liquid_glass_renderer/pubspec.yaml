@@ -16,8 +16,8 @@ topics:
   - effects
 
 environment:
-  sdk: ">=3.13.0 <3.14.0"
-  flutter: ">=3.47.0"
+  sdk: ">=3.12.0 <3.13.0"
+  flutter: ">=3.44.0 <3.45.0"
 
 # Real glass needs Impeller and Flutter GPU (macOS, iOS, Android). The web
 # build compiles and renders the fake-glass fallback.
