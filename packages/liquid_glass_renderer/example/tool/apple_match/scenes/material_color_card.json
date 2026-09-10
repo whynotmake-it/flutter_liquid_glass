@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "material_color_card",
+  "profile": "material_shape",
+  "canvas": {"logicalWidth": 402, "logicalHeight": 874, "scale": 3},
+  "shape": {
+    "kind": "roundedSuperellipse", "x": 96, "y": 362,
+    "width": 210, "height": 150, "cornerRadius": 38,
+    "appleContentInsetX": 0, "appleContentInsetY": 0
+  },
+  "appearance": "light",
+  "transparency": {"reduceTransparency": false, "appleSliderMapped": false},
+  "probes": [
+    {
+      "id": "A",
+      "background": {
+        "kind": "tileGrid", "cellSize": 72, "gutter": 0,
+        "gutterColor": "#404040", "sampleInset": 18,
+        "palette": {"R": "#EF4444", "O": "#F97316", "Y": "#EAB308", "G": "#22C55E", "C": "#06B6D4", "B": "#3B82F6", "P": "#A855F7", "N": "#737373"},
+        "pattern": ["ROYG", "CBPN", "YGRO", "NPCB"]
+      }
+    },
+    {
+      "id": "B",
+      "background": {
+        "kind": "tileGrid", "cellSize": 72, "gutter": 0,
+        "gutterColor": "#404040", "sampleInset": 18,
+        "palette": {"R": "#EF4444", "O": "#F97316", "Y": "#EAB308", "G": "#22C55E", "C": "#06B6D4", "B": "#3B82F6", "P": "#A855F7", "N": "#737373"},
+        "pattern": ["ROYG", "CBPN", "YGRO", "NPCB"]
+      }
+    },
+    {"id": "C", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "D", "background": {"kind": "solid", "color": "#FFFFFF"}}
+  ]
+}

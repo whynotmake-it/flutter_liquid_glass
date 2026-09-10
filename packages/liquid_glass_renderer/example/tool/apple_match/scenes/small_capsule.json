@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "small_capsule",
+  "profile": "small_capsule",
+  "canvas": {
+    "logicalWidth": 402,
+    "logicalHeight": 874,
+    "scale": 3
+  },
+  "shape": {
+    "kind": "capsule",
+    "x": 126.6665,
+    "y": 405.5,
+    "width": 148.667,
+    "height": 63,
+    "cornerRadius": 31.5,
+    "appleContentInsetX": 24,
+    "appleContentInsetY": 14
+  },
+  "appearance": "light",
+  "transparency": {
+    "reduceTransparency": false,
+    "appleSliderMapped": false
+  },
+  "probes": [
+    {
+      "id": "A",
+      "background": {
+        "kind": "rgbwGrid",
+        "cellSize": 12,
+        "gutter": 1,
+        "gutterColor": "#101010",
+        "layout": "primary",
+        "colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF"],
+        "markerColumn": 2,
+        "markerRow": 3,
+        "marker": ["RGBWWBRG", "WRBGRGBW", "BGWWRBRG", "RRGWBBGW"]
+      }
+    },
+    {
+      "id": "B",
+      "background": {
+        "kind": "rgbwGrid",
+        "cellSize": 12,
+        "gutter": 1,
+        "gutterColor": "#101010",
+        "layout": "holdout",
+        "colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF"],
+        "markerColumn": 23,
+        "markerRow": 56,
+        "marker": ["WGBRRWBG", "BRWWGGRB", "RWBGBWRG", "GGRBWWBR"]
+      }
+    },
+    {"id": "C", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "D", "background": {"kind": "solid", "color": "#FFFFFF"}}
+  ]
+}
