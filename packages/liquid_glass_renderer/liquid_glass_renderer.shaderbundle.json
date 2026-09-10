@@ -1,0 +1,22 @@
+{
+    "GeometryVertex": {
+        "type": "vertex",
+        "file": "lib/assets/shaders/gpu/geometry_vertex.glsl"
+    },
+    "GeometryTestFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/geometry_test_fragment.glsl"
+    },
+    "GeometryFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/geometry_fragment.glsl"
+    },
+    "MaterialGradientFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/material_gradient_fragment.glsl"
+    },
+    "MaterialTintGradientFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/material_tint_gradient_fragment.glsl"
+    }
+}

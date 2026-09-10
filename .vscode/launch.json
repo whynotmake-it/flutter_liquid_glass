@@ -15,13 +15,14 @@
             ]
         },
         {
-            "name": "example (no impeller)",
+            "name": "example (Flutter GPU)",
             "cwd": "packages/liquid_glass_renderer/example",
             "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
-                "--no-enable-impeller"
+                "--enable-impeller",
+                "--enable-flutter-gpu"
             ]
         },
         {
@@ -33,6 +34,18 @@
             "flutterMode": "profile",
             "toolArgs": [
                 "--enable-impeller"
+            ]
+        },
+        {
+            "name": "example (profile mode) (Flutter GPU)",
+            "cwd": "packages/liquid_glass_renderer/example",
+            "program": "lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "toolArgs": [
+                "--enable-impeller",
+                "--enable-flutter-gpu"
             ]
         },
         {
