@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "material_tint_blue",
+  "profile": "material_shape",
+  "canvas": {"logicalWidth": 402, "logicalHeight": 874, "scale": 3},
+  "shape": {
+    "kind": "roundedSuperellipse", "x": 96, "y": 362,
+    "width": 210, "height": 150, "cornerRadius": 38,
+    "appleContentInsetX": 0, "appleContentInsetY": 0
+  },
+  "appearance": "light",
+  "glassTint": {"color": "#007AFF", "opacity": 1.0},
+  "transparency": {"reduceTransparency": false, "appleSliderMapped": false},
+  "roles": {"luminance": ["K", "L", "N", "H", "W"], "sameHue": "B", "complement": "O"},
+  "probes": [
+    {"id": "K", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "L", "background": {"kind": "solid", "color": "#333333"}},
+    {"id": "N", "background": {"kind": "solid", "color": "#737373"}},
+    {"id": "H", "background": {"kind": "solid", "color": "#DDDDDD"}},
+    {"id": "W", "background": {"kind": "solid", "color": "#FFFFFF"}},
+    {"id": "B", "background": {"kind": "solid", "color": "#3B82F6"}},
+    {"id": "O", "background": {"kind": "solid", "color": "#F97316"}}
+  ]
+}

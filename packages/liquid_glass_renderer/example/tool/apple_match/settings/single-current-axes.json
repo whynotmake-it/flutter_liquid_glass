@@ -1,0 +1,7 @@
+{
+  "frost": [5.0],
+  "edgeRefraction": [18.3],
+  "highlight": [0.4],
+  "contourStrength": [0.65],
+  "contourWidth": [1.0]
+}

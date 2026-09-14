@@ -1,0 +1,21 @@
+name: apple_match_flutter
+description: Deterministic Flutter capture target for Apple liquid-glass matching.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0 <3.48.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  liquid_glass_renderer:
+    path: ../../../..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
