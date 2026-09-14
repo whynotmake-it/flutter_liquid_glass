@@ -31,6 +31,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+/test/failures/
 /build/
 
 # Symbolication related
@@ -44,9 +45,22 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Platform Directories
-ios/
-android/
+# Platform directories are generated locally, except for the two checked-in
+# manifests that carry the renderer flags used by the example.
+ios/*
+!ios/Runner/
+ios/Runner/*
+!ios/Runner/Info.plist
+!tool/apple_match/flutter/ios/
+!tool/apple_match/flutter/ios/**
+android/*
+!android/app/
+android/app/*
+!android/app/src/
+android/app/src/*
+!android/app/src/main/
+android/app/src/main/*
+!android/app/src/main/AndroidManifest.xml
 windows/
 linux/
 web/

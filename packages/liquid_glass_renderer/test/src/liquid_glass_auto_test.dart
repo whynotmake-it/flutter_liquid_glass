@@ -30,8 +30,9 @@ void main() {
       expect(find.byType(LiquidGlassLayer), findsOneWidget);
     });
 
-    testWidgets('creates own layer when no parent layer exists',
-        (tester) async {
+    testWidgets('creates own layer when no parent layer exists', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const CupertinoApp(
           home: LiquidGlass.auto(
@@ -47,8 +48,9 @@ void main() {
       expect(find.byType(LiquidGlassLayer), findsOneWidget);
     });
 
-    testWidgets('falls back to FakeGlass when parent layer uses fake',
-        (tester) async {
+    testWidgets('falls back to FakeGlass when parent layer uses fake', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const CupertinoApp(
           home: LiquidGlassLayer(
@@ -68,30 +70,31 @@ void main() {
       expect(find.byType(LiquidGlassLayer), findsOneWidget);
     });
 
-    testWidgets('creates own FakeGlass when no parent and fake is true',
-        (tester) async {
-      await tester.pumpWidget(
-        const CupertinoApp(
-          home: LiquidGlass.auto(
-            shape: LiquidOval(),
-            fake: true,
-            child: SizedBox.square(dimension: 100),
+    testWidgets(
+      'creates a layer-owned FakeGlass when no parent and fake is true',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: LiquidGlass.auto(
+              shape: LiquidOval(),
+              fake: true,
+              child: SizedBox.square(dimension: 100),
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Should create its own FakeGlass since there is no parent layer and
-      // fake is true.
-      expect(find.byType(FakeGlass), findsOneWidget);
-      // Should NOT create a LiquidGlassLayer since fake mode bypasses it.
-      expect(find.byType(LiquidGlassLayer), findsNothing);
-    });
+        // Fake glass still owns a layer so its surface, shadows, and children
+        // preserve the same ordering contract as real glass.
+        expect(find.byType(FakeGlass), findsOneWidget);
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+      },
+    );
 
     testWidgets('uses custom settings when creating own layer', (tester) async {
       const customSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(
@@ -118,7 +121,7 @@ void main() {
       );
       const autoSettings = LiquidGlassSettings(
         thickness: 42,
-        blur: 10,
+        frost: 10,
       );
 
       await tester.pumpWidget(
@@ -142,5 +145,58 @@ void main() {
       );
       expect(layer.settings, equals(parentSettings));
     });
+
+    testWidgets(
+      'sibling autos under one layer share that sample without a blend group',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: LiquidGlassLayer(
+              child: Row(
+                children: [
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                  LiquidGlass.auto(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 80),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsOneWidget);
+        expect(find.byType(LiquidGlassBlendGroup), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'sibling autos without a layer each create their own sample',
+      (tester) async {
+        await tester.pumpWidget(
+          const CupertinoApp(
+            home: Row(
+              children: [
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+                LiquidGlass.auto(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
+      },
+    );
   });
 }
