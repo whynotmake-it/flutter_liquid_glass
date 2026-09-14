@@ -12,7 +12,7 @@ void main() {
   test(
     'flutter_gpu renders geometry and produces a valid image',
     () async {
-      final library = await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
       );
       expect(library, isNotNull);
@@ -63,8 +63,9 @@ void main() {
             offsetInBytes: 0,
             lengthInBytes: vertices.lengthInBytes,
           ),
+          4,
         )
-        ..draw(4);
+        ..draw();
       commandBuffer.submit();
 
       final image = texture.asImage();
@@ -115,9 +116,9 @@ void main() {
         isTrue,
       );
       expect(first.debugHostBufferBlockLength, greaterThan(0));
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
+      )!;
       final size = library['GeometryFragment']!
           .getUniformSlot('GeometryUniforms')
           .sizeInBytes!;
@@ -133,9 +134,9 @@ void main() {
   test(
     'geometry renderer buckets dimensions without overwriting older images',
     () async {
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
+      )!;
       final renderer = FlutterGpuGeometryRenderer(
         vertexShader: library['GeometryVertex']!,
         fragmentShader: library['GeometryFragment']!,
@@ -182,9 +183,9 @@ void main() {
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
+      )!;
       final renderer = FlutterGpuGeometryRenderer(
         vertexShader: library['GeometryVertex']!,
         fragmentShader: library['GeometryFragment']!,
