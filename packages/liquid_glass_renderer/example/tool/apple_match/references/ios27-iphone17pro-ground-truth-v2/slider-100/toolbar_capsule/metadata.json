@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 2,
+  "status": "validated-ground-truth",
+  "runtime": "iOS 27.0 (24A5408d)",
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B",
+  "device": "iPhone 17 Pro",
+  "orientation": "portrait",
+  "appearance": "light",
+  "captureEncoding": "SDR tone-mapped 8-bit PNG",
+  "pixelWidth": 1206,
+  "pixelHeight": 2622,
+  "reduceMotion": true,
+  "reduceTransparency": false,
+  "increaseContrast": false,
+  "contentSize": "large",
+  "medianFrameCount": 3,
+  "liquidGlassTintPosition": 1.0,
+  "liquidGlassTintPositionReadback": 1.0,
+  "liquidGlassTintControlMethod": "simctl defaults write com.apple.UIKit UIViewGlassTintAmount",
+  "api": "SwiftUI PrimitiveButtonStyle.glass",
+  "apiConstruction": "Button{Color.clear.frame(shape-insets)}.buttonStyle(.glass)",
+  "scene": "toolbar_capsule",
+  "sceneProfile": "toolbar_capsule",
+  "sceneSha256": "29c5e2bdcfd720bdbfa563746ceb71a5d48d57b05a958073ff96a2bd333096bc",
+  "appleSourceSha256": "345be57ccb516c193dc90c7765aa5d837622e930765a2925dde20f8d12f26a3d",
+  "sceneModelSha256": "999d949f84729cf564ea16afa1df5e9c53486b78159231b16b0b664114265b3d",
+  "infoPlistSha256": "ffb047f66e35358bfc7e7fe96e17f038aef80a0b7c3ca6f8be06aa3b4c5e358c",
+  "captureAppExecutableSha256": "6b942a578ba69059c8614ddee59d9c19cd8a04a5fe034f2249fac6c0ac50fcba",
+  "captureScriptSha256": "0127aaed2972b0cf61ca8765fc162403a6cfbe6e78c5f694e9bfda50f95c381d",
+  "frameValidatorSha256": "e11e0b98d345d05998e8f2ffe5c79de4faa295ec3187de769c9691a9d5e93243",
+  "provenanceToolSha256": "86c405ff9bc4ff13f670adec10a9e2fb5038415b746ad517bdfdff3474230bc9",
+  "probeAndFrameSha256": {
+    "A.png": "4e9655f7bf184b6e30b301d0c486acde7e9b5008d45a1d10993107d1a7683996",
+    "B.png": "974619c12ab870629a3266e0138a53d12e2577815a52db03c138f756ff50ca45",
+    "C.png": "57ece35664f15d0923a5bc82207b3f94c9b36ede1ddb073d785036d4cc570c65",
+    "D.png": "1be2b2488bd4e05e48e8c645d0fd565e4f4e3ae51fdf1d79cfc8009dd927d518",
+    "frames/A_1.png": "d1dd9451f2bb03fe7512ed3c2e4e3709292d7a4171964dac5b934477e591b6f4",
+    "frames/A_2.png": "d1dd9451f2bb03fe7512ed3c2e4e3709292d7a4171964dac5b934477e591b6f4",
+    "frames/A_3.png": "d1dd9451f2bb03fe7512ed3c2e4e3709292d7a4171964dac5b934477e591b6f4",
+    "frames/B_1.png": "861fc29566fa018a1bfa10945f99bfb69b595ea01baf0fd8be9b8e7f66f7d053",
+    "frames/B_2.png": "861fc29566fa018a1bfa10945f99bfb69b595ea01baf0fd8be9b8e7f66f7d053",
+    "frames/B_3.png": "861fc29566fa018a1bfa10945f99bfb69b595ea01baf0fd8be9b8e7f66f7d053",
+    "frames/C_1.png": "018bd65a712257709bcdf36d8c86d680759e13b95ea7ce5e7cf6d3c4f42b8cfb",
+    "frames/C_2.png": "018bd65a712257709bcdf36d8c86d680759e13b95ea7ce5e7cf6d3c4f42b8cfb",
+    "frames/C_3.png": "018bd65a712257709bcdf36d8c86d680759e13b95ea7ce5e7cf6d3c4f42b8cfb",
+    "frames/D_1.png": "5fc81b512c096ab34e6c6eaff428014d54dcbcf6a02e99d87936e63f94482cad",
+    "frames/D_2.png": "5fc81b512c096ab34e6c6eaff428014d54dcbcf6a02e99d87936e63f94482cad",
+    "frames/D_3.png": "5fc81b512c096ab34e6c6eaff428014d54dcbcf6a02e99d87936e63f94482cad"
+  },
+  "frameStability": {
+    "A": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "B": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "C": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "D": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    }
+  }
+}
