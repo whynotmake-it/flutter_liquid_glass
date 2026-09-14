@@ -61,9 +61,14 @@ android/app/src/*
 !android/app/src/main/
 android/app/src/main/*
 !android/app/src/main/AndroidManifest.xml
+!android/app/src/main/kotlin/
+!android/app/src/main/kotlin/**
 windows/
 linux/
 web/
 
 # FVM Version Cache
 .fvm/
+
+# Android GPU power bench (local venv)
+/tool/.venv-android-bench/

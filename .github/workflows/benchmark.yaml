@@ -5,18 +5,82 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - 'packages/liquid_glass_renderer/**'
 
 jobs:
+  benchmark-smoke:
+    if: >-
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'performance')
+    name: Run Benchmark Sanity Check
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: |
+          flutter config --enable-macos-desktop
+          flutter config --no-enable-swift-package-manager
+
+      - name: 🔧 Get dependencies
+        working-directory: packages/liquid_glass_renderer/example
+        run: flutter pub get
+
+      - name: 🏃 Run compact benchmark
+        working-directory: packages/liquid_glass_renderer/example
+        env:
+          LIQUID_GLASS_BENCHMARK_CAPTURE_NATIVE_TRACE: 'false'
+          LIQUID_GLASS_BENCHMARK_ENFORCE: 'false'
+          LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS: '2'
+          LIQUID_GLASS_BENCHMARK_REPETITIONS: '1'
+          LIQUID_GLASS_BENCHMARK_SCENARIOS: >-
+            staticSingle grouped4Motion independent4Motion fakeStatic
+          LIQUID_GLASS_BENCHMARK_WARMUP_SECONDS: '1'
+        run: |
+          chmod +x tool/benchmark.sh
+          ./tool/benchmark.sh
+
+      - name: 📊 Validate benchmark results
+        working-directory: packages/liquid_glass_renderer/example
+        run: |
+          dart run tool/parse_benchmark_results.dart \
+            --input build/benchmark \
+            --markdown build/benchmark/summary.md \
+            --json build/benchmark/summary.json \
+            --minimum-repetitions 1 \
+            --enforce false
+
+      - name: 📤 Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-smoke-${{ github.run_id }}
+          path: packages/liquid_glass_renderer/example/build/benchmark/
+          retention-days: 7
+
   benchmark:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'performance')
     name: Run Performance Benchmarks
-    runs-on: macos-15
-    timeout-minutes: 30
+    runs-on: macos-26
+    timeout-minutes: 120
     permissions:
       pull-requests: write
       contents: read
@@ -29,18 +93,29 @@ jobs:
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Enable macOS desktop support
-        run: flutter config --enable-macos-desktop
+        run: |
+          flutter config --enable-macos-desktop
+          flutter config --no-enable-swift-package-manager
 
       - name: 🔧 Get dependencies
         working-directory: packages/liquid_glass_renderer/example
         run: flutter pub get
 
+      - name: Verify Flutter GPU capability fallback
+        working-directory: packages/liquid_glass_renderer
+        run: >-
+          flutter test --enable-impeller
+          --dart-define=EXPECT_FLUTTER_GPU_FALLBACK=true
+          test/src/flutter_gpu_fallback_test.dart
+
       - name: 🏃‍♂️ Run benchmark tests
         working-directory: packages/liquid_glass_renderer/example
+        env:
+          LIQUID_GLASS_BENCHMARK_ENFORCE: 'true'
         run: |
           chmod +x tool/benchmark.sh
           ./tool/benchmark.sh
@@ -49,9 +124,15 @@ jobs:
         id: parse-results
         working-directory: packages/liquid_glass_renderer/example
         run: |
-          dart tool/parse_benchmark_results.dart >> $GITHUB_OUTPUT
+          dart run tool/parse_benchmark_results.dart \
+            --input build/benchmark \
+            --markdown build/benchmark/summary.md \
+            --json build/benchmark/summary.json \
+            --minimum-repetitions 3 \
+            --enforce true
 
       - name: 📝 Find existing comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/find-comment@v4
         id: find-comment
         with:
@@ -60,6 +141,7 @@ jobs:
           body-includes: 'Performance Benchmark Results'
 
       - name: 💬 Create or update PR comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
@@ -71,6 +153,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results-${{ github.event.pull_request.number }}
-          path: packages/liquid_glass_renderer/example/build/*.timeline*.json
+          name: benchmark-results-${{ github.run_id }}
+          path: |
+            packages/liquid_glass_renderer/example/build/benchmark/
           retention-days: 30
