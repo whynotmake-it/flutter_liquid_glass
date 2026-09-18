@@ -4,6 +4,59 @@ This is the prioritized backlog for the native benchmark harness. Every change
 should be compared against the relevant control scenario on the same runner;
 visual output and native `phys_footprint` remain regression gates.
 
+## 2026-09-15 shadow pass, matte resolution, indicator capture (Pixel 10)
+
+Full log with every measurement and rejection: `OPTIMIZATION_LOG_2026-09.md`.
+
+- **Analytic exterior shadows (rejected 2026-09-22).** Replacing the layer
+  shadow pass (saveLayer + MaskFilter blur per shape + dstOut punch) with one
+  SDF shader draw saved 25 % of the fake shadow's GPU cost and was GPU-neutral
+  on real glass, but its smooth-union silhouette did not match Flutter's
+  per-shape shadows in blend groups, and `RSuperellipse` cannot be matched
+  exactly by an SDF. Shadows require an exact silhouette; the raster path
+  stays. Same lesson as the matte: statistics over one golden are not a
+  visual review.
+- **Half-resolution geometry matte (rejected).** −70 mW GPU on
+  `appScrollRealTabs`, but clearly visible artifacts at rounded corners on a
+  real display: the sqrt-encoded edge distance and the displacement field do
+  not interpolate across texels. Golden statistics under-weighted the
+  concentrated corner error; anything touching the matte needs visual review.
+- **Indicator with its own backdrop capture (ClickUp design, measured).**
+  A loupe on its own `BackdropFilter` over a static bar costs ≈ +120…145 mW GPU
+  and ≈ +60 mW DDR per frame versus blending it into the bar's group
+  (`appScrollRealTabsOwnLoupeStatic` 895 vs 751–783 mW). While the loupe
+  moves it saves ~60 mW CPU (no full-bar matte rebuild) but still costs
+  +73 mW GPU. Readbacks are full-screen regardless of shape size, so this
+  transfers to any app ~1:1.
+- **Harness fixes.** Constant status-bar inset in the app-like scene
+  (`MediaQuery.padding.top` was 0 on ~25 % of fresh launches and moved ~40 px
+  of filter area between runs); `run_scenario` waits for thermal status ≤ 1
+  (`THERMAL_GATE`).
+
+## 2026-09-14 iPhone 15 (iOS 27.0, 60 Hz) ClickUp Inbox scroll
+
+Recorded with `tool/ios_power/` (Power Profiler and Metal System Trace, USB,
+thermal-gated, 20 s each, app self-driven by an in-app hook). iOS exposes no
+power rails; the Power Profiler gives Apple's unitless per-process impact
+indexes (~1 Hz), so only the ordering and ratios between labels carry
+information. OLD = the 0.2 `FakeGlass` ClickUp shipped, NEW = this stack.
+The matrix is incomplete (OLD_REAL did not exist; OLD_FAKE r1 recorded the
+splash idle by mistake) and was stopped by the phone heating up.
+
+| label (2 runs) | GPU busy % | GPU ms/frame | fps | CPU impact | GPU impact | display impact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| NEW_FAKE | 38.8 | 6.5 | 59.6 | 2.2 | 1.0 | 1.2–2.0 |
+| NEW_REAL | 50.9 | 8.5 | 59.4 | 2.4 | 1.4–1.8 | 1.0–2.0 |
+| OLD_FAKE (r2) | 80.2 | 13.4 | – | 3.1 | 2.0 | 3.0 |
+| OLD_OFF | 7.0 | 1.2 | idle | – | – | – |
+
+Reading: real glass costs about 2 ms more GPU per 60 Hz frame than fake
+glass on the A16 (≈12 % GPU busy), a larger relative step than on the Pixel
+10, but both new paths sit well below the old shipped `FakeGlass`, which ran
+the GPU at 80 % busy at the same frame rate. Battery drain and thermal state
+were dominated by CPU (≈2 instructions·10⁹/s in every glass state), matching
+the Pixel finding that the app's CPU work, not glass, sets the floor.
+
 ## 2026-09-13 Pixel 10 GPU power audit
 
 Pixel 10, Impeller/Vulkan, 120 Hz, SoC GPU power rail: every independent
