@@ -230,8 +230,9 @@ void runOpacityTests(SubmittedSceneCapture binding) {
                 final png = await image.toByteData(
                   format: ui.ImageByteFormat.png,
                 );
-                await File('/private/tmp/opacity-$kind-$inside-$value.png')
-                    .writeAsBytes(png!.buffer.asUint8List());
+                await File(
+                  '/private/tmp/opacity-$kind-$inside-$value.png',
+                ).writeAsBytes(png!.buffer.asUint8List());
               });
             }
             image.dispose();
@@ -311,8 +312,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
                 'Opacity must actually fade the material, not just its child.',
           );
           // Keep the two independent diagnostics visible on failure.
-          if (const bool.fromEnvironment('PROBE_BLUR_SHELL') ||
-              const bool.fromEnvironment('HOIST_GLASS_OPACITY')) {
+          if (const bool.fromEnvironment('PROBE_BLUR_SHELL')) {
             debugPrint(
               '$kind inside=$inside halfError=$halfError '
               'pixel=${halfErrorIndex ~/ 4 % 240},'

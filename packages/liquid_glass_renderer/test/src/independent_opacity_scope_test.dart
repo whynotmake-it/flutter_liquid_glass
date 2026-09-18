@@ -169,11 +169,7 @@ void runIndependentOpacityScopeTests(SubmittedSceneCapture binding) {
           final initialTotal = FlutterGpuGeometryRenderer.debugTotalRenderCount;
           final counts = <int?>[];
 
-          const independent = bool.fromEnvironment(
-            'INDEPENDENT_GLASS_OPACITY',
-            defaultValue: true,
-          );
-          if (independent && !endpointsOnly) {
+          if (!endpointsOnly) {
             left.value = 0.75;
             await capture();
             final recordings = fakeOwner?.debugIndependentPassRecordCount;
@@ -274,7 +270,7 @@ void runIndependentOpacityScopeTests(SubmittedSceneCapture binding) {
           if (renderer != null) {
             // Temporary subsets are released at opacity 1. Each later zero
             // transition constructs its one survivor; restoration does not.
-            final expectedDeltas = independent && !idleMaterial
+            final expectedDeltas = !idleMaterial
                 ? (endpointsOnly ? [1, 1, 2, 2] : [3, 3, 4, 4])
                 : [0, 0, 0, 0];
             if (FlutterGpuGeometryRenderer.debugTotalRenderCount !=

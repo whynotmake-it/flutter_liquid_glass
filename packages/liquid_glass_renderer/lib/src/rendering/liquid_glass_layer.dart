@@ -227,17 +227,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
       _triedGpuGeometryRenderer = true;
       try {
-        if (const bool.fromEnvironment(
-          'INDEPENDENT_GLASS_OPACITY',
-          defaultValue: true,
-        )) {
-          _independentOpacityPrograms = await Future.wait([
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassRender),
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassMaterialRender),
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassTintRender),
-          ]);
-          if (!mounted || widget.fake) return;
-        }
+        _independentOpacityPrograms = await Future.wait([
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassRender),
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassMaterialRender),
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassTintRender),
+        ]);
+        if (!mounted || widget.fake) return;
         final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );
@@ -634,15 +629,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   @override
-  bool paintLiquidGlass(
+  void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
-    PaintingContextCallback paintForeground,
   ) {
-    if (!attached) return false;
-    const nestBackdropContents = bool.fromEnvironment('NEST_GLASS_CONTENTS');
+    if (!attached) return;
     // The engine snapshots this shader's uniforms into the native image
     // filter at creation, so the composed filter can only be reused while
     // every snapshotted input is unchanged. Repaints with identical shader
@@ -663,15 +656,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       filterBounds,
       (context, offset) {
         if (drawableEmpty) return;
-        context.pushLayer(
-          shaderLayer!,
-          nestBackdropContents ? paintForeground : (context, offset) {},
-          offset,
-        );
+        context.pushLayer(shaderLayer!, (context, offset) {}, offset);
       },
       oldLayer: _clipRectLayerHandle.layer,
     );
-    return nestBackdropContents && !drawableEmpty;
   }
 
   @override

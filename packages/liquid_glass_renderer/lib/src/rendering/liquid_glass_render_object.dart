@@ -564,23 +564,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     );
     if (settings.effectiveThickness <= 0 || !hasVisibleShape) {
       _independentOpacity.layer = null;
-      _idleComposition =
-          const bool.fromEnvironment(
-            'INDEPENDENT_GLASS_OPACITY',
-            defaultValue: true,
-          ) &&
-          !const bool.fromEnvironment('NEST_GLASS_CONTENTS');
-      if (_idleComposition) {
-        // Foreground can change while a cached matte is dormant. Poll against
-        // its last paint without overwriting that matte's encoded coordinates.
-        _rememberGeometryInputs(_idleGeometryInputs ??= []);
-        _idleAncestorClips.update(
-          this,
-          _shapesWithGeometry.expand(
-            (entry) => entry.$2.shapes.map((shape) => shape.renderObject),
-          ),
-        );
-      }
+      _idleComposition = true;
+      // Foreground can change while a cached matte is dormant. Poll against
+      // its last paint without overwriting that matte's encoded coordinates.
+      _rememberGeometryInputs(_idleGeometryInputs ??= []);
+      _idleAncestorClips.update(
+        this,
+        _shapesWithGeometry.expand(
+          (entry) => entry.$2.shapes.map((shape) => shape.renderObject),
+        ),
+      );
       // Keep any existing matte so ancestor motion stays compositor-only.
       // Skip the backdrop filter so idle glass does not sample.
       releaseCompositorFilter();
@@ -629,46 +622,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       _emptyGeometryInputs = null;
     }
 
-    var foregroundPainted = false;
     void paintOriginalEffect(PaintingContext context, Offset offset) {
       _paintRetainedEffect(context, offset, (effectContext, effectOffset) {
         if (debugPaintLiquidGlassGeometry) {
           _debugPaintGeometry(effectContext, effectOffset);
         } else if (_drawableEmpty || _geometryImage != null) {
           if (!_drawableEmpty) _bindGeometryShader(_geometryImage!);
-          if (const bool.fromEnvironment(
-            'INDEPENDENT_GLASS_OPACITY',
-            defaultValue: true,
-          )) {
-            _recordOriginalShadows(effectOffset);
-            if (_originalShadows.layer case final shadows?) {
-              effectContext.addLayer(shadows);
-            }
-          } else if (!_drawableEmpty) {
-            _paintLayerShadows(
-              effectContext,
-              effectOffset,
-              _shapesWithGeometry,
-            );
+          _recordOriginalShadows(effectOffset);
+          if (_originalShadows.layer case final shadows?) {
+            effectContext.addLayer(shadows);
           }
-          foregroundPainted = paintLiquidGlass(
+          paintLiquidGlass(
             effectContext,
             effectOffset,
             _shapesWithGeometry,
             materialPaintBounds,
-            super.paint,
           );
         }
       });
     }
 
-    if (const bool.fromEnvironment(
-          'INDEPENDENT_GLASS_OPACITY',
-          defaultValue: true,
-        ) &&
-        independentOpacityPrograms != null &&
-        !debugPaintLiquidGlassGeometry &&
-        !const bool.fromEnvironment('NEST_GLASS_CONTENTS')) {
+    if (independentOpacityPrograms != null && !debugPaintLiquidGlassGeometry) {
       final selector = _independentOpacity.layer ??=
           _IndependentRealOpacityLayer();
       selector.prepare(this, _shapesWithGeometry, offset);
@@ -682,7 +656,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       paintOriginalEffect(context, offset);
     }
 
-    if (!foregroundPainted) super.paint(context, offset);
+    // Foreground always paints in its own render ancestry, above the glass.
+    super.paint(context, offset);
   }
 
   // Geometry preparation does not record pictures or paint child objects.
@@ -1170,13 +1145,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       (a.bottom - b.bottom).abs() <= 1e-6;
 
   /// Subclasses implement the actual glass rendering
-  /// (e.g., with backdrop filters)
-  bool paintLiquidGlass(
+  /// (e.g., with backdrop filters). The foreground is painted by the caller.
+  void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
-    PaintingContextCallback paintForeground,
   );
 
   (double, double, double, double, double, double)? _coordinateMapping;

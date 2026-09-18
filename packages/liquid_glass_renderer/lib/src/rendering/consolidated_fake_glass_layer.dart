@@ -310,7 +310,6 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       return;
     }
     final clipPath = _cachedClipPath!;
-    const nestBackdropContents = bool.fromEnvironment('NEST_GLASS_CONTENTS');
 
     debugClipBounds = bounds;
     _paintBounds = _expandForEffects(bounds, geometries);
@@ -348,13 +347,6 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
               bounds,
               clipPath,
               (clipContext, clipOffset) {
-                if (nestBackdropContents) {
-                  clipContext.pushLayer(backdropLayer, (context, offset) {
-                    _paintSurfaces(context.canvas, offset, geometries);
-                    paintTrackedChild(context, offset);
-                  }, clipOffset);
-                  return;
-                }
                 clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
               },
               oldLayer: _clipLayer.layer,
@@ -367,39 +359,26 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
             _debugLastPaintStages.add(_FakeGlassPaintStage.surfaces);
             return true;
           }(), 'Record layer-owned surface composition order.');
-          if (!nestBackdropContents || !_hasBackdropEffect) {
-            _paintSurfaces(effectContext.canvas, effectOffset, geometries);
-          }
+          _paintSurfaces(effectContext.canvas, effectOffset, geometries);
         },
         offset,
       );
     }
 
     // Foreground remains in its existing render ancestry.
-    if (const bool.fromEnvironment(
-          'INDEPENDENT_GLASS_OPACITY',
-          defaultValue: true,
-        ) &&
-        !nestBackdropContents) {
-      final selector =
-          (_independentOpacity.layer ??= _IndependentFakeOpacityLayer())
-            ..prepare(this, geometries, offset);
-      context.pushLayer(selector, (context, offset) {
-        // The common-opacity replay in _ancestorClips belongs ONLY to the
-        // original branch. Subset branches replace it, not sit inside it.
-        context.pushLayer(selector.original, paintOriginalEffect, offset);
-      }, offset);
-    } else {
-      _independentOpacity.layer = null;
-      paintOriginalEffect(context, offset);
-    }
+    final selector =
+        (_independentOpacity.layer ??= _IndependentFakeOpacityLayer())
+          ..prepare(this, geometries, offset);
+    context.pushLayer(selector, (context, offset) {
+      // The common-opacity replay in _ancestorClips belongs ONLY to the
+      // original branch. Subset branches replace it, not sit inside it.
+      context.pushLayer(selector.original, paintOriginalEffect, offset);
+    }, offset);
     assert(() {
       _debugLastPaintStages.add(_FakeGlassPaintStage.contents);
       return true;
     }(), 'Record normal subtree composition order.');
-    if (!nestBackdropContents || !_hasBackdropEffect) {
-      paintTrackedChild(context, offset);
-    }
+    paintTrackedChild(context, offset);
   }
 
   void _paintSurfaces(
