@@ -152,6 +152,33 @@ background work will leak into GPU/CPU/VBATT. Repetitions are interleaved
 (`rep1` of every scenario, then `rep2`, …) so thermal drift is not confused
 with a scenario effect.
 
+## iOS power harness (iPhone, xctrace)
+
+`ios_power/` records Instruments sessions of an installed build with the same
+discipline as the Android harness: one launch per label, a thermal gate before
+every run, USB only (xctrace cannot attach over Wi-Fi), interleaved labels.
+
+```sh
+IOS_UDID=<xctrace udid> DEVICECTL_ID=<devicectl id> BUNDLE=com.example.app \
+  LAUNCH_ENV='{"GLASS_BENCH":"MODE"}' \
+  tool/ios_power/ios_power_bench.sh power NEW_REAL:real NEW_FAKE:fake OFF:off
+python3 tool/ios_power/parse_power_trace.py build/ios_power_bench/traces/NEW_REAL_r1_power.trace
+```
+
+- `power` uses the Power Profiler template. `parse_power_trace.py` prints
+  duration-weighted means of Apple's per-process power-impact indexes (CPU,
+  GPU, display, networking; unitless, ~1 Hz), CPU instructions/s, system frame
+  rate, thermal state, charging state and battery drain %/h. There is no
+  per-rail milliwatt reading on iOS; compare indexes between labels only.
+- `metal` uses the Metal System Trace template; open the `.trace` in
+  Instruments or export `metal-gpu-intervals` /
+  `displayed-surfaces-per-second` with `xcrun xctrace export --xpath`.
+- The app has to drive itself during the recorded window (navigate, scroll)
+  from `LAUNCH_ENV` or a `TRIGGER_DEST` file in its Documents container; the
+  harness never touches the UI. `ios_thermal_probe.sh` is the gate
+  (`COOL_TO=Nominal` for stricter runs).
+- Xcode 26.0 `xctrace export` segfaults intermittently; the scripts retry.
+
 ## Appendix: opt-in xctrace attribution
 
 Instruments Metal System Traces are opt-in, on-demand attribution tooling
