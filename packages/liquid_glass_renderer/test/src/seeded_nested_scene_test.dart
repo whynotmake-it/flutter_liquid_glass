@@ -72,8 +72,9 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
                 final png = await image.toByteData(
                   format: ui.ImageByteFormat.png,
                 );
-                await File('${Directory.systemTemp.path}/nested-$label.png')
-                    .writeAsBytes(png!.buffer.asUint8List());
+                await File(
+                  '${Directory.systemTemp.path}/nested-$label.png',
+                ).writeAsBytes(png!.buffer.asUint8List());
               });
             }
             final bytes = (await tester.runAsync(image.toByteData))!;

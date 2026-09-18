@@ -8,11 +8,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// A callback used by [MultiShaderBuilder].
-typedef MultiShaderBuilderCallback = Widget Function(
-  BuildContext,
-  List<ui.FragmentShader>,
-  Widget?,
-);
+typedef MultiShaderBuilderCallback =
+    Widget Function(
+      BuildContext,
+      List<ui.FragmentShader>,
+      Widget?,
+    );
 
 /// A widget that loads and caches [ui.FragmentProgram]s based on asset keys.
 ///
