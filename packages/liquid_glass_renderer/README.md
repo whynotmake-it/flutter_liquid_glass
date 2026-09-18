@@ -21,7 +21,8 @@ material or rendering APIs.
 
 - Flutter 3.47 or newer.
 - Impeller and Flutter GPU for full refraction.
-- Android, iOS, or macOS for the tested prerelease path.
+- Android, iOS, or macOS for the tested prerelease path. Web builds compile
+  and render `FakeGlass`.
 
 Unsupported renderer paths automatically use `FakeGlass`, which preserves the
 main surface treatment but omits refraction.
@@ -310,6 +311,7 @@ Rules:
 - Keep frost around the presets (5–8). σ≤4 disables Impeller's downsample
   and costs more than σ7; σ20 costs about 3× σ7.
 - Avoid glass shadows, or keep them small.
+- Glass that must sit on other glass: see "Glass on glass" below.
 - Do not animate blend-group geometry continuously.
 - `FakeGlass` is not cheaper on Android: it pays the same readback and
   blur as real glass. The only real low-power tier is not sampling the
@@ -382,7 +384,8 @@ small; a capture the size of the screen saves nothing.
 
 - The package is experimental and not battle-tested.
 - Full glass requires Impeller and Flutter GPU.
-- The tested prerelease platforms are Android, iOS, and macOS.
+- The tested prerelease platforms are Android, iOS, and macOS. The web only
+  renders `FakeGlass`.
 - One layer supports at most 16 shapes.
 - FakeGlass does not refract the backdrop.
 - The renderer cannot reproduce Apple's private mixed clear/blur pipeline

@@ -1,11 +1,13 @@
 # Review guide
 
 Review the stack from bottom to top. Production fixes and regression tests are
-folded into the original renderer and test commits. The new example stays on top.
+folded into the original renderer and test commits. Later work is stacked on
+top as focused commits; the Flutter 3.44 compatibility variant is the tip and
+is the only commit that must not be reviewed as part of the 3.47 line.
 
 | Commit | Review focus |
 | --- | --- |
-| `feat!: rebuild liquid glass renderer for 0.3.0-dev.1` | Public API, real/fake rendering, retained geometry, nested composition, frame-owned coordinates. |
+| `feat!: rebuild liquid glass renderer for 0.3.0-dev.1` (now shipped as 1.0.0-dev.1) | Public API, real/fake rendering, retained geometry, nested composition, frame-owned coordinates. |
 | `build: adopt Flutter 3.47 workspace configuration` | SDK, workspace, and CI. |
 | `test: cover final renderer behavior and visual output` | Unit, lifecycle, golden, clipping, and submitted-frame regression tests. |
 | `example: add the liquid glass workbench` | Original workbench and loupe behavior. |
@@ -14,7 +16,48 @@ folded into the original renderer and test commits. The new example stays on top
 | `harness: add Apple visual fitting pipeline` | Capture, fitting, and provenance tools. |
 | `testdata: update audited Apple glass references` | Reference images and audit data. |
 | `docs: add renderer review and harness guidance` | Review and harness instructions only. |
-| `fix: stabilize nested glass workbench` | New example and its scroll tests; kept on top. |
+| `fix: stabilize nested glass workbench` | New example and its scroll tests. |
+| `test: reproduce whole-layer fake glass blur loss during opacity` | Regression test for whole-layer fake frost under an opacity fade. |
+| `refactor: remove opacity experiment switches and the example probe` | Hardcodes the shipped defaults of `INDEPENDENT_GLASS_OPACITY`, `NEST_GLASS_CONTENTS`, `WEAK_OPACITY_FILTER`, `HOIST_GLASS_OPACITY`, `PROBE_STABLE_NEAR_OPAQUE_SEED`; deletes dead branches and the probe app. |
+| `fix: compile for the web by stubbing the Flutter GPU geometry renderer` | Conditional export; web renders `FakeGlass`. |
+| `feat: LiquidGlassSeed bounds backdrop passes to a glass region (experimental)` | Seed render object and seed-relative filter coordinates. |
+| `harness: thermal gate, fixed status-bar inset, loupe/pill/seed scenarios` | Benchmark scenes and the Android power harness. |
+| `harness: iOS power and Metal trace tooling (xctrace, thermal gate, parser)` | `tool/ios_power/` scripts and their README section. |
+| `docs: optimization log, independent renderer review, iPhone results, audit summary` | Measurements, rejected ideas, iPhone 15 results, and the audit update. |
+| `feat: LiquidGlassCapture sizes itself and is covered by goldens` | Rename of the seed; `effectBounds` on both layers; pass origin shared with the opacity passes; `precacheLiquidGlassShaders`; per-scene pixel tests and goldens; README "Glass on glass". |
+| `chore: prepare the 1.0.0-dev.1 prerelease` | Version, changelog, README. |
+| `compat: build against Flutter 3.44 (experimental)` | Tip only. Flutter GPU API and GLES sampling differences; SDK pins. |
+
+## Stack consolidation (2026-09-18)
+
+The 1.0.0-dev.1 stack above is the only line of development. Everything else
+that existed in the repository after `main` was audited by content against this
+stack and abandoned (152 commits, recoverable from the jj operation log):
+
+| Thread | Commits | Outcome |
+| --- | --- | --- |
+| Three older copies of the rebuild stack and the Aug 25–28 `perf: reduce independent glass layer overhead` chain | ~100 | Superseded. Their content was squashed into the ten canonical commits; a tree diff against the canonical tip showed nothing unique. |
+| `codex/opacity-*` experiment branches (weak filters, single capture, memory plateaus, release measurements, …) | 19 experiments + follow-up fixes | Superseded. Every production fix is folded into the canonical commits; the only unique content was `experiments/opacity-composition/PROGRESS.md` (research notes). Their compile-time A/B switches are removed in `refactor: remove opacity experiment switches`. |
+| Duplicate `fix: backport renderer rewrite to Flutter 3.44` commits | 5 | Replaced by the single `compat: build against Flutter 3.44` tip commit, re-derived from the current code (adds the `apple_match` harness SDK pin the originals missed). |
+| `test: reproduce whole-layer fake glass blur loss on iOS` (renderer-344) | 1 | Dropped: strict subset of the kept 3.47 test (1×2 vs 3×2 cases). |
+| `feat: backport shader-based fake glass` on the 0.2 line | 1 | Dropped: the same consolidated fake glass ships in the rewrite. |
+| `codex/web-flutter-3.44` on the 0.2 line | 1 (remote branch kept) | Dropped locally: the 0.2 renderer never used Flutter GPU, so it only needed pubspec metadata. The rewrite needs the stub in `fix: compile for the web`, which supersedes it. The GitHub branch can be deleted. |
+| Analytic SDF exterior shadows (`glass_shadow.frag`) | 1 | Dropped after review: in a blend group the analytic smooth union did not match the per-shape silhouettes Flutter draws (fake glass never merges; real glass merges by the group's blend), and `RSuperellipse` cannot be matched exactly by an SDF. Shadows stay on the raster path. |
+| Host-regenerated goldens, empty working-copy commits, stale workspaces | 4 + 7 workspaces | Dropped. Goldens are produced by CI on macOS-15 runners; on other Macs six pre-existing goldens differ (`rounded_superellipse_radii`, `liquid_glass_blend_group_stretch_dpr2`, `per_shape_appearance_blending`, `fake_glass_real_comparison`, `liquid_glass_transform_dpr2`, `fake_glass_real_contour_offsets`). |
+
+Known host-only test noise on Apple-silicon Macs with `flutter_tester`
+(identical set before and after this stack, so not regressions): 29 opacity
+compositing / lifecycle assertions and an intermittent Flutter GPU segmentation
+fault. CI is the authority for those suites.
+
+`flutter_tester` also renders only the first subpass that contains a
+`BackdropFilter` per process; later ones are black (a 20-line repro with plain
+`ClipRect`, identity `ColorFilter` `BackdropFilter` and a blur shows it; Metal
+and Vulkan render all of them). The `LiquidGlassCapture` pixel tests therefore
+live one scene per file and render the captured scene first;
+`example/integration_test/liquid_glass_capture_test.dart` runs every scene,
+the fake references under a fade, and dispose/recreate on a real GPU
+(`flutter test --enable-impeller -d macos`).
 
 ## API ownership
 

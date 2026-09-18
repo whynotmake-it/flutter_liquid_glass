@@ -1,4 +1,4 @@
-## 0.3.0-dev.1
+## 1.0.0-dev.1
 
 This experimental prerelease contains breaking API and rendering changes.
 
@@ -37,6 +37,12 @@ This experimental prerelease contains breaking API and rendering changes.
   refraction reach, and size-aware shadow controls.
 - Add `backdropKey` and `useBackdropGroup` to supported real and fake paths.
 - Add per-shape shadows below blended glass with a material cutout.
+- Add `LiquidGlassCapture` for glass on glass. It captures the backdrop once
+  for all the glass inside it, so an indicator that refracts its tab bar no
+  longer costs a second full-screen readback. It sizes itself to the glass
+  inside; `bleed` overrides that. See "Glass on glass" in the README.
+- Add `precacheLiquidGlassShaders()` so the first glass on screen renders
+  fully instead of painting its fallback while shaders load.
 
 ### Changed
 
@@ -68,6 +74,9 @@ This experimental prerelease contains breaking API and rendering changes.
 
 ### Fixed
 
+- Compile on the web. `flutter_gpu` needs `dart:ffi`, so the web build gets a
+  stub geometry renderer and renders `FakeGlass`, which is the only path
+  selected there anyway.
 - Preserve shadow blur tails without expanding the refraction pass.
 - Restore glow behavior and consistent real/fake foreground ordering.
 - Invalidate shader caches when included shader sources change.
