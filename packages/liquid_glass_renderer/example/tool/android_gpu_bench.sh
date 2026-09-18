@@ -429,7 +429,28 @@ PY
   run_analyzer "$OUT_DIR"
 }
 
+thermal_status() {
+  adb_s shell dumpsys thermalservice | strip_cr | sed -n 's/.*Thermal Status: *\([0-9]*\).*/\1/p' | head -1
+}
+
+# Wait until the device is at or below THERMAL_GATE (default 1 = Pixel "light",
+# its resting level on USB). Back-to-back scenarios otherwise drift into
+# throttling and the later ones measure a slower GPU clock.
+wait_for_cool() {
+  local waited=0 status
+  while :; do
+    status="$(thermal_status)"; status="${status:-9}"
+    if [[ "$status" -le "${THERMAL_GATE:-1}" ]]; then
+      echo "thermal status=$status after ${waited}s"
+      return
+    fi
+    echo "thermal status=$status, cooling (${waited}s)"
+    sleep 20; waited=$((waited+20))
+  done
+}
+
 run_scenario() {
+  wait_for_cool
   local scenario="$1"
   local rep="$2"
   local uid="$3"
