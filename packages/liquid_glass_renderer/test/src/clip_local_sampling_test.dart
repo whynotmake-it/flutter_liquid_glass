@@ -259,7 +259,7 @@ void main() {
 
   test('rim precision does not increase geometry texture bandwidth', () {
     final renderer = File(
-      'lib/src/internal/flutter_gpu_geometry_renderer.dart',
+      'lib/src/internal/flutter_gpu_geometry_renderer_native.dart',
     ).readAsStringSync();
 
     final geometryAllocationStart = renderer.indexOf(

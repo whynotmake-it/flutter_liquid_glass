@@ -19,11 +19,13 @@ environment:
   sdk: ">=3.13.0 <3.14.0"
   flutter: ">=3.47.0"
 
-# We only support Platforms that support Impeller.
+# Real glass needs Impeller and Flutter GPU (macOS, iOS, Android). The web
+# build compiles and renders the fake-glass fallback.
 platforms:
   macos:
   ios:
   android:
+  web:
 
 dependencies:
   equatable: ^2.1.0
