@@ -13,6 +13,7 @@ import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_seed.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
@@ -515,7 +516,18 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   Matrix4 get shaderCoordinateTransform {
-    final transform = getTransformTo(null);
+    // Filter fragment coordinates are local to the enclosing render pass. At
+    // the root that is the screen; inside a [LiquidGlassSeed] it is the seed's
+    // pixel-snapped clip, so map to that origin instead.
+    final seed = RenderLiquidGlassSeed.enclosing(this);
+    final Matrix4 transform;
+    if (seed == null) {
+      transform = getTransformTo(null);
+    } else {
+      transform = getTransformTo(seed);
+      final origin = seed.subpassOrigin;
+      transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
+    }
     final translation = compositorTranslation;
     if (translation != Offset.zero) {
       transform.multiply(
