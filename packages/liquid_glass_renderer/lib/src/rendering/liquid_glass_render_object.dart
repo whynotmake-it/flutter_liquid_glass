@@ -14,6 +14,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
+import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
@@ -25,7 +26,76 @@ import 'package:liquid_glass_renderer/src/logging.dart';
 part 'independent_real_glass_opacity.dart';
 
 @internal
-abstract interface class LiquidGlassLayerRenderObject {}
+abstract interface class LiquidGlassLayerRenderObject {
+  /// Everything this layer paints or samples, in its own coordinates, or
+  /// `null` while it has no shapes: the material plus contour, the backdrop
+  /// reach of its blur and refraction, and its exterior shadows. A
+  /// `LiquidGlassCapture` sizes itself to the union of these. Reads layout and
+  /// cached shape data only; it never polls or rebuilds geometry.
+  Rect? get effectBounds;
+}
+
+/// Grows [bounds] to include the exterior shadows of [shapes], whose
+/// coordinates map into the layer through their transforms.
+@internal
+Rect expandForGlassShadows(
+  Rect bounds,
+  Iterable<(List<ShapeGeometry>, Matrix4)> shapes,
+  LiquidGlassSettings settings,
+) {
+  var result = bounds;
+  for (final (geometryShapes, geometryToLayer) in shapes) {
+    for (final shape in geometryShapes) {
+      final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
+      if (shapeVisibility <= 0) continue;
+      final shadowScale = liquidGlassShadowScale(
+        shape.renderObject.size,
+        settings.effectiveExteriorShadowSizeResponse,
+      );
+      final shapeToLayer = shape.shapeToGeometry == null
+          ? geometryToLayer
+          : geometryToLayer.multiplied(shape.shapeToGeometry!);
+      for (final shadow in shape.shadows) {
+        final extent = max(
+          shadow.spreadRadius +
+              glassShadowBlurSupport(
+                shadow.blurRadius * shapeVisibility * shadowScale.blur,
+              ),
+          0,
+        ).toDouble();
+        final localBounds = (Offset.zero & shape.renderObject.size)
+            .shift(shadow.offset)
+            .inflate(extent);
+        result = result.expandToInclude(
+          MatrixUtils.transformRect(shapeToLayer, localBounds),
+        );
+      }
+    }
+  }
+  return result;
+}
+
+/// Union of the geometry bounds registered with [link], in layer space, with
+/// the shapes and transforms needed to grow it. Pure: no polling, no rebuild.
+@internal
+(Rect, List<(List<ShapeGeometry>, Matrix4)>)? gatherGlassGeometryBounds(
+  GeometryRenderLink link,
+  RenderObject layer,
+) {
+  Rect? bounds;
+  final shapes = <(List<ShapeGeometry>, Matrix4)>[];
+  for (final geometryRo in link.shapes) {
+    if (!geometryRo.attached || !geometryRo.hasSize) continue;
+    final (geometryBounds, geometryShapes, _) = geometryRo.gatherShapeData();
+    if (geometryShapes.isEmpty) continue;
+    final toLayer = geometryRo.getTransformTo(layer);
+    final inLayer = MatrixUtils.transformRect(toLayer, geometryBounds);
+    bounds = bounds?.expandToInclude(inLayer) ?? inLayer;
+    shapes.add((geometryShapes, toLayer));
+  }
+  if (bounds == null) return null;
+  return (bounds, shapes);
+}
 
 @internal
 bool hasLiquidGlassLayerAncestor(RenderObject renderObject) {
@@ -804,37 +874,42 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     );
   }
 
-  Rect _expandForLayerShadows(Rect bounds) {
-    var result = bounds;
-    for (final (_, geometry, geometryToLayer) in _shapesWithGeometry) {
-      for (final shape in geometry.shapes) {
-        final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
-        if (shapeVisibility <= 0) continue;
-        final shadowScale = liquidGlassShadowScale(
-          shape.renderObject.size,
-          settings.effectiveExteriorShadowSizeResponse,
-        );
-        final shapeToLayer = shape.shapeToGeometry == null
-            ? geometryToLayer
-            : geometryToLayer.multiplied(shape.shapeToGeometry!);
-        for (final shadow in shape.shadows) {
-          final extent = max(
-            shadow.spreadRadius +
-                glassShadowBlurSupport(
-                  shadow.blurRadius * shapeVisibility * shadowScale.blur,
-                ),
-            0,
-          ).toDouble();
-          final localBounds = (Offset.zero & shape.renderObject.size)
-              .shift(shadow.offset)
-              .inflate(extent);
-          result = result.expandToInclude(
-            MatrixUtils.transformRect(shapeToLayer, localBounds),
-          );
-        }
-      }
-    }
-    return result;
+  Rect _expandForLayerShadows(Rect bounds) => expandForGlassShadows(
+    bounds,
+    _shapesWithGeometry.map((entry) => (entry.$2.shapes, entry.$3)),
+    settings,
+  );
+
+  @override
+  Rect? get effectBounds {
+    final gathered = gatherGlassGeometryBounds(link, this);
+    if (gathered == null) return null;
+    final (bounds, shapes) = gathered;
+    final material = bounds.inflate(_contourOutset);
+    return expandForGlassShadows(
+      material.inflate(backdropSamplingReach(material)),
+      shapes,
+      settings,
+    );
+  }
+
+  /// How far outside the material the composed filter reads the backdrop:
+  /// the blur kernel (3 sigma), the peak edge displacement including its
+  /// chromatic split, and, below unit backdrop scale, the extra content
+  /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
+  /// the filter samples its own edge.
+  double backdropSamplingReach(Rect material) {
+    final blur = settings.effectiveFrost > 0
+        ? settings.effectiveFrost * 3 + 1 / devicePixelRatio
+        : 0.0;
+    final displacement =
+        settings.effectiveDisplacementScale *
+        (1 + settings.effectiveChromaticAberration.abs() * 0.5);
+    final scale = settings.effectiveBackdropScale;
+    final revealed = scale < 1
+        ? (1 / scale - 1) * max(material.width, material.height) / 2
+        : 0.0;
+    return blur + displacement + revealed;
   }
 
   void _paintLayerShadows(

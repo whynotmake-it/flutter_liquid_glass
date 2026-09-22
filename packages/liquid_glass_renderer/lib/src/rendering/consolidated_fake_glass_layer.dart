@@ -561,6 +561,20 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
 
   double get _surfaceOutset => fakeGlassSurfaceOutset(settings);
 
+  @override
+  Rect? get effectBounds {
+    final gathered = gatherGlassGeometryBounds(link, this);
+    if (gathered == null) return null;
+    final (bounds, shapes) = gathered;
+    // One extra logical pixel covers the kernel's rounding at any DPR.
+    final blur = _hasBlur ? settings.effectiveFrost * 3 + 1 : 0.0;
+    return expandForGlassShadows(
+      bounds.inflate(_surfaceOutset + blur),
+      shapes,
+      settings,
+    );
+  }
+
   void _paintShadows(
     PaintingContext context,
     Offset offset,

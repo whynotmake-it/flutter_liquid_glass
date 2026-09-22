@@ -785,34 +785,7 @@ class _RealOpacityPass {
         if (!identical(ancestor, enclosingSeed)) continue;
         insideSeed = false;
       }
-      final clip = ancestor is RenderClipRect
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size) ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipOval
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size) ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipRRect
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).outerRect ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipRSuperellipse
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).outerRect ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipPath
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).getBounds() ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderView
-          ? Offset.zero & ancestor.size
-          : ancestor.describeApproximatePaintClip(child);
+      final clip = clipOfAncestor(ancestor, child);
       if (clip != null) {
         final screenClip = MatrixUtils.transformRect(
           ancestor.getTransformTo(null),

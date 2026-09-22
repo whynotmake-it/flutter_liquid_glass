@@ -56,6 +56,14 @@ Stack(
 )
 ```
 
+Shaders load on first use, so the first glass on screen paints its fallback
+for a frame or two. Load them up front instead:
+
+```dart
+await precacheLiquidGlassShaders();
+runApp(const MyApp());
+```
+
 ## Mental model
 
 | Type | Responsibility |
@@ -314,6 +322,61 @@ Rules:
 See the [performance audit](example/tool/PERFORMANCE_AUDIT.md) for the
 full evidence, including ClickUp Inbox scroll (glass off 88 / fake 224 /
 real 247 mW GPU; CPU ≈1.34 W in every state).
+
+## Glass on glass
+
+Apple's guidelines say not to stack glass on glass: glass is the control
+layer that floats above content, and one glass element should not sit on
+another. Follow that where you can. Sometimes you can't, for example a tab
+indicator that has to slide over its tab bar. You then have four options.
+
+Every `BackdropFilter` (each `LiquidGlassLayer` is one) has to read the
+pixels behind it. On Impeller that means copying the whole current render
+pass into a texture, the entire screen at the top level. We call that a
+**full-screen readback**. It costs about 115 mW GPU on a Pixel 10 at 120 Hz,
+before any blur or glass work. It is the unit to count.
+
+| | Full-screen readbacks | The top glass shows | Drawback |
+| --- | --- | --- | --- |
+| Shapes in one `LiquidGlassLayer` | 1 | The content below | Shapes share the layer's settings and cannot refract each other. Use a `LiquidGlassBlendGroup` if they should merge. |
+| Separate layers in one `BackdropGroup` (`useBackdropGroup: true`) | 1, shared by all layers; each layer still runs its own blur and shader | The content below, not the other glass | The indicator does not look like it sits on the bar. |
+| Separate layers, each reading back on its own (default) | 1 per layer | The glass below it | Cost grows with every layer. |
+| Separate layers inside a `LiquidGlassCapture` | 1 for the capture; inside it each layer reads back only the capture | The glass below it | You must paint the content outside the capture. |
+
+Measured on the example's tab bar with a sliding indicator, list scrolling
+at 120 Hz on a Pixel 10: own readbacks 910 mW GPU, shared `BackdropGroup`
+751–783, `LiquidGlassCapture` 736. In ClickUp's bottom bar the capture saved
+about 5 % GPU. Real screens have more going on than a benchmark, so measure
+your own.
+
+### Using `LiquidGlassCapture`
+
+Wrap the glass that belongs together. Paint the content the glass should
+refract below it, not inside it.
+
+```dart
+Stack(
+  children: [
+    content,
+    Align(
+      alignment: Alignment.bottomCenter,
+      child: LiquidGlassCapture(
+        child: LiquidGlassLayer(
+          // the bar
+          child: LiquidGlassLayer(
+            // the indicator, refracting the bar
+          ),
+        ),
+      ),
+    ),
+  ],
+)
+```
+
+The capture sizes itself to the glass inside it plus its blur, refraction
+and shadow. Pass `bleed` to size it yourself, for example when the child
+paints something that reaches further out than the glass. Keep captures
+small; a capture the size of the screen saves nothing.
 
 ## Limitations
 
