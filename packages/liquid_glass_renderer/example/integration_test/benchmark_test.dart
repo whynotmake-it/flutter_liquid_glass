@@ -1633,7 +1633,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
   late final ScrollController _controller;
   final Map<(int, int), ImageFilter> _passthroughBySize = {};
 
-  /// Mild saturation boost — same filter *shape* as fake-glass compose.
+  /// Mild saturation boost - same filter *shape* as fake-glass compose.
   static const _mildSaturation = ColorFilter.matrix(<double>[
     1.15, -0.075, -0.075, 0, 0,
     -0.075, 1.15, -0.075, 0, 0,
@@ -1688,9 +1688,9 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
       if (program == null) {
         return _passthroughFilter!;
       }
-      final shader = program.fragmentShader();
-      shader.setFloat(0, width.toDouble());
-      shader.setFloat(1, height.toDouble());
+      final shader = program.fragmentShader()
+        ..setFloat(0, width.toDouble())
+        ..setFloat(1, height.toDouble());
       return ImageFilter.shader(shader);
     });
   }
@@ -1801,9 +1801,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
         Positioned(
           left: 0,
           right: 0,
-          // Keep the chrome at the same screen position with or without the
-          // seed's padding, so the comparison isolates the pass structure.
-          bottom: widget.seedBottom ? 24 - 64 : 24,
+          bottom: 24,
           child: Center(
             child: _seed(
               tabs
@@ -1819,17 +1817,11 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
     ];
   }
 
-  /// E3 seed: [LiquidGlassSeed] around the chrome plus the blur/refraction
-  /// reach (64 logical px covers 3 sigma of the sigma-7 frost, the maximum
-  /// refraction displacement and the shadow support for these settings).
+  /// E3: [LiquidGlassCapture] around the chrome; it sizes itself to the
+  /// blur, refraction and shadow reach of the glass inside.
   Widget _seed(Widget child) {
     if (!widget.seedBottom) return child;
-    const pad = 64.0;
-    return SizedBox(
-      width: 340 + 2 * pad,
-      height: 64 + 2 * pad,
-      child: LiquidGlassSeed(child: Center(child: child)),
-    );
+    return LiquidGlassCapture(child: child);
   }
 
   Widget _topBar(double topInset) => SizedBox(
@@ -1910,8 +1902,8 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                 child: widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
                         widget.chrome ==
                             _AppChromeKind.realTabsOwnLoupeStatic
-                    ? LiquidGlassLayer(
-                        settings: const LiquidGlassSettings(
+                    ? const LiquidGlassLayer(
+                        settings: LiquidGlassSettings(
                           frost: 0,
                           edgeRefraction: 40,
                           backdropScale: .92,
@@ -1921,9 +1913,8 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                           contourStrength: .1,
                           contourWidth: 1,
                         ),
-                        defaultAppearance: const LiquidGlassAppearance(),
-                        useBackdropGroup: false,
-                        child: const LiquidGlass(
+                        defaultAppearance: LiquidGlassAppearance(),
+                        child: LiquidGlass(
                           shape: LiquidRoundedSuperellipse(borderRadius: 24),
                           child: SizedBox(width: 56, height: 48),
                         ),

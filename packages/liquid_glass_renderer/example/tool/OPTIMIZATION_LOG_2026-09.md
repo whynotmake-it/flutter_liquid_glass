@@ -245,6 +245,35 @@ frame capture of the (debuggable) profile APK or bisecting ClickUp's structure
 into the example scene (RepaintBoundary, LiquidStretch, seed size ≈ 0.75 Mpx
 vs 0.15, 68 fps timer scroll vs 120). Decision pending.
 
+### J. `LiquidGlassSeed` shipped as `LiquidGlassCapture` (2026-09-22)
+
+Renamed; `reach` became a nullable `bleed` and the capture now sizes itself
+from the glass inside it (`LiquidGlassLayerRenderObject.effectBounds`: filter
+clip + blur/refraction sampling reach + shadow paint reach). Two fixes found
+while locking it down with pixel tests: (1) the independent-opacity passes
+computed their pass origin from the ancestor clip chain and did not see the
+capture, so real glass under `Opacity`/`FadeTransition` inside a capture drew
+its refraction shifted; the capture now reports its region through
+`describeApproximatePaintClip` and both paths share `clipOfAncestor`.
+(2) `flutter_tester` renders only the first subpass containing a
+`BackdropFilter` per process (later ones black; Metal and Vulkan are fine),
+so the host pixel tests run one scene per file and the full matrix runs as a
+macOS integration test. Capture vs no capture: max 4/255 on the host,
+max 24/255 on Metal (MSAA edge resolve through the subpass, glass identical).
+
+Pixel 10 re-measurement with the auto-sized capture (Flutter 3.47 build,
+3 reps, thermal-gated, 120 fps, `/tmp/pixel_glass/fast/cap_pair*`):
+
+| static bar, list scrolling | GPU | GPU-mem | DDR | CPU |
+|---|---:|---:|---:|---:|
+| bottom pill (`appScrollRealPillOnly`) | 374 | 106 | 154 | 307 |
+| bottom pill in capture | **309** | 93 | 141 | 323 |
+| bar + own-capture loupe (`appScrollRealTabsOwnLoupeStatic`) | 863 | 182 | 303 | 376 |
+| bar + own-capture loupe in capture | **706** | **154** | **254** | 386 |
+
+−17 % / −18 % GPU, −16 % DDR, CPU +10…16 mW (within noise): the automatic
+region reproduces the hand-sized seed's result (383 → 329, 910 → 736).
+
 ## Summary (2026-09-16 00:50)
 
 Kept at the time, rejected 2026-09-22 (see A): **A** analytic shadows (fake −26 mW GPU / −8 CPU per two shadowed
