@@ -4,7 +4,7 @@
 part of 'liquid_glass_render_object.dart';
 
 // Scope replay. Live normal children stay in their native ancestry; contained
-// holders move between branches. NEST_GLASS_CONTENTS remains excluded.
+// holders move between branches.
 class _IndependentRealOpacityLayer extends ContainerLayer {
   final _original = LayerHandle<ContainerLayer>(ContainerLayer());
   final _groups = <_RealOpacityGroup>[];
@@ -332,54 +332,51 @@ class _IndependentRealOpacityLayer extends ContainerLayer {
       bounds = bounds?.expandToInclude(transformed) ?? transformed;
     }
 
-    if (const bool.fromEnvironment('WEAK_OPACITY_FILTER', defaultValue: true)) {
-      for (var i = _retiredFilters.length - 1; i >= 0; i--) {
-        final cached = _retiredFilters[i];
-        if (_sameRealIdentities(cached.shapes, shapes) &&
-            cached.capturesRefraction == canvasFractional) {
-          // Transfer to one active owner before permitting uniform updates.
-          _retiredFilters.removeAt(i);
-          final filter = cached.filter.target;
-          final shader = cached.shader.target;
-          if (shader != null) {
-            GpuAllocationDiagnostics.filterRecoveryHits++;
-            final recovered =
-                _RealOpacityPass(
-                    shapes,
-                    null,
-                    shader,
-                    subset,
-                    bounds!,
-                    usesCanvasComposition: canvasFractional,
-                    capturesRefraction: cached.capturesRefraction,
-                  )
-                  .._mapping = cached.capturesRefraction || filter == null
-                      ? null
-                      : cached.mapping
-                  .._captureMapping =
-                      cached.capturesRefraction && filter != null
-                      ? cached.mapping
-                      : null
-                  ..placement = cached.placement;
-            try {
-              recovered.backdrop.layer!
-                ..filter = filter
-                // Capture passes read the sequential enclosing surface, just
-                // like fresh passes; only ordinary passes share backdrop input.
-                ..backdropKey = cached.capturesRefraction
+    for (var i = _retiredFilters.length - 1; i >= 0; i--) {
+      final cached = _retiredFilters[i];
+      if (_sameRealIdentities(cached.shapes, shapes) &&
+          cached.capturesRefraction == canvasFractional) {
+        // Transfer to one active owner before permitting uniform updates.
+        _retiredFilters.removeAt(i);
+        final filter = cached.filter.target;
+        final shader = cached.shader.target;
+        if (shader != null) {
+          GpuAllocationDiagnostics.filterRecoveryHits++;
+          final recovered =
+              _RealOpacityPass(
+                  shapes,
+                  null,
+                  shader,
+                  subset,
+                  bounds!,
+                  usesCanvasComposition: canvasFractional,
+                  capturesRefraction: cached.capturesRefraction,
+                )
+                .._mapping = cached.capturesRefraction || filter == null
                     ? null
-                    : owner.backdropKey;
-              recovered.syncFilter(owner);
-              return recovered;
-            } catch (_) {
-              recovered.dispose();
-              rethrow;
-            }
+                    : cached.mapping
+                .._captureMapping = cached.capturesRefraction && filter != null
+                    ? cached.mapping
+                    : null
+                ..placement = cached.placement;
+          try {
+            recovered.backdrop.layer!
+              ..filter = filter
+              // Capture passes read the sequential enclosing surface, just
+              // like fresh passes; only ordinary passes share backdrop input.
+              ..backdropKey = cached.capturesRefraction
+                  ? null
+                  : owner.backdropKey;
+            recovered.syncFilter(owner);
+            return recovered;
+          } catch (_) {
+            recovered.dispose();
+            rethrow;
           }
         }
       }
-      GpuAllocationDiagnostics.filterRecoveryMisses++;
     }
+    GpuAllocationDiagnostics.filterRecoveryMisses++;
 
     // The allocator owns the borrowed handles currently used by the owner.
     // Pin BOTH originals before any subset render can replace/dispose them.
@@ -596,10 +593,6 @@ class _IndependentRealOpacityLayer extends ContainerLayer {
       if (!retain) {
         if (identical(pass, _latestOpaquePass)) _latestOpaquePass = null;
         final preserveShader =
-            const bool.fromEnvironment(
-              'WEAK_OPACITY_FILTER',
-              defaultValue: true,
-            ) &&
             (!pass.usesCanvasComposition || pass.capturesRefraction) &&
             pass.layer.hasSubmitted &&
             pass.backdrop.layer?.filter != null;
@@ -647,13 +640,7 @@ class _IndependentRealOpacityLayer extends ContainerLayer {
     _selectOriginal();
     // The hidden tree and image handles are released normally. Weak entries
     // own no resources and may serve a later fade of unchanged geometry.
-    _clearPasses(
-      // ignore: avoid_redundant_argument_values
-      keepRetiredFilters: const bool.fromEnvironment(
-        'WEAK_OPACITY_FILTER',
-        defaultValue: true,
-      ),
-    );
+    _clearPasses(keepRetiredFilters: true);
   }
 
   @override
@@ -798,34 +785,7 @@ class _RealOpacityPass {
         if (!identical(ancestor, enclosingSeed)) continue;
         insideSeed = false;
       }
-      final clip = ancestor is RenderClipRect
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size) ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipOval
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size) ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipRRect
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).outerRect ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipRSuperellipse
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).outerRect ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderClipPath
-          ? (ancestor.clipBehavior == Clip.none
-                ? null
-                : ancestor.clipper?.getClip(ancestor.size).getBounds() ??
-                      Offset.zero & ancestor.size)
-          : ancestor is RenderView
-          ? Offset.zero & ancestor.size
-          : ancestor.describeApproximatePaintClip(child);
+      final clip = clipOfAncestor(ancestor, child);
       if (clip != null) {
         final screenClip = MatrixUtils.transformRect(
           ancestor.getTransformTo(null),

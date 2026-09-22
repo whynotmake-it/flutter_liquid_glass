@@ -483,9 +483,14 @@ enum BenchmarkScenario {
   appScrollRealTopOnly,
   appScrollPlainBlurTopOnly,
   appScrollRealPillOnly,
+  appScrollPlainBlurPillOnly,
+  appScrollRealPillSeeded,
+  appScrollRealTabsOwnLoupeStaticSeeded,
   appIdlePlainBlur,
   appIdleFake,
   appScrollRealTabsStatic,
+  appScrollRealTabsOwnLoupe,
+  appScrollRealTabsOwnLoupeStatic,
   appScrollPassthroughOnly,
   appScrollPlainBlurNestedPassthrough,
   appScrollPlainBlurNestedColor,
@@ -1083,6 +1088,32 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         chrome: _AppChromeKind.real,
         showTop: false,
       ),
+      // E1: real - blur increment for a bottom element vs a top element. If
+      // the runtime-effect intermediate is anchored at the pass origin, the
+      // bottom increment is markedly larger than the top one.
+      BenchmarkScenario.appScrollPlainBlurPillOnly => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.plainBlur,
+        showTop: false,
+      ),
+      // E3: same elements inside a bar-sized seeded subpass (ClipRect +
+      // passthrough BackdropFilter). Inner backdrop filters then flip the
+      // small seed instead of the screen, and the shader intermediate is
+      // anchored next to the bar.
+      BenchmarkScenario.appScrollRealPillSeeded => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.real,
+        showTop: false,
+        seedBottom: true,
+      ),
+      BenchmarkScenario.appScrollRealTabsOwnLoupeStaticSeeded => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.realTabsOwnLoupeStatic,
+        seedBottom: true,
+      ),
       BenchmarkScenario.appIdlePlainBlur => const _AppLikeScene(
         t: 0,
         scroll: false,
@@ -1097,6 +1128,16 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         t: t,
         scroll: true,
         chrome: _AppChromeKind.realTabsStatic,
+      ),
+      BenchmarkScenario.appScrollRealTabsOwnLoupe => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.realTabsOwnLoupe,
+      ),
+      BenchmarkScenario.appScrollRealTabsOwnLoupeStatic => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.realTabsOwnLoupeStatic,
       ),
       BenchmarkScenario.appScrollPassthroughOnly => _AppLikeScene(
         t: t,
@@ -1542,6 +1583,8 @@ enum _AppChromeKind {
   plainBlurColor,
   realNoFrost,
   realTabsStatic,
+  realTabsOwnLoupe,
+  realTabsOwnLoupeStatic,
   passthroughOnly,
   plainBlurNestedPassthrough,
   plainBlurNestedColor,
@@ -1569,6 +1612,7 @@ class _AppLikeScene extends StatefulWidget {
     required this.chrome,
     this.showTop = true,
     this.showBottom = true,
+    this.seedBottom = false,
   });
 
   final double t;
@@ -1576,6 +1620,10 @@ class _AppLikeScene extends StatefulWidget {
   final _AppChromeKind chrome;
   final bool showTop;
   final bool showBottom;
+
+  /// Wraps the bottom chrome in a pixel-snapped ClipRect + passthrough
+  /// BackdropFilter so nested backdrop filters flip a bar-sized subpass.
+  final bool seedBottom;
 
   @override
   State<_AppLikeScene> createState() => _AppLikeSceneState();
@@ -1585,7 +1633,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
   late final ScrollController _controller;
   final Map<(int, int), ImageFilter> _passthroughBySize = {};
 
-  /// Mild saturation boost — same filter *shape* as fake-glass compose.
+  /// Mild saturation boost - same filter *shape* as fake-glass compose.
   static const _mildSaturation = ColorFilter.matrix(<double>[
     1.15, -0.075, -0.075, 0, 0,
     -0.075, 1.15, -0.075, 0, 0,
@@ -1640,16 +1688,19 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
       if (program == null) {
         return _passthroughFilter!;
       }
-      final shader = program.fragmentShader();
-      shader.setFloat(0, width.toDouble());
-      shader.setFloat(1, height.toDouble());
+      final shader = program.fragmentShader()
+        ..setFloat(0, width.toDouble())
+        ..setFloat(1, height.toDouble());
       return ImageFilter.shader(shader);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.paddingOf(context).top;
+    // Fixed status-bar inset: MediaQuery padding can be 0 on the first build
+    // or change while the harness pins the screen, which would move ~40 px of
+    // top-bar filter area between otherwise identical runs.
+    const topInset = 48.0;
     Widget stack = Stack(
       fit: StackFit.expand,
       children: [
@@ -1731,7 +1782,9 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
 
     final tabs =
         widget.chrome == _AppChromeKind.realTabs ||
-        widget.chrome == _AppChromeKind.realTabsStatic;
+        widget.chrome == _AppChromeKind.realTabsStatic ||
+        widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
+        widget.chrome == _AppChromeKind.realTabsOwnLoupeStatic;
     return [
       if (widget.showTop)
         Positioned(
@@ -1750,16 +1803,25 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
           right: 0,
           bottom: 24,
           child: Center(
-            child: tabs
-                ? _realTabsPill(bottomPill)
-                : _wrapChrome(
-                    radius: 32,
-                    child: bottomPill,
-                    filterSize: pillSize,
-                  ),
+            child: _seed(
+              tabs
+                  ? _realTabsPill(bottomPill)
+                  : _wrapChrome(
+                      radius: 32,
+                      child: bottomPill,
+                      filterSize: pillSize,
+                    ),
+            ),
           ),
         ),
     ];
+  }
+
+  /// E3: [LiquidGlassCapture] around the chrome; it sizes itself to the
+  /// blur, refraction and shadow reach of the glass inside.
+  Widget _seed(Widget child) {
+    if (!widget.seedBottom) return child;
+    return LiquidGlassCapture(child: child);
   }
 
   Widget _topBar(double topInset) => SizedBox(
@@ -1826,15 +1888,41 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
               ),
               Positioned(
                 left: 4 +
-                    (widget.chrome == _AppChromeKind.realTabsStatic
+                    (widget.chrome == _AppChromeKind.realTabsStatic ||
+                            widget.chrome ==
+                                _AppChromeKind.realTabsOwnLoupeStatic
                         ? 0.0
                         : widget.t) *
                         travel,
                 top: 8,
-                child: const LiquidGlass.grouped(
-                  shape: LiquidRoundedSuperellipse(borderRadius: 24),
-                  child: SizedBox(width: 56, height: 48),
-                ),
+                // ClickUp's indicator samples the painted bar through its own
+                // backdrop capture (frost 0, strong edge refraction). This
+                // variant prices that second readback against the blended
+                // loupe above.
+                child: widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
+                        widget.chrome ==
+                            _AppChromeKind.realTabsOwnLoupeStatic
+                    ? const LiquidGlassLayer(
+                        settings: LiquidGlassSettings(
+                          frost: 0,
+                          edgeRefraction: 40,
+                          backdropScale: .92,
+                          refractionSpread: .5,
+                          chromaticAberration: .1,
+                          highlight: .4,
+                          contourStrength: .1,
+                          contourWidth: 1,
+                        ),
+                        defaultAppearance: LiquidGlassAppearance(),
+                        child: LiquidGlass(
+                          shape: LiquidRoundedSuperellipse(borderRadius: 24),
+                          child: SizedBox(width: 56, height: 48),
+                        ),
+                      )
+                    : const LiquidGlass.grouped(
+                        shape: LiquidRoundedSuperellipse(borderRadius: 24),
+                        child: SizedBox(width: 56, height: 48),
+                      ),
               ),
             ],
           ),
@@ -2042,6 +2130,8 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
       case _AppChromeKind.realShadow:
       case _AppChromeKind.realTabs:
       case _AppChromeKind.realTabsStatic:
+      case _AppChromeKind.realTabsOwnLoupe:
+      case _AppChromeKind.realTabsOwnLoupeStatic:
       case _AppChromeKind.realOneLayer:
       case _AppChromeKind.realSharedKey:
       case _AppChromeKind.realNoFrost:

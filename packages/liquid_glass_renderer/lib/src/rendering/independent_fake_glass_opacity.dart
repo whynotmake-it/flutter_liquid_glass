@@ -70,12 +70,7 @@ class _IndependentFakeOpacityLayer extends ContainerLayer {
       group.alpha = glassOpacityChainState(group.scopes);
       allOpaque &= group.alpha == 255;
     }
-    if (allOpaque ||
-        (const bool.fromEnvironment(
-              'HOIST_GLASS_OPACITY',
-              defaultValue: true,
-            ) &&
-            areGlassOpacityScopesOpaque(_localOpacityScopes))) {
+    if (allOpaque || areGlassOpacityScopesOpaque(_localOpacityScopes)) {
       _scopeTree.clear();
       if (!identical(firstChild, original) || !identical(lastChild, original)) {
         removeAllChildren();

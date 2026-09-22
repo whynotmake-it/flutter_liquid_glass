@@ -12,6 +12,7 @@ import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
@@ -227,17 +228,12 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
       _triedGpuGeometryRenderer = true;
       try {
-        if (const bool.fromEnvironment(
-          'INDEPENDENT_GLASS_OPACITY',
-          defaultValue: true,
-        )) {
-          _independentOpacityPrograms = await Future.wait([
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassRender),
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassMaterialRender),
-            FragmentProgram.fromAsset(ShaderKeys.liquidGlassTintRender),
-          ]);
-          if (!mounted || widget.fake) return;
-        }
+        _independentOpacityPrograms = await Future.wait([
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassRender),
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassMaterialRender),
+          FragmentProgram.fromAsset(ShaderKeys.liquidGlassTintRender),
+        ]);
+        if (!mounted || widget.fake) return;
         final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );
@@ -520,7 +516,18 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   Matrix4 get shaderCoordinateTransform {
-    final transform = getTransformTo(null);
+    // Filter fragment coordinates are local to the enclosing render pass. At
+    // the root that is the screen; inside a [LiquidGlassCapture] it is the
+    // capture's pixel-snapped clip, so map to that origin instead.
+    final capture = RenderLiquidGlassCapture.enclosing(this);
+    final Matrix4 transform;
+    if (capture == null) {
+      transform = getTransformTo(null);
+    } else {
+      transform = getTransformTo(capture);
+      final origin = capture.passOrigin;
+      transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
+    }
     final translation = compositorTranslation;
     if (translation != Offset.zero) {
       transform.multiply(
@@ -634,15 +641,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   @override
-  bool paintLiquidGlass(
+  void paintLiquidGlass(
     PaintingContext context,
     Offset offset,
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> shapes,
     Rect boundingBox,
-    PaintingContextCallback paintForeground,
   ) {
-    if (!attached) return false;
-    const nestBackdropContents = bool.fromEnvironment('NEST_GLASS_CONTENTS');
+    if (!attached) return;
     // The engine snapshots this shader's uniforms into the native image
     // filter at creation, so the composed filter can only be reused while
     // every snapshotted input is unchanged. Repaints with identical shader
@@ -663,15 +668,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       filterBounds,
       (context, offset) {
         if (drawableEmpty) return;
-        context.pushLayer(
-          shaderLayer!,
-          nestBackdropContents ? paintForeground : (context, offset) {},
-          offset,
-        );
+        context.pushLayer(shaderLayer!, (context, offset) {}, offset);
       },
       oldLayer: _clipRectLayerHandle.layer,
     );
-    return nestBackdropContents && !drawableEmpty;
   }
 
   @override

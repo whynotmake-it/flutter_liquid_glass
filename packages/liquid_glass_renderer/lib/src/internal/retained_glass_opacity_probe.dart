@@ -95,21 +95,15 @@ bool isUnfinishedGlassOpacityChain(List<RenderObject> scopes) =>
     !scopes.any(isSettledTransparentGlassScope) &&
     !scopes.every(isSettledOpaqueGlassScope);
 
-/// Experimental replay of opacity ancestry bypassed by layer-owned effects.
+/// Replays opacity ancestry bypassed by layer-owned effects.
 /// Only scopes common to every contributor are handled here. Independent
 /// overlapping scopes require separate cached material, not a combined replay.
 class RetainedGlassOpacityProbe {
-  /// Keeps this incomplete scope experiment out of the production path.
-  static const enabled = bool.fromEnvironment(
-    'HOIST_GLASS_OPACITY',
-    defaultValue: true,
-  );
   final _layer = LayerHandle<_ScopedEffectLayer>();
   List<RenderObject> _scopes = [];
 
   /// Collects shared opacity ancestors bypassed by the material owner.
   void update(RenderBox owner, Iterable<RenderBox> shapes) {
-    if (!enabled) return;
     List<RenderObject>? common;
     for (final shape in shapes) {
       final scopes = <RenderObject>[];
@@ -134,7 +128,7 @@ class RetainedGlassOpacityProbe {
 
   /// Reconciles alpha before the current retained scene is submitted.
   void sync() {
-    if (!enabled || _layer.layer == null) return;
+    if (_layer.layer == null) return;
     var opacity = 1.0;
     for (final scope in _scopes) {
       opacity *= switch (scope) {
@@ -153,7 +147,7 @@ class RetainedGlassOpacityProbe {
     Offset offset,
     PaintingContextCallback painter,
   ) {
-    if (!enabled || _scopes.isEmpty) {
+    if (_scopes.isEmpty) {
       painter(context, offset);
       return;
     }
@@ -201,13 +195,7 @@ class RetainedGlassOpacityTree {
         };
         node
           ..alpha = ui.Color.getAlphaFromOpacity(opacity)
-          ..keepFractionalSeed =
-              const bool.fromEnvironment(
-                'PROBE_STABLE_NEAR_OPAQUE_SEED',
-                defaultValue: true,
-              ) &&
-              opacity > 0 &&
-              opacity < 1;
+          ..keepFractionalSeed = opacity > 0 && opacity < 1;
         bounds[node] = bounds.containsKey(node)
             ? (bounds[node] == null || seedBounds == null
                   ? null
