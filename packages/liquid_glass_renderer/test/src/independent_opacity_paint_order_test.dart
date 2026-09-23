@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,17 +14,11 @@ import 'submitted_scene_binding.dart';
 void main() => runIndependentOpacityPaintOrderTests(SubmittedSceneBinding());
 
 void runIndependentOpacityPaintOrderTests(SubmittedSceneCapture binding) {
-  _outerOpticsTests(binding);
-}
-
-void _outerOpticsTests(SubmittedSceneCapture binding) {
   for (final fake in [true, false]) {
     for (final clipped in [false, true]) {
       testWidgets(
         'outer optical fade fake=$fake clipped=$clipped',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final oldSize = (binding.captureWidth, binding.captureHeight);
           binding
             ..captureWidth = 240
@@ -44,10 +36,6 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
           });
           final alpha = AnimationController(vsync: tester, value: 1);
           addTearDown(alpha.dispose);
-          final activeAlpha = const bool.fromEnvironment('PROBE_ACTIVE_OUTER')
-              ? _ActiveOpacity(alpha)
-              : null;
-          addTearDown(() => activeAlpha?.parent = null);
           await tester.runAsync(
             () => MultiShaderBuilder.precacheShaders([
               ShaderKeys.fakeGlassSurface,
@@ -56,137 +44,28 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
               ShaderKeys.liquidGlassTintRender,
             ]),
           );
-          const localOptics = bool.fromEnvironment('PROBE_LOCAL_OPTICS');
-          const keyedOptics = bool.fromEnvironment(
-            'PROBE_OPTICAL_BACKDROP_KEY',
-          );
-          // Move the material across a capture bucket boundary without moving
-          // its owner. This distinguishes input-surface and output-clip origins.
-          const opticalShiftX = int.fromEnvironment('PROBE_OPTICAL_SHIFT_X');
-          const fullOptics = bool.fromEnvironment('PROBE_FULL_OPTICS');
-          const staticOuter = bool.fromEnvironment('PROBE_STATIC_OUTER');
-          assert(
-            !staticOuter || !localOptics,
-            'Select one outer fade mechanism.',
-          );
-          const opticalShape = LiquidGlass.grouped(
-            shape: LiquidRoundedRectangle(borderRadius: 20),
-            child: SizedBox(width: 120, height: 120),
-          );
-          final opticalAppearance = switch (const String.fromEnvironment(
-            'PROBE_OPTICAL_APPEARANCE',
-            defaultValue: 'neutral',
-          )) {
-            'toolbar-light' => const LiquidGlassAppearance.ios27ToolbarLight(),
-            'toolbar-dark' => const LiquidGlassAppearance.ios27ToolbarDark(),
-            'regular-light' => const LiquidGlassAppearance.ios27RegularLight(),
-            'regular-dark' => const LiquidGlassAppearance.ios27RegularDark(),
-            'neutral' => const LiquidGlassAppearance(),
-            final unknown => throw ArgumentError(
-              'Unknown optical appearance: $unknown',
-            ),
-          };
-          Widget layer = LiquidGlassLayer(
+          final Widget layer = LiquidGlassLayer(
             fake: fake,
-            backdropKey: keyedOptics ? BackdropKey() : null,
-            defaultAppearance:
-                const bool.fromEnvironment('PROBE_OPTICAL_LINEAR_TRANSMISSION')
-                ? opticalAppearance.copyWith(transmissionGamma: 1)
-                : opticalAppearance,
-            settings: fullOptics
-                ? const LiquidGlassSettings(frost: 8)
-                : const LiquidGlassSettings(
-                    frost: 8,
-                    edgeRefraction: 0,
-                    highlight: 0,
-                    chromaticAberration: 0,
-                  ),
-            child: Stack(
+            defaultAppearance: const LiquidGlassAppearance(),
+            settings: const LiquidGlassSettings(
+              frost: 8,
+              edgeRefraction: 0,
+              highlight: 0,
+              chromaticAberration: 0,
+            ),
+            child: const Stack(
               children: [
                 Positioned(
-                  left: 60.0 + opticalShiftX,
+                  left: 60,
                   top: 40,
-                  child: localOptics
-                      ? FadeTransition(
-                          opacity: activeAlpha ?? alpha,
-                          child: opticalShape,
-                        )
-                      : opticalShape,
+                  child: LiquidGlass.grouped(
+                    shape: LiquidRoundedRectangle(borderRadius: 20),
+                    child: SizedBox(width: 120, height: 120),
+                  ),
                 ),
               ],
             ),
           );
-          const nested = bool.fromEnvironment('PROBE_OUTER_NESTED');
-          const betweenFade = bool.fromEnvironment('PROBE_BETWEEN_FADE');
-          assert(
-            !betweenFade || nested,
-            'Between-owner fade requires nesting.',
-          );
-          assert(
-            !localOptics || !betweenFade,
-            'Select one optical fade placement.',
-          );
-          if (nested) {
-            layer = LiquidGlassLayer(
-              fake: fake,
-              defaultAppearance: const LiquidGlassAppearance(),
-              settings: const LiquidGlassSettings(
-                frost: 0,
-                edgeRefraction: 0,
-                highlight: 0,
-                chromaticAberration: 0,
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  const Positioned(
-                    left: 2,
-                    top: 2,
-                    child: LiquidGlass.grouped(
-                      shape: LiquidRoundedRectangle(borderRadius: 2),
-                      child: SizedBox(width: 8, height: 8),
-                    ),
-                  ),
-                  if (betweenFade)
-                    if (const bool.fromEnvironment('PROBE_STATIC_BETWEEN'))
-                      AnimatedBuilder(
-                        animation: alpha,
-                        child: layer,
-                        builder: (_, child) =>
-                            Opacity(opacity: alpha.value, child: child),
-                      )
-                    else
-                      FadeTransition(
-                        opacity: activeAlpha ?? alpha,
-                        child: layer,
-                      )
-                  else
-                    layer,
-                ],
-              ),
-            );
-          }
-          if (const bool.fromEnvironment('PROBE_OPTICAL_SCALE')) {
-            layer = Transform.scale(
-              scale: 1.1,
-              alignment: Alignment.topLeft,
-              child: layer,
-            );
-          }
-          if (const bool.fromEnvironment('PROBE_OPTICAL_ROTATION')) {
-            layer = Transform.rotate(
-              angle: .08,
-              alignment: Alignment.topLeft,
-              child: layer,
-            );
-          }
-          const smallOwner = bool.fromEnvironment('PROBE_OPTICAL_SMALL_OWNER');
-          if (smallOwner) {
-            layer = Align(
-              alignment: Alignment.bottomRight,
-              child: SizedBox(width: 180, height: 160, child: layer),
-            );
-          }
           await tester.pumpWidget(
             MediaQuery(
               data: const MediaQueryData(size: Size(240, 200)),
@@ -196,20 +75,12 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
                   fit: StackFit.expand,
                   children: [
                     const CustomPaint(painter: _OpticalBackground()),
-                    if (staticOuter)
-                      AnimatedBuilder(
-                        animation: alpha,
-                        child: clipped ? _opticalAncestorClip(layer) : layer,
-                        builder: (_, child) =>
-                            Opacity(opacity: alpha.value, child: child),
-                      )
-                    else
-                      FadeTransition(
-                        opacity: localOptics
-                            ? const AlwaysStoppedAnimation<double>(1)
-                            : activeAlpha ?? alpha,
-                        child: clipped ? _opticalAncestorClip(layer) : layer,
-                      ),
+                    FadeTransition(
+                      opacity: alpha,
+                      child: clipped
+                          ? ClipRect(clipper: const _OffsetClip(), child: layer)
+                          : layer,
+                    ),
                   ],
                 ),
               ),
@@ -220,7 +91,7 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
             final scopes = tester.widgetList<LiquidGlassRenderScope>(
               find.byType(LiquidGlassRenderScope),
             );
-            expect(scopes, hasLength(nested ? 2 : 1));
+            expect(scopes, hasLength(1));
             expect(
               scopes.every((scope) => !scope.consolidatesFakeBackdrop),
               isTrue,
@@ -235,21 +106,6 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
             await tester.pump();
             final image = (await tester.runAsync(() => binding.captured!))!;
             try {
-              if (const bool.fromEnvironment('PROBE_SAVE_OPTICAL_SCENES') &&
-                  fullOptics &&
-                  !fake &&
-                  clipped) {
-                await tester.runAsync(() async {
-                  final png = await image.toByteData(
-                    format: ui.ImageByteFormat.png,
-                  );
-                  final file = File(
-                    '${Directory.systemTemp.path}/glass-clipped-${Color.getAlphaFromOpacity(opacity)}.png',
-                  );
-                  await file.writeAsBytes(png!.buffer.asUint8List());
-                  debugPrint('OPTICS_CAPTURE ${file.path}');
-                });
-              }
               final bytes = (await tester.runAsync(image.toByteData))!;
               return Uint8List.fromList(
                 bytes.buffer.asUint8List(
@@ -265,17 +121,7 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
 
           final full = await capture(1);
           final background = await capture(0);
-          const baseRegion = fullOptics
-              ? Rect.fromLTRB(62, 42, 178, 158)
-              : Rect.fromLTRB(92, 88, 148, 120);
-          // A nonzero define deliberately tests a different capture origin.
-          final region = baseRegion.shift(
-            // ignore: use_named_constants
-            const Offset(
-              opticalShiftX * 1.0 + (smallOwner ? 60 : 0),
-              smallOwner ? 40 : 0,
-            ),
-          );
+          const region = Rect.fromLTRB(92, 88, 148, 120);
           final opaquePixels = _region(full, region);
           final backgroundPixels = _region(background, region);
           expect(
@@ -296,14 +142,9 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
             128 / 255,
           ]) {
             final value = Color.getAlphaFromOpacity(opacity);
-            // This witness contains only the inner layer's neutral blur. Two
-            // enclosing native scopes therefore apply their alphas once each.
-            final coverage = betweenFade
-                ? value * value / 255
-                : value.toDouble();
             final expected = Uint8List.fromList([
               for (var i = 0; i < full.length; i++)
-                ((full[i] * coverage + background[i] * (255 - coverage)) / 255)
+                ((full[i] * value + background[i] * (255 - value)) / 255)
                     .round(),
             ]);
             Uint8List? firstActual;
@@ -353,36 +194,17 @@ void _outerOpticsTests(SubmittedSceneCapture binding) {
   }
 }
 
-// Nonmonotonic animation can attain value1 while its controller keeps running.
-// Keep value notifications deterministic without pumping elapsed-time frames.
-class _ActiveOpacity extends ProxyAnimation {
-  _ActiveOpacity(super.animation);
-  bool active = true;
-
-  @override
-  AnimationStatus get status => active ? AnimationStatus.forward : super.status;
-}
-
 class _OpticalBackground extends CustomPainter {
   const _OpticalBackground();
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
-    final (first, second) = switch (const String.fromEnvironment(
-      'PROBE_OPTICAL_PALETTE',
-      defaultValue: 'gray',
-    )) {
-      'gray' => (const Color(0xFF000000), const Color(0xFFFFFFFF)),
-      'purple' => (const Color(0xFF1740B8), const Color(0xFFAD2080)),
-      'green' => (const Color(0xFF18782C), const Color(0xFF90D020)),
-      'dark' => (const Color(0xFF080810), const Color(0xFF303048)),
-      'light' => (const Color(0xFFB8CCD8), const Color(0xFFF8F4E8)),
-      final unknown => throw ArgumentError('Unknown optical palette: $unknown'),
-    };
     for (var y = 0; y < size.height; y += 8) {
       for (var x = 0; x < size.width; x += 8) {
-        paint.color = (x ~/ 8 + y ~/ 8).isEven ? first : second;
+        paint.color = (x ~/ 8 + y ~/ 8).isEven
+            ? const Color(0xFF000000)
+            : const Color(0xFFFFFFFF);
         canvas.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 8, 8), paint);
       }
     }
@@ -416,53 +238,6 @@ void _compareRegion(
     if (error > maximum) maximum = error;
   }
   if (bad > 0) failures.add('$label: $bad RGBA channels >3; max $maximum.');
-}
-
-Widget _opticalAncestorClip(Widget child) =>
-    const String.fromEnvironment('PROBE_OPTICAL_CLIP_KIND') == 'oval'
-    ? ClipOval(clipper: const _OffsetClip(), child: child)
-    : const String.fromEnvironment('PROBE_OPTICAL_CLIP_KIND') == 'superellipse'
-    ? ClipRSuperellipse(clipper: const _OffsetSuperellipseClip(), child: child)
-    : const bool.fromEnvironment('PROBE_OPTICAL_PATH_CLIP')
-    ? ClipPath(clipper: const _OffsetPathClip(), child: child)
-    : const bool.fromEnvironment('PROBE_OPTICAL_ROUNDED_CLIP')
-    ? ClipRRect(clipper: const _OffsetRoundedClip(), child: child)
-    : ClipRect(clipper: const _OffsetClip(), child: child);
-
-class _OffsetSuperellipseClip extends CustomClipper<RSuperellipse> {
-  const _OffsetSuperellipseClip();
-
-  @override
-  RSuperellipse getClip(Size size) => const BorderRadius.all(
-    Radius.circular(12),
-  ).toRSuperellipse(const Rect.fromLTRB(16, 64, 224, 144));
-
-  @override
-  bool shouldReclip(_OffsetSuperellipseClip oldClipper) => false;
-}
-
-class _OffsetPathClip extends CustomClipper<Path> {
-  const _OffsetPathClip();
-
-  @override
-  Path getClip(Size size) =>
-      Path()..addRRect(const _OffsetRoundedClip().getClip(size));
-
-  @override
-  bool shouldReclip(_OffsetPathClip oldClipper) => false;
-}
-
-class _OffsetRoundedClip extends CustomClipper<RRect> {
-  const _OffsetRoundedClip();
-
-  @override
-  RRect getClip(Size size) => RRect.fromRectAndRadius(
-    const Rect.fromLTRB(16, 64, 224, 144),
-    const Radius.circular(12),
-  );
-
-  @override
-  bool shouldReclip(_OffsetRoundedClip oldClipper) => false;
 }
 
 class _OffsetClip extends CustomClipper<Rect> {
