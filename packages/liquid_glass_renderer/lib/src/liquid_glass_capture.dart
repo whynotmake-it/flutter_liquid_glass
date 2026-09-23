@@ -1,11 +1,8 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'dart:ui' as ui;
-
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:liquid_glass_renderer/src/internal/capture_pass.dart';
 
 /// Captures the backdrop once for all the glass inside it.
 ///
@@ -90,8 +87,7 @@ class RenderLiquidGlassCapture extends RenderProxyBox {
 
   /// The region this capture covered at its last paint, in local coordinates.
   /// Starts as the layout box before the first paint.
-  Rect get captureRect => _captureRect ?? (Offset.zero & size);
-  Rect? _captureRect;
+  Rect get captureRect => _pass.captureRect ?? (Offset.zero & size);
 
   /// Origin of the captured pass in local coordinates: the top-left of
   /// [captureRect], snapped down to a whole device pixel so it matches the
@@ -109,78 +105,25 @@ class RenderLiquidGlassCapture extends RenderProxyBox {
   @override
   bool get alwaysNeedsCompositing => true;
 
-  static const _identity = ColorFilter.matrix(<double>[
-    1, 0, 0, 0, 0, //
-    0, 1, 0, 0, 0, //
-    0, 0, 1, 0, 0, //
-    0, 0, 0, 1, 0, //
-  ]);
-
-  final _clipHandle = LayerHandle<ClipRectLayer>();
-  final _captureHandle = LayerHandle<BackdropFilterLayer>();
-
-  /// The layout box grown to cover every glass layer inside, or by [bleed].
-  Rect _computeRegion() {
-    final box = Offset.zero & size;
-    if (_bleed case final bleed?) return bleed.inflateRect(box);
-    var region = box;
-    void visit(RenderObject node) {
-      if (node is LiquidGlassLayerRenderObject) {
-        final bounds = (node as LiquidGlassLayerRenderObject).effectBounds;
-        if (bounds != null) {
-          region = region.expandToInclude(
-            MatrixUtils.transformRect(node.getTransformTo(this), bounds),
-          );
-        }
-      }
-      node.visitChildren(visit);
-    }
-
-    visitChildren(visit);
-    return region;
-  }
+  final _pass = CapturePass();
 
   @override
   void paint(PaintingContext context, Offset offset) {
     if (child == null) return;
-    final dpr = devicePixelRatio;
-    final toGlobal = getTransformTo(null);
-    var region = MatrixUtils.transformRect(toGlobal, _computeRegion());
-    // Impeller covers the clip intersected with every enclosing clip and the
-    // screen; stay inside them so the origin handed to the glass shaders is
-    // the origin the pass actually gets.
-    if (screenClipAbove(this) case final outer?) {
-      region = region.intersect(outer);
-      if (region.isEmpty) return;
-    }
-    // Snap outward to device pixels so the pass origin Impeller derives from
-    // the rounded coverage matches ours.
-    final snapped = Rect.fromLTRB(
-      (region.left * dpr).floorToDouble() / dpr,
-      (region.top * dpr).floorToDouble() / dpr,
-      (region.right * dpr).ceilToDouble() / dpr,
-      (region.bottom * dpr).ceilToDouble() / dpr,
-    );
-    final clip = MatrixUtils.transformRect(Matrix4.inverted(toGlobal), snapped);
-    _captureRect = clip;
-    _clipHandle.layer = context.pushClipRect(
-      true,
+    if (_pass.computeRegion(this, bleed: _bleed) == null) return;
+    _pass.paint(
+      context,
       offset,
-      clip,
-      (context, offset) {
-        final capture = _captureHandle.layer ??= BackdropFilterLayer()
-          ..filter = _identity
-          ..blendMode = ui.BlendMode.srcOver;
-        context.pushLayer(capture, super.paint, offset);
-      },
-      oldLayer: _clipHandle.layer,
+      this,
+      super.paint,
+      enabled: true,
+      bleed: _bleed,
     );
   }
 
   @override
   void dispose() {
-    _clipHandle.layer = null;
-    _captureHandle.layer = null;
+    _pass.dispose();
     super.dispose();
   }
 

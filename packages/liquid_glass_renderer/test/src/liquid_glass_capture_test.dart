@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/capture_pass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
@@ -120,6 +121,70 @@ void main() {
       skip: skipProperGlassTests,
     );
   }
+
+  testWidgets(
+    'capture rect tracks paint-only shape motion',
+    (tester) async {
+      for (final fake in [true, false]) {
+        final offset = ValueNotifier(const Offset(0, 40));
+        addTearDown(offset.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: LiquidGlassCapture(
+                child: SizedBox(
+                  width: 300,
+                  height: 200,
+                  child: LiquidGlassLayer(
+                    fake: fake,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ValueListenableBuilder<Offset>(
+                        valueListenable: offset,
+                        builder: (_, value, __) => Transform.translate(
+                          offset: value,
+                          child: const LiquidGlass(
+                            shape: LiquidRoundedSuperellipse(borderRadius: 22),
+                            child: SizedBox(width: 120, height: 44),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final capture = tester.renderObject<RenderLiquidGlassCapture>(
+          find.byType(LiquidGlassCapture),
+        );
+        offset.value = Offset.zero;
+        // A paint-only change must not need a capture repaint: the retained
+        // clip layer refreshes the region during compositing.
+        await tester.pump();
+
+        final fresh = CapturePass().computeRegion(capture);
+        final rect = capture.captureRect;
+        expect(fresh, isNotNull);
+        expect(
+          fresh!.left >= rect.left - 1 &&
+              fresh.top >= rect.top - 1 &&
+              fresh.right <= rect.right + 1 &&
+              fresh.bottom <= rect.bottom + 1,
+          isTrue,
+          reason:
+              'fake=$fake: captureRect $rect must contain the freshly '
+              'computed region $fresh',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+    skip: skipProperGlassTests,
+  );
 
   testWidgets('nested captures resolve to the nearest one', (tester) async {
     await tester.pumpWidget(
