@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
@@ -533,15 +534,24 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Matrix4 get shaderCoordinateTransform {
     // Filter fragment coordinates are local to the enclosing render pass. At
     // the root that is the screen; inside a [LiquidGlassCapture] it is the
-    // capture's pixel-snapped clip, so map to that origin instead.
-    final capture = RenderLiquidGlassCapture.enclosing(this);
+    // capture's pixel-snapped clip. Inside a seeded fractional-opacity pass
+    // it is that pass, which the engine bounds by the enclosing clips
+    // (including any capture's). The innermost pass wins.
     final Matrix4 transform;
-    if (capture == null) {
-      transform = getTransformTo(null);
-    } else {
+    final capture = RenderLiquidGlassCapture.enclosing(this);
+    if (compositionProbeSeeding) {
+      final origin = GlassCompositionProbe.seededPassOrigin(
+        this,
+        devicePixelRatio,
+      );
+      transform = getTransformTo(null)
+        ..leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
+    } else if (capture != null) {
       transform = getTransformTo(capture);
       final origin = capture.passOrigin;
       transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
+    } else {
+      transform = getTransformTo(null);
     }
     final translation = compositorTranslation;
     if (translation != Offset.zero) {
@@ -579,6 +589,19 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       }
       return;
     }
+    // A pass-origin change — the probe enabling, or a capture's clip moving
+    // with paint-only changes inside it — moves no tracked transform, so the
+    // translation poll above misses it. Re-sync the coordinate mapping into
+    // the retained filter, or repaint when its inputs cannot be reused.
+    if (syncCoordinateMapping()) {
+      if (!drawableEmpty &&
+          hasReusableGeometry &&
+          _shaderHandle.layer != null) {
+        _shaderHandle.layer!.filter = _updateShaderFilter();
+      } else {
+        markNeedsPaint();
+      }
+    }
     if (motion.needsRepaint &&
         (_shaderHandle.layer != null || drawableEmpty) &&
         _clipRectLayerHandle.layer != null &&
@@ -614,9 +637,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _cachedFilterSnapshot = snapshot;
     return filter;
   }
-
-  @visibleForTesting
-  bool get debugMaterialFilterAttached => _shaderHandle.layer?.parent != null;
 
   // Both painting and retained geometry updates need the same native filter
   // bounds. This only updates existing handles; it never paints children.

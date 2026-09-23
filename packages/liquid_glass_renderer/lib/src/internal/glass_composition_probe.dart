@@ -1,37 +1,29 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
 
-/// Seeds enclosing fractional-opacity surfaces with their backdrop while
-/// preserving the original child clips and opaque rendering path.
+/// Seeds an enclosing fractional-opacity surface with its backdrop.
+///
+/// A backdrop filter inside a fractional `Opacity` or `FadeTransition` only
+/// sees that opacity pass, which starts transparent. An identity backdrop
+/// filter first copies the real backdrop into it, so the glass inside blurs
+/// and refracts what is actually behind it.
 @internal
 class GlassCompositionProbe {
   final _layer = LayerHandle<_OpacitySeedLayer>();
 
-  static const _identity = ColorFilter.matrix([
-    1,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
+  static const _identity = ColorFilter.matrix(<double>[
+    1, 0, 0, 0, 0, //
+    0, 1, 0, 0, 0, //
+    0, 0, 1, 0, 0, //
+    0, 0, 0, 1, 0, //
   ]);
+
+  /// Whether the owner currently paints inside a seeded opacity pass.
+  bool get seeding => _layer.layer?.seeded ?? false;
 
   /// Paints the original sequence, seeding only fractional-opacity surfaces.
   void paint(
@@ -48,10 +40,11 @@ class GlassCompositionProbe {
   /// Updates before retained-layer dirtiness is propagated for this frame.
   ///
   /// Seeds iff an ancestor between [owner] and the nearest enclosing
-  /// [LiquidGlassLayerRenderObject] has fractional native opacity and none
-  /// has fully transparent opacity.
+  /// [LiquidGlassLayerRenderObject] has fractional native opacity and none is
+  /// fully transparent.
   void syncOpacity(RenderObject owner) {
-    if (_layer.layer == null) return;
+    final layer = _layer.layer;
+    if (layer == null) return;
     var fractional = false;
     var blocked = false;
     for (
@@ -72,10 +65,22 @@ class GlassCompositionProbe {
       }
       if (alpha < 255) fractional = true;
     }
-    _layer.layer!.seeded = fractional && !blocked;
+    layer.seeded = fractional && !blocked;
   }
 
-  /// Releases the retained experimental layer.
+  /// Screen-space origin of the opacity pass [owner] paints into while
+  /// [seeding]: Impeller bounds that pass by the enclosing clips, rounded out
+  /// to device pixels. Zero when nothing clips.
+  static Offset seededPassOrigin(RenderObject owner, double devicePixelRatio) {
+    final clip = screenClipAbove(owner);
+    if (clip == null) return Offset.zero;
+    return Offset(
+      (clip.left * devicePixelRatio).floorToDouble() / devicePixelRatio,
+      (clip.top * devicePixelRatio).floorToDouble() / devicePixelRatio,
+    );
+  }
+
+  /// Releases the retained seed layer.
   void dispose() => _layer.layer = null;
 }
 
@@ -93,7 +98,7 @@ class _OpacitySeedLayer extends BackdropFilterLayer {
     if (_seeded) {
       super.addToScene(builder);
     } else {
-      // Drop the old native pass, but keep the original retained children.
+      // Drop the native pass, but keep the retained children.
       engineLayer = null;
       addChildrenToScene(builder);
     }
