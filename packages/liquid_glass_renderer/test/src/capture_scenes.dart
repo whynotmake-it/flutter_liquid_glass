@@ -18,8 +18,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
-import 'shared.dart';
-
 /// Every scene the capture is locked down for. Names are golden file names.
 const captureScenes = <CaptureScene>[
   CaptureScene('bar', shadow: true),
@@ -218,11 +216,7 @@ Future<void> pumpCaptureScene(
       controller: controller,
     ),
   );
-  if (!fake) await pumpUntilGlassReady(tester);
-  // Let the asynchronous shaders and the first geometry pass settle.
-  for (var i = 0; i < 3; i++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
+  await tester.pump();
 }
 
 /// Rasterizes the whole scene at the view's device pixel ratio.

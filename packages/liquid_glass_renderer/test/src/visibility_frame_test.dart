@@ -102,7 +102,6 @@ void main() {
 
           await tester.pumpWidget(buildScene(fresh: false));
           await tester.pumpAndSettle();
-          await pumpUntilGlassReady(tester);
           final before = await capture();
           final layer = tester.allRenderObjects
               .whereType<RenderLiquidGlassLayer>()
@@ -146,7 +145,6 @@ void main() {
 
           await tester.pumpWidget(buildScene(fresh: true));
           await tester.pumpAndSettle();
-          await pumpUntilGlassReady(tester);
           final reference = await capture();
           expect(
             animated,

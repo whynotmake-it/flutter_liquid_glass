@@ -22,7 +22,7 @@ import '../../test/src/capture_scenes.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(precacheLiquidGlassShaders);
+  setUpAll(LiquidGlass.precache);
 
   for (final fake in [true, false]) {
     for (final scene in captureScenes) {

@@ -157,12 +157,15 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   late final logger = Logger(LgrLogNames.layer);
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
-  List<FragmentProgram>? _independentOpacityPrograms;
   final List<FlutterGpuGeometryRenderer> _retiredGpuGeometryRenderers = [];
   bool _triedGpuGeometryRenderer = false;
   bool _gpuInitializationScheduled = false;
   bool _loggedFallback = false;
   Element? _debugParent;
+
+  // Fake and real subtrees never coexist, so one key keeps the user's subtree
+  // alive across a renderer swap without ever being mounted twice.
+  final _childKey = GlobalKey(debugLabel: 'LiquidGlassLayer.child');
 
   void _registerDebugSiblingCheck() {
     if (!kDebugMode) return;
@@ -219,6 +222,20 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     debugPrint('liquid_glass_renderer: $message');
   }
 
+  void _tryCreateCachedGpuGeometryRenderer() {
+    if (widget.fake ||
+        !ImageFilter.isShaderFilterSupported ||
+        _triedGpuGeometryRenderer) {
+      return;
+    }
+    final renderer = FlutterGpuGeometryRenderer.tryCreateCached(
+      ShaderKeys.gpuGeometryShaderBundle,
+    );
+    if (renderer == null) return;
+    _gpuGeometryRenderer = renderer;
+    _triedGpuGeometryRenderer = true;
+  }
+
   void _scheduleGpuGeometryRendererInitialization() {
     if (_triedGpuGeometryRenderer || _gpuInitializationScheduled) return;
     _gpuInitializationScheduled = true;
@@ -228,12 +245,6 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
       _triedGpuGeometryRenderer = true;
       try {
-        _independentOpacityPrograms = await Future.wait([
-          FragmentProgram.fromAsset(ShaderKeys.liquidGlassRender),
-          FragmentProgram.fromAsset(ShaderKeys.liquidGlassMaterialRender),
-          FragmentProgram.fromAsset(ShaderKeys.liquidGlassTintRender),
-        ]);
-        if (!mounted || widget.fake) return;
         final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );
@@ -254,8 +265,17 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   }
 
   @override
+  void initState() {
+    super.initState();
+    _tryCreateCachedGpuGeometryRenderer();
+  }
+
+  @override
   void didUpdateWidget(covariant LiquidGlassLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.fake && !widget.fake) {
+      _tryCreateCachedGpuGeometryRenderer();
+    }
     if (!oldWidget.fake && widget.fake) {
       final renderer = _gpuGeometryRenderer;
       _gpuGeometryRenderer = null;
@@ -341,7 +361,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         backdropKey: backdropKey,
         defaultAppearance: defaultAppearance,
         settings: widget.settings,
-        child: widget.child,
+        child: KeyedSubtree(key: _childKey, child: widget.child),
       );
     }
 
@@ -368,11 +388,10 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 defaultAppearance: defaultAppearance,
                 link: _link,
                 gpuGeometryRenderer: gpuRenderer,
-                independentOpacityPrograms: _independentOpacityPrograms,
                 child: child!,
               );
             },
-            child: widget.child,
+            child: KeyedSubtree(key: _childKey, child: widget.child),
           ),
         ),
       ),
@@ -431,7 +450,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required Widget super.child,
     required this.link,
     this.gpuGeometryRenderer,
-    this.independentOpacityPrograms,
   });
 
   final FragmentShader defaultRenderShader;
@@ -442,7 +460,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final LiquidGlassAppearance defaultAppearance;
   final GeometryRenderLink link;
   final FlutterGpuGeometryRenderer? gpuGeometryRenderer;
-  final List<FragmentProgram>? independentOpacityPrograms;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -456,7 +473,6 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       defaultAppearance: defaultAppearance,
       link: link,
       gpuGeometryRenderer: gpuGeometryRenderer,
-      independentOpacityPrograms: independentOpacityPrograms,
     );
   }
 
@@ -489,7 +505,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     required super.defaultAppearance,
     required super.link,
     super.gpuGeometryRenderer,
-    super.independentOpacityPrograms,
   });
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
@@ -562,7 +577,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
         _shaderHandle.layer?.filter = _updateShaderFilter();
       }
-      syncIndependentOpacity();
       return;
     }
     if (motion.needsRepaint &&
@@ -573,16 +587,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         })) {
       return;
     }
-    syncIndependentOpacity();
     if (motion.needsRepaint) markNeedsPaint();
-  }
-
-  @override
-  void onTrackingLayerDetached() {
-    if (!attached) return;
-    if (layer case final tracker?) {
-      scheduleHiddenPassCleanup(tracker);
-    }
   }
 
   ImageFilter? _cachedFilter;

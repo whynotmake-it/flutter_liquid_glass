@@ -2,8 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
-import 'shared.dart';
-
 void main() {
   final placements = <String, Widget Function({required bool fake})>{
     'explicit layer': ({required fake}) => LiquidGlassLayer(
@@ -56,7 +54,6 @@ void main() {
           ),
         );
 
-        if (!fake) await pumpUntilGlassReady(tester);
         await tester.pump();
 
         expect(find.byType(LiquidGlassLayer), findsOneWidget);

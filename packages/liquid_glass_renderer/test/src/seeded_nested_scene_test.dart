@@ -110,19 +110,7 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
             ),
           );
           if (!fake) {
-            await pumpUntilGlassReady(tester);
-            // The shared helper waits for any real scope; nested coverage
-            // needs every scope to have left its asynchronous fallback.
-            for (var frame = 0; frame < 60; frame++) {
-              final scopes = tester.widgetList<LiquidGlassRenderScope>(
-                find.byType(LiquidGlassRenderScope),
-              );
-              if (scopes.length >= 2 &&
-                  scopes.every((scope) => !scope.consolidatesFakeBackdrop)) {
-                break;
-              }
-              await tester.pump(const Duration(milliseconds: 16));
-            }
+            await tester.pump();
             final scopes = tester.widgetList<LiquidGlassRenderScope>(
               find.byType(LiquidGlassRenderScope),
             );

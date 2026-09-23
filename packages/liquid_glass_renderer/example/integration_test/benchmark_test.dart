@@ -1144,12 +1144,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         scroll: true,
         chrome: _AppChromeKind.passthroughOnly,
       ),
-      BenchmarkScenario.appScrollPlainBlurNestedPassthrough =>
-        _AppLikeScene(
-          t: t,
-          scroll: true,
-          chrome: _AppChromeKind.plainBlurNestedPassthrough,
-        ),
+      BenchmarkScenario.appScrollPlainBlurNestedPassthrough => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.plainBlurNestedPassthrough,
+      ),
       BenchmarkScenario.appScrollPlainBlurNestedColor => _AppLikeScene(
         t: t,
         scroll: true,
@@ -1165,12 +1164,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         scroll: true,
         chrome: _AppChromeKind.plainBlurSigma20,
       ),
-      BenchmarkScenario.appScrollMatrixDownsamplePassthrough =>
-        _AppLikeScene(
-          t: t,
-          scroll: true,
-          chrome: _AppChromeKind.matrixDownsamplePassthrough,
-        ),
+      BenchmarkScenario.appScrollMatrixDownsamplePassthrough => _AppLikeScene(
+        t: t,
+        scroll: true,
+        chrome: _AppChromeKind.matrixDownsamplePassthrough,
+      ),
       BenchmarkScenario.appScrollPassthroughTopOnly => _AppLikeScene(
         t: t,
         scroll: true,
@@ -1635,10 +1633,26 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
 
   /// Mild saturation boost - same filter *shape* as fake-glass compose.
   static const _mildSaturation = ColorFilter.matrix(<double>[
-    1.15, -0.075, -0.075, 0, 0,
-    -0.075, 1.15, -0.075, 0, 0,
-    -0.075, -0.075, 1.15, 0, 0,
-    0, 0, 0, 1, 0,
+    1.15,
+    -0.075,
+    -0.075,
+    0,
+    0,
+    -0.075,
+    1.15,
+    -0.075,
+    0,
+    0,
+    -0.075,
+    -0.075,
+    1.15,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 
   @override
@@ -1887,21 +1901,22 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                 child: pillContent,
               ),
               Positioned(
-                left: 4 +
+                left:
+                    4 +
                     (widget.chrome == _AppChromeKind.realTabsStatic ||
-                            widget.chrome ==
-                                _AppChromeKind.realTabsOwnLoupeStatic
-                        ? 0.0
-                        : widget.t) *
+                                widget.chrome ==
+                                    _AppChromeKind.realTabsOwnLoupeStatic
+                            ? 0.0
+                            : widget.t) *
                         travel,
                 top: 8,
                 // ClickUp's indicator samples the painted bar through its own
                 // backdrop capture (frost 0, strong edge refraction). This
                 // variant prices that second readback against the blended
                 // loupe above.
-                child: widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
-                        widget.chrome ==
-                            _AppChromeKind.realTabsOwnLoupeStatic
+                child:
+                    widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
+                        widget.chrome == _AppChromeKind.realTabsOwnLoupeStatic
                     ? const LiquidGlassLayer(
                         settings: LiquidGlassSettings(
                           frost: 0,
@@ -1932,8 +1947,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
   }
 
   List<BoxShadow> _shadowsFor(_AppChromeKind chrome) =>
-      chrome == _AppChromeKind.realShadow ||
-          chrome == _AppChromeKind.fakeShadow
+      chrome == _AppChromeKind.realShadow || chrome == _AppChromeKind.fakeShadow
       ? _appChromeShadows
       : const [];
 

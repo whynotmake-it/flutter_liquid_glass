@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/internal/retained_glass_opacity_probe.dart';
 import 'package:meta/meta.dart';
 
 /// Retains clip ancestry common to every contributor in one glass pass.
@@ -10,18 +9,12 @@ import 'package:meta/meta.dart';
 /// material through a viewport, not the viewport through the material.
 @internal
 class RetainedGlassClip {
-  /// Scope-specific passes already apply their opacity outside these clips.
-  RetainedGlassClip({bool includeOpacity = true})
-    : _opacity = includeOpacity ? RetainedGlassOpacityProbe() : null;
-
   RenderBox? _owner;
   Offset _paintOffset = Offset.zero;
   final List<_ClipEntry> _entries = [];
-  final RetainedGlassOpacityProbe? _opacity;
 
   void update(RenderBox owner, Iterable<RenderBox> shapes) {
     _owner = owner;
-    _opacity?.update(owner, shapes);
     List<RenderBox>? common;
     for (final shape in shapes) {
       final ancestors = <RenderBox>[];
@@ -63,7 +56,6 @@ class RetainedGlassClip {
   void sync() {
     final owner = _owner;
     if (owner == null || !owner.attached) return;
-    _opacity?.sync();
     for (final entry in _entries) {
       entry.sync(owner, _paintOffset);
     }
@@ -79,14 +71,7 @@ class RetainedGlassClip {
     sync();
     void push(PaintingContext context, Offset offset, int index) {
       if (index == _entries.length) {
-        final opacity = _opacity;
-        if (opacity == null) {
-          context.pushLayer(effect, painter, offset);
-        } else {
-          opacity.paint(context, offset, (context, offset) {
-            context.pushLayer(effect, painter, offset);
-          });
-        }
+        context.pushLayer(effect, painter, offset);
       } else {
         _entries[index].push(
           context,
@@ -100,7 +85,6 @@ class RetainedGlassClip {
   }
 
   void dispose() {
-    _opacity?.dispose();
     _clearClips();
   }
 

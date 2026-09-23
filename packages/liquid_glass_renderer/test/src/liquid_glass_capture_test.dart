@@ -73,49 +73,52 @@ void main() {
   });
 
   for (final dpr in [1.0, 2.0, 3.0]) {
-    testWidgets('pass origin is device-pixel aligned at DPR $dpr', (
-      tester,
-    ) async {
-      tester.view
-        ..physicalSize = Size(320 * dpr, 240 * dpr)
-        ..devicePixelRatio = dpr;
-      addTearDown(tester.view.reset);
-      const scene = CaptureScene('origin', shadow: true, edge: true);
-      await tester.pumpWidget(captureSceneWidget(scene, fake: false));
-      await pumpUntilGlassReady(tester);
-      await tester.pump();
-      final capture = tester.renderObject<RenderLiquidGlassCapture>(
-        find.byType(LiquidGlassCapture),
-      );
-      final global = MatrixUtils.transformPoint(
-        capture.getTransformTo(null),
-        capture.passOrigin,
-      );
-      expect((global.dx * dpr) % 1, closeTo(0, 1e-6));
-      expect((global.dy * dpr) % 1, closeTo(0, 1e-6));
-      // The screen clamps the capture; the edge scene reaches past it.
-      expect(global.dx, greaterThanOrEqualTo(0));
-      expect(global.dy, greaterThanOrEqualTo(0));
-
-      final layer =
-          glassLayersBelow(
-                tester.renderObject<RenderObject>(
-                  find.byType(LiquidGlassLayer),
-                ),
-              ).single
-              as RenderLiquidGlassLayer;
-      final expected = layer.getTransformTo(capture)
-        ..leftTranslateByDouble(
-          -capture.passOrigin.dx,
-          -capture.passOrigin.dy,
-          0,
-          1,
+    testWidgets(
+      'pass origin is device-pixel aligned at DPR $dpr',
+      (
+        tester,
+      ) async {
+        tester.view
+          ..physicalSize = Size(320 * dpr, 240 * dpr)
+          ..devicePixelRatio = dpr;
+        addTearDown(tester.view.reset);
+        const scene = CaptureScene('origin', shadow: true, edge: true);
+        await tester.pumpWidget(captureSceneWidget(scene, fake: false));
+        await tester.pump();
+        final capture = tester.renderObject<RenderLiquidGlassCapture>(
+          find.byType(LiquidGlassCapture),
         );
-      expect(
-        layer.shaderCoordinateTransform.storage,
-        orderedEquals(expected.storage),
-      );
-    }, skip: skipProperGlassTests);
+        final global = MatrixUtils.transformPoint(
+          capture.getTransformTo(null),
+          capture.passOrigin,
+        );
+        expect((global.dx * dpr) % 1, closeTo(0, 1e-6));
+        expect((global.dy * dpr) % 1, closeTo(0, 1e-6));
+        // The screen clamps the capture; the edge scene reaches past it.
+        expect(global.dx, greaterThanOrEqualTo(0));
+        expect(global.dy, greaterThanOrEqualTo(0));
+
+        final layer =
+            glassLayersBelow(
+                  tester.renderObject<RenderObject>(
+                    find.byType(LiquidGlassLayer),
+                  ),
+                ).single
+                as RenderLiquidGlassLayer;
+        final expected = layer.getTransformTo(capture)
+          ..leftTranslateByDouble(
+            -capture.passOrigin.dx,
+            -capture.passOrigin.dy,
+            0,
+            1,
+          );
+        expect(
+          layer.shaderCoordinateTransform.storage,
+          orderedEquals(expected.storage),
+        );
+      },
+      skip: skipProperGlassTests,
+    );
   }
 
   testWidgets('nested captures resolve to the nearest one', (tester) async {

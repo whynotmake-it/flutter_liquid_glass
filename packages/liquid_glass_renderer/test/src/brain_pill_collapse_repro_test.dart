@@ -17,7 +17,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
@@ -35,7 +34,7 @@ void main() {
 
   const shape = LiquidRoundedSuperellipse(borderRadius: 20);
   const probeChild = SizedBox(width: 120, height: 44, child: _Probe());
-  const visibilitySteps = [0.5, 1.0, 1.1, 0.95, 1.0, 0.0, 1.0];
+  const visibilitySteps = <double>[0.5, 1, 1.1, 0.95, 1, 0, 1];
 
   Widget framed(Widget child) => Directionality(
     textDirection: TextDirection.ltr,
@@ -65,7 +64,6 @@ void main() {
       ),
       _AKind.standaloneFake => FakeGlass(
         shape: shape,
-        settings: const LiquidGlassSettings(),
         appearance: appearance,
         child: probeChild,
       ),
@@ -90,18 +88,9 @@ void main() {
   /// created after the baseline.
   Future<void> driveVisibilitySequence(
     WidgetTester tester,
-    Widget Function(double v) scene, {
-    required bool real,
-  }) async {
-    await tester.pumpWidget(scene(1.0));
-    if (real) {
-      await pumpUntilGlassReady(tester);
-    }
-    // Let MultiShaderBuilder's async swap resolve so a shader-load remount
-    // lands in the baseline instead of being attributed to a sequence step.
-    for (var i = 0; i < 3; i++) {
-      await tester.pump(const Duration(milliseconds: 16));
-    }
+    Widget Function(double v) scene,
+  ) async {
+    await tester.pumpWidget(scene(1));
     final baseline = _Probe.created.length;
     var firstBad = -1;
     for (var i = 0; i < visibilitySteps.length; i++) {
@@ -123,59 +112,37 @@ void main() {
 
   group('A. state survives visibility changes', () {
     testWidgets('A1 real layer + blend group + grouped', (tester) async {
-      await driveVisibilitySequence(
-        tester,
-        (v) => aScene(_AConfig.a1, v),
-        real: true,
-      );
+      await driveVisibilitySequence(tester, (v) => aScene(_AConfig.a1, v));
     }, skip: skipProperGlassTests);
 
     testWidgets('A1 appearance-driven (unclamped)', (tester) async {
       await driveVisibilitySequence(
         tester,
         (v) => aScene(_AConfig.a1, v, viaAppearance: true),
-        real: true,
       );
     }, skip: skipProperGlassTests);
 
     testWidgets('A2 real layer + ungrouped glass', (tester) async {
-      await driveVisibilitySequence(
-        tester,
-        (v) => aScene(_AConfig.a2, v),
-        real: true,
-      );
+      await driveVisibilitySequence(tester, (v) => aScene(_AConfig.a2, v));
     }, skip: skipProperGlassTests);
 
     testWidgets('A3 fake layer + blend group + grouped', (tester) async {
-      await driveVisibilitySequence(
-        tester,
-        (v) => aScene(_AConfig.a3, v),
-        real: false,
-      );
+      await driveVisibilitySequence(tester, (v) => aScene(_AConfig.a3, v));
     });
 
     testWidgets('A3 appearance-driven (unclamped)', (tester) async {
       await driveVisibilitySequence(
         tester,
         (v) => aScene(_AConfig.a3, v, viaAppearance: true),
-        real: false,
       );
     });
 
     testWidgets('A4 fake layer + ungrouped glass', (tester) async {
-      await driveVisibilitySequence(
-        tester,
-        (v) => aScene(_AConfig.a4, v),
-        real: false,
-      );
+      await driveVisibilitySequence(tester, (v) => aScene(_AConfig.a4, v));
     });
 
     testWidgets('A5 standalone FakeGlass (no layer)', (tester) async {
-      await driveVisibilitySequence(
-        tester,
-        (v) => aScene(_AConfig.a5, v),
-        real: false,
-      );
+      await driveVisibilitySequence(tester, (v) => aScene(_AConfig.a5, v));
     });
   });
 
@@ -195,8 +162,8 @@ void main() {
             ),
           ),
         );
-        await pumpUntilGlassReady(tester);
-        await _pumpUntilRealLayer(tester);
+        await tester.pump();
+        await tester.pump();
         expect(
           _Probe.created,
           hasLength(1),
@@ -216,8 +183,8 @@ void main() {
         await tester.pumpWidget(
           framed(const LiquidGlassLayer(child: _Probe())),
         );
-        await pumpUntilGlassReady(tester);
-        await _pumpUntilRealLayer(tester);
+        await tester.pump();
+        await tester.pump();
         expect(
           _Probe.created,
           hasLength(1),
@@ -275,10 +242,7 @@ void main() {
           },
         ),
       );
-      if (!fake) await pumpUntilGlassReady(tester);
-      for (var i = 0; i < 3; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
+      await tester.pump();
       return tester.renderObject<RenderLiquidGlassCapture>(
         find.byType(LiquidGlassCapture),
       );
@@ -299,7 +263,7 @@ void main() {
             vars: vars,
             stater: (s) => setState = s,
           );
-          setState(() => vars.visibility = 1.0);
+          setState(() => vars.visibility = 1);
           await tester.pump();
           final capture = tester.renderObject<RenderLiquidGlassCapture>(
             find.byType(LiquidGlassCapture),
@@ -359,7 +323,6 @@ void main() {
           tester,
         ) async {
           await tester.pumpWidget(_CollapseScene(fake: fake, open: false));
-          if (!fake) await pumpUntilGlassReady(tester);
           await tester.pumpAndSettle();
           await tester.pumpWidget(_CollapseScene(fake: fake, open: true));
           await tester.pumpAndSettle();
@@ -495,18 +458,19 @@ enum _AKind { grouped, plain, standaloneFake }
 
 enum _ALayer { real, fake, none }
 
-class _AConfig {
-  const _AConfig._(this.kind, this.layer, this.grouped);
+enum _AConfig {
+  a1(_AKind.grouped, _ALayer.real),
+  a2(_AKind.plain, _ALayer.real),
+  a3(_AKind.grouped, _ALayer.fake),
+  a4(_AKind.plain, _ALayer.fake),
+  a5(_AKind.standaloneFake, _ALayer.none);
 
-  static const a1 = _AConfig._(_AKind.grouped, _ALayer.real, true);
-  static const a2 = _AConfig._(_AKind.plain, _ALayer.real, false);
-  static const a3 = _AConfig._(_AKind.grouped, _ALayer.fake, true);
-  static const a4 = _AConfig._(_AKind.plain, _ALayer.fake, false);
-  static const a5 = _AConfig._(_AKind.standaloneFake, _ALayer.none, false);
+  const _AConfig(this.kind, this.layer);
 
   final _AKind kind;
   final _ALayer layer;
-  final bool grouped;
+
+  bool get grouped => kind == _AKind.grouped;
 }
 
 /// The capture region `RenderLiquidGlassCapture._computeRegion` would compute
@@ -541,11 +505,11 @@ bool _containsWithTolerance(
 RenderBox? _pillBox(WidgetTester tester) {
   final elements = find.byKey(const ValueKey('pill')).evaluate();
   if (elements.isEmpty) return null;
-  RenderObject? node = elements.first.findRenderObject();
+  var node = elements.first.findRenderObject();
   while (node != null &&
       node is! RenderLiquidGlass &&
       node is! RenderFakeGlass) {
-    node = node.parent as RenderObject?;
+    node = node.parent;
   }
   return node is RenderBox ? node : null;
 }
@@ -657,16 +621,4 @@ class _CollapseSceneState extends State<_CollapseScene> {
       ),
     );
   }
-}
-
-/// `pumpUntilGlassReady` returns on the first frame because the fake layer's
-/// scope also reports `useFake == false`; wait for the real render object.
-Future<void> _pumpUntilRealLayer(WidgetTester tester) async {
-  bool isReal() => tester.allRenderObjects.any(
-    (r) => r.runtimeType.toString() == 'RenderLiquidGlassLayer',
-  );
-  for (var frame = 0; frame < 60 && !isReal(); frame++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
-  expect(isReal(), isTrue, reason: 'real LiquidGlassLayer never appeared');
 }

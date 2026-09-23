@@ -61,7 +61,7 @@ Shaders load on first use, so the first glass on screen paints its fallback
 for a frame or two. Load them up front instead:
 
 ```dart
-await precacheLiquidGlassShaders();
+await LiquidGlass.precache();
 runApp(const MyApp());
 ```
 

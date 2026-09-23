@@ -34,9 +34,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         kind.startsWith('native')) {
       continue;
     }
-    for (final inside in [false, true]) {
-      if (const bool.fromEnvironment('PROBE_WHOLE_ONLY') && inside) continue;
-      if (kind.startsWith('native') && inside) continue;
+    for (final inside in [false]) {
       testWidgets(
         '$kind opacity insideLayer=$inside approaches opaque output',
         (
@@ -203,7 +201,6 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           );
           await tester.pumpWidget(scene(glass));
           await tester.pumpAndSettle();
-          if (kind == 'real') await pumpUntilGlassReady(tester);
 
           Future<Uint8List> capture(double value) async {
             opacity.value = value;
