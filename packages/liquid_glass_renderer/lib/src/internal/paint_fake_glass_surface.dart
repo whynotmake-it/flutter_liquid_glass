@@ -40,12 +40,12 @@ void paintFakeGlassSurface(
   required LiquidGlassSettings settings,
   required LiquidGlassAppearance appearance,
 }) {
-  final visibility = appearance.visibility;
+  final appearanceVisibility = appearance.visibility.clamp(0.0, 1.0);
   final surfaceTint = appearance.colorModel.approximateSurfaceTint(
     appearance.tint,
   );
   final tint = surfaceTint.withValues(
-    alpha: surfaceTint.a * visibility,
+    alpha: surfaceTint.a * appearanceVisibility,
   );
   final shapeType = switch (shape) {
     LiquidOval() => 0.0,
@@ -63,7 +63,6 @@ void paintFakeGlassSurface(
       : math.min(size.shortestSide * 0.12, 12).toDouble();
   final configuredHighlightWidth = fakeGlassHighlightBandWidth(settings);
   final opticalThickness = math.max(settings.effectiveThickness, 1).toDouble();
-  final appearanceVisibility = appearance.visibility.clamp(0.0, 1.0);
   shader.setFloatUniforms((uniforms) {
     uniforms
       ..setSize(size)

@@ -33,6 +33,9 @@ uniform vec3 uBevelShadowConfig;
 uniform vec3 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
+// 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
+// glass opaque so visibility 0 is an exact identity of the backdrop.
+uniform float uBlurFade;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -602,7 +605,8 @@ void main() {
         backdropScaleOffset =
             filterDeltaFromCenter *
             (1.0 / backdropScale - 1.0) *
-            scaleWeight;
+            scaleWeight *
+            appearanceVisibility;
     }
     vec4 refractColor;
     // Skip two texture reads only when the maximum channel separation is
@@ -694,16 +698,21 @@ void main() {
     // Reconstruct the original material silhouette from the signed SDF. The
     // geometry alpha is only an expanded support mask, allowing the attached
     // contour to sit outside without turning those pixels into glass.
-    vec3 finalColor = applySpecularHighlights(
+    vec3 litColor = applySpecularHighlights(
         baseColor,
         transmittedColor,
         signedEdgeDistance,
         surfaceNormal
     );
+    // Highlights, bevel shadow, and in-material contour are incident effects
+    // of the glass: they fade to the untinted transmitted material as
+    // visibility reaches zero instead of ghosting a hidden shape.
+    vec3 finalColor = mix(baseColor, litColor, appearanceVisibility);
     // Inside the material, contour absorption is handled before highlights so
     // specular light can eclipse it. Only the part outside the material is
     // composited as a translucent attached boundary.
-    float visibleMaterialAlpha = materialAlpha * appearanceVisibility;
+    float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
+    float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
         contourCoverage(signedEdgeDistance) *
         uContourColor.a *

@@ -141,7 +141,7 @@ class FakeGlass extends StatelessWidget {
               (useBackdropGroup
                   ? BackdropGroup.of(context)?.backdropKey
                   : null);
-    final glow = _maybeFade(
+    final glow = _fadeChildren(
       appearance.visibility,
       GlassGlowLayer(child: child),
     );
@@ -184,10 +184,8 @@ class FakeGlass extends StatelessWidget {
     );
   }
 
-  static Widget _maybeFade(double visibility, Widget child) {
-    final opacity = visibility.clamp(0.0, 1.0);
-    if (opacity >= 1) return child;
-    return Opacity(opacity: opacity, child: child);
+  static Widget _fadeChildren(double visibility, Widget child) {
+    return Opacity(opacity: visibility.clamp(0.0, 1.0), child: child);
   }
 }
 
@@ -431,7 +429,7 @@ class RenderFakeGlass extends RenderProxyBox {
       _paintShaderSurface(canvas, offset, shader);
       return;
     }
-    final visibility = appearance.visibility;
+    final visibility = appearance.visibility.clamp(0.0, 1.0);
     final surfaceTint = appearance.colorModel.approximateSurfaceTint(
       appearance.tint,
     );

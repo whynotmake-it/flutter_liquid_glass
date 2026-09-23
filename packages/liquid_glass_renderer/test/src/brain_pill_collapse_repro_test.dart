@@ -51,7 +51,7 @@ void main() {
     final appearance = viaAppearance
         ? const LiquidGlassAppearance().copyWith(visibility: v)
         : null;
-    Widget glass = switch (config.kind) {
+    var glass = switch (config.kind) {
       _AKind.grouped => LiquidGlass.grouped(
         shape: shape,
         appearance: appearance,
