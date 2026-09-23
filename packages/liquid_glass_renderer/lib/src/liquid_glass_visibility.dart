@@ -4,8 +4,9 @@ import 'package:flutter/widgets.dart';
 ///
 /// Values compose through the tree: a visibility of `0.5` nested beneath
 /// `0.4` gives descendant glass an effective visibility multiplier of `0.2`.
-/// This affects glass materialization only; ordinary child content remains
-/// visible and interactive.
+/// As visibility falls, the glass transitions out (refraction goes to zero,
+/// lighting and blur fade) and the glass's children fade with it. Children
+/// stay mounted and interactive at every value.
 class LiquidGlassVisibility extends StatelessWidget {
   /// Creates a compositional visibility scope for descendant glass shapes.
   const LiquidGlassVisibility({

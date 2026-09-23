@@ -59,6 +59,22 @@ live one scene per file and render the captured scene first;
 the fake references under a fade, and dispose/recreate on a real GPU
 (`flutter test --enable-impeller -d macos`).
 
+The other device suites install a `SubmittedSceneCapture` binding, which
+`flutter test -d macos` rejects because it initializes
+`IntegrationTestWidgetsFlutterBinding` before `main`. Run those through
+`flutter drive`, which leaves binding setup to the test:
+
+```sh
+flutter drive --enable-impeller -d macos \
+  --driver=test_driver/backdrop_seed_driver.dart \
+  --target=integration_test/independent_opacity_paint_order_test.dart
+```
+
+The `outer optical fade` host tests fail under `flutter_tester` on the first
+fractional frame after a fully transparent one (the whole frame, including
+content outside the glass, rasterizes wrong). They pass on Metal through the
+command above.
+
 ## API ownership
 
 ```mermaid
