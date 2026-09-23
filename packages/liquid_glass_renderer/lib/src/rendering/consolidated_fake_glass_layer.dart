@@ -128,11 +128,19 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   final _clipLayer = LayerHandle<ClipPathLayer>();
   final _effectLayer = LayerHandle<OffsetLayer>();
   final _ancestorClips = RetainedGlassClip();
+
+  /// Per-shape blur passes for shapes that are fading (0 < visibility < 1).
+  /// They sit between the shared opaque-shape blur and the surfaces so a
+  /// fading shape keeps its own clipped backdrop filter instead of swapping
+  /// its widget subtree.
+  final Map<LiquidGlassShapeRenderObject, _FadingShapeLayers>
+  _fadingShapeLayers = {};
   ImageFilter? _cachedFilter;
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
   final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
   _cachedClipInputs = [];
+  List<int> _cachedClipClasses = const [];
   Rect _paintBounds = Rect.zero;
   bool _debugWarnedOpacityBetweenShapeAndLayer = false;
   bool _repaintAfterCompositingScheduled = false;
@@ -280,9 +288,12 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     if (!_clipInputsMatch(geometries)) {
       Rect? rebuiltBounds;
       final rebuiltPath = Path();
+      final rebuiltClasses = <int>[];
       for (final (_, geometry, transform) in geometries) {
         for (final shape in geometry.shapes) {
-          if (shape.appearance.visibility <= 0) continue;
+          final visibilityClass = _visibilityClass(shape.appearance);
+          rebuiltClasses.add(visibilityClass);
+          if (visibilityClass == 0) continue;
           final shapeToLayer = shape.shapeToGeometry == null
               ? transform
               : transform.multiplied(shape.shapeToGeometry!);
@@ -294,15 +305,20 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
           rebuiltBounds =
               rebuiltBounds?.expandToInclude(transformedBounds) ??
               transformedBounds;
-          rebuiltPath.addPath(
-            shape.shape.getOuterPath(shapeBounds),
-            Offset.zero,
-            matrix4: shapeToLayer.storage,
-          );
+          // The shared union clip covers only fully visible shapes; a fading
+          // shape gets its own clipped blur pass below.
+          if (visibilityClass == 2) {
+            rebuiltPath.addPath(
+              shape.shape.getOuterPath(shapeBounds),
+              Offset.zero,
+              matrix4: shapeToLayer.storage,
+            );
+          }
         }
       }
       _cachedClipPath = rebuiltPath;
       _cachedClipBounds = rebuiltBounds;
+      _cachedClipClasses = rebuiltClasses;
       _cachedClipInputs
         ..clear()
         ..addAll(
@@ -361,6 +377,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
               },
               oldLayer: _clipLayer.layer,
             );
+            _paintFadingBackdrops(effectContext, effectOffset, geometries);
           } else {
             _releaseGlassLayers();
           }
@@ -413,10 +430,62 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     }
   }
 
+  /// Paints each fading shape's own clipped backdrop filter so its blur fades
+  /// independently while the shape stays registered with this layer. Layers
+  /// are retained across frames keyed by the shape's render object; entries
+  /// for shapes that stopped fading are released.
+  void _paintFadingBackdrops(
+    PaintingContext context,
+    Offset offset,
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
+  ) {
+    final active = <LiquidGlassShapeRenderObject>{};
+    for (final (_, geometry, geometryToLayer) in geometries) {
+      for (final shape in geometry.shapes) {
+        if (_visibilityClass(shape.appearance) != 1) continue;
+        final filter = fakeGlassBackdropFilter(settings, shape.appearance);
+        if (filter == null) continue;
+        final renderObject = shape.renderObject;
+        active.add(renderObject);
+        final layers = _fadingShapeLayers.putIfAbsent(
+          renderObject,
+          _FadingShapeLayers.new,
+        );
+        final backdropLayer = (layers.backdrop.layer ??= BackdropFilterLayer())
+          ..filter = filter
+          ..blendMode = BlendMode.srcOver
+          ..backdropKey = backdropKey;
+        assert(() {
+          debugRegisterBackdropCapture(this, backdropKey);
+          return true;
+        }(), 'Count independent backdrop captures in debug builds.');
+        final shapeToLayer = shape.shapeToGeometry == null
+            ? geometryToLayer
+            : geometryToLayer.multiplied(shape.shapeToGeometry!);
+        final shapeBounds = Offset.zero & renderObject.size;
+        layers.clip.layer = context.pushClipPath(
+          true,
+          offset,
+          MatrixUtils.transformRect(shapeToLayer, shapeBounds),
+          shape.shape.getOuterPath(shapeBounds).transform(shapeToLayer.storage),
+          (clipContext, clipOffset) {
+            clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
+          },
+          oldLayer: layers.clip.layer,
+        );
+      }
+    }
+    for (final renderObject in _fadingShapeLayers.keys.toList()) {
+      if (active.contains(renderObject)) continue;
+      _fadingShapeLayers.remove(renderObject)!.dispose();
+    }
+  }
+
   bool _clipInputsMatch(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> current,
   ) {
     if (current.length != _cachedClipInputs.length) return false;
+    var shapeIndex = 0;
     for (var index = 0; index < current.length; index++) {
       final value = current[index];
       final cached = _cachedClipInputs[index];
@@ -425,8 +494,23 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
           !_sameTransform(value.$3, cached.$3)) {
         return false;
       }
+      for (final shape in value.$2.shapes) {
+        if (shapeIndex >= _cachedClipClasses.length ||
+            _cachedClipClasses[shapeIndex] !=
+                _visibilityClass(shape.appearance)) {
+          return false;
+        }
+        shapeIndex++;
+      }
     }
-    return true;
+    return shapeIndex == _cachedClipClasses.length;
+  }
+
+  /// 0: hidden, 1: fading (needs its own clipped blur), 2: fully visible
+  /// (covered by the shared union clip).
+  static int _visibilityClass(LiquidGlassAppearance appearance) {
+    final visibility = appearance.visibility.clamp(0.0, 1.0);
+    return visibility <= 0 ? 0 : (visibility >= 1 ? 2 : 1);
   }
 
   ({bool needsRepaint, Offset? translation}) _pollCompositorTranslation() {
@@ -515,6 +599,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     _cachedClipPath = null;
     _cachedClipBounds = null;
     _cachedClipInputs.clear();
+    _cachedClipClasses = const [];
   }
 
   ImageFilter _buildBackdropFilter() {
@@ -672,6 +757,10 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   void _releaseGlassLayers() {
     _backdropLayer.layer = null;
     _clipLayer.layer = null;
+    for (final layers in _fadingShapeLayers.values) {
+      layers.dispose();
+    }
+    _fadingShapeLayers.clear();
   }
 
   void _releaseLayers() {
@@ -686,5 +775,16 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     _repaintAfterCompositingScheduled = false;
     _releaseLayers();
     super.dispose();
+  }
+}
+
+/// Retained layer handles for one fading shape's clipped backdrop pass.
+class _FadingShapeLayers {
+  final clip = LayerHandle<ClipPathLayer>();
+  final backdrop = LayerHandle<BackdropFilterLayer>();
+
+  void dispose() {
+    clip.layer = null;
+    backdrop.layer = null;
   }
 }

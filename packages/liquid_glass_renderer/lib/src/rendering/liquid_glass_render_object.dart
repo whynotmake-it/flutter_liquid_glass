@@ -347,6 +347,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
         ]);
     });
+    // Float index 50, after the 44-float common block and the 6-float
+    // filter->matte mapping: frosted glass cross-fades its blur away, while
+    // unfrosted glass stays alpha-1 and matches the backdrop exactly.
+    shader.setFloat(50, settings.effectiveFrost > 0 ? 1 : 0);
   }
 
   List<double> _appearanceLookupData(

@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
@@ -16,10 +15,11 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///
 /// Loads the fake-glass surface program everywhere, and the real-glass
 /// programs plus the Flutter GPU geometry bundle where shader filters are
-/// supported. On Android, the GPU part first awaits the first rasterized
-/// frame because the Impeller context is unavailable before the first
-/// surface frame; calling it before `runApp` therefore lets the GPU portion
-/// complete after the first frame. Failures are reported through
+/// supported. On Android, the GPU part initializes the widgets binding if
+/// needed and awaits the first rasterized frame, because the Impeller
+/// context is unavailable before the first surface frame; calling it before
+/// `runApp` therefore lets the GPU portion complete after the first frame.
+/// Failures are reported through
 /// [FlutterError] and never thrown; the layers fall back the same way they
 /// would without precaching.
 Future<void> precacheLiquidGlass() {
@@ -36,9 +36,7 @@ Future<void> precacheLiquidGlass() {
     shaders,
     if (!kIsWeb && ui.ImageFilter.isShaderFilterSupported)
       _guard(() async {
-        if (defaultTargetPlatform == TargetPlatform.android) {
-          await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
-        }
+        await FlutterGpuGeometryRenderer.waitUntilGpuContextAvailable();
         final renderer = await FlutterGpuGeometryRenderer.fromAsset(
           ShaderKeys.gpuGeometryShaderBundle,
         );

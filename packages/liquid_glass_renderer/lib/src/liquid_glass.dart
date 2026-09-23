@@ -37,7 +37,7 @@ import 'package:meta/meta.dart';
 /// chrome (tab bars, toolbars) so sibling `auto` widgets share that sample.
 ///
 /// See the [LiquidGlassLayer] documentation for more information.
-class LiquidGlass extends StatelessWidget {
+class LiquidGlass extends StatefulWidget {
   /// Creates a new [LiquidGlass] with the given [child] and [shape].
   ///
   /// This will expect a parent [LiquidGlassLayer] to be present in the widget
@@ -191,13 +191,25 @@ class LiquidGlass extends StatelessWidget {
   /// real glass as fake glass. Glass layers mounted after the returned future
   /// completes render real glass from their first frame.
   ///
-  /// This can be called before `runApp`. On Android, the GPU portion then
-  /// completes after the first frame, because the Impeller context is
-  /// unavailable before the first surface frame.
+  /// This can be called before `runApp`. On Android it initializes the
+  /// widgets binding itself, and the GPU portion then completes after the
+  /// first frame, because the Impeller context is unavailable before the
+  /// first surface frame.
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.
   static Future<void> precache() => precacheLiquidGlass();
+
+  @override
+  State<LiquidGlass> createState() => _LiquidGlassState();
+}
+
+class _LiquidGlassState extends State<LiquidGlass> {
+  /// Keeps [LiquidGlass.child] mounted when the layer switches this shape
+  /// between its fake and real subtrees.
+  final _childKey = GlobalKey(debugLabel: 'LiquidGlass.child');
+
+  Widget get _keyedChild => KeyedSubtree(key: _childKey, child: widget.child);
 
   @override
   Widget build(BuildContext context) {
@@ -205,16 +217,16 @@ class LiquidGlass extends StatelessWidget {
     // layer is the fallback, not the default for a row of siblings. A glass
     // ancestor blocks reuse of the layer above it because nested shapes cannot
     // render correctly into the same sample.
-    if (_auto &&
+    if (widget._auto &&
         _nearestLiquidGlassBoundary(context) ==
             _LiquidGlassAncestorBoundary.layer) {
       return _buildGlass(context);
     }
 
-    if (ownLayerConfig case final config?) {
+    if (widget.ownLayerConfig case final config?) {
       return LiquidGlassLayer(
         settings: config.settings,
-        defaultAppearance: appearance,
+        defaultAppearance: widget.appearance,
         fake: config.fake,
         useBackdropGroup: config.useBackdropGroup,
         backdropKey: config.backdropKey,
@@ -222,7 +234,7 @@ class LiquidGlass extends StatelessWidget {
       );
     }
 
-    if (!grouped &&
+    if (!widget.grouped &&
         _nearestLiquidGlassBoundary(context) ==
             _LiquidGlassAncestorBoundary.glass) {
       final scope = LiquidGlassRenderScope.of(context);
@@ -264,21 +276,21 @@ class LiquidGlass extends StatelessWidget {
   /// one backdrop sample without a dummy blend group.
   Widget _buildGlass(BuildContext context) {
     final scopeSettings = LiquidGlassRenderScope.of(context);
-    final baseAppearance = this.appearance ?? scopeSettings.defaultAppearance;
+    final baseAppearance = widget.appearance ?? scopeSettings.defaultAppearance;
     final appearance = baseAppearance.copyWith(
       visibility: baseAppearance.visibility * LiquidGlassVisibility.of(context),
     );
     if (scopeSettings.useFake) {
       return FakeGlass.inLayerResolved(
-        shape: shape,
+        shape: widget.shape,
         appearance: appearance,
-        shadows: shadows,
-        child: child,
+        shadows: widget.shadows,
+        child: _keyedChild,
       );
     }
 
-    final groupLink = grouped
-        ? blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context)
+    final groupLink = widget.grouped
+        ? widget.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context)
         : null;
     return _buildContent(context, groupLink, appearance);
   }
@@ -295,10 +307,10 @@ class LiquidGlass extends StatelessWidget {
         (!ImageFilter.isShaderFilterSupported &&
             !scope.consolidatesFakeBackdrop)) {
       return FakeGlass.inLayerResolved(
-        shape: shape,
+        shape: widget.shape,
         appearance: appearance,
-        shadows: shadows,
-        child: child,
+        shadows: widget.shadows,
+        child: _keyedChild,
       );
     }
 
@@ -306,35 +318,20 @@ class LiquidGlass extends StatelessWidget {
         ? InheritedGeometryRenderLink.of(context)
         : null;
 
-    // One consolidated BackdropFilter cannot represent different opacity for
-    // overlapping clips. Keep the zero-cost shared path at stable visibility,
-    // but let a transitioning shape composite its backdrop and surface in the
-    // same order as the parent layer.
-    if (scope.consolidatesFakeBackdrop &&
-        appearance.visibility > 0 &&
-        appearance.visibility < 1) {
-      return FakeGlass.inLayerResolved(
-        shape: shape,
-        appearance: appearance,
-        shadows: shadows,
-        child: child,
-      );
-    }
-
     final registeredChild = scope.consolidatesFakeBackdrop
         ? FakeGlass.inLayerResolved(
-            shape: shape,
+            shape: widget.shape,
             appearance: appearance,
             backdropHandledByLayer: true,
-            child: child,
+            child: _keyedChild,
           )
         : OptimizedClip(
-            shape: shape,
-            clipBehavior: clipBehavior,
-            child: _maybeFade(
+            shape: widget.shape,
+            clipBehavior: widget.clipBehavior,
+            child: _fadeChildren(
               appearance.visibility,
               GlassGlowLayer(
-                child: child,
+                child: _keyedChild,
               ),
             ),
           );
@@ -344,13 +341,13 @@ class LiquidGlass extends StatelessWidget {
       settings: settings,
       appearance: appearance,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      shape: shape,
+      shape: widget.shape,
       layerShadows: scope.consolidatesFakeBackdrop || blendGroupLink != null
-          ? shadows
+          ? widget.shadows
           : const [],
       child: registeredChild,
     );
-    if (shadows.isEmpty ||
+    if (widget.shadows.isEmpty ||
         blendGroupLink != null ||
         scope.consolidatesFakeBackdrop) {
       return content;
@@ -358,16 +355,14 @@ class LiquidGlass extends StatelessWidget {
     return GlassShadow(
       settings: settings,
       appearanceVisibility: appearance.visibility,
-      shape: shape,
-      shadows: shadows,
+      shape: widget.shape,
+      shadows: widget.shadows,
       child: content,
     );
   }
 
-  static Widget _maybeFade(double visibility, Widget child) {
-    final opacity = visibility.clamp(0.0, 1.0);
-    if (opacity >= 1) return child;
-    return Opacity(opacity: opacity, child: child);
+  static Widget _fadeChildren(double visibility, Widget child) {
+    return Opacity(opacity: visibility.clamp(0.0, 1.0), child: child);
   }
 }
 

@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 
 void main() {
@@ -47,52 +49,62 @@ void main() {
     );
   });
 
-  testWidgets('a fading fake shape fades its own backdrop filter', (
+  testWidgets('fading shape keeps its render object in the shared layer', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: LiquidGlassLayer(
-          fake: true,
-          settings: settings,
-          defaultAppearance: appearance,
+    final visibility = ValueNotifier(0.5);
+    addTearDown(visibility.dispose);
+
+    int glassRenderObjectCount() =>
+        tester.allRenderObjects.whereType<RenderLiquidGlass>().toSet().length;
+
+    // Excludes the composition-probe seed layer, whose filter is an identity
+    // ColorFilter; the shared and per-shape fading blurs carry ImageFilters.
+    int backdropFilterCount() => tester.layers
+        .whereType<BackdropFilterLayer>()
+        .where((layer) => layer.filter is! ColorFilter)
+        .length;
+
+    Widget build() => MaterialApp(
+      home: LiquidGlassLayer(
+        fake: true,
+        settings: settings,
+        child: LiquidGlassBlendGroup(
           child: Row(
             children: [
-              LiquidGlass(
+              const LiquidGlass.grouped(
                 shape: LiquidOval(),
                 child: SizedBox(width: 80, height: 60),
               ),
-              LiquidGlass(
-                appearance: LiquidGlassAppearance(visibility: 0.5),
-                shape: LiquidOval(),
-                child: SizedBox(width: 80, height: 60),
+              ValueListenableBuilder<double>(
+                valueListenable: visibility,
+                builder: (_, value, _) => LiquidGlass.grouped(
+                  appearance: LiquidGlassAppearance(visibility: value),
+                  shape: const LiquidOval(),
+                  child: const SizedBox(width: 80, height: 60),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
-    for (var frame = 0; frame < 60; frame++) {
-      await tester.pump(const Duration(milliseconds: 16));
-      final fadingShapes = tester
-          .renderObjectList<RenderFakeGlass>(find.byType(RawFakeGlass))
-          .where((shape) => !shape.backdropHandledByLayer);
-      if (fadingShapes.any((shape) => shape.surfaceShader != null)) break;
-    }
 
-    final shapes = tester
-        .renderObjectList<RenderFakeGlass>(find.byType(RawFakeGlass))
-        .toList(growable: false);
-    expect(shapes, hasLength(2));
-    expect(shapes.where((shape) => shape.backdropHandledByLayer), hasLength(1));
-    final fading = shapes.singleWhere(
-      (shape) => !shape.backdropHandledByLayer,
+    await tester.pumpWidget(build());
+    await tester.pump();
+    expect(glassRenderObjectCount(), 2);
+    final fadingCount = backdropFilterCount();
+
+    visibility.value = 1;
+    await tester.pump();
+    expect(glassRenderObjectCount(), 2);
+    expect(
+      backdropFilterCount(),
+      fadingCount - 1,
+      reason:
+          'At visibility 1 the per-shape fading backdrop is released, '
+          'leaving only the shared union backdrop.',
     );
-    expect(fading.appearance.visibility, 0.5);
-    expect(fading.debugBackdropFilterLayer, isNotNull);
-    expect(fading.paintSurface, isTrue);
-    expect(fading.allowSurfaceOutset, isTrue);
-    expect(fading.surfaceShader, isNotNull);
   });
 
   testWidgets('shared fake composition preserves material paint order', (

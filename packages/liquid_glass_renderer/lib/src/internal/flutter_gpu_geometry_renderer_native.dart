@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
@@ -156,6 +158,18 @@ class FlutterGpuGeometryRenderer {
       }
       return null;
     }
+  }
+
+  /// Completes once a Flutter GPU context can be created.
+  ///
+  /// On Android the Impeller context is unavailable before the first surface
+  /// frame, so this initializes the widgets binding if needed — including
+  /// when called before `runApp` — and waits for the first rasterized frame.
+  /// On every other platform it completes immediately.
+  static Future<void> waitUntilGpuContextAvailable() async {
+    if (!Platform.isAndroid) return;
+    await WidgetsFlutterBinding.ensureInitialized()
+        .waitUntilFirstFrameRasterized;
   }
 
   static final Map<String, Future<_SharedGeometryResources>> _assetResources =
