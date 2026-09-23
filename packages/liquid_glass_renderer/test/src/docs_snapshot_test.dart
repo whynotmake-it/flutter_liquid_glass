@@ -72,7 +72,6 @@ void _docsSnapshot({
           ),
         ),
       );
-      await pumpUntilGlassReady(tester);
       await tester.pump();
       await snap(name: snapshotName, from: find.byKey(snapshotKey));
       debugDisableShadows = previousDisableShadows;

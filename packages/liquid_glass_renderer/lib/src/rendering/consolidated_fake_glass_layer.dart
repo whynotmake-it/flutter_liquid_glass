@@ -12,13 +12,9 @@ import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart'
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
-import 'package:liquid_glass_renderer/src/internal/retained_glass_opacity_probe.dart';
-import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
-
-part 'independent_fake_glass_opacity.dart';
 
 enum _FakeGlassPaintStage {
   shadows,
@@ -132,26 +128,18 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   final _clipLayer = LayerHandle<ClipPathLayer>();
   final _effectLayer = LayerHandle<OffsetLayer>();
   final _ancestorClips = RetainedGlassClip();
-  final _independentOpacity = LayerHandle<_IndependentFakeOpacityLayer>();
   ImageFilter? _cachedFilter;
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
   final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
   _cachedClipInputs = [];
   Rect _paintBounds = Rect.zero;
+  bool _debugWarnedOpacityBetweenShapeAndLayer = false;
   bool _repaintAfterCompositingScheduled = false;
   Offset _effectTranslation = Offset.zero;
 
   @visibleForTesting
   int debugPaintCount = 0;
-
-  @visibleForTesting
-  int get debugIndependentPassRecordCount =>
-      _independentOpacity.layer?.debugRecordedPassCount ?? 0;
-
-  @visibleForTesting
-  int get debugIndependentPassCount =>
-      _independentOpacity.layer?._passes.length ?? 0;
 
   @visibleForTesting
   Offset get debugCompositorTranslation => _effectTranslation;
@@ -217,10 +205,8 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     final motion = _pollCompositorTranslation();
     if (motion.translation case final translation?) {
       _setEffectTranslation(translation);
-      _independentOpacity.layer?.sync(translation);
       return;
     }
-    _independentOpacity.layer?.sync(_effectTranslation);
     if (!motion.needsRepaint || _repaintAfterCompositingScheduled) return;
     _repaintAfterCompositingScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -251,6 +237,30 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       if (geometry == null || transform == null) continue;
       geometries.add((geometryRenderObject, geometry, transform));
     }
+    assert(() {
+      for (final shapeRenderObject in link.shapes) {
+        for (
+          var ancestor = shapeRenderObject.parent;
+          ancestor != null && !identical(ancestor, this);
+          ancestor = ancestor.parent
+        ) {
+          if (ancestor is RenderOpacity || ancestor is RenderAnimatedOpacity) {
+            if (!_debugWarnedOpacityBetweenShapeAndLayer) {
+              _debugWarnedOpacityBetweenShapeAndLayer = true;
+              debugPrint(
+                'liquid_glass_renderer: an Opacity or FadeTransition between '
+                'a LiquidGlass and its LiquidGlassLayer only fades the '
+                "glass's children, not the glass. Fade glass with "
+                'LiquidGlassVisibility or LiquidGlassAppearance.visibility '
+                'instead.',
+              );
+            }
+            break;
+          }
+        }
+      }
+      return true;
+    }(), 'Warn about an opacity scope between a shape and its layer.');
 
     _ancestorClips.update(
       this,
@@ -366,14 +376,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     }
 
     // Foreground remains in its existing render ancestry.
-    final selector =
-        (_independentOpacity.layer ??= _IndependentFakeOpacityLayer())
-          ..prepare(this, geometries, offset);
-    context.pushLayer(selector, (context, offset) {
-      // The common-opacity replay in _ancestorClips belongs ONLY to the
-      // original branch. Subset branches replace it, not sit inside it.
-      context.pushLayer(selector.original, paintOriginalEffect, offset);
-    }, offset);
+    paintOriginalEffect(context, offset);
     assert(() {
       _debugLastPaintStages.add(_FakeGlassPaintStage.contents);
       return true;
@@ -672,7 +675,6 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   }
 
   void _releaseLayers() {
-    _independentOpacity.layer = null;
     _releaseGlassLayers();
     _effectLayer.layer = null;
   }

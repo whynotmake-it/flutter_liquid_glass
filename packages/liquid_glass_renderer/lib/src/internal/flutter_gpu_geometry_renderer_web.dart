@@ -18,6 +18,9 @@ class FlutterGpuGeometryRenderer {
         UnsupportedError('Flutter GPU is not available on the web.'),
       );
 
+  /// Nothing is ever cached on the web.
+  static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey) => null;
+
   static int get debugTotalRenderCount => 0;
   static int get debugActiveRendererCount => 0;
   static int get debugActiveGeometryTextureCount => 0;
@@ -51,8 +54,7 @@ class FlutterGpuGeometryRenderer {
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
-  }) =>
-      throw UnsupportedError('Flutter GPU is not available on the web.');
+  }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}
 
@@ -62,8 +64,6 @@ class FlutterGpuGeometryRenderer {
 /// Web stand-in for the allocation diagnostics; always disabled.
 @internal
 class GpuAllocationDiagnostics {
-  static int filterRecoveryHits = 0;
-  static int filterRecoveryMisses = 0;
   static const enabled = false;
   static final allocations = <String>[];
 

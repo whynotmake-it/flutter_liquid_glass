@@ -10,6 +10,7 @@ import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
+import 'package:liquid_glass_renderer/src/precache.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
 
@@ -182,6 +183,21 @@ class LiquidGlass extends StatelessWidget {
 
   /// Whether this glass should automatically detect a parent layer.
   final bool _auto;
+
+  /// Loads and compiles every shader the renderer can use on this platform.
+  ///
+  /// Shaders otherwise load on first use, so the first glass on screen paints
+  /// its fallback for a frame or two: fake glass without its surface shader,
+  /// real glass as fake glass. Glass layers mounted after the returned future
+  /// completes render real glass from their first frame.
+  ///
+  /// This can be called before `runApp`. On Android, the GPU portion then
+  /// completes after the first frame, because the Impeller context is
+  /// unavailable before the first surface frame.
+  ///
+  /// Failures are reported through [FlutterError] and never thrown; glass
+  /// layers fall back the same way they would without precaching.
+  static Future<void> precache() => precacheLiquidGlass();
 
   @override
   Widget build(BuildContext context) {

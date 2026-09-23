@@ -10,20 +10,15 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
-import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
-import 'package:liquid_glass_renderer/src/internal/retained_glass_opacity_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
-
-part 'independent_real_glass_opacity.dart';
 
 @internal
 abstract interface class LiquidGlassLayerRenderObject {
@@ -122,7 +117,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     required this._devicePixelRatio,
     required this._backdropKey,
     this._gpuGeometryRenderer,
-    this.independentOpacityPrograms,
   }) {
     _updateShaderSettings();
   }
@@ -132,7 +126,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
-  final List<FragmentProgram>? independentOpacityPrograms;
   FragmentShader get renderShader => switch ((
     _usesShapeAppearances,
     _usesTintOnlyAppearance,
@@ -406,33 +399,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   @visibleForTesting
   int debugPaintCount = 0;
 
-  @visibleForTesting
-  int get debugIndependentPassCount =>
-      _independentOpacity.layer?._passes.length ?? 0;
-
-  @visibleForTesting
-  List<BackdropKey?> get debugIndependentCaptureBackdropKeys => [
-    for (final pass
-        in _independentOpacity.layer?._passes ?? <_RealOpacityPass>[])
-      if (pass.capturesRefraction) pass.backdrop.layer?.backdropKey,
-  ];
-
-  @visibleForTesting
-  List<(int, bool, bool)> get debugIndependentMaterialKinds => [
-    for (final pass
-        in _independentOpacity.layer?._passes ?? <_RealOpacityPass>[])
-      (() {
-        final (mixed, tintOnly, _) = _classifyShapeAppearances([
-          for (final entry in pass.subset)
-            for (final shape in entry.$2.shapes) shape.appearance,
-        ], defaultAppearance);
-        return (pass.shapes.length, mixed, tintOnly);
-      })(),
-  ];
-
   final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
   _shapesWithGeometry = [];
-  List<Object> _retainedStructure = [];
   final List<_EncodedGeometryInput> _encodedGeometryInputs = [];
   List<_EncodedGeometryInput>? _idleGeometryInputs;
   List<_EncodedGeometryInput>? _emptyGeometryInputs;
@@ -444,62 +412,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   final _effectLayer = LayerHandle<OffsetLayer>();
   final _originalShadows = LayerHandle<ContainerLayer>();
   final _ancestorClips = RetainedGlassClip();
-  final _idleAncestorClips = RetainedGlassClip(includeOpacity: false);
+  final _idleAncestorClips = RetainedGlassClip();
   bool _idleComposition = false;
-  final _independentOpacity = LayerHandle<_IndependentRealOpacityLayer>();
-
-  /// Test-only effective bounds; computed on demand, never during rendering.
-  @visibleForTesting
-  List<Object?> get debugOpacityPlacement => [
-    _paintBounds.shift(_effectTranslation),
-    for (final pass
-        in _independentOpacity.layer?._passes ?? <_RealOpacityPass>[])
-      (
-        pass.bounds.shift(_effectTranslation),
-        pass.filterClip.layer?.clipRect?.shift(_effectTranslation),
-        pass.layer.seedBounds,
-        pass._mapping,
-      ),
-  ];
-
-  @protected
-  void syncIndependentOpacity() {
-    _independentOpacity.layer?.sync(_effectTranslation);
-  }
-
-  bool _hiddenPassCleanupPending = false;
-
-  @protected
-  void scheduleHiddenPassCleanup(OffsetLayer tracker) {
-    final selector = _independentOpacity.layer;
-    if (selector == null ||
-        selector._passes.isEmpty ||
-        _hiddenPassCleanupPending) {
-      return;
-    }
-    _hiddenPassCleanupPending = true;
-    // Repainting detaches and reattaches layers too. Inspect the settled tree,
-    // not that transient state, and never run geometry/paint work here.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _hiddenPassCleanupPending = false;
-      if (!attached ||
-          tracker.attached ||
-          !identical(tracker, layer) ||
-          !identical(selector, _independentOpacity.layer)) {
-        return;
-      }
-      for (
-        var ancestor = parent;
-        ancestor != null;
-        ancestor = ancestor.parent
-      ) {
-        if (isSettledTransparentGlassScope(ancestor)) {
-          selector.releaseHiddenPasses();
-          return;
-        }
-      }
-    });
-  }
+  bool _debugWarnedOpacityBetweenShapeAndLayer = false;
+  List<Object> _retainedStructure = [];
+  Offset _retainedPaintOffset = Offset.zero;
 
   /// Refreshes already recorded contributors before layer-tree descent.
   /// No child painting occurs here, and the unchanged/translation paths do
@@ -513,9 +430,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     )
     updateMaterial,
   ) {
-    final selector = _independentOpacity.layer;
-    if (selector == null ||
-        (_geometryImage == null && !_drawableEmpty) ||
+    if ((_geometryImage == null && !_drawableEmpty) ||
         _idleComposition ||
         debugPaintLiquidGlassGeometry ||
         settings.effectiveThickness <= 0) {
@@ -523,7 +438,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     }
     final candidate = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
     final bounds = _collectFrameGeometry(candidate);
-    // Topology changes need normal painting to rebuild opacity ancestry.
+    // Topology changes need normal painting to rebuild clip ancestry.
     if (bounds == null ||
         !listEquals(_retainedStructure, _geometryStructure(candidate))) {
       return false;
@@ -562,14 +477,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     link
       ..updateAllGeometries()
       .._dirty = false;
-    final offset = selector._offset;
-    _recordOriginalShadows(offset);
-    updateMaterial(_shapesWithGeometry, materialBounds, offset);
-    selector.prepare(this, _shapesWithGeometry, offset);
+    _recordOriginalShadows(_retainedPaintOffset);
+    updateMaterial(_shapesWithGeometry, materialBounds, _retainedPaintOffset);
     syncAncestorClips();
-    syncIndependentOpacity();
     return true;
   }
+
+  List<Object> _geometryStructure(
+    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
+  ) => [
+    for (final entry in geometries)
+      for (final shape in entry.$2.shapes) ...[
+        shape.renderObject,
+        shape.shadows.isNotEmpty,
+        for (
+          var node = shape.renderObject.parent;
+          node != null && !identical(node, this);
+          node = node.parent
+        )
+          node,
+      ],
+  ];
 
   @protected
   void syncAncestorClips() =>
@@ -608,6 +536,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   void _paintOriginal(PaintingContext context, Offset offset) {
+    _retainedPaintOffset = offset;
     assert(() {
       debugPaintCount++;
       return true;
@@ -633,7 +562,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ),
     );
     if (settings.effectiveThickness <= 0 || !hasVisibleShape) {
-      _independentOpacity.layer = null;
       _idleComposition = true;
       // Foreground can change while a cached matte is dormant. Poll against
       // its last paint without overwriting that matte's encoded coordinates.
@@ -712,19 +640,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       });
     }
 
-    if (independentOpacityPrograms != null && !debugPaintLiquidGlassGeometry) {
-      final selector = _independentOpacity.layer ??=
-          _IndependentRealOpacityLayer();
-      selector.prepare(this, _shapesWithGeometry, offset);
-      context.pushLayer(selector, (context, offset) {
-        // Common opacity replay belongs to this branch only. Temporary
-        // branches own alpha and opt out of RetainedGlassClip's opacity.
-        context.pushLayer(selector.original, paintOriginalEffect, offset);
-      }, offset);
-    } else {
-      _independentOpacity.layer = null;
-      paintOriginalEffect(context, offset);
-    }
+    paintOriginalEffect(context, offset);
 
     // Foreground always paints in its own render ancestry, above the glass.
     super.paint(context, offset);
@@ -754,24 +670,32 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ? geoBounds
           : boundingBox.expandToInclude(geoBounds);
     }
+    assert(() {
+      for (final shapeRenderObject in link.shapes) {
+        for (
+          var ancestor = shapeRenderObject.parent;
+          ancestor != null && !identical(ancestor, this);
+          ancestor = ancestor.parent
+        ) {
+          if (ancestor is RenderOpacity || ancestor is RenderAnimatedOpacity) {
+            if (!_debugWarnedOpacityBetweenShapeAndLayer) {
+              _debugWarnedOpacityBetweenShapeAndLayer = true;
+              debugPrint(
+                'liquid_glass_renderer: an Opacity or FadeTransition between '
+                'a LiquidGlass and its LiquidGlassLayer only fades the '
+                "glass's children, not the glass. Fade glass with "
+                'LiquidGlassVisibility or LiquidGlassAppearance.visibility '
+                'instead.',
+              );
+            }
+            break;
+          }
+        }
+      }
+      return true;
+    }(), 'Warn about an opacity scope between a shape and its layer.');
     return boundingBox;
   }
-
-  List<Object> _geometryStructure(
-    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
-  ) => [
-    for (final entry in geometries)
-      for (final shape in entry.$2.shapes) ...[
-        shape.renderObject,
-        shape.shadows.isNotEmpty,
-        for (
-          var node = shape.renderObject.parent;
-          node != null && !identical(node, this);
-          node = node.parent
-        )
-          node,
-      ],
-  ];
 
   void _commitFrameGeometry(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> candidate,
@@ -912,19 +836,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return blur + displacement + revealed;
   }
 
-  void _paintLayerShadows(
-    PaintingContext context,
-    Offset offset,
-    List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
-  ) {
-    final hasShadows = geometries.any(
-      (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
-    );
-    if (!hasShadows) return;
-
-    _drawLayerShadows(context.canvas, offset, geometries);
-  }
-
   // Own a replaceable picture rather than recording shadows together with
   // unrelated foreground. Geometry refresh may replace this before submission
   // without asking any child render object to paint outside the paint phase.
@@ -1041,7 +952,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   void _clearGeometryImage() {
-    _independentOpacity.layer = null;
     _originalShadows.layer = null;
     _releaseGeometryImageHandles();
     _encodedGeometryInputs.clear();
@@ -1464,8 +1374,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     ];
   }
 
-  // Share the encoder's drawable-shape decision with opacity partitioning.
-  // Called only while preparing geometry, never during retained opacity sync.
+  // The encoder's drawable-shape decision. Called only while preparing
+  // geometry, never during retained compositing sync.
   ({Offset axisX, Offset axisY, double determinant})? _matteShapeBasis(
     Matrix4 geometryToLayer,
     Matrix4 shapeToGeometry,

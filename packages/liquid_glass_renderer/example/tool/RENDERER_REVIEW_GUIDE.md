@@ -24,7 +24,7 @@ is the only commit that must not be reviewed as part of the 3.47 line.
 | `harness: thermal gate, fixed status-bar inset, loupe/pill/seed scenarios` | Benchmark scenes and the Android power harness. |
 | `harness: iOS power and Metal trace tooling (xctrace, thermal gate, parser)` | `tool/ios_power/` scripts and their README section. |
 | `docs: optimization log, independent renderer review, iPhone results, audit summary` | Measurements, rejected ideas, iPhone 15 results, and the audit update. |
-| `feat: LiquidGlassCapture sizes itself and is covered by goldens` | Rename of the seed; `effectBounds` on both layers; pass origin shared with the opacity passes; `precacheLiquidGlassShaders`; per-scene pixel tests and goldens; README "Glass on glass". |
+| `feat: LiquidGlassCapture sizes itself and is covered by goldens` | Rename of the seed; `effectBounds` on both layers; pass origin shared with the opacity passes; `LiquidGlass.precache`; per-scene pixel tests and goldens; README "Glass on glass". |
 | `chore: prepare the 1.0.0-dev.1 prerelease` | Version, changelog, README. |
 | `compat: build against Flutter 3.44 (experimental)` | Tip only. Flutter GPU API and GLES sampling differences; SDK pins. |
 

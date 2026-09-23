@@ -19,7 +19,6 @@ export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
 export 'src/liquid_shape.dart';
 export 'src/logging.dart' show LgrLogs;
-export 'src/precache.dart' show precacheLiquidGlassShaders;
 export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
 export 'src/stretch.dart'
     show LiquidStretch, OffsetResistanceExtension, RawLiquidStretch;

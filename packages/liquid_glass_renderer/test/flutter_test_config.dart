@@ -1,19 +1,14 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:alchemist/alchemist.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   isLocalTest = true;
 
-  await MultiShaderBuilder.precacheShaders([
-    if (ImageFilter.isShaderFilterSupported) ...[
-      ShaderKeys.liquidGlassRender,
-    ],
-  ]);
+  await LiquidGlass.precache();
 
   await AlchemistConfig.runWithConfig(
     config: AlchemistConfig(

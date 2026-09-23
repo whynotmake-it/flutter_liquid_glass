@@ -81,7 +81,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        if (!fake) await pumpUntilGlassReady(tester);
+        await tester.pump();
         Future<Uint8List> capture() async {
           binding
             ..captureNextScene = true

@@ -1,3 +1,16 @@
+## Unreleased
+
+### Breaking changes
+
+- Replace `precacheLiquidGlassShaders()` with `LiquidGlass.precache()`. The new
+  API also warms the Flutter GPU geometry cache so layers mounted afterwards
+  render real glass from their first frame; call it before `runApp` (on
+  Android the GPU portion completes after the first frame).
+- Remove support for `Opacity`/`FadeTransition` between a `LiquidGlassLayer`
+  and its shapes; it only faded the shapes' children, not the glass. Fade
+  glass with `LiquidGlassVisibility` or `LiquidGlassAppearance.visibility`
+  instead. Opacity above a whole `LiquidGlassLayer` is still supported.
+
 ## 1.0.0-dev.1
 
 This experimental prerelease contains breaking API and rendering changes.

@@ -1,25 +1,15 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/internal/retained_glass_opacity_probe.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:meta/meta.dart';
 
 /// Seeds enclosing fractional-opacity surfaces with their backdrop while
 /// preserving the original child clips and opaque rendering path.
+@internal
 class GlassCompositionProbe {
   final _layer = LayerHandle<_OpacitySeedLayer>();
 
-  /// Whether this owner currently supplies a backdrop-initialized surface.
-  bool get hasActiveSeed => _layer.layer?.seeded ?? false;
-
-  /// Native opacity outside this owner already supplies alpha. Its fractional
-  /// state still determines which material composition is safe to submit.
-  bool get hasFractionalAncestor => _fractionalAncestor;
-  bool _fractionalAncestor = false;
-
-  /// Existing temporary passes can be needed again by an unfinished fade.
-  bool get hasUnfinishedAncestor => _unfinishedAncestor;
-  bool _unfinishedAncestor = false;
   static const _identity = ColorFilter.matrix([
     1,
     0,
@@ -56,49 +46,33 @@ class GlassCompositionProbe {
   }
 
   /// Updates before retained-layer dirtiness is propagated for this frame.
+  ///
+  /// Seeds iff an ancestor between [owner] and the nearest enclosing
+  /// [LiquidGlassLayerRenderObject] has fractional native opacity and none
+  /// has fully transparent opacity.
   void syncOpacity(RenderObject owner) {
     if (_layer.layer == null) return;
     var fractional = false;
-    var aboveOwner = false;
-    _fractionalAncestor = false;
-    _unfinishedAncestor = false;
-    var visible = true;
-    var ancestor = owner.parent;
-    while (ancestor != null) {
-      // A containing glass owner handles its shared outer opacity scope.
-      // An opacity between the owners still needs its own initialization.
-      if (ancestor is LiquidGlassLayerRenderObject) {
-        // The enclosing owner initializes the backdrop, but a native fade
-        // above it still changes the safe presentation of this inner owner.
-        aboveOwner = true;
-      }
-      final opacity = switch (ancestor) {
-        RenderOpacity() => ancestor.opacity,
-        RenderAnimatedOpacity() => ancestor.opacity.value,
-        _ => 1.0,
-      };
-      final alpha = ui.Color.getAlphaFromOpacity(opacity);
-      _unfinishedAncestor |= !isSettledOpaqueGlassScope(ancestor);
-      if (isSettledTransparentGlassScope(ancestor)) {
-        _unfinishedAncestor = false;
-        _fractionalAncestor = false;
-        fractional = false;
+    var blocked = false;
+    for (
+      var ancestor = owner.parent;
+      ancestor != null && ancestor is! LiquidGlassLayerRenderObject;
+      ancestor = ancestor.parent
+    ) {
+      final alpha = ui.Color.getAlphaFromOpacity(
+        switch (ancestor) {
+          RenderOpacity() => ancestor.opacity,
+          RenderAnimatedOpacity() => ancestor.opacity.value,
+          _ => 1.0,
+        },
+      );
+      if (alpha == 0) {
+        blocked = true;
         break;
       }
-      if (alpha == 0) {
-        visible = false;
-        fractional = false;
-        _fractionalAncestor = false;
-      }
-      // Full-optics capture follows native presentation alpha; raw endpoint
-      // and animation status above still govern temporary resource lifetime.
-      if (visible) {
-        _fractionalAncestor |= alpha < 255;
-        if (!aboveOwner) fractional |= alpha < 255;
-      }
-      ancestor = ancestor.parent;
+      if (alpha < 255) fractional = true;
     }
-    _layer.layer!.seeded = fractional;
+    _layer.layer!.seeded = fractional && !blocked;
   }
 
   /// Releases the retained experimental layer.

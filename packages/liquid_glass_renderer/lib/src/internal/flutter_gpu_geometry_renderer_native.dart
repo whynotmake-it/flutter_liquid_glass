@@ -140,6 +140,24 @@ class FlutterGpuGeometryRenderer {
     }
   }
 
+  /// Synchronously builds a renderer from already resolved shared resources.
+  ///
+  /// Returns null when [fromAsset] has not resolved [assetKey] yet, so callers
+  /// can fall back to the asynchronous path. On failure the poisoned cache
+  /// entry is evicted exactly like [fromAsset] does.
+  static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey) {
+    final cachedResources = _resolvedAssetResources[assetKey];
+    if (cachedResources == null) return null;
+    try {
+      return FlutterGpuGeometryRenderer._fromShared(cachedResources);
+    } on Object {
+      if (identical(_resolvedAssetResources[assetKey], cachedResources)) {
+        _resolvedAssetResources.remove(assetKey);
+      }
+      return null;
+    }
+  }
+
   static final Map<String, Future<_SharedGeometryResources>> _assetResources =
       {};
   static final Map<String, _SharedGeometryResources> _resolvedAssetResources =
@@ -622,9 +640,6 @@ class FlutterGpuGeometryRenderer {
 /// Temporary diagnostic bookkeeping; never enabled in published/default builds.
 @internal
 class GpuAllocationDiagnostics {
-  static int filterRecoveryHits = 0;
-  static int filterRecoveryMisses = 0;
-
   /// Controls all instrumentation at compile time.
   static const enabled = bool.fromEnvironment('DIAG_GPU_ALLOCATION');
   static final _objects = <(String, WeakReference<Object>)>[];
@@ -653,8 +668,6 @@ class GpuAllocationDiagnostics {
       'seen': seen,
       'alive': alive,
       'allocations': List<String>.of(allocations),
-      'filter_recovery_hits': filterRecoveryHits,
-      'filter_recovery_misses': filterRecoveryMisses,
       'uniform_block_bytes':
           FlutterGpuGeometryRenderer._sharedHostBufferBlockLength,
       'max_uniform_writes_per_timestamp':
