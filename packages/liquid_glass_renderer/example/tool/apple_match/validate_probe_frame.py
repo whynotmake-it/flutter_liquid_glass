@@ -113,8 +113,14 @@ def main() -> None:
             expected = np.array(expected_rgb(scene, probe, physical_x, physical_y))
             actual = image[physical_y, physical_x, ::-1].astype(np.int16)
             residuals.append(int(np.max(np.abs(actual - expected))))
-    if not residuals or float(np.percentile(residuals, 95)) < 4.0:
+    if not residuals:
         raise SystemExit(1)
+    if float(np.percentile(residuals, 95)) < 4.0:
+        # `.clear` glass over a solid probe leaves the interior unchanged, so
+        # only its rim proves the glass is present; transient frames have none.
+        rim_fraction = float(np.mean(np.array(residuals) >= 16))
+        if scene.get("glassVariant") != "clear" or rim_fraction < 0.001:
+            raise SystemExit(1)
     raise SystemExit(0)
 
 
