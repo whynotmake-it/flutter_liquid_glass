@@ -238,6 +238,12 @@ provides Impeller and Flutter GPU. This supersedes the earlier FakeGlass note
 above: FakeGlass now evaluates the whole iOS 27 face in its backdrop color
 matrix.
 
+Both sides are SDR. The Apple references are simulator screenshots
+(`captureEncoding: SDR tone-mapped 8-bit PNG`), and host captures read back
+8-bit RGBA, so glint values above 1.0 clip identically on both sides. The
+glint's 1.6 target luminance is inferred only from channels that did not clip.
+Verifying the headroom itself needs an extended-range capture from a device.
+
 ### Pinned iOS promotion and final validation
 
 ```bash
