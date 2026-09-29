@@ -223,6 +223,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   @protected
   ui.Image? get geometryImage => _geometryImage;
 
+  @visibleForTesting
+  ui.Image? get debugGeometryImage => _geometryImage;
+
   /// The bounding box of the geometry matte in screen space.
   ///
   /// Exposed for subclasses that need to map the geometry texture into their

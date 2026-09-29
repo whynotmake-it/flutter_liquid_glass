@@ -29,6 +29,10 @@ class FlutterGpuGeometryRenderer {
   static int get debugActiveGeometryTextureCount => 0;
   static int get debugActiveMaterialTextureCount => 0;
 
+  /// Matches the native test hook; there is no geometry pass to scissor.
+  static bool debugDisableGeometryScissor = false;
+  static int debugScissoredRenderCount = 0;
+
   /// Material map texels per matte pixel; shared constant with the native
   /// renderer so uniform math stays identical.
   static const int materialRasterScale = 8;
