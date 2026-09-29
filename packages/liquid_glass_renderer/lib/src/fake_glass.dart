@@ -148,9 +148,9 @@ class FakeGlass extends StatelessWidget {
     final paintsOwnSurface =
         !(renderScope?.consolidatesFakeSurface ?? false) ||
         !backdropHandledByLayer;
-    final allowsSurfaceOutset =
-        (renderScope?.consolidatesFakeSurface ?? false) &&
-        !backdropHandledByLayer;
+    // The dark border lies outside the silhouette, so any glass that owns
+    // its backdrop paints its surface past the shape clip.
+    final allowsSurfaceOutset = !backdropHandledByLayer;
     RawFakeGlass buildRawFake(ui.FragmentShader? surfaceShader) => RawFakeGlass(
       shape: shape,
       settings: settings,
@@ -223,6 +223,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) {
     return RenderFakeGlass(
+      devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1,
       shape: shape,
       settings: settings,
       appearance: appearance,
@@ -241,6 +242,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
   ) {
     if (renderObject is RenderFakeGlass) {
       renderObject
+        ..devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1
         ..shape = shape
         ..settings = settings
         ..appearance = appearance
@@ -257,6 +259,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 @internal
 class RenderFakeGlass extends RenderProxyBox {
   RenderFakeGlass({
+    required this._devicePixelRatio,
     required this._shape,
     required this._settings,
     required this._appearance,
@@ -272,6 +275,14 @@ class RenderFakeGlass extends RenderProxyBox {
   set paintSurface(bool value) {
     if (_shouldPaintSurface == value) return;
     _shouldPaintSurface = value;
+    markNeedsPaint();
+  }
+
+  double _devicePixelRatio;
+  double get devicePixelRatio => _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
     markNeedsPaint();
   }
 
@@ -463,6 +474,7 @@ class RenderFakeGlass extends RenderProxyBox {
       shape: shape,
       settings: settings,
       appearance: appearance,
+      devicePixelRatio: devicePixelRatio,
     );
     canvas.restore();
   }

@@ -237,7 +237,7 @@ void main() {
     expect(source, contains('backdropScaleOffset + blueOffset'));
     expect(renderer, contains('_materialCenterInMatte'));
     expect(renderer, contains('matteTransform,\n        bounds,'));
-    expect(renderer, contains('setFloatUniforms(initialIndex: 33'));
+    expect(renderer, contains('setFloatUniforms(initialIndex: 34'));
 
     double boundaryWeight(double distance, double transition) {
       final distanceSquared = distance * distance;

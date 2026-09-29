@@ -25,14 +25,15 @@ class LiquidGlassSettings with Equatable {
     this.frost = 5.0,
     this.chromaticAberration = 0.01,
     this.highlight = 1.0,
-    this.highlightWidth = 0.0,
-    this.highlightWrap = 0.25,
+    this.highlightWidth = 1.2,
+    this.highlightWrap = 0.5,
     this.highlightOppositeStrength = 1.0,
     this.curvatureLighting = 0.0,
     this.contourStrength = 0.0,
     this.contourWidth = 0.0,
     this.contourOffset = 0.0,
     this.contourTransmittance = 0.0,
+    this.contourDirectionality = 0.0,
     this.bevelShadowStrength = 0.0,
     this.bevelShadowDepth = 12.0,
     this.bevelShadowOffset = 0.0,
@@ -53,14 +54,15 @@ class LiquidGlassSettings with Equatable {
       frost: number('frost', 5),
       chromaticAberration: number('chromaticAberration', .01),
       highlight: number('highlight', 1),
-      highlightWidth: number('highlightWidth', 0),
-      highlightWrap: number('highlightWrap', .25),
+      highlightWidth: number('highlightWidth', 1.2),
+      highlightWrap: number('highlightWrap', .5),
       highlightOppositeStrength: number('highlightOppositeStrength', 1),
       curvatureLighting: number('curvatureLighting', 0),
       contourStrength: number('contourStrength', 0),
       contourWidth: number('contourWidth', 0),
       contourOffset: number('contourOffset', 0),
       contourTransmittance: number('contourTransmittance', 0),
+      contourDirectionality: number('contourDirectionality', 0),
       bevelShadowStrength: number('bevelShadowStrength', 0),
       bevelShadowDepth: number('bevelShadowDepth', 12),
       bevelShadowOffset: number('bevelShadowOffset', 0),
@@ -76,6 +78,11 @@ class LiquidGlassSettings with Equatable {
   /// platform materials vary with appearance, control role, and accessibility
   /// settings. Override [frost] when the surrounding design needs a clearer or
   /// softer surface.
+  ///
+  /// The lighting is the measured iOS 27 rim: a 1.2 pt glint on both walls
+  /// along the light axis and a 0.75 pt dark border outside the silhouette
+  /// that concentrates where the glint fades. iOS 27 shows no inner bevel
+  /// shadow on solid backdrops.
   const LiquidGlassSettings.ios27ToolbarLight({
     this.frost = 7.0,
   }) : thickness = 12.0,
@@ -83,16 +90,17 @@ class LiquidGlassSettings with Equatable {
        refractionSpread = 0.0,
        backdropScale = 1.0,
        chromaticAberration = 0.005,
-       highlight = 0.25,
-       highlightWidth = 0.75,
-       highlightWrap = 0.25,
-       highlightOppositeStrength = 0.5,
+       highlight = 1.0,
+       highlightWidth = 1.2,
+       highlightWrap = 0.5,
+       highlightOppositeStrength = 1.0,
        curvatureLighting = 0.0,
-       contourStrength = 0.15,
-       contourWidth = 0.65,
-       contourOffset = 0.25,
-       contourTransmittance = 0.8,
-       bevelShadowStrength = 0.04,
+       contourStrength = 0.43,
+       contourWidth = 0.75,
+       contourOffset = 0.0,
+       contourTransmittance = 0.0,
+       contourDirectionality = 0.77,
+       bevelShadowStrength = 0.0,
        bevelShadowDepth = 18.0,
        bevelShadowOffset = 4.0,
        bevelShadowDirectionality = 0.75,
@@ -102,7 +110,9 @@ class LiquidGlassSettings with Equatable {
   /// Dark-mode structural settings fitted to an iOS 27 toolbar capsule.
   ///
   /// Use this alongside [LiquidGlassSettings.ios27ToolbarLight] when the
-  /// surrounding application follows the platform brightness.
+  /// surrounding application follows the platform brightness. The glint is
+  /// identical to light mode; the border is stronger and vanishes entirely
+  /// where the normal faces the light axis.
   const LiquidGlassSettings.ios27ToolbarDark({
     this.frost = 5.0,
   }) : thickness = 12.0,
@@ -110,16 +120,17 @@ class LiquidGlassSettings with Equatable {
        refractionSpread = 0.0,
        backdropScale = 1.0,
        chromaticAberration = 0.005,
-       highlight = 0.25,
-       highlightWidth = 0.0,
-       highlightWrap = 0.25,
-       highlightOppositeStrength = 0.5,
+       highlight = 1.0,
+       highlightWidth = 1.2,
+       highlightWrap = 0.5,
+       highlightOppositeStrength = 1.0,
        curvatureLighting = 0.0,
-       contourStrength = 0.25,
-       contourWidth = 0.5,
+       contourStrength = 0.88,
+       contourWidth = 0.75,
        contourOffset = 0.0,
-       contourTransmittance = 0.8,
-       bevelShadowStrength = 0.04,
+       contourTransmittance = 0.0,
+       contourDirectionality = 1.0,
+       bevelShadowStrength = 0.0,
        bevelShadowDepth = 18.0,
        bevelShadowOffset = 4.0,
        bevelShadowDirectionality = 0.75,
@@ -189,20 +200,26 @@ class LiquidGlassSettings with Equatable {
   /// Wavelength separation for the edge displacement.
   final double chromaticAberration;
 
-  /// Strength of the paired directional highlight lobe.
+  /// Strength of the glint along the light axis.
+  ///
+  /// The glint recolors the face instead of adding white: it pulls the lit
+  /// material toward a target brighter than SDR white carrying the face's own
+  /// chroma amplified, so glass over color glints in that color. `1` is the
+  /// strength measured on iOS 27 in both appearances.
   final double highlight;
 
-  /// Width of the directional highlight band in logical pixels.
+  /// Width of the glint line in logical pixels, measured inward from the
+  /// silhouette. A faint bleed reaches four times as deep.
   ///
-  /// `0` preserves the legacy behavior of following [contourWidth]. Keeping
-  /// this independent lets a thin dielectric contour coexist with the wider
-  /// optical highlight visible on Apple glass.
+  /// `0` follows [contourWidth].
   final double highlightWidth;
 
-  /// Angular spread of directional highlights around the SDF contour.
+  /// Angular spread of the glint around the SDF contour.
   ///
-  /// `0` confines the lobe to normals nearly aligned with the light axis;
-  /// larger values wrap it more gradually through corners and curved edges.
+  /// `0.5` fades the glint linearly with the normal's component
+  /// perpendicular to the light axis, as on iOS 27. Lower values confine it
+  /// to normals aligned with the light axis; higher values carry it further
+  /// around corners and curved edges.
   final double highlightWrap;
 
   /// Relative energy of the highlight opposite the light-facing rim.
@@ -220,16 +237,16 @@ class LiquidGlassSettings with Equatable {
   /// not add a texture sample or rendering pass.
   final double curvatureLighting;
 
-  /// Strength of the dark dielectric contour derived from the SDF.
+  /// Peak absorption of the dark border derived from the SDF.
   final double contourStrength;
 
-  /// Width of the dielectric contour in logical pixels.
+  /// Distance in logical pixels over which the border fades outward from
+  /// the silhouette.
   final double contourWidth;
 
-  /// Signed placement of the contour relative to the mathematical boundary.
+  /// Outward shift of the border's start relative to the silhouette.
   ///
-  /// Positive values move the contour outward and negative values move it
-  /// inward. The contour remains derived from the same SDF as the glass and
+  /// The border remains derived from the same SDF as the glass and
   /// highlights, so it follows blended geometry without a canvas shadow or a
   /// second rendering pass.
   final double contourOffset;
@@ -241,6 +258,13 @@ class LiquidGlassSettings with Equatable {
   /// highlight. This lets the highlight eclipse the contour without a canvas
   /// stroke or another rendering pass.
   final double contourTransmittance;
+
+  /// How strongly the border concentrates where the glint fades.
+  ///
+  /// `0` darkens the whole silhouette evenly. `1` keeps the border only where
+  /// the normal is perpendicular to the light axis and removes it where the
+  /// glint sits, as in iOS 27 dark mode.
+  final double contourDirectionality;
 
   /// Strength of the ambient shadow immediately inside the raised bevel.
   final double bevelShadowStrength;
@@ -319,6 +343,9 @@ class LiquidGlassSettings with Equatable {
   /// Effective transmitted fraction beneath the contour.
   double get effectiveContourTransmittance => contourTransmittance;
 
+  /// Effective contour directionality.
+  double get effectiveContourDirectionality => contourDirectionality;
+
   /// Effective bevel-shadow strength.
   double get effectiveBevelShadowStrength => bevelShadowStrength;
 
@@ -369,6 +396,7 @@ class LiquidGlassSettings with Equatable {
     double? contourWidth,
     double? contourOffset,
     double? contourTransmittance,
+    double? contourDirectionality,
     double? bevelShadowStrength,
     double? bevelShadowDepth,
     double? bevelShadowOffset,
@@ -392,6 +420,7 @@ class LiquidGlassSettings with Equatable {
     contourWidth: contourWidth ?? this.contourWidth,
     contourOffset: contourOffset ?? this.contourOffset,
     contourTransmittance: contourTransmittance ?? this.contourTransmittance,
+    contourDirectionality: contourDirectionality ?? this.contourDirectionality,
     bevelShadowStrength: bevelShadowStrength ?? this.bevelShadowStrength,
     bevelShadowDepth: bevelShadowDepth ?? this.bevelShadowDepth,
     bevelShadowOffset: bevelShadowOffset ?? this.bevelShadowOffset,
@@ -420,6 +449,7 @@ class LiquidGlassSettings with Equatable {
     'contourWidth': contourWidth,
     'contourOffset': contourOffset,
     'contourTransmittance': contourTransmittance,
+    'contourDirectionality': contourDirectionality,
     'bevelShadowStrength': bevelShadowStrength,
     'bevelShadowDepth': bevelShadowDepth,
     'bevelShadowOffset': bevelShadowOffset,
@@ -445,6 +475,7 @@ class LiquidGlassSettings with Equatable {
     contourWidth,
     contourOffset,
     contourTransmittance,
+    contourDirectionality,
     bevelShadowStrength,
     bevelShadowDepth,
     bevelShadowOffset,

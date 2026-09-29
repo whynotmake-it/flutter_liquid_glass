@@ -42,6 +42,13 @@ sealed class LiquidGlassColorModel with Equatable {
   @internal
   Color get neutralMaterialTint;
 
+  /// Luminance self-screen amount and chroma gain of the untinted face, or
+  /// `null` when transmitted content is composited per channel.
+  ///
+  /// Mirrors `ios27FaceTransfer` in the final shader.
+  @internal
+  ({double lift, double chromaGain})? get faceTransfer;
+
   /// Maps one opaque tint to the tone selected for backdrop [luminance].
   ///
   /// The direct model returns [tint] unchanged. The iOS 27 model implements
@@ -49,11 +56,12 @@ sealed class LiquidGlassColorModel with Equatable {
   @visibleForTesting
   Color tintTone(Color tint, double luminance);
 
-  /// Resolves the single-color approximation used by FakeGlass.
+  /// Resolves the single-color surface tint painted by FakeGlass.
   ///
   /// FakeGlass cannot inspect backdrop luminance in its analytic surface
-  /// shader, so adaptive models evaluate their tonal ramp at a midtone while
-  /// retaining the exact neutral-plus-tint alpha composition.
+  /// shader, so adaptive models evaluate their tonal ramp at a midtone. Their
+  /// neutral face is applied by the backdrop color filter instead, so it is
+  /// not part of this color.
   @internal
   Color approximateSurfaceTint(Color tint);
 }
@@ -71,6 +79,9 @@ final class DirectLiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   Color get neutralMaterialTint => const Color(0x00000000);
+
+  @override
+  ({double lift, double chromaGain})? get faceTransfer => null;
 
   @override
   Color tintTone(Color tint, double luminance) => tint;
@@ -112,6 +123,12 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
         );
 
   @override
+  ({double lift, double chromaGain}) get faceTransfer =>
+      brightness == Brightness.dark
+      ? (lift: 1.0, chromaGain: 1.03)
+      : (lift: 0.13, chromaGain: 1.17);
+
+  @override
   Color tintTone(Color tint, double luminance) {
     final backdropLuminance = luminance.clamp(0.0, 1.0);
     double tone(double channel) => brightness == Brightness.dark
@@ -128,23 +145,8 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   Color approximateSurfaceTint(Color tint) {
-    final neutral = neutralMaterialTint;
-    final tone = tintTone(tint, 0.5);
-    final tintWeight = tint.a;
-    final alpha = 1 - (1 - neutral.a) * (1 - tintWeight);
-    if (alpha <= 0) return const Color(0x00000000);
-    return Color.from(
-      alpha: alpha,
-      red:
-          ((1 - tintWeight) * neutral.r * neutral.a + tintWeight * tone.r) /
-          alpha,
-      green:
-          ((1 - tintWeight) * neutral.g * neutral.a + tintWeight * tone.g) /
-          alpha,
-      blue:
-          ((1 - tintWeight) * neutral.b * neutral.a + tintWeight * tone.b) /
-          alpha,
-    );
+    if (tint.a <= 0) return const Color(0x00000000);
+    return tintTone(tint, 0.5).withValues(alpha: tint.a);
   }
 
   static double _lightTone(double channel, double luminance) =>
