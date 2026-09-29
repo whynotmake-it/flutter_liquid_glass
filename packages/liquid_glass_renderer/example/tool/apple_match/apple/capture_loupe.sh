@@ -65,29 +65,30 @@ fi
 mkdir -p "$OUT/frames"
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
-xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
-xcrun simctl ui "$IOS_27_UDID" appearance light
-xcrun simctl ui "$IOS_27_UDID" content_size large
-xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
-  ReduceTransparencyEnabled -bool NO
+# System processes read accessibility defaults at startup; reboot before any
+# other setting or install, as in capture.sh.
 PREVIOUS_REDUCE_MOTION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
   com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo unset)"
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
-REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.Accessibility ReduceMotionEnabled)"
-if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
-  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
-  exit 4
-fi
-# System processes read accessibility defaults at startup; see capture.sh.
 if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
   xcrun simctl shutdown "$IOS_27_UDID"
   xcrun simctl boot "$IOS_27_UDID"
   xcrun simctl bootstatus "$IOS_27_UDID" -b
   sleep 5
 fi
+REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled)"
+if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
+  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
+  exit 4
+fi
+xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
+xcrun simctl ui "$IOS_27_UDID" appearance light
+xcrun simctl ui "$IOS_27_UDID" content_size large
+xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
+xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
+  ReduceTransparencyEnabled -bool NO
 cleanup() {
   agent-device close --platform ios --udid "$IOS_27_UDID" \
     --session "$AD_SESSION" >/dev/null 2>&1 || true

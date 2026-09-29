@@ -57,6 +57,27 @@ ACTUAL_TINT_POSITION=""
 # have launched the simulator first.
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
+# Accessibility defaults are read by system processes at startup, so a changed
+# Reduce Motion value only takes effect for glass rendering after a reboot.
+# Reboot before any other defaults write or app install: both can be lost
+# when the device shuts down immediately after them.
+PREVIOUS_REDUCE_MOTION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo unset)"
+xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
+  ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
+if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
+  xcrun simctl shutdown "$IOS_27_UDID"
+  xcrun simctl boot "$IOS_27_UDID"
+  xcrun simctl bootstatus "$IOS_27_UDID" -b
+  sleep 5
+fi
+REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled)"
+if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
+  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
+  exit 4
+fi
+export REDUCE_MOTION
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
   UIViewGlassTintAmount -float "$LIQUID_GLASS_TINT_POSITION"
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
@@ -91,25 +112,6 @@ xcrun simctl ui "$IOS_27_UDID" content_size large
 xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceTransparencyEnabled -bool NO
-# Accessibility defaults are read by system processes at startup, so a changed
-# Reduce Motion value only takes effect for glass rendering after a reboot.
-PREVIOUS_REDUCE_MOTION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo unset)"
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
-  ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
-REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.Accessibility ReduceMotionEnabled)"
-if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
-  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
-  exit 4
-fi
-if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
-  xcrun simctl shutdown "$IOS_27_UDID"
-  xcrun simctl boot "$IOS_27_UDID"
-  xcrun simctl bootstatus "$IOS_27_UDID" -b
-  sleep 5
-fi
-export REDUCE_MOTION
 screenshot_frame() {
   local probe="$1"
   local destination="$2"
