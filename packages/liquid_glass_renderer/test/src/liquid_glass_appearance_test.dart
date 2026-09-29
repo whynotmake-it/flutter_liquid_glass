@@ -50,6 +50,16 @@ void main() {
     );
   });
 
+  test('clear appearance is a 12.5% white wash', () {
+    const clear = LiquidGlassAppearance.ios27ClearLight();
+
+    expect(clear.tint.a, closeTo(.125, 1e-3));
+    expect(clear.tint.r, 1);
+    expect(clear.colorModel, const LiquidGlassColorModel.direct());
+    expect(clear.saturation, 1);
+    expect(clear.transmissionGamma, 1);
+  });
+
   test('regular material uses the iOS 27 face transfer unadjusted', () {
     const light = LiquidGlassAppearance.ios27RegularLight();
     const dark = LiquidGlassAppearance.ios27RegularDark();
