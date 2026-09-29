@@ -68,28 +68,16 @@ List<double> fakeGlassColorMatrix({
   return result..addAll([0, 0, 0, filterOpacity, 0]);
 }
 
-/// The complete untinted iOS 27 face as a 4x5 color matrix:
-/// `neutral + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
-///
-/// Evaluating the whole face in the filter clamps only the final color, so
-/// amplified chroma is not clipped before the neutral wash attenuates it. The
-/// luminance transfer `(Y + lift * Y * (1 - Y)) ^ transmissionGamma` is not
-/// linear, so the matrix uses its least-squares line over `[0, 1]`; at unit
-/// gamma that is exactly `Y + lift / 6`.
-@internal
-List<double> fakeGlassFaceMatrix({
-  required Color neutral,
-  required double lift,
-  required double chromaGain,
-  double transmissionGamma = 1,
-  double opacity = 1,
-}) {
-  const luminance = [0.2126, 0.7152, 0.0722];
-  final transmittance = 1 - neutral.a;
+/// Least-squares line `slope * Y + offset` through the iOS 27 luminance
+/// transfer `(Y + lift * Y * (1 - Y)) ^ transmissionGamma` over `[0, 1]`.
+/// At unit gamma it is exactly `Y + lift / 6`.
+(double slope, double offset) _faceLuminanceLine(
+  double lift,
+  double transmissionGamma,
+) {
   final gamma = math.max(transmissionGamma, 0.01);
   double transfer(double y) =>
       math.pow((y + lift * y * (1 - y)).clamp(0.0, 1.0), gamma).toDouble();
-  // Least-squares line through the transfer on evenly spaced samples.
   const samples = 17;
   var meanY = 0.0;
   var meanT = 0.0;
@@ -106,7 +94,26 @@ List<double> fakeGlassFaceMatrix({
     variance += (y - meanY) * (y - meanY);
   }
   final slope = covariance / variance;
-  final offset = meanT - slope * meanY;
+  return (slope, meanT - slope * meanY);
+}
+
+/// The complete untinted iOS 27 face as a 4x5 color matrix:
+/// `neutral + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
+///
+/// Evaluating the whole face in the filter clamps only the final color, so
+/// amplified chroma is not clipped before the neutral wash attenuates it.
+/// The luminance transfer is replaced by its least-squares line.
+@internal
+List<double> fakeGlassFaceMatrix({
+  required Color neutral,
+  required double lift,
+  required double chromaGain,
+  double transmissionGamma = 1,
+  double opacity = 1,
+}) {
+  const luminance = [0.2126, 0.7152, 0.0722];
+  final transmittance = 1 - neutral.a;
+  final (slope, offset) = _faceLuminanceLine(lift, transmissionGamma);
   final neutralColor = [neutral.r, neutral.g, neutral.b];
   final result = <double>[];
   for (var row = 0; row < 3; row++) {
@@ -118,6 +125,7 @@ List<double> fakeGlassFaceMatrix({
     }
     result
       ..add(0)
+      // ColorFilter.matrix biases use the 0-255 channel scale.
       ..add((neutral.a * neutralColor[row] + transmittance * offset) * 255);
   }
   return result..addAll([0, 0, 0, opacity.clamp(0.0, 1.0), 0]);
