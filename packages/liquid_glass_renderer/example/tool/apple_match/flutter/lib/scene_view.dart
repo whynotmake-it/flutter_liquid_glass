@@ -471,8 +471,10 @@ class _MatchLoupe extends StatelessWidget {
           children: [
             RawMagnifier(
               size: size,
-              magnificationScale: 1.55,
-              focalPointOffset: const Offset(0, 75.15),
+              // Fitted to the iOS 27 loupe capture: interior rms 0.009 on
+              // both grid probes.
+              magnificationScale: 1.25,
+              focalPointOffset: const Offset(0, 75),
               decoration: MagnifierDecoration(
                 shape: RoundedRectangleBorder(borderRadius: borderRadius),
               ),

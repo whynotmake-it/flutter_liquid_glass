@@ -29,7 +29,7 @@ class ExampleLoupe extends StatelessWidget {
     required this.settings,
     super.key,
     this.size = const Size(116, 86),
-    this.magnificationScale = 1.55,
+    this.magnificationScale = 1.25,
     this.alignment = Alignment.center,
     this.focalPointOffset = Offset.zero,
   });
