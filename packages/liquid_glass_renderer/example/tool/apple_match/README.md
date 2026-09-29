@@ -62,6 +62,21 @@ prints its exact UDID. Captures are portrait, 402×874 logical points at 3×,
 light appearance, Reduce Motion enabled, and Reduce Transparency off. The
 scene JSON records the remaining geometry and transparency metadata.
 
+Reduce Motion removes Liquid Glass lensing, so references captured with it
+enabled contain no refraction. `REDUCE_MOTION=0` (for `apple/capture.sh` and
+`apple/capture_loupe.sh`) captures with it disabled, waits
+`CAPTURE_SETTLE_SECONDS` (default 4) after each launch instead, and writes to
+`references/ios27-iphone17pro-reduce-motion-off/slider-000` (loupe:
+`references/ios27-iphone17pro-light-reduce-motion-off`). Changing the value
+reboots the target simulator so system processes pick it up. Every
+`metadata.json` records `reduceMotion`; fit refraction only against `false`
+references.
+
+```bash
+REDUCE_MOTION=0 LIQUID_GLASS_TINT_POSITION=0 SCENE_ID=toolbar_capsule \
+  bash apple/capture.sh
+```
+
 ## Tests
 
 Run comparator/schema tests before trusting any optimization:

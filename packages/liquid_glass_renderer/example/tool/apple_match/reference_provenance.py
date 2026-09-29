@@ -16,6 +16,13 @@ SCHEMA_VERSION = 2
 CAPTURE_ENCODING = "SDR tone-mapped 8-bit PNG"
 PINNED_RUNTIME_IDENTIFIER = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
 PINNED_UDID = "DB4F41F3-1C36-476D-B775-AFDC3686C75B"
+# Every simulator that produced a committed reference. The Reduce Motion off
+# set came from a dedicated, since-deleted "lg-agent-capture" device so the
+# pinned device's settings were never changed.
+CAPTURE_UDIDS = {
+    PINNED_UDID,
+    "AF1E2F44-34B6-4E7D-BAA6-352DF8F5B173",
+}
 PINNED_DEVICE = "iPhone 17 Pro"
 
 
@@ -104,6 +111,8 @@ def build_metadata(
     slider_readback: float,
     slider_method: str,
     frame_count: int,
+    reduce_motion: bool = True,
+    settle_seconds: float | None = None,
 ) -> dict:
     scene = json.loads(scene_path.read_text())
     probe_ids = [
@@ -123,7 +132,7 @@ def build_metadata(
         for path in sorted(capture_dir.rglob("*.png"))
     }
     first = read_png(capture_dir / f"{probe_ids[0]}.png")
-    return {
+    metadata = {
         "schemaVersion": SCHEMA_VERSION,
         "status": "validated-ground-truth",
         "runtime": runtime,
@@ -135,7 +144,7 @@ def build_metadata(
         "captureEncoding": CAPTURE_ENCODING,
         "pixelWidth": int(first.shape[1]),
         "pixelHeight": int(first.shape[0]),
-        "reduceMotion": True,
+        "reduceMotion": reduce_motion,
         "reduceTransparency": False,
         "increaseContrast": False,
         "contentSize": "large",
@@ -159,6 +168,9 @@ def build_metadata(
         "probeAndFrameSha256": files,
         "frameStability": frame_stability(capture_dir, frame_count, probe_ids),
     }
+    if settle_seconds is not None:
+        metadata["captureSettleSeconds"] = settle_seconds
+    return metadata
 
 
 def validate_reference(
@@ -202,11 +214,9 @@ def validate_reference(
         "schemaVersion": SCHEMA_VERSION,
         "status": "validated-ground-truth",
         "runtimeIdentifier": PINNED_RUNTIME_IDENTIFIER,
-        "udid": PINNED_UDID,
         "device": PINNED_DEVICE,
         "appearance": scene["appearance"],
         "captureEncoding": CAPTURE_ENCODING,
-        "reduceMotion": True,
         "reduceTransparency": False,
         "increaseContrast": False,
         "contentSize": "large",
@@ -228,6 +238,16 @@ def validate_reference(
         for key, value in expected.items()
         if metadata.get(key) != value
     }
+    if metadata["udid"] not in CAPTURE_UDIDS:
+        mismatches["udid"] = {
+            "expected": sorted(CAPTURE_UDIDS), "actual": metadata["udid"],
+        }
+    # Reduce Motion removes Liquid Glass lensing, so both values are valid
+    # references of different conditions; consumers must pick one explicitly.
+    if not isinstance(metadata["reduceMotion"], bool):
+        mismatches["reduceMotion"] = {
+            "expected": "bool", "actual": metadata["reduceMotion"],
+        }
     if mismatches:
         raise ValueError(f"reference provenance mismatch: {mismatches}")
     declared = float(metadata["liquidGlassTintPosition"])
@@ -288,6 +308,8 @@ def main() -> None:
     parser.add_argument("--slider-readback", type=float)
     parser.add_argument("--slider-method")
     parser.add_argument("--frames", type=int, default=3)
+    parser.add_argument("--reduce-motion", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--settle-seconds", type=float)
     args = parser.parse_args()
     if args.write:
         needed = ("runtime", "runtime_identifier", "udid", "device", "appearance", "slider", "slider_readback", "slider_method")
@@ -300,6 +322,8 @@ def main() -> None:
             udid=args.udid, device=args.device, appearance=args.appearance,
             slider_position=args.slider, slider_readback=args.slider_readback,
             slider_method=args.slider_method, frame_count=args.frames,
+            reduce_motion=bool(args.reduce_motion),
+            settle_seconds=args.settle_seconds,
         )
         (args.capture_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     validated = validate_reference(
