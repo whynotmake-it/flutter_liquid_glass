@@ -104,7 +104,7 @@ def compose(
     detail_row_w = detail_w * len(points) + 8 * (len(points) - 1)
     column_w = max(full_w // 2, detail_row_w)
     row_full_h = int(full_h * column_w / full_w)
-    header = 76
+    header = 92
     label_h = 30
     gap = 14
     per_probe = row_full_h + detail_h + label_h + gap * 2
@@ -159,7 +159,7 @@ def compose_palette(
     face_w = face_box[2] - face_box[0]
     row_h = DETAIL[1] * ZOOM
     gap = 10
-    header = 76
+    header = 96
     col_w = face_w + cell_w + gap
     canvas = Image.new(
         "RGB",
@@ -197,6 +197,7 @@ def main() -> None:
     parser.add_argument("--candidate", action="append", required=True, help="label=dir")
     parser.add_argument("--title", required=True)
     parser.add_argument("--subtitle", default="")
+    parser.add_argument("--note", default="", help="extra provenance line under the subtitle")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--probe", action="append", help="probes to show (default C D A)")
     parser.add_argument(
@@ -223,6 +224,8 @@ def main() -> None:
             f"glint MAE {s['paletteGlintMae8']:.1f} (worst {s['paletteGlintWorst8']:.1f})"
             for label, s in scores.items()
         )
+        if args.note:
+            subtitle = f"{subtitle}\n{args.note}"
         compose_palette(args.reference, candidates, args.palette, args.title, subtitle, args.output)
         args.output.with_suffix(".json").write_text(json.dumps(scores, indent=2) + "\n")
         print(json.dumps({k: {m: v for m, v in s.items() if m != "probes"} for k, s in scores.items()}, indent=2))
@@ -235,6 +238,8 @@ def main() -> None:
             f"rim T RMS {s['rimTransmittanceRms']:.3f}"
             for label, s in scores.items()
         )
+    if args.note:
+        subtitle = f"{subtitle}\n{args.note}"
     compose(
         args.reference,
         candidates,
