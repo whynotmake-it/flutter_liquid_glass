@@ -112,13 +112,6 @@ class _AdaptiveGlyphs extends StatelessWidget {
   }
 }
 
-LiquidGlassAppearance _appearanceOver(Brightness backdrop) =>
-    LiquidGlassAppearance.ios27Toolbar(
-      brightness: backdrop == Brightness.light
-          ? Brightness.light
-          : Brightness.dark,
-    );
-
 class _AdaptiveCircle extends StatelessWidget {
   const _AdaptiveCircle({required this.source, required this.icon});
 
@@ -129,14 +122,12 @@ class _AdaptiveCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlassAdaptiveBrightness(
       source: source,
-      builder: (context, estimate, child) => LiquidGlass(
+      child: LiquidGlass(
         shape: const LiquidOval(),
-        appearance: _appearanceOver(estimate.brightness),
-        child: child!,
-      ),
-      child: SizedBox.square(
-        dimension: 48,
-        child: _AdaptiveGlyphs(child: Center(child: Icon(icon))),
+        child: SizedBox.square(
+          dimension: 48,
+          child: _AdaptiveGlyphs(child: Center(child: Icon(icon))),
+        ),
       ),
     );
   }
@@ -159,30 +150,28 @@ class _AdaptiveTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlassAdaptiveBrightness(
       source: source,
-      builder: (context, estimate, child) => LiquidGlass(
+      child: LiquidGlass(
         shape: const LiquidRoundedSuperellipse(borderRadius: 32),
-        appearance: _appearanceOver(estimate.brightness),
-        child: child!,
-      ),
-      child: SizedBox(
-        height: 64,
-        child: _AdaptiveGlyphs(
-          child: Row(
-            children: [
-              for (var i = 0; i < icons.length; i++)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onSelected(i),
-                    child: AnimatedOpacity(
-                      opacity: i == selected ? 1 : .55,
-                      duration: const Duration(milliseconds: 150),
-                      child: Icon(icons[i]),
+        child: SizedBox(
+          height: 64,
+          child: _AdaptiveGlyphs(
+            child: Row(
+              children: [
+                for (var i = 0; i < icons.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onSelected(i),
+                      child: AnimatedOpacity(
+                        opacity: i == selected ? 1 : .55,
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(icons[i]),
+                      ),
                     ),
                   ),
-                ),
-              const _LuminanceReadout(),
-            ],
+                const _LuminanceReadout(),
+              ],
+            ),
           ),
         ),
       ),
