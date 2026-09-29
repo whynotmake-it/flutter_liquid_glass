@@ -1,6 +1,6 @@
 // Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 5: the shared uniform layout carries the compact
-// appearance lookup table used by the low-resolution material pass.
+// Geometry encoding revision 6: smooth unions are bounded by each pair's
+// convex hull, so merged shapes no longer bulge past collinear edges.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
@@ -20,6 +20,7 @@ layout(std140) uniform GeometryUniforms {
     vec4 uRseData[MAX_SHAPES * 3];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
+    vec4 uShapeBounds[MAX_SHAPES];
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
@@ -29,6 +30,7 @@ layout(std140) uniform GeometryUniforms {
 #define uNumShapes (uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
 #define uRseData geometryUniforms.uRseData
+#define uShapeBounds geometryUniforms.uShapeBounds
 
 #include "displacement_encoding.glsl"
 

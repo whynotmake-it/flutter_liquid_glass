@@ -1,6 +1,7 @@
 // Deliberately low-resolution per-shape appearance map. The full-resolution
 // geometry pass remains authoritative for optics and lighting; this pass only
 // supplies a smooth, approximate tint transition between nearby shapes.
+// Geometry encoding revision 6: shares the hull-bounded smooth union.
 
 #define MAX_SHAPES 16
 
@@ -17,12 +18,14 @@ layout(std140) uniform GeometryUniforms {
     vec4 uRseData[MAX_SHAPES * 3];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
+    vec4 uShapeBounds[MAX_SHAPES];
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
 #define uNumShapes (geometryUniforms.uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
 #define uRseData geometryUniforms.uRseData
+#define uShapeBounds geometryUniforms.uShapeBounds
 #define uMaterialRasterScale (geometryUniforms.uContourProps.y)
 #define uMaterialMapSize (geometryUniforms.uContourProps.zw)
 

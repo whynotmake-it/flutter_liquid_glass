@@ -10,6 +10,7 @@ struct MaterialSceneSample {
     float primaryDistance;
     float secondaryDistance;
     float blendWidth;
+    vec4 primaryBounds;
 };
 
 MaterialSceneSample materialShapeSample(int index, vec2 p) {
@@ -23,18 +24,19 @@ MaterialSceneSample materialShapeSample(int index, vec2 p) {
     result.primaryDistance = shape.distance;
     result.secondaryDistance = 1e9;
     result.blendWidth = 0.0;
+    result.primaryBounds = uShapeBounds[index];
     return result;
 }
 
 MaterialSceneSample materialSmoothUnion(
     MaterialSceneSample composite,
     MaterialSceneSample next,
-    float k
+    float k,
+    vec2 p
 ) {
     if (k <= 0.0) {
         return composite.distance <= next.distance ? composite : next;
     }
-    float e = max(k - abs(composite.distance - next.distance), 0.0);
     float geometryWeight = clamp(
         0.5 + (next.distance - composite.distance) / (2.0 * k),
         0.0,
@@ -43,7 +45,14 @@ MaterialSceneSample materialSmoothUnion(
 
     MaterialSceneSample result;
     result.distance = min(composite.distance, next.distance) -
-        e * e * 0.25 / k;
+        hullBoundedFill(
+            composite.distance,
+            next.distance,
+            k,
+            composite.primaryBounds,
+            next.primaryBounds,
+            p
+        );
     result.halfMinor = mix(
         next.halfMinor,
         composite.halfMinor,
@@ -57,6 +66,7 @@ MaterialSceneSample materialSmoothUnion(
 
     result.primary = composite.primary;
     result.primaryDistance = composite.primaryDistance;
+    result.primaryBounds = composite.primaryBounds;
     result.secondary = composite.secondary;
     result.secondaryDistance = composite.secondaryDistance;
     if (next.primaryDistance < result.primaryDistance) {
@@ -64,6 +74,7 @@ MaterialSceneSample materialSmoothUnion(
         result.secondaryDistance = result.primaryDistance;
         result.primary = next.primary;
         result.primaryDistance = next.primaryDistance;
+        result.primaryBounds = next.primaryBounds;
     } else if (next.primaryDistance < result.secondaryDistance) {
         result.secondary = next.primary;
         result.secondaryDistance = next.primaryDistance;
@@ -82,6 +93,7 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
     empty.primaryDistance = 1e9;
     empty.secondaryDistance = 1e9;
     empty.blendWidth = 0.0;
+    empty.primaryBounds = vec4(0.0);
     if (numShapes <= 0) return empty;
 
     MaterialSceneSample result = empty;
@@ -94,8 +106,11 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
         float groupBlend = startsGroup ? -marker - 1.0 : marker;
         if (
             !startsGroup &&
-            getShapeBoundsDistanceFromArray(i, p) >=
+            cannotAffectGroup(
+                uShapeBounds[i],
+                p,
                 groupResult.distance + groupBlend
+            )
         ) {
             continue;
         }
@@ -109,7 +124,8 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
             groupResult = materialSmoothUnion(
                 groupResult,
                 shapeValue,
-                groupBlend
+                groupBlend,
+                p
             );
         }
     }
