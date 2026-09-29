@@ -155,7 +155,7 @@ PY
 for probe in A B C D; do
   xcrun simctl launch --terminate-running-process "$IOS_27_UDID" \
     dev.liquidglass.applematch --args --scene-id "$SCENE_ID" --probe "$probe"
-  sleep 1.8
+  sleep "$CAPTURE_SETTLE_SECONDS"
   verify_background "$probe" "$OUT/bg_$probe.png"
 
   frame=1
@@ -165,14 +165,14 @@ for probe in A B C D; do
       --udid "$IOS_27_UDID" --relaunch --session "$AD_SESSION" \
       --launch-args=--scene-id --launch-args="$SCENE_ID" \
       --launch-args=--probe --launch-args="$probe" >/dev/null 2>&1
-    sleep 1.8
+    sleep "$CAPTURE_SETTLE_SECONDS"
     verify_background "$probe" "$OUT/bg_$probe.png"
 
     agent-device longpress "$LOUPE_TOUCH_X" "$LOUPE_TOUCH_Y" "$LOUPE_HOLD_MS" \
       --platform ios --udid "$IOS_27_UDID" --session "$AD_SESSION" \
       >/dev/null 2>&1 &
     local_lp_pid=$!
-    sleep 1.5
+    sleep "$LOUPE_CAPTURE_DELAY"
     candidate="$OUT/frames/${probe}_${frame}_try${attempt}.png"
     xcrun simctl io "$IOS_27_UDID" screenshot "$candidate"
     wait "$local_lp_pid" || true
@@ -214,7 +214,9 @@ Path(sys.argv[1]).write_text(
             "device": "iPhone 17 Pro",
             "orientation": "portrait",
             "appearance": os.environ["APPEARANCE"],
-            "reduceMotion": True,
+            "reduceMotion": os.environ["REDUCE_MOTION"] == "1",
+            "captureSettleSeconds": float(os.environ["CAPTURE_SETTLE_SECONDS"]),
+            "loupeCaptureDelaySeconds": float(os.environ["LOUPE_CAPTURE_DELAY"]),
             "medianFrameCount": int(os.environ.get("CAPTURE_FRAMES", "3")),
             "reduceTransparency": False,
             "api": os.environ["APPLE_MATCH_API"],
