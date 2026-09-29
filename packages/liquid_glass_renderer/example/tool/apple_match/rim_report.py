@@ -101,11 +101,9 @@ def compose(
     full_h = box[3] - box[1]
     detail_w = DETAIL[0] * ZOOM
     detail_h = DETAIL[1] * ZOOM
-    column_w = max(full_w // 2, detail_w * len(points) // 2 + 8)
-    scale = column_w / full_w
-    row_full_h = int(full_h * scale)
     detail_row_w = detail_w * len(points) + 8 * (len(points) - 1)
-    column_w = max(column_w, detail_row_w)
+    column_w = max(full_w // 2, detail_row_w)
+    row_full_h = int(full_h * column_w / full_w)
     header = 76
     label_h = 30
     gap = 14
@@ -141,6 +139,52 @@ def compose(
     canvas.save(output)
 
 
+def compose_palette(
+    reference: Path,
+    candidates: list[tuple[str, Path]],
+    probes: list[str],
+    title: str,
+    subtitle: str,
+    output: Path,
+) -> None:
+    """One row per solid probe: face crop plus a 5x glint crop per column."""
+    mask = rim.silhouette_mask(read_rgb(reference / "K.png"), read_rgb(reference / "W.png"))
+    ys, xs = np.where(mask)
+    y0 = int(ys.min())
+    cx = (int(xs.min()) + int(xs.max())) // 2
+    glint_center = (cx, y0)
+    face_box = (cx - 60, y0 - 12, cx + 60, y0 + 48)
+    columns = [("APPLE", reference), *candidates]
+    cell_w = DETAIL[0] * ZOOM
+    face_w = face_box[2] - face_box[0]
+    row_h = DETAIL[1] * ZOOM
+    gap = 10
+    header = 76
+    col_w = face_w + cell_w + gap
+    canvas = Image.new(
+        "RGB",
+        (60 + len(columns) * (col_w + gap), header + len(probes) * (row_h + gap) + 30),
+        (28, 30, 34),
+    )
+    draw = ImageDraw.Draw(canvas)
+    draw.text((gap, 8), title, font=_font(22), fill="white")
+    draw.text((gap, 40), subtitle, font=_font(14), fill=(206, 211, 219))
+    for ci, (label, _) in enumerate(columns):
+        draw.text((60 + ci * (col_w + gap), header - 4), label, font=_font(15),
+                  fill=(255, 214, 102) if ci == 0 else "white")
+    for pi, probe in enumerate(probes):
+        top = header + 18 + pi * (row_h + gap)
+        draw.text((gap, top + row_h // 2 - 8), probe, font=_font(18), fill="white")
+        for ci, (_, directory) in enumerate(columns):
+            image = _load(directory, probe)
+            left = 60 + ci * (col_w + gap)
+            face = image.crop(face_box).resize((face_w, row_h), Image.NEAREST)
+            canvas.paste(face, (left, top))
+            canvas.paste(_crop(image, glint_center), (left + face_w + gap, top))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output)
+
+
 def score(reference: Path, candidate: Path) -> dict[str, float]:
     ref = rim.rim_table(read_rgb(reference / "C.png"), read_rgb(reference / "D.png"))
     can = rim.rim_table(read_rgb(candidate / "C.png"), read_rgb(candidate / "D.png"))
@@ -155,11 +199,34 @@ def main() -> None:
     parser.add_argument("--subtitle", default="")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--probe", action="append", help="probes to show (default C D A)")
+    parser.add_argument(
+        "--palette",
+        nargs="+",
+        help="score isolated solid-color probes (needs K and W) instead of C/D",
+    )
     args = parser.parse_args()
     candidates = []
     for item in args.candidate:
         label, _, directory = item.partition("=")
         candidates.append((label, Path(directory)))
+    if args.palette:
+        def load_all(directory: Path) -> dict[str, np.ndarray]:
+            return {p: read_rgb(directory / f"{p}.png") for p in args.palette}
+
+        reference = load_all(args.reference)
+        scores = {
+            label: rim.palette_errors(reference, load_all(directory))
+            for label, directory in candidates
+        }
+        subtitle = args.subtitle or "  ".join(
+            f"{label}: face MAE {s['paletteFaceMae8']:.1f} (worst {s['paletteFaceWorst8']:.1f}), "
+            f"glint MAE {s['paletteGlintMae8']:.1f} (worst {s['paletteGlintWorst8']:.1f})"
+            for label, s in scores.items()
+        )
+        compose_palette(args.reference, candidates, args.palette, args.title, subtitle, args.output)
+        args.output.with_suffix(".json").write_text(json.dumps(scores, indent=2) + "\n")
+        print(json.dumps({k: {m: v for m, v in s.items() if m != "probes"} for k, s in scores.items()}, indent=2))
+        return
     scores = {label: score(args.reference, directory) for label, directory in candidates}
     subtitle = args.subtitle
     if not subtitle:
