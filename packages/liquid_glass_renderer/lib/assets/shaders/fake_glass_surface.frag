@@ -27,6 +27,9 @@ uniform float uBevelSizeResponse;
 uniform vec2 uLightDirection;
 // Logical size of one physical pixel.
 uniform float uPixelSize;
+// 1 when drawing only the border ring outside the shape clip. The clip path is
+// the silhouette there; the analytic SDF may approximate it by a pixel.
+uniform float uExteriorOnly;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -151,7 +154,9 @@ void main() {
   // backdrop access FakeGlass reproduces that luminance pull exactly via
   // source-over of an emissive target (RGB > alpha); only RealGlass also
   // amplifies the face chroma under the glint.
-  float materialCoverage = clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
+  float materialCoverage = uExteriorOnly > 0.5
+      ? 0.0
+      : clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
   float backdropAbsorption = 1.0 -
       (1.0 - backdropContourAbsorption) * (1.0 - bevelShadow);
   float materialAlpha = 1.0 - (1.0 - tintAlpha) *
