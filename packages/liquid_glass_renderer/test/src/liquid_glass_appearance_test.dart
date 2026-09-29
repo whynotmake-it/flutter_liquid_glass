@@ -29,17 +29,19 @@ void main() {
       light.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.light),
     );
-    expect(light.saturation, .9);
-    expect(light.transmissionGamma, .9);
-    expect(light.vibrancy, .15);
+    // The iOS 27 color model carries Apple's face transfer, so the
+    // adjustments are identity.
+    expect(light.saturation, 1);
+    expect(light.transmissionGamma, 1);
+    expect(light.vibrancy, 0);
     expect(dark.tint.a, 0);
     expect(
       dark.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.dark),
     );
-    expect(dark.saturation, 2.6);
-    expect(dark.transmissionGamma, .58);
-    expect(dark.vibrancy, .1);
+    expect(dark.saturation, 1);
+    expect(dark.transmissionGamma, 1);
+    expect(dark.vibrancy, 0);
 
     const blue = Color(0x66007AFF);
     expect(
@@ -48,18 +50,28 @@ void main() {
     );
   });
 
-  test('regular material keeps its separately fitted light transmission', () {
+  test('regular material uses the iOS 27 face transfer unadjusted', () {
     const light = LiquidGlassAppearance.ios27RegularLight();
     const dark = LiquidGlassAppearance.ios27RegularDark();
 
-    expect(light.saturation, 1.65);
-    expect(light.transmissionGamma, 1.3);
+    expect(light.saturation, 1);
+    expect(light.transmissionGamma, 1);
     expect(
       light.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.light),
     );
-    expect(dark.saturation, 2.6);
-    expect(dark.transmissionGamma, .58);
+    expect(dark.saturation, 1);
+    expect(dark.transmissionGamma, 1);
+    expect(
+      const LiquidGlassColorModel.ios27(brightness: Brightness.light)
+          .faceTransfer,
+      (lift: 0.13, chromaGain: 1.17),
+    );
+    expect(
+      const LiquidGlassColorModel.ios27(brightness: Brightness.dark)
+          .faceTransfer,
+      (lift: 1.0, chromaGain: 1.03),
+    );
   });
 
   test('adaptive tint tones match the native solid-palette measurements', () {

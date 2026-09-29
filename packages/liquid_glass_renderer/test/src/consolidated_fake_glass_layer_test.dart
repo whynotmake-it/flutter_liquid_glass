@@ -446,6 +446,49 @@ void main() {
     expect(channel(0.5), greaterThan(0.5));
   });
 
+  test('iOS 27 face matrix reproduces the native light solid palette', () {
+    const model = LiquidGlassColorModel.ios27(brightness: Brightness.light);
+    final transfer = model.faceTransfer!;
+    final matrix = fakeGlassFaceMatrix(
+      neutral: model.neutralMaterialTint,
+      lift: transfer.lift,
+      chromaGain: transfer.chromaGain,
+    );
+    List<double> apply(List<int> rgb) => [
+      for (var row = 0; row < 3; row++)
+        ((matrix[row * 5] * rgb[0] +
+                            matrix[row * 5 + 1] * rgb[1] +
+                            matrix[row * 5 + 2] * rgb[2]) /
+                        255 +
+                    matrix[row * 5 + 4] / 255)
+                .clamp(0.0, 1.0) *
+            255,
+    ];
+    // Face means of the pinned iOS 27 toolbar_solid_palette capture.
+    const measured = <List<int>, List<double>>{
+      [0, 0, 0]: [101.9, 101.9, 101.9],
+      [51, 51, 51]: [135.0, 135.0, 135.0],
+      [153, 153, 153]: [197.6, 197.6, 197.6],
+      [255, 255, 255]: [252.8, 252.8, 252.8],
+      [239, 68, 68]: [255.0, 124.7, 124.7],
+      [34, 197, 94]: [56.9, 247.3, 126.7],
+      [59, 130, 246]: [103.8, 187.6, 255.0],
+    };
+    for (final entry in measured.entries) {
+      final output = apply(entry.key);
+      for (var channel = 0; channel < 3; channel++) {
+        expect(
+          output[channel],
+          // The matrix replaces the luminance self-screen by its
+          // least-squares line, which is exact at midtones and within
+          // lift / 6 of the curve at black and white.
+          closeTo(entry.value[channel], 5),
+          reason: '${entry.key} channel $channel',
+        );
+      }
+    }
+  });
+
   test('native color matrix fades filtered backdrop premultiplied', () {
     final full = fakeGlassColorMatrix(
       saturation: 1,
