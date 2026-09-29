@@ -11,6 +11,13 @@
   glass with `LiquidGlassVisibility` or `LiquidGlassAppearance.visibility`
   instead. Opacity above a whole `LiquidGlassLayer` is still supported.
 
+### Fixes
+
+- Blended shapes in a `LiquidGlassBlendGroup` no longer bulge outward at the
+  join. The smooth union still rounds concave joins and bridges nearby shapes,
+  but never extends past the box around each pair, so shared straight edges
+  stay straight.
+
 ## 1.0.0-dev.1
 
 This experimental prerelease contains breaking API and rendering changes.
