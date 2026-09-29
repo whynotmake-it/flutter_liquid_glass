@@ -36,6 +36,7 @@ FINAL_OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
 API="SwiftUI PrimitiveButtonStyle.glass"
 [[ "$SCENE_ID" == "tab_bar_holdout" ]] && API="SwiftUI TabView system tab bar"
 [[ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SCENE")" == "material_shape" ]] && API="SwiftUI View.glassEffect(_:in:)"
+[[ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SCENE")" == "merge_pair" ]] && API="SwiftUI GlassEffectContainer + View.glassEffect(_:in:)"
 APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE")"
 ACTUAL_TINT_POSITION=""
 # Slider defaults live inside the simulated device. Boot a cold pinned device
