@@ -67,10 +67,15 @@ enabled contain no refraction. `REDUCE_MOTION=0` (for `apple/capture.sh` and
 `apple/capture_loupe.sh`) captures with it disabled, waits
 `CAPTURE_SETTLE_SECONDS` (default 4) after each launch instead, and writes to
 `references/ios27-iphone17pro-reduce-motion-off/slider-000` (loupe:
-`references/ios27-iphone17pro-light-reduce-motion-off`). Changing the value
-reboots the target simulator so system processes pick it up. Every
-`metadata.json` records `reduceMotion`; fit refraction only against `false`
-references.
+`references/ios27-iphone17pro-reduce-motion-off/loupe`; `SCENE_ID=loupe_dark`
+captures the dark loupe). Changing the value reboots the target simulator so
+system processes pick it up. Every `metadata.json` records `reduceMotion`; fit
+refraction only against `false` references.
+
+Material scenes may set `"glassVariant": "clear"` for `.glassEffect(.clear)`.
+`material_capsule_toolbar_size_dark` is a `.regular` material capsule at the
+toolbar button's measured glass rect (224×94 at 89,390) so it separates the
+`.glass` button style from size when compared with `toolbar_capsule_dark`.
 
 ```bash
 REDUCE_MOTION=0 LIQUID_GLASS_TINT_POSITION=0 SCENE_ID=toolbar_capsule \

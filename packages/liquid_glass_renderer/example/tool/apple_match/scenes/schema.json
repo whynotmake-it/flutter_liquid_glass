@@ -63,6 +63,7 @@
         "appleContentInsetY": {"type": "number", "minimum": 0}
       }
     },
+    "glassVariant": {"enum": ["regular", "clear"]},
     "appearance": {"enum": ["light", "dark"]},
     "transparency": {
       "type": "object",

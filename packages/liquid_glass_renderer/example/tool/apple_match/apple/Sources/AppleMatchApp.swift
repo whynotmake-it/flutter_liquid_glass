@@ -108,10 +108,11 @@ struct MatchView: View {
 
     @available(iOS 26.0, *)
     private var materialGlass: Glass {
+        let base: Glass = scene.glassVariant == "clear" ? .clear : .regular
         guard let tint = scene.glassTint else {
-            return .regular
+            return base
         }
-        return .regular.tint(
+        return base.tint(
             Color(srgbHex: tint.color).opacity(tint.opacity)
         )
     }

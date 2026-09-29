@@ -9,6 +9,7 @@ set -euo pipefail
 # Required env:
 #   IOS_27_UDID  UDID of the pinned iOS 27 simulator
 # Optional env:
+#   SCENE_ID        loupe scene (default loupe; loupe_dark for dark appearance)
 #   REFERENCE_SET   reference directory name (default ios27-iphone17pro-light)
 #   CAPTURE_FRAMES  frames medianed per probe (default 3)
 #   FORCE_REFERENCE 1 = replace an existing pinned reference
@@ -27,7 +28,7 @@ case "$REDUCE_MOTION" in
      : "${CAPTURE_SETTLE_SECONDS:=1.8}"
      : "${LOUPE_CAPTURE_DELAY:=1.5}" ;;
   0) REDUCE_MOTION_DEFAULT=NO
-     : "${REFERENCE_SET:=ios27-iphone17pro-light-reduce-motion-off}"
+     : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/loupe}"
      : "${CAPTURE_SETTLE_SECONDS:=4}"
      : "${LOUPE_CAPTURE_DELAY:=2.5}" ;;
   *) echo "REDUCE_MOTION must be 0 or 1" >&2; exit 2 ;;
@@ -39,7 +40,7 @@ export REDUCE_MOTION CAPTURE_SETTLE_SECONDS LOUPE_CAPTURE_DELAY
 : "${LOUPE_HOLD_MS:=4500}"
 : "${DEVELOPER_DIR:=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer}"
 export DEVELOPER_DIR
-SCENE_ID="loupe"
+: "${SCENE_ID:=loupe}"
 export SCENE_ID
 
 # agent-device keys its session state by process cwd; pin every call to one
@@ -49,6 +50,8 @@ cd "$ROOT"
 
 SCENE="$ROOT/scenes/$SCENE_ID.json"
 [[ -f "$SCENE" ]] || { echo "Unknown scene: $SCENE_ID" >&2; exit 2; }
+APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE")"
+export APPEARANCE
 OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
 API="iOS 27 system text-selection loupe (UITextView long-press)"
 export APPLE_MATCH_API="$API"
@@ -84,7 +87,7 @@ if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
   exit 4
 fi
 xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
-xcrun simctl ui "$IOS_27_UDID" appearance light
+xcrun simctl ui "$IOS_27_UDID" appearance "$APPEARANCE"
 xcrun simctl ui "$IOS_27_UDID" content_size large
 xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
@@ -210,7 +213,7 @@ Path(sys.argv[1]).write_text(
             "udid": os.environ["IOS_27_UDID"],
             "device": "iPhone 17 Pro",
             "orientation": "portrait",
-            "appearance": "light",
+            "appearance": os.environ["APPEARANCE"],
             "reduceMotion": True,
             "medianFrameCount": int(os.environ.get("CAPTURE_FRAMES", "3")),
             "reduceTransparency": False,

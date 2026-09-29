@@ -64,9 +64,10 @@ def expected_api(profile: str) -> str:
     return "SwiftUI PrimitiveButtonStyle.glass"
 
 
-def expected_construction(profile: str) -> str:
+def expected_construction(profile: str, glass_variant: str | None = None) -> str:
     if profile == "material_shape":
-        return "Color.clear.frame(scene.shape).glassEffect(.regular,in:ReferenceGlassShape)"
+        variant = glass_variant or "regular"
+        return f"Color.clear.frame(scene.shape).glassEffect(.{variant},in:ReferenceGlassShape)"
     if profile == "tab_bar_holdout":
         return "SwiftUI TabView system tab bar"
     if profile == "loupe":
@@ -153,7 +154,7 @@ def build_metadata(
         "liquidGlassTintPositionReadback": slider_readback,
         "liquidGlassTintControlMethod": slider_method,
         "api": expected_api(profile),
-        "apiConstruction": expected_construction(profile),
+        "apiConstruction": expected_construction(profile, scene.get("glassVariant")),
         "scene": scene["id"],
         "sceneProfile": profile,
         "probeIds": probe_ids,
@@ -224,7 +225,9 @@ def validate_reference(
         "sceneProfile": scene["profile"],
         "sceneSha256": sha256(scene_path),
         "api": expected_api(scene["profile"]),
-        "apiConstruction": expected_construction(scene["profile"]),
+        "apiConstruction": expected_construction(
+            scene["profile"], scene.get("glassVariant")
+        ),
     }
     # Source, executable, plist, and capture-tool hashes describe the exact
     # program that produced this immutable reference. They must remain in the

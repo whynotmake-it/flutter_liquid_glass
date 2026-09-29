@@ -48,6 +48,7 @@ struct Scene: Decodable {
 
     let canvas: CanvasSpec
     let shape: ShapeSpec
+    let glassVariant: String?
     let id: String
     let profile: String
     let appearance: String
