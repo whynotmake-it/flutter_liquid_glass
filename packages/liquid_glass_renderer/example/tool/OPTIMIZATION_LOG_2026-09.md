@@ -274,6 +274,100 @@ Pixel 10 re-measurement with the auto-sized capture (Flutter 3.47 build,
 −17 % / −18 % GPU, −16 % DDR, CPU +10…16 mW (within noise): the automatic
 region reproduces the hand-sized seed's result (383 → 329, 910 → 736).
 
+### K. Scissored single-shape geometry passes — KEPT (2026-09-29)
+
+Target: geometry-pass fragments on rebuild frames. Mattes are allocated in
+64-texel buckets; the padding (up to 63 texels right and bottom) was shaded
+too, and a lone shape has no empty-pixel rejection
+(`sceneBoundsOutsideSquared` only runs for `uNumShapes > 1`), so every
+padding texel ran the full superellipse/ellipse solve.
+
+Change: `FlutterGpuGeometryRenderer._singleShapeScissor` clears the
+attachment and scissors a single-shape pass to the requested extent plus the
+SDF's reach: `(contourExtent + 2) × anisotropy + 1` texels, where anisotropy
+is the ratio of the matte basis' singular values. Outside the layout box the
+local SDF is at least the box distance (the invariant the multi-shape culling
+already relies on), so every skipped texel would have written the empty
+encoding the clear produces. Multi-shape passes are unchanged: their padding
+already takes the cheap bounds rejection, and a safe reach for smooth unions
+would depend on the blend formula.
+
+Evidence (Linux host, Flutter 3.47.1, Impeller/Vulkan on SwiftShader):
+
+- `geometry_scissor_test.dart`: scissored and full mattes byte-identical for
+  superellipse, oval, rounded rectangle, with and without contour, and under
+  rotation + anisotropic scale. With the margin forced to −6 texels the test
+  fails (2 080–7 910 differing bytes); at 0 it still passes, so the shipped
+  margin is conservative.
+- All 76 package + example goldens re-rendered on the same host before and
+  after: byte-identical. 5× nearest-neighbour crops of blend seams, rims,
+  highlights, blur edges and rotated borders show 0/255 difference.
+- Fragments skipped at DPR 3 (DPR 2): 44 pt button −49 % (−47 %), 60×44 pill
+  −31 % (−29 %), 90×60 loupe −17 % (−6 %), 130×44 tab pill −37 % (−40 %),
+  370×64 bar −26 % (−33 %), 390×600 sheet −6 % (−7 %).
+- SwiftShader render + readback per matte, 150 renders × 3 reps: 133² ellipse
+  in a 192² bucket 1.47 → 0.91 ms, 391×133 in 448×192 3.45 → 2.40 ms, 271×181
+  in 320×192 2.32 → 2.06 ms. Software rasterisation is ALU-bound, so this
+  overstates a TBDR GPU; the device gain is only on frames that rebuild a
+  single-shape matte (press/stretch/resize, sheet morphs).
+
+Needs a device: rebuild-frame GPU time on Pixel 10 / iPhone
+(`resizeAnimated`, a single-shape stretch scenario).
+
+### L. Flutter GPU object lifetimes and transient matte memory — measured, not shipped (2026-09-29)
+
+`gpu.Texture`, `gpu.CommandBuffer` and `gpu.RenderPass` are
+`RefCountedDartWrappable`s registered with the Dart GC at `sizeof` of the C++
+object (tonic `dart_wrappable.cc`), and none has a `dispose`. A texture's
+storage lives until its wrapper is finalized, and a submitted render pass
+holds its encoded state plus a strong reference to its render target until
+*its* wrapper is finalized. A matte replaced every frame therefore looks like
+a few bytes of garbage to the GC while each one pins megabytes.
+
+Host probe (1200 renders of a new 320² matte each, live heap via glibc
+`mallinfo2`, not RSS, which glibc's retained arenas make meaningless):
+
+| variant | live at end of loop | after 3 s idle |
+|---|---:|---:|
+| as shipped | 572–700 MB | 33–35 MB |
+| texture + submission wrappers leased with `NativeFinalizer(externalSize:)` | 215–321 MB | 33–35 MB |
+| submitting into one persistent texture (encoder state only) | 89 MB | 89 MB |
+| same, submission leased | 44 MB | 44 MB |
+
+The lease (a `Finalizable` holder with a no-op libc `free` finalizer and
+`externalSize` = texture bytes + 64 KiB encoder state) makes the GC collect
+at the allocation rate. It was **not shipped**: in the widget-level resize
+probe (420×400…757 pt sheet at DPR 3, a new ~9 MB matte per frame) it cost
++3.7 ms/frame of GC on the host (2.6 → 6.4 ms) and did not lower the peak,
+because under `flutter_test`'s fake-async pump a second, native-side retention
+holds every matte until the UI message loop turns (2.5 GB live after 300
+frames with every Dart wrapper already collected; +35 MB after a real-time
+idle). That second retention is a test-harness artifact and says nothing about
+devices, so the lease's net value can only be measured on a phone:
+`resizeAnimated` peak `phys_footprint` / PSS and UI-thread GC time, with and
+without the lease. The 621 MB `resizeAnimated` peak (vs ~440 MB for the other
+scenarios, 2026-09-01 audit) is consistent with GC-deferred mattes. The
+correct fix is engine-side: report `GetAllocationSize` for Flutter GPU
+textures and passes, or add `dispose()`.
+
+Also found: recording two render passes into one Flutter GPU command buffer
+segfaults `flutter_tester` (Vulkan/SwiftShader) 3/3, one pass per buffer 0/3.
+The geometry and material passes stay in separate command buffers.
+
+### M. Considered and not pursued (2026-09-29)
+
+- Scissoring multi-shape passes: padding already takes the bounds rejection
+  (one loop over ≤16 AABBs), and a safe reach needs `(n−1)·k/4` per smooth
+  union group, a bound tied to the blend formula other work is changing.
+- Clearing stale samplers on inactive shader variants: a layer that switched
+  from mixed to uniform appearance keeps the old matte bound to the material
+  shader. The host probe could not attribute the retained ~13 MB (it also
+  stayed after the layer was removed), so no fix without device evidence.
+- Retained-layer submission (`alwaysNeedsAddToScene` on the tracking layer):
+  still unmeasured (idea #5, E5). The flag forces ancestors to re-add while
+  the tracking callbacks update the filter and clip layers in that same
+  pass, so removing it needs its own correctness proof and a CPU-rail run.
+
 ## Summary (2026-09-16 00:50)
 
 Kept at the time, rejected 2026-09-22 (see A): **A** analytic shadows (fake −26 mW GPU / −8 CPU per two shadowed
