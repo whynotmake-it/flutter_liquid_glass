@@ -27,13 +27,16 @@ SHADER_MARKER="$ROOT/out/.host_shader_sources.sha256"
 shader_digest="$({
   find "$SHADER_ROOT" -type f \( -name '*.frag' -o -name '*.glsl' \) -print | sort
 } | while IFS= read -r shader; do
-  shasum "$shader"
-done | shasum | awk '{print $1}')"
+  sha1sum "$shader"
+done | sha1sum | awk '{print $1}')"
 if [[ ! -f "$SHADER_MARKER" ]] || [[ "$(<"$SHADER_MARKER")" != "$shader_digest" ]]; then
   # The path dependency has its own generated unit-test asset bundle. Cleaning
   # only the capture app leaves that package-level shader binary stale, so
   # invalidate both build roots when an include changes.
-  "$FLUTTER_BIN" clean
+  (
+    cd "$ROOT/flutter"
+    "$FLUTTER_BIN" clean
+  )
   (
     cd "$PACKAGE_ROOT"
     "$FLUTTER_BIN" clean
