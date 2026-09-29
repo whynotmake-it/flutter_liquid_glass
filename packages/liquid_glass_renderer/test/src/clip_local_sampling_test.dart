@@ -219,7 +219,7 @@ void main() {
     expect(maximumVectorError, lessThan(0.85));
   });
 
-  test('backdrop scaling is smooth at the SDF contour', () {
+  test('magnification is one uniform lens about the material center', () {
     final source = File(
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
@@ -228,9 +228,7 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('abs(uBackdropScale - 1.0) > 0.0001'));
-    expect(source, contains('inwardDistance * inwardDistance'));
-    expect(source, contains('transitionDepth * transitionDepth'));
-    expect(source, contains('distanceWeight * refractionComplement'));
+    expect(source, isNot(contains('refractionComplement')));
     expect(source, contains('matteCoord - uMaterialCenter'));
     expect(source, contains('backdropScaleOffset + displacement'));
     expect(source, contains('backdropScaleOffset + redOffset'));

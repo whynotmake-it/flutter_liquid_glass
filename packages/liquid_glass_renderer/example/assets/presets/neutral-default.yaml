@@ -1,8 +1,7 @@
 # Bundled neutral seed preset
-settings.thickness: 20.0
-settings.edgeRefraction: 106.13
-settings.refractionSpread: 0.0
-settings.backdropScale: 1.0
+settings.refractionHeight: 12.0
+settings.refractionAmount: 36.0
+settings.magnification: 1.0
 settings.frost: 5.0
 settings.chromaticAberration: 0.01
 settings.highlight: 1.0

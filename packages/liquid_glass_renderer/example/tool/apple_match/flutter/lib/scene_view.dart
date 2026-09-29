@@ -6,6 +6,13 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import 'scene.dart';
 
+/// Edge displacement of the retired Snell-cap profile, which harness vectors
+/// written before `edgeRefraction` stored as `thickness` + `refractiveIndex`.
+double _legacyEdgeRefraction(double thickness, double refractiveIndex) =>
+    8.0 *
+    thickness *
+    math.sqrt(math.max(0.0, refractiveIndex * refractiveIndex - 1));
+
 /// Maps a harness settings JSON object onto structural renderer settings.
 ///
 /// Shared by the legacy per-launch capture path and the persistent hot-reload
@@ -15,29 +22,26 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       (settings[key] as num?)?.toDouble() ?? fallback;
   const defaults = LiquidGlassSettings();
   return LiquidGlassSettings(
-    thickness: number('thickness', defaults.thickness),
-    edgeRefraction: number(
-      'edgeRefraction',
-      8.0 *
-          number('thickness', defaults.thickness) *
-          math.sqrt(
-            math.max(
-              0.0,
-              math
-                      .pow(
-                        number(
-                          'refractiveIndex',
-                          defaults.effectiveOpticalIndex,
-                        ),
-                        2,
-                      )
-                      .toDouble() -
-                  1.0,
-            ),
-          ),
+    refractionHeight: number(
+      'refractionHeight',
+      number('thickness', defaults.refractionHeight),
     ),
-    refractionSpread: number('refractionSpread', defaults.refractionSpread),
-    backdropScale: number('backdropScale', defaults.backdropScale),
+    refractionAmount: number(
+      'refractionAmount',
+      number(
+        'edgeRefraction',
+        settings.containsKey('refractiveIndex')
+            ? _legacyEdgeRefraction(
+                number('thickness', defaults.refractionHeight),
+                number('refractiveIndex', 1),
+              )
+            : defaults.refractionAmount,
+      ),
+    ),
+    magnification: number(
+      'magnification',
+      number('backdropScale', defaults.magnification),
+    ),
     frost: number('frost', number('blur', defaults.frost)),
     highlight: number(
       'highlight',
@@ -478,7 +482,7 @@ class _MatchLoupe extends StatelessWidget {
               // magnification belongs to RawMagnifier above; never let a
               // candidate's ordinary material vector turn this holdout into
               // a frosted, opaque pill or a full-face shader zoom.
-              settings: settings.copyWith(refractionSpread: 0, frost: 0),
+              settings: settings.copyWith(magnification: 1, frost: 0),
               appearance: const LiquidGlassAppearance(),
               shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
               shadows: shadows,

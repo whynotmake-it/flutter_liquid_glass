@@ -10,6 +10,15 @@
   and its shapes; it only faded the shapes' children, not the glass. Fade
   glass with `LiquidGlassVisibility` or `LiquidGlassAppearance.visibility`
   instead. Opacity above a whole `LiquidGlassLayer` is still supported.
+- Replace the refraction settings with a bevel model: `thickness` becomes
+  `refractionHeight` (bevel width), `edgeRefraction` becomes
+  `refractionAmount` (displacement at the silhouette, now with a
+  quarter-circle falloff instead of the Snell/circular-cap profile), and
+  `backdropScale` becomes `magnification`, which now stays uniform up to the
+  silhouette. Remove `refractionSpread`; a `refractionHeight` of half the
+  shape's short side gives a full-face lens. `refractionHeight: 0` now means
+  flat glass instead of no glass. `LiquidGlassSettings.fromJson` still reads
+  the old keys.
 
 ## 1.0.0-dev.1
 

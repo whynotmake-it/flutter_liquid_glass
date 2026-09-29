@@ -152,18 +152,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     final geometryInputsChanged =
-        _settings?.effectiveThickness != value.effectiveThickness ||
-        _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
-        _settings?.effectiveRefractionSpread !=
-            value.effectiveRefractionSpread ||
+        _settings?.effectiveRefractionHeight !=
+            value.effectiveRefractionHeight ||
+        _settings?.effectiveRefractionAmount !=
+            value.effectiveRefractionAmount ||
         _settings?.effectiveContourWidth != value.effectiveContourWidth ||
         _settings?.effectiveContourOffset != value.effectiveContourOffset;
-    final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
-    final isIdle = value.effectiveThickness <= 0;
     _settings = value;
     _updateShaderSettings();
     if (geometryInputsChanged) needsGeometryUpdate = true;
-    if (wasIdle != isIdle) markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -203,8 +200,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   @override
-  bool get alwaysNeedsCompositing =>
-      _geometryImage != null && settings.effectiveThickness > 0;
+  bool get alwaysNeedsCompositing => _geometryImage != null;
 
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
@@ -299,9 +295,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
           settings.effectiveChromaticAberration,
-          settings.effectiveThickness * devicePixelRatio,
+          settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.effectiveHighlight,
-          settings.effectiveBackdropScale,
+          settings.effectiveMagnification,
           saturation,
         ])
         ..setOffset(
@@ -436,8 +432,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ) {
     if ((_geometryImage == null && !_drawableEmpty) ||
         _idleComposition ||
-        debugPaintLiquidGlassGeometry ||
-        settings.effectiveThickness <= 0) {
+        debugPaintLiquidGlassGeometry) {
       return false;
     }
     final candidate = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
@@ -565,7 +560,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         (shape) => shape.appearance.visibility > 0,
       ),
     );
-    if (settings.effectiveThickness <= 0 || !hasVisibleShape) {
+    if (!hasVisibleShape) {
       _idleComposition = true;
       // Foreground can change while a cached matte is dormant. Poll against
       // its last paint without overwriting that matte's encoded coordinates.
@@ -827,7 +822,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// How far outside the material the composed filter reads the backdrop:
   /// the blur kernel (3 sigma), the peak edge displacement including its
-  /// chromatic split, and, below unit backdrop scale, the extra content
+  /// chromatic split, and, below unit magnification, the extra content
   /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
   /// the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
@@ -837,7 +832,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     final displacement =
         settings.effectiveDisplacementScale *
         (1 + settings.effectiveChromaticAberration.abs() * 0.5);
-    final scale = settings.effectiveBackdropScale;
+    final scale = settings.effectiveMagnification;
     final revealed = scale < 1
         ? (1 / scale - 1) * max(material.width, material.height) / 2
         : 0.0;
@@ -1545,11 +1540,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         shapeData: _shapeData,
         rseData: _rseData,
         numShapes: numShapes,
-        opticalIndex: settings.effectiveOpticalIndex,
-        refractionSpread: settings.effectiveRefractionSpread,
-        displacementScale:
-            settings.effectiveDisplacementScale * devicePixelRatio,
-        thickness: settings.effectiveThickness * devicePixelRatio,
+        refractionHeight: settings.effectiveRefractionHeight * devicePixelRatio,
+        refractionAmount: settings.effectiveRefractionAmount * devicePixelRatio,
+        edgeDistanceRange:
+            settings.effectiveEdgeDistanceRange * devicePixelRatio,
         contourExtent: aaPadding * devicePixelRatio,
         writeMaterials: usesShapeAppearances,
         writeTintOnly: usesTintOnlyAppearance,

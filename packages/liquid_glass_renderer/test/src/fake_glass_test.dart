@@ -367,7 +367,7 @@ Widget _offsetComparisonSurface({
   child: LiquidGlassLayer(
     fake: fake,
     settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
-      edgeRefraction: 0,
+      refractionAmount: 0,
       chromaticAberration: 0,
       contourOffset: offset,
     ),

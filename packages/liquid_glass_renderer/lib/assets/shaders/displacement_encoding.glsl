@@ -12,7 +12,7 @@ vec4 encodeDisplacementData(
     float displacementMagnitude,
     float maxDisplacement,
     float signedEdgeDistance,
-    float thickness,
+    float inwardRange,
     float exteriorRange
 ) {
     // Use codes 0...254 as an asymmetric signed-normal mapping. Conventional
@@ -41,8 +41,7 @@ vec4 encodeDisplacementData(
     // leaving low-magnitude precision no worse than the former half-channel
     // signed mapping. The inverse below is multiply-only.
     float normalizedMagnitude = 1.0 - sqrt(1.0 - linearMagnitude);
-    
-    float inwardRange = thickness * 4.0;
+
     // The geometry target is RGBA8. A linear mapping across the complete
     // optical profile left fewer than two code points per physical pixel at
     // common thicknesses, which the narrow contour/highlight ramps exposed as
@@ -94,12 +93,12 @@ vec2 decodeDisplacement(vec4 encoded, float maxDisplacement) {
 // mathematical boundary and negative values are outside it.
 float decodeSignedEdgeDistance(
     vec4 encoded,
-    float thickness,
+    float inwardRange,
     float exteriorRange
 ) {
     float centeredDistance = (encoded.b - 0.5) * 2.0;
     float normalizedMagnitude = centeredDistance * centeredDistance;
     return centeredDistance >= 0.0
-        ? normalizedMagnitude * thickness * 4.0
+        ? normalizedMagnitude * inwardRange
         : -normalizedMagnitude * exteriorRange;
 }

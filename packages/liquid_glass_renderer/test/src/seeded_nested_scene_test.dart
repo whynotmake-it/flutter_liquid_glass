@@ -237,7 +237,7 @@ Widget _nestedForeground(bool fake, ValueNotifier<Offset> translation) =>
     LiquidGlassLayer(
       fake: fake,
       settings: const LiquidGlassSettings(
-        thickness: 18,
+        refractionHeight: 18,
         frost: 4,
         highlight: 0,
         chromaticAberration: 0,
