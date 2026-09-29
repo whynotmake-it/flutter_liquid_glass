@@ -241,6 +241,51 @@ def summarize(table: RimTable) -> Dict[str, object]:
     return out
 
 
+def palette_errors(
+    reference: Dict[str, np.ndarray],
+    candidate: Dict[str, np.ndarray],
+    black: str = "K",
+    white: str = "W",
+) -> Dict[str, object]:
+    """Face and glint color errors over isolated solid-color probes.
+
+    Each probe is one backdrop color, so the face statistic measures the
+    material's color transfer and the first rows along the light axis measure
+    how the glint recolors it. Both use the reference silhouette so a
+    registration offset shows up as error instead of being hidden.
+    """
+    mask = silhouette_mask(reference[black], reference[white])
+    distance = signed_distance(mask)
+    face = mask & (distance > 36)
+    ys, xs = np.where(mask)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    cx = (int(xs.min()) + int(xs.max())) // 2
+    columns = slice(cx - 40, cx + 40)
+    face_errors = []
+    glint_errors = []
+    per_probe = {}
+    for probe in reference:
+        if probe not in candidate:
+            continue
+        ref = reference[probe][..., :3]
+        can = candidate[probe][..., :3]
+        face_error = float(np.mean(np.abs(ref[face].mean(0) - can[face].mean(0))) * 255)
+        rows = [y0, y0 + 1, y0 + 2, y1 - 1, y1 - 2, y1 - 3]
+        ref_glint = np.stack([ref[r, columns].mean(0) for r in rows])
+        can_glint = np.stack([can[r, columns].mean(0) for r in rows])
+        glint_error = float(np.mean(np.abs(ref_glint - can_glint)) * 255)
+        face_errors.append(face_error)
+        glint_errors.append(glint_error)
+        per_probe[probe] = {"face8": face_error, "glint8": glint_error}
+    return {
+        "paletteFaceMae8": float(np.mean(face_errors)),
+        "paletteFaceWorst8": float(np.max(face_errors)),
+        "paletteGlintMae8": float(np.mean(glint_errors)),
+        "paletteGlintWorst8": float(np.max(glint_errors)),
+        "probes": per_probe,
+    }
+
+
 def compare_tables(reference: RimTable, candidate: RimTable) -> Dict[str, float]:
     """Rim-specific errors, all in 8-bit units except transmittance."""
     band = _rows(-4.0, 12.0)
