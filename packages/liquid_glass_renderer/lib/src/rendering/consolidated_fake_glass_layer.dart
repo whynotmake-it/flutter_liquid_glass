@@ -166,7 +166,8 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   bool get _hasBlur => settings.effectiveFrost > 0;
   bool get _hasColorTransfer =>
       defaultAppearance.saturation != 1 ||
-      defaultAppearance.transmissionGamma != 1;
+      defaultAppearance.transmissionGamma != 1 ||
+      defaultAppearance.colorModel.faceTransfer != null;
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
   @override
