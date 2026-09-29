@@ -10,14 +10,22 @@ void main() {
     expect(light.thickness, 12);
     expect(light.frost, 7);
     expect(light.edgeRefraction, closeTo(27.42, .01));
-    expect(light.highlightWidth, .75);
-    expect(light.contourStrength, .15);
+    expect(light.highlight, 1);
+    expect(light.highlightWidth, 1.2);
+    expect(light.highlightOppositeStrength, 1);
+    expect(light.contourStrength, .43);
+    expect(light.contourWidth, .75);
+    expect(light.contourDirectionality, .77);
+    expect(light.bevelShadowStrength, 0);
     expect(light.exteriorShadowSizeResponse, 1);
     expect(dark.thickness, 12);
     expect(dark.frost, 5);
     expect(dark.edgeRefraction, closeTo(27.42, .01));
-    expect(dark.highlightWidth, 0);
-    expect(dark.contourStrength, .25);
+    expect(dark.highlight, light.highlight);
+    expect(dark.highlightWidth, light.highlightWidth);
+    expect(dark.contourStrength, .88);
+    expect(dark.contourDirectionality, 1);
+    expect(dark.bevelShadowStrength, 0);
     expect(dark.exteriorShadowSizeResponse, 0);
   });
 
