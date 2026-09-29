@@ -297,11 +297,19 @@ def compare_tables(reference: RimTable, candidate: RimTable) -> Dict[str, float]
     valid = np.isfinite(ref_e) & np.isfinite(can_e)
     e_err = float(np.sqrt(np.mean((ref_e[valid] - can_e[valid]) ** 2)) * 255.0)
     t_err = float(np.sqrt(np.mean((ref_t[valid] - can_t[valid]) ** 2)))
-    # Shape of the excess glint independent of the face level.
-    ref_x = reference.luma("emission")[glint_band] - float(reference.interior_emission @ LUMA)
-    can_x = candidate.luma("emission")[glint_band] - float(candidate.interior_emission @ LUMA)
+    # Shape of the excess glint independent of the face level. The first
+    # covered ring is dominated by silhouette anti-aliasing, so it is scored
+    # separately as edge coverage.
+    inner_band = _rows(2.0, GLINT_RANGE[1])
+    ref_x = reference.luma("emission")[inner_band] - float(reference.interior_emission @ LUMA)
+    can_x = candidate.luma("emission")[inner_band] - float(candidate.interior_emission @ LUMA)
     gv = np.isfinite(ref_x) & np.isfinite(can_x)
     glint_err = float(np.sqrt(np.mean((ref_x[gv] - can_x[gv]) ** 2)) * 255.0)
+    edge_ring = _rows(1.0, 1.0)
+    ref_edge = reference.luma("emission")[edge_ring]
+    can_edge = candidate.luma("emission")[edge_ring]
+    ev = np.isfinite(ref_edge) & np.isfinite(can_edge)
+    edge_err = float(np.sqrt(np.mean((ref_edge[ev] - can_edge[ev]) ** 2)) * 255.0)
     ref_s = summarize(reference)
     can_s = summarize(candidate)
     width_err = float(
@@ -337,6 +345,7 @@ def compare_tables(reference: RimTable, candidate: RimTable) -> Dict[str, float]
         "rimEmissionRms8": e_err,
         "rimTransmittanceRms": t_err,
         "glintShapeRms8": glint_err,
+        "edgeCoverageRms8": edge_err,
         "glintWidthErrorPx": width_err,
         "glintPeakError8": peak_err,
         "contourDepthError": contour_err,

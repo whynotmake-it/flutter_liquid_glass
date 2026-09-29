@@ -38,6 +38,7 @@ void paintFakeGlassSurface(
   required LiquidGlassSettings settings,
   required LiquidGlassAppearance appearance,
   required double devicePixelRatio,
+  bool exteriorOnly = false,
 }) {
   final appearanceVisibility = appearance.visibility.clamp(0.0, 1.0);
   final surfaceTint = appearance.colorModel.approximateSurfaceTint(
@@ -85,7 +86,8 @@ void paintFakeGlassSurface(
         settings.effectiveBevelShadowSizeResponse,
       ])
       ..setOffset(const Offset(0, 1))
-      ..setFloat(1 / math.max(devicePixelRatio, 0.01));
+      ..setFloat(1 / math.max(devicePixelRatio, 0.01))
+      ..setFloat(exteriorOnly ? 1 : 0);
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(

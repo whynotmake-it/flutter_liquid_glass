@@ -506,6 +506,7 @@ class RenderFakeGlass extends RenderProxyBox {
       settings: settings,
       appearance: appearance,
       devicePixelRatio: devicePixelRatio,
+      exteriorOnly: true,
     );
     canvas.restore();
   }
