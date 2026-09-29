@@ -68,6 +68,61 @@ List<double> fakeGlassColorMatrix({
   return result..addAll([0, 0, 0, filterOpacity, 0]);
 }
 
+/// The complete untinted iOS 27 face as a 4x5 color matrix:
+/// `neutral + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
+///
+/// Evaluating the whole face in the filter clamps only the final color, so
+/// amplified chroma is not clipped before the neutral wash attenuates it. The
+/// luminance transfer `(Y + lift * Y * (1 - Y)) ^ transmissionGamma` is not
+/// linear, so the matrix uses its least-squares line over `[0, 1]`; at unit
+/// gamma that is exactly `Y + lift / 6`.
+@internal
+List<double> fakeGlassFaceMatrix({
+  required Color neutral,
+  required double lift,
+  required double chromaGain,
+  double transmissionGamma = 1,
+  double opacity = 1,
+}) {
+  const luminance = [0.2126, 0.7152, 0.0722];
+  final transmittance = 1 - neutral.a;
+  final gamma = math.max(transmissionGamma, 0.01);
+  double transfer(double y) =>
+      math.pow((y + lift * y * (1 - y)).clamp(0.0, 1.0), gamma).toDouble();
+  // Least-squares line through the transfer on evenly spaced samples.
+  const samples = 17;
+  var meanY = 0.0;
+  var meanT = 0.0;
+  for (var i = 0; i < samples; i++) {
+    final y = i / (samples - 1);
+    meanY += y / samples;
+    meanT += transfer(y) / samples;
+  }
+  var covariance = 0.0;
+  var variance = 0.0;
+  for (var i = 0; i < samples; i++) {
+    final y = i / (samples - 1);
+    covariance += (y - meanY) * (transfer(y) - meanT);
+    variance += (y - meanY) * (y - meanY);
+  }
+  final slope = covariance / variance;
+  final offset = meanT - slope * meanY;
+  final neutralColor = [neutral.r, neutral.g, neutral.b];
+  final result = <double>[];
+  for (var row = 0; row < 3; row++) {
+    for (var column = 0; column < 3; column++) {
+      result.add(
+        luminance[column] * (transmittance * slope - chromaGain) +
+            (row == column ? chromaGain : 0),
+      );
+    }
+    result
+      ..add(0)
+      ..add((neutral.a * neutralColor[row] + transmittance * offset) * 255);
+  }
+  return result..addAll([0, 0, 0, opacity.clamp(0.0, 1.0), 0]);
+}
+
 /// Builds the backdrop-only portion shared by standalone and consolidated
 /// fake glass. Tint remains in the analytic surface pass so contour
 /// transmittance can treat tint and backdrop energy independently.
@@ -85,25 +140,39 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
-  final hasMaterialColorTransfer =
-      appearance.saturation != 1 || appearance.transmissionGamma != 1;
-  final hasColorTransfer =
-      hasMaterialColorTransfer || (blur != null && visibility < 1);
-  final colorTransfer = hasColorTransfer
-      ? ColorFilter.matrix(
-          fakeGlassColorMatrix(
-            saturation: 1 + (appearance.saturation - 1) * visibility,
-            tint: const Color(0x00000000),
-            transmissionGamma:
-                1 + (appearance.transmissionGamma - 1) * visibility,
-            // A partially transparent filtered backdrop composites over the
-            // untouched backdrop, matching RealGlass's material fade without
-            // another backdrop sample. This filter is only used during the
-            // transition; fully visible shapes retain the original matrix.
-            opacity: visibility,
-          ),
-        )
-      : null;
+  final faceTransfer = appearance.colorModel.faceTransfer;
+  final ColorFilter? colorTransfer;
+  if (faceTransfer != null) {
+    colorTransfer = ColorFilter.matrix(
+      fakeGlassFaceMatrix(
+        neutral: appearance.colorModel.neutralMaterialTint,
+        lift: faceTransfer.lift,
+        chromaGain: faceTransfer.chromaGain * appearance.saturation,
+        transmissionGamma: appearance.transmissionGamma,
+        opacity: visibility,
+      ),
+    );
+  } else {
+    final hasMaterialColorTransfer =
+        appearance.saturation != 1 || appearance.transmissionGamma != 1;
+    final hasColorTransfer =
+        hasMaterialColorTransfer || (blur != null && visibility < 1);
+    colorTransfer = hasColorTransfer
+        ? ColorFilter.matrix(
+            fakeGlassColorMatrix(
+              saturation: 1 + (appearance.saturation - 1) * visibility,
+              tint: const Color(0x00000000),
+              transmissionGamma:
+                  1 + (appearance.transmissionGamma - 1) * visibility,
+              // A partially transparent filtered backdrop composites over the
+              // untouched backdrop, matching RealGlass's material fade without
+              // another backdrop sample. This filter is only used during the
+              // transition; fully visible shapes retain the original matrix.
+              opacity: visibility,
+            ),
+          )
+        : null;
+  }
   return switch ((blur, colorTransfer)) {
     (final blur?, final colorTransfer?) => ImageFilter.compose(
       inner: blur,

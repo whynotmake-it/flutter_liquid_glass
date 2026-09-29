@@ -38,9 +38,9 @@ class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27RegularLight({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1.65,
-       transmissionGamma = 1.3,
-       vibrancy = 0.15,
+  }) : saturation = 1,
+       transmissionGamma = 1,
+       vibrancy = 0,
        colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.light,
        );
@@ -49,9 +49,9 @@ class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27RegularDark({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 2.6,
-       transmissionGamma = 0.58,
-       vibrancy = 0.1,
+  }) : saturation = 1,
+       transmissionGamma = 1,
+       vibrancy = 0,
        colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.dark,
        );
@@ -75,9 +75,9 @@ class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27ToolbarLight({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 0.9,
-       transmissionGamma = 0.9,
-       vibrancy = 0.15,
+  }) : saturation = 1,
+       transmissionGamma = 1,
+       vibrancy = 0,
        colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.light,
        );
@@ -86,9 +86,9 @@ class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27ToolbarDark({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 2.6,
-       transmissionGamma = 0.58,
-       vibrancy = 0.1,
+  }) : saturation = 1,
+       transmissionGamma = 1,
+       vibrancy = 0,
        colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.dark,
        );
@@ -112,9 +112,15 @@ class LiquidGlassAppearance with Equatable {
   final Color tint;
 
   /// Saturation applied to transmitted backdrop content.
+  ///
+  /// With an iOS 27 [colorModel] this scales Apple's own chroma transfer, so
+  /// `1` is the platform face.
   final double saturation;
 
   /// Display-referred transfer applied to transmitted content.
+  ///
+  /// With an iOS 27 [colorModel] this is applied on top of Apple's luminance
+  /// transfer, so `1` is the platform face.
   final double transmissionGamma;
 
   /// Backdrop-aware chroma lift.

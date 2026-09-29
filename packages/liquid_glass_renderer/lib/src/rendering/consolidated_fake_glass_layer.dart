@@ -43,6 +43,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) =>
       RenderConsolidatedFakeGlassLayer(
+        devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1,
         link: link,
         settings: settings,
         defaultAppearance: defaultAppearance,
@@ -56,6 +57,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
     RenderConsolidatedFakeGlassLayer renderObject,
   ) {
     renderObject
+      ..devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1
       ..link = link
       ..settings = settings
       ..defaultAppearance = defaultAppearance
@@ -70,12 +72,21 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     with TransformTrackingRenderObjectMixin
     implements LiquidGlassLayerRenderObject {
   RenderConsolidatedFakeGlassLayer({
+    required this._devicePixelRatio,
     required this._link,
     required this._settings,
     required this._defaultAppearance,
     required this._backdropKey,
     required this._surfaceShader,
   });
+
+  double _devicePixelRatio;
+  double get devicePixelRatio => _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
+    markNeedsPaint();
+  }
 
   GeometryRenderLink _link;
   GeometryRenderLink get link => _link;
@@ -424,6 +435,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
           shape: shape.shape,
           settings: settings,
           appearance: shape.appearance,
+          devicePixelRatio: devicePixelRatio,
         );
         canvas.restore();
       }
