@@ -4,6 +4,25 @@ This is the prioritized backlog for the native benchmark harness. Every change
 should be compared against the relevant control scenario on the same runner;
 visual output and native `phys_footprint` remain regression gates.
 
+## 2026-09-29 geometry-pass scissor, Flutter GPU object lifetimes (host)
+
+Details: `OPTIMIZATION_LOG_2026-09.md` K–M.
+
+- **Scissored single-shape geometry passes (kept).** The 64-texel bucket
+  padding no longer runs the SDF for lone shapes: −6…−49 % geometry fragments
+  on rebuild frames, byte-identical mattes (test) and goldens. Host
+  SwiftShader: 44 pt button matte 1.47 → 0.91 ms. Device rebuild-frame GPU
+  time still to be measured.
+- **Transient matte memory is GC-bound (measured, lease not shipped).**
+  Flutter GPU textures, command buffers and render passes report only their
+  C++ object size to the GC, and a submitted pass pins its render target.
+  Leasing them with `NativeFinalizer(externalSize:)` cut live native memory
+  after 1200 matte replacements from 572–700 to 215–321 MB on the host, but
+  cost +3.7 ms/frame of GC in the widget-level probe. Needs a device A/B on
+  `resizeAnimated` (peak footprint vs UI GC time). Engine fix preferred.
+- Two render passes in one Flutter GPU command buffer segfault
+  `flutter_tester` deterministically; passes stay in separate buffers.
+
 ## 2026-09-15 shadow pass, matte resolution, indicator capture (Pixel 10)
 
 Full log with every measurement and rejection: `OPTIMIZATION_LOG_2026-09.md`.
