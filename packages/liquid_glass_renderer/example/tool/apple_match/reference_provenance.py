@@ -61,6 +61,8 @@ def expected_api(profile: str) -> str:
         return "SwiftUI TabView system tab bar"
     if profile == "loupe":
         return "iOS 27 system text-selection loupe (UITextView long-press)"
+    if profile == "merge_pair":
+        return "SwiftUI GlassEffectContainer + View.glassEffect(_:in:)"
     return "SwiftUI PrimitiveButtonStyle.glass"
 
 
@@ -71,6 +73,12 @@ def expected_construction(profile: str) -> str:
         return "SwiftUI TabView system tab bar"
     if profile == "loupe":
         return "UIKit UITextView system text-selection loupe"
+    if profile == "merge_pair":
+        return (
+            "GlassEffectContainer(spacing:scene.containerSpacing){"
+            "Color.clear.frame(shape).glassEffect(scene.glassVariant,"
+            "in:ReferenceGlassShape) x2}"
+        )
     return "Button{Color.clear.frame(shape-insets)}.buttonStyle(.glass)"
 
 
