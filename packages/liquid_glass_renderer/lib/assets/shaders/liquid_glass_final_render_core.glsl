@@ -364,7 +364,10 @@ vec3 applySpecularHighlights(
     float resultLuminance = dot(result, LUMA_WEIGHTS);
     vec3 glintTarget = uHighlightColor.rgb * kGlintLuminance +
         (result - vec3(resultLuminance)) * kGlintVibrancy;
-    result = mix(result, glintTarget, glint);
+    // Only the lower bound is clamped: amplified chroma must not produce
+    // negative (out-of-gamut) channels, while the upper side keeps its
+    // headroom above SDR white for extended-range surfaces.
+    result = max(mix(result, glintTarget, glint), vec3(0.0));
 
     return result;
 }
