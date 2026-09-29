@@ -210,8 +210,8 @@ Independent `LiquidGlass` children may share a layer without blending.
 - Frost: `frost`, expressed as a logical-pixel blur sigma.
 - Highlight: `highlight`, `highlightWidth`, `highlightWrap`,
   `highlightOppositeStrength`, and `curvatureLighting`.
-- Outline: `contourStrength`, `contourWidth`, `contourOffset`, and
-  `contourTransmittance`.
+- Outline: `contourStrength`, `contourWidth`, `contourOffset`,
+  `contourTransmittance`, and `contourDirectionality`.
 - Inner shading: `bevelShadowStrength`, `bevelShadowDepth`,
   `bevelShadowOffset`, `bevelShadowDirectionality`, and
   `bevelShadowSizeResponse`.
@@ -225,6 +225,28 @@ and for fitting materials that are not covered by the toolbar presets.
 Keep `backdropScale` near `1`. Strong magnification enlarges an already
 captured image and loses detail. Build a loupe with Flutter's `RawMagnifier`
 before applying glass, then use glass only for edge optics and lighting.
+
+### HDR highlights
+
+The iOS 27 glint pulls the lit face toward a target 1.6× brighter than SDR
+white. Real glass writes that value unclamped; whether it reaches the display
+depends on the surface Flutter renders into:
+
+- **iOS**: set `FLTEnableWideGamut` to `true` in `Info.plist`. Impeller then
+  renders into an extended-range sRGB `BGRA10_XR` surface, which holds values
+  up to about 1.25, so the brightest part of the glint is compressed.
+- **macOS**: with `FLTEnableWideGamut` enabled on capable hardware and
+  displays, the surface is `RGBA16Float`, which keeps the full range.
+- **Android and other platforms**: 8-bit surfaces, so the glint is SDR.
+
+On an SDR surface each channel clips at white. This reproduces Apple's own
+SDR screenshots. Whether iOS or macOS shows the values above 1.0 brighter than
+SDR white depends on the platform's extended dynamic range handling; this has
+not been verified on a device yet.
+
+FakeGlass draws a neutral glint. Under Impeller it keeps the same headroom at
+no extra cost. On Skia, or on an 8-bit target, it clips to white, so it cannot
+shift hue.
 
 ## Shapes, children, and shadows
 
