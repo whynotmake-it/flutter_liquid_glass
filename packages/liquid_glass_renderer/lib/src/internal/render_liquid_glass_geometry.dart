@@ -385,9 +385,8 @@ extension on LiquidGlassSettings {
   bool requiresGeometryRebuild(LiquidGlassSettings? other) {
     if (other == null) return false;
 
-    return effectiveThickness != other.effectiveThickness ||
-        edgeRefraction != other.edgeRefraction ||
-        refractionSpread != other.refractionSpread ||
+    return effectiveRefractionHeight != other.effectiveRefractionHeight ||
+        effectiveRefractionAmount != other.effectiveRefractionAmount ||
         contourWidth != other.contourWidth ||
         contourOffset != other.contourOffset;
   }

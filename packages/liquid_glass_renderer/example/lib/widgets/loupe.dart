@@ -6,8 +6,6 @@ import 'package:motor/motor.dart';
 /// inherit the toolbar's milky tint or frost. Keep the edge optics and contour
 /// from the matched toolbar while neutralizing transmission.
 const loupeGlassSettings = LiquidGlassSettings(
-  thickness: 12,
-  edgeRefraction: 27.42,
   frost: 0,
   chromaticAberration: 0.005,
   // Keep only a hairline dielectric rim. The lens body must remain the
@@ -106,10 +104,11 @@ class _DraggableLoupeState extends State<DraggableLoupe> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bounds = Offset(
-          (constraints.maxWidth - widget.size.width)
-              .clamp(0, double.infinity),
-          (constraints.maxHeight - widget.size.height)
-              .clamp(0, double.infinity),
+          (constraints.maxWidth - widget.size.width).clamp(0, double.infinity),
+          (constraints.maxHeight - widget.size.height).clamp(
+            0,
+            double.infinity,
+          ),
         );
         _clampPosition(bounds);
         return MouseRegion(

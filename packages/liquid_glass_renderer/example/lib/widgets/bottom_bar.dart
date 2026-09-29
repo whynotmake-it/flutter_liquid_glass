@@ -600,9 +600,9 @@ class _TabIndicatorState extends State<_TabIndicator>
                         ],
                         fake: widget.fake,
                         settings: const LiquidGlassSettings(
-                          edgeRefraction: 40,
-                          backdropScale: .92,
-                          refractionSpread: .5,
+                          refractionHeight: 24,
+                          refractionAmount: 40,
+                          magnification: .92,
                           chromaticAberration: .1,
                           frost: 0,
                           highlight: .4,

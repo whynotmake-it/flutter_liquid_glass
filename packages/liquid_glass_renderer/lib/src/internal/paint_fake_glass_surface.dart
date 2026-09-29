@@ -62,7 +62,7 @@ void paintFakeGlassSurface(
       ? configuredDepth
       : math.min(size.shortestSide * 0.12, 12).toDouble();
   final configuredHighlightWidth = fakeGlassHighlightBandWidth(settings);
-  final opticalThickness = math.max(settings.effectiveThickness, 1).toDouble();
+  final opticalThickness = settings.effectiveEdgeDistanceRange;
   shader.setFloatUniforms((uniforms) {
     uniforms
       ..setSize(size)

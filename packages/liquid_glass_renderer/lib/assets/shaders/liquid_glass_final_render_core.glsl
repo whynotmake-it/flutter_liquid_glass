@@ -39,6 +39,7 @@ uniform float uBlurFade;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
+// Rim lighting depth; the matte encodes edge distance up to 4x this.
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
 float uBackdropScale = uLightConfig.y;
@@ -554,7 +555,7 @@ void main() {
     float maxDisplacement = max(uDisplacementScale, 0.001);
     float signedEdgeDistance = decodeSignedEdgeDistance(
         geometryData,
-        max(uThickness, 1.0),
+        4.0 * max(uThickness, 1.0),
         contourExtent()
     );
     float materialAlpha = smoothstep(
@@ -577,35 +578,17 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // Treat face scaling and edge refraction as one source-coordinate
-        // mapping. The scale is exactly identity at the mathematical contour,
-        // then approaches the requested face scale continuously without a
-        // clipped cutoff. Complementing the actual displacement field lets
-        // edge refraction own the optical wall for every SDF/blended shape.
-        float inwardDistance = max(signedEdgeDistance, 0.0);
-        float transitionDepth = max(uThickness * 0.25, 1.0);
-        float inwardDistanceSquared = inwardDistance * inwardDistance;
-        float transitionDepthSquared = transitionDepth * transitionDepth;
-        float distanceWeight =
-            inwardDistanceSquared /
-            (inwardDistanceSquared + transitionDepthSquared);
-        float displacementRatio = clamp(
-            length(displacement) / maxDisplacement,
-            0.0,
-            1.0
-        );
-        float refractionComplement =
-            1.0 - smoothstep(0.0, 1.0, displacementRatio);
-        float scaleWeight = distanceWeight * refractionComplement;
+        // Magnification is one lens over the whole face, about the material
+        // center, uniform up to the silhouette as on the iOS 27 loupe. The
+        // bevel displacement adds on top of it.
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis
         );
-        float backdropScale = clamp(uBackdropScale, 0.25, 4.0);
+        float magnification = clamp(uBackdropScale, 0.25, 4.0);
         backdropScaleOffset =
             filterDeltaFromCenter *
-            (1.0 / backdropScale - 1.0) *
-            scaleWeight *
+            (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
     vec4 refractColor;

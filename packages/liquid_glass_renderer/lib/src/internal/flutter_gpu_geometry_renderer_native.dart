@@ -338,12 +338,11 @@ class FlutterGpuGeometryRenderer {
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
@@ -445,18 +444,9 @@ class FlutterGpuGeometryRenderer {
       offsetY: offsetY,
       textureWidth: allocatedWidth.toDouble(),
       textureHeight: allocatedHeight.toDouble(),
-      opticalIndex: opticalIndex,
-      refractionSpread: refractionSpread,
-      displacementScale:
-          displacementScale ??
-          math.max(
-            1e-3,
-            1.05 *
-                8.0 *
-                thickness *
-                math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
-          ),
-      thickness: thickness,
+      refractionHeight: refractionHeight,
+      refractionAmount: refractionAmount,
+      edgeDistanceRange: edgeDistanceRange ?? math.max(12, refractionHeight),
       contourExtent: contourExtent,
       materialScale: writeMaterials ? materialRasterScale.toDouble() : 1.0,
       materialMapWidth: writeMaterials
@@ -535,10 +525,9 @@ class FlutterGpuGeometryRenderer {
     required double offsetY,
     required double textureWidth,
     required double textureHeight,
-    required double opticalIndex,
-    required double refractionSpread,
-    required double displacementScale,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
+    required double edgeDistanceRange,
     required double contourExtent,
     required double materialScale,
     required double materialMapWidth,
@@ -556,17 +545,17 @@ class FlutterGpuGeometryRenderer {
     floatData[uOffsetIndex + 1] = offsetY;
 
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
-    // Reuse the existing vec2 slot for profile spread and codec scale.
-    floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
-    floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
+    // Y is the bevel's edge displacement, which is also the codec scale.
+    floatData[textureSizeIndex] = 0;
+    floatData[textureSizeIndex + 1] = math.max(1e-3, refractionAmount);
 
     final opticalPropsIndex = _offsetOpticalProps ~/ 4;
-    floatData[opticalPropsIndex] = opticalIndex;
+    floatData[opticalPropsIndex] = math.max(0, refractionHeight);
     // The Y slot is a harness-only centered-AA half-width. It defaults to
     // 0.5, matching Flutter's one-pixel transition; keeping it in the
     // existing reserved slot avoids changing the uniform ABI.
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
-    floatData[opticalPropsIndex + 2] = thickness;
+    floatData[opticalPropsIndex + 2] = math.max(1, edgeDistanceRange);
     floatData[opticalPropsIndex + 3] = numShapes;
 
     final contourPropsIndex = _offsetContourProps ~/ 4;

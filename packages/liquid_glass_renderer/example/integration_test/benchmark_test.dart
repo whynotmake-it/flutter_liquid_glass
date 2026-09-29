@@ -624,12 +624,12 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
 
   Widget _buildScenario(double t) {
     final settings = LiquidGlassSettings(
-      thickness: 30,
+      refractionHeight: 30,
       frost: 15,
-      backdropScale: _benchmarkBackdropScale,
+      magnification: _benchmarkBackdropScale,
     );
     const litSettings = LiquidGlassSettings(
-      thickness: 30,
+      refractionHeight: 30,
       frost: 15,
       contourStrength: .22,
       contourWidth: 1.5,
@@ -1920,9 +1920,9 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                     ? const LiquidGlassLayer(
                         settings: LiquidGlassSettings(
                           frost: 0,
-                          edgeRefraction: 40,
-                          backdropScale: .92,
-                          refractionSpread: .5,
+                          refractionHeight: 24,
+                          refractionAmount: 40,
+                          magnification: .92,
                           chromaticAberration: .1,
                           highlight: .4,
                           contourStrength: .1,

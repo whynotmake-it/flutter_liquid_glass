@@ -205,8 +205,8 @@ Independent `LiquidGlass` children may share a layer without blending.
 
 `LiquidGlassSettings` groups controls by purpose:
 
-- Optics: `thickness`, `edgeRefraction`, `refractionSpread`,
-  `backdropScale`, and `chromaticAberration`.
+- Optics: `refractionHeight`, `refractionAmount`, `magnification`, and
+  `chromaticAberration`.
 - Frost: `frost`, expressed as a logical-pixel blur sigma.
 - Highlight: `highlight`, `highlightWidth`, `highlightWrap`,
   `highlightOppositeStrength`, and `curvatureLighting`.
@@ -222,9 +222,25 @@ Independent `LiquidGlass` children may share a layer without blending.
 its transfer function; the remaining fields stay available for custom looks
 and for fitting materials that are not covered by the toolbar presets.
 
-Keep `backdropScale` near `1`. Strong magnification enlarges an already
-captured image and loses detail. Build a loupe with Flutter's `RawMagnifier`
-before applying glass, then use glass only for edge optics and lighting.
+### Refraction
+
+Glass is modeled as a flat face with a rounded bevel along its edge. Only the
+bevel refracts, pulling content inward:
+
+- `refractionHeight` is the bevel width in logical pixels, measured inward
+  from the silhouette.
+- `refractionAmount` is how far inside the silhouette the outermost pixel
+  samples the backdrop. The displacement falls off across the bevel as a
+  quarter circle and reaches zero, without a crease, at `refractionHeight`.
+  Its ratio to `refractionHeight` sets how rod-like the rim looks: above `1`,
+  content near the rim is mirrored, as on Apple's glass.
+- `magnification` scales the backdrop seen through the whole face about its
+  center; the iOS 27 text loupe measures `1.25`.
+
+Shapes narrower than two bevels scale the whole lens down, so one setting keeps
+its look on small and large controls. Strong magnification enlarges an already
+captured image and loses detail; for a large zoom, paint the backdrop with
+Flutter's `RawMagnifier` before applying glass.
 
 ## Shapes, children, and shadows
 
