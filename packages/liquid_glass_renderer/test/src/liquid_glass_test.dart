@@ -669,6 +669,36 @@ void main() {
       );
 
       goldenTest(
+        'blended shapes stay inside the box around each pair',
+        skip: skipGoldenTests,
+        fileName: 'blend_without_bulge',
+        pumpBeforeTest: pumpOnce,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: BoxConstraints.tight(const Size(360, 200)),
+          children: [
+            for (final gap in [-40.0, -20.0, 0.0, 12.0, 30.0])
+              GoldenTestScenario(
+                name: 'equal rects, gap ${gap.toStringAsFixed(0)}',
+                child: _blendPairScene(
+                  gap: gap,
+                  second: const LiquidRoundedSuperellipse(borderRadius: 18),
+                  secondSize: const Size(120, 80),
+                ),
+              ),
+            for (final gap in [-10.0, 6.0])
+              GoldenTestScenario(
+                name: 'rect and circle, gap ${gap.toStringAsFixed(0)}',
+                child: _blendPairScene(
+                  gap: gap,
+                  second: const LiquidOval(),
+                  secondSize: const Size.square(64),
+                ),
+              ),
+          ],
+        ),
+      );
+
+      goldenTest(
         'shapes merge with different blend values',
         skip: skipGoldenTests,
         fileName: 'merging_blend_values',
@@ -1282,6 +1312,51 @@ Future<void> _pumpAtDpr2(WidgetTester tester) async {
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.resetDevicePixelRatio);
   await pumpOnce(tester);
+}
+
+/// A 120x80 continuous-corner rect blended with [second], [gap] logical
+/// pixels apart (negative overlaps), on clear glass so blur cannot mask the
+/// seam.
+Widget _blendPairScene({
+  required double gap,
+  required LiquidShape second,
+  required Size secondSize,
+}) {
+  const firstSize = Size(120, 80);
+  const center = Offset(180, 100);
+  final width = firstSize.width + gap + secondSize.width;
+  final left = center.dx - width / 2;
+  return buildWithGridPaper(
+    LiquidGlassLayer(
+      settings: const LiquidGlassSettings(frost: 0),
+      defaultAppearance: LiquidGlassAppearance(
+        tint: Colors.blue.withValues(alpha: 0.25),
+      ),
+      child: LiquidGlassBlendGroup(
+        blend: 40,
+        child: Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: center.dy - firstSize.height / 2,
+              child: LiquidGlass.grouped(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 18),
+                child: SizedBox.fromSize(size: firstSize),
+              ),
+            ),
+            Positioned(
+              left: left + firstSize.width + gap,
+              top: center.dy - secondSize.height / 2,
+              child: LiquidGlass.grouped(
+                shape: second,
+                child: SizedBox.fromSize(size: secondSize),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 Widget _appearanceBlendScene({
