@@ -42,6 +42,10 @@ class AdaptiveGroup extends StatelessWidget {
   }
 }
 
+/// Size of the glyphs on glass controls, matching the SF Symbols in iOS 27
+/// toolbar buttons.
+const controlGlyphSize = 25.0;
+
 /// Glass for one control, with glyphs that stay legible on it and the touch
 /// glow beneath them.
 ///
@@ -81,7 +85,7 @@ class ControlGlass extends StatelessWidget {
             converter: const ColorRgbMotionConverter(),
             value: CupertinoColors.label.resolveFrom(context),
             builder: (context, glyph, child) => IconTheme(
-              data: IconThemeData(color: glyph, size: 22),
+              data: IconThemeData(color: glyph, size: controlGlyphSize),
               child: DefaultTextStyle(
                 style: TextStyle(
                   color: glyph,

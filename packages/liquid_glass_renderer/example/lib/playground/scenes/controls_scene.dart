@@ -83,9 +83,9 @@ const bottomBarSide = 16.0;
 /// Distance of the bottom bar from the bottom of the screen, for a home
 /// indicator inset of [bottomInset].
 ///
-/// The iOS 27 tab bar reaches 13 pt into the 34 pt home indicator inset of
-/// an iPhone 17 Pro, ending 21 pt above the screen's edge.
-double bottomBarGap(double bottomInset) => math.max(bottomInset - 13, 20);
+/// The iOS 27 tab bar reaches 13.5 pt into the 34 pt home indicator inset
+/// of an iPhone 17 Pro, ending 20.5 pt above the screen's edge.
+double bottomBarGap(double bottomInset) => math.max(bottomInset - 13.5, 20);
 
 /// Distance of the row of glass buttons along the top of the stage from the
 /// top of the stage's safe area.
@@ -95,8 +95,8 @@ const topControlsTop = 12.0;
 /// sides of the stage's safe area.
 const topControlsSide = 16.0;
 
-/// Height of the glass buttons along the top of the stage.
-const topControlSize = 48.0;
+/// Height of the glass buttons along the top of the stage, as on iOS 27.
+const topControlSize = 44.0;
 
 /// Gap between neighboring glass buttons along the top of the stage.
 const topControlsSpacing = 8.0;
