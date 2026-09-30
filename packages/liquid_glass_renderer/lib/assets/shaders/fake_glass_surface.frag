@@ -172,9 +172,9 @@ void main() {
 
   float tintAlpha = uTint.a;
   // The glint pulls the lit face toward a target 1.6x SDR white. Without
-  // backdrop access FakeGlass reproduces that luminance pull exactly via
-  // source-over of an emissive target (RGB > alpha); only RealGlass also
-  // amplifies the face chroma under the glint.
+  // backdrop access FakeGlass pulls toward it with source-over of an
+  // emissive target; only RealGlass also amplifies the face chroma under the
+  // glint and keeps the headroom above white.
   float materialCoverage = uExteriorOnly > 0.5
       ? 0.0
       : clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
@@ -194,10 +194,17 @@ void main() {
   litPremultiplied =
       litPremultiplied * (1.0 - glint) + vec3(uGlintLuminance * glint);
   litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
+  // FakeGlass stays SDR, as Skia needs: premultiplied color never exceeds
+  // alpha. Where the glint's emission would, the glass covers that much more
+  // of the backdrop, so the composite reaches SDR white but never exceeds it.
+  litPremultiplied = min(litPremultiplied, vec3(1.0));
+  litAlpha = max(
+    litAlpha,
+    max(max(litPremultiplied.r, litPremultiplied.g), litPremultiplied.b)
+  );
   float alpha = litAlpha * materialCoverage + exteriorContourAlpha;
-  // FakeGlass stays SDR: its emissive glint is capped at SDR white.
   fragColor = vec4(
-    clamp(litPremultiplied * materialCoverage, vec3(0.0), vec3(1.0)),
+    max(litPremultiplied * materialCoverage, vec3(0.0)),
     clamp(alpha, 0.0, 1.0)
   );
 }
