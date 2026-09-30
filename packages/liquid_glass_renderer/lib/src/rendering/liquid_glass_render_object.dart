@@ -774,6 +774,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ..setFloatUniforms(initialIndex: 33, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
+      // Sampler 0 is the image-filter input. The engine replaces its texture
+      // with the backdrop but keeps the sampling set here, so any bound image
+      // selects bilinear or nearest backdrop sampling at no cost.
+      ..setImageSampler(
+        0,
+        geometryImage,
+        filterQuality: settings.effectiveSmoothRefraction
+            ? FilterQuality.low
+            : FilterQuality.none,
+      )
       // Nearest: the matte packs 12-bit normal angle and displacement codes
       // across byte boundaries, which filtering between texels would mix.
       ..setImageSampler(1, geometryImage);

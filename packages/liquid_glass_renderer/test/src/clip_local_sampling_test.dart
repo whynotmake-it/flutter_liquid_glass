@@ -243,6 +243,23 @@ void main() {
     expect(maximumVectorError, lessThan(0.2));
   });
 
+  test('smooth refraction keeps undisplaced glass an exact backdrop copy', () {
+    final source = File(
+      'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+    ).readAsStringSync();
+    final renderer = File(
+      'lib/src/rendering/liquid_glass_render_object.dart',
+    ).readAsStringSync();
+
+    // Sampler 0 is the image-filter input; its filter quality selects
+    // bilinear or nearest backdrop sampling.
+    expect(renderer, contains('..setImageSampler(\n        0,'));
+    expect(renderer, contains('effectiveSmoothRefraction'));
+    // Undisplaced pixels bypass the sampler.
+    expect(source, contains('texelFetch('));
+    expect(source, contains('sourceOffset.x == 0.0 && sourceOffset.y == 0.0'));
+  });
+
   test('magnification is one uniform lens about the material center', () {
     final source = File(
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
