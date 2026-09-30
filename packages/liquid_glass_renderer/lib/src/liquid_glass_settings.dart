@@ -300,8 +300,9 @@ class LiquidGlassSettings with Equatable {
   ///
   /// Clamped to `0` to `0.75`, so the glass can reveal more of its
   /// surroundings but never enlarges (and pixelates) the captured backdrop.
-  /// Use `LiquidGlassLoupe` for magnifiers; it re-renders content at full
-  /// resolution. The bevel's [refractionAmount] is applied on top.
+  /// Magnifiers should re-render their content at full resolution instead
+  /// (the example app's loupe does). The bevel's [refractionAmount] is applied
+  /// on top.
   ///
   /// All glass in one layer shares the center, so give a shrinking shape its
   /// own layer when it should shrink about itself.
