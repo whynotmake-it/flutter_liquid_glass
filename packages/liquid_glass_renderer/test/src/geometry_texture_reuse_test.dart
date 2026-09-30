@@ -9,8 +9,6 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
 import 'shared.dart';
 
-const _reuseAfter = FlutterGpuGeometryRenderer.reuseAfterFrames;
-
 Widget _scene(double width, {Key? key}) {
   return Directionality(
     key: key,
@@ -29,6 +27,8 @@ Widget _scene(double width, {Key? key}) {
               child: SizedBox(width: width, height: 44),
             ),
             const SizedBox(width: 12),
+            // A second appearance, so every render also writes a material
+            // map.
             const LiquidGlass(
               shape: LiquidOval(),
               appearance: LiquidGlassAppearance(tint: Color(0x552060FF)),
@@ -44,102 +44,211 @@ Widget _scene(double width, {Key? key}) {
 RenderLiquidGlassLayer _layer(WidgetTester tester) =>
     tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
 
-Future<Uint8List> _bytes(WidgetTester tester, ui.Image image) async {
-  final bytes = await tester.runAsync(image.toByteData);
-  return bytes!.buffer.asUint8List();
+/// The top-left [width] x [height] texels of [image], as RGBA bytes.
+Future<Uint8List> _subRect(
+  WidgetTester tester,
+  ui.Image image,
+  int width,
+  int height,
+) async {
+  final data = await tester.runAsync(image.toByteData);
+  final bytes = data!.buffer.asUint8List();
+  final out = Uint8List(width * height * 4);
+  for (var y = 0; y < height; y++) {
+    out.setRange(
+      y * width * 4,
+      (y + 1) * width * 4,
+      bytes,
+      y * image.width * 4,
+    );
+  }
+  return out;
 }
+
+int get _allocated => FlutterGpuGeometryRenderer.debugAllocatedTextureCount;
+int get _dropped => FlutterGpuGeometryRenderer.debugDroppedTextureCount;
+int get _reused => FlutterGpuGeometryRenderer.debugReusedTextureCount;
 
 void main() {
   setUp(() {
     FlutterGpuGeometryRenderer.debugReusedTextureCount = 0;
   });
 
-  testWidgets(
-    'replaced mattes are reused only after the in-flight horizon',
-    (tester) async {
-      tester.view
-        ..physicalSize = const Size(1200, 600)
-        ..devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
+  void useDpr3(WidgetTester tester) {
+    tester.view
+      ..physicalSize = const Size(2400, 600)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
 
+  testWidgets(
+    'a changing matte ping-pongs between two textures',
+    (tester) async {
+      useDpr3(tester);
+      // 0.05 logical px per frame keeps the 64 px bucket, like a stretch.
       await tester.pumpWidget(_scene(130));
       final renderer = _layer(tester).gpuGeometryRenderer!;
-      // Every frame rebuilds the matte and material map at the same
-      // bucketed sizes.
-      for (var frame = 1; frame <= _reuseAfter; frame++) {
+      final textures = <Object?>[renderer.debugMatteTexture];
+      for (var frame = 1; frame <= 8; frame++) {
         await tester.pumpWidget(_scene(130 + frame * 0.05));
+        textures.add(renderer.debugMatteTexture);
+      }
+      for (var frame = 1; frame < textures.length; frame++) {
         expect(
-          FlutterGpuGeometryRenderer.debugReusedTextureCount,
-          0,
-          reason: 'frame $frame is inside the horizon',
+          identical(textures[frame], textures[frame - 1]),
+          isFalse,
+          reason: 'frame $frame must not rewrite the texture on screen',
         );
       }
-      for (var frame = 0; frame < 20; frame++) {
-        await tester.pumpWidget(_scene(130.5 + frame * 0.05));
+      for (var frame = 2; frame < textures.length; frame++) {
+        expect(
+          identical(textures[frame], textures[frame - 2]),
+          isTrue,
+          reason: 'frame $frame reuses the texture retired one frame earlier',
+        );
       }
-      expect(FlutterGpuGeometryRenderer.debugReusedTextureCount, 20 * 2);
-      expect(
-        renderer.debugRetiredTextureCount,
-        lessThanOrEqualTo(2 * (_reuseAfter + 2)),
-      );
+      expect(renderer.debugMatteTextureCount, 2);
     },
     skip: skipProperGlassTests,
   );
 
   testWidgets(
-    'a matte written into a reused texture is byte-identical to a fresh one',
+    'a resize sweep stops allocating once the texture has grown',
     (tester) async {
-      tester.view
-        ..physicalSize = const Size(1200, 600)
-        ..devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
-
-      for (var frame = 0; frame < 3 * _reuseAfter; frame++) {
-        await tester.pumpWidget(_scene(130 + frame * 0.05));
+      useDpr3(tester);
+      // 4 logical px per frame at DPR 3 crosses a 64 px bucket every few
+      // frames, in both directions.
+      double width(int frame) {
+        final phase = frame % 100;
+        return 130 + 4.0 * (phase < 50 ? phase : 100 - phase);
       }
-      final reusedBefore = FlutterGpuGeometryRenderer.debugReusedTextureCount;
+
+      await tester.pumpWidget(_scene(width(0)));
+      final renderer = _layer(tester).gpuGeometryRenderer!;
+      // Two sweeps, which also outlast the expiry of textures released by
+      // earlier tests.
+      for (var frame = 1; frame < 200; frame++) {
+        await tester.pumpWidget(_scene(width(frame)));
+      }
+      final allocatedBefore = _allocated;
+      final droppedBefore = _dropped;
+      final reusedBefore = _reused;
+      const measured = 200;
+      for (var frame = 200; frame < 200 + measured; frame++) {
+        await tester.pumpWidget(_scene(width(frame)));
+      }
+      expect(_allocated - allocatedBefore, 0);
+      expect(_dropped - droppedBefore, 0);
+      expect(
+        _reused - reusedBefore,
+        2 * measured,
+        reason: 'every matte and material map comes from the ring',
+      );
+      final (textureWidth, _) = renderer.debugMatteTextureSize!;
+      expect(textureWidth, lessThanOrEqualTo(2432), reason: 'capped at view');
+      expect(renderer.debugMatteTextureCount, 2);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'a matte in a sub-rect of a larger texture is byte-identical to a fresh '
+    'one',
+    (tester) async {
+      useDpr3(tester);
+      // Grow the texture, then come back to a much smaller matte.
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pumpWidget(_scene(130 + frame * 12.0));
+      }
+      for (var frame = 0; frame < 4; frame++) {
+        await tester.pumpWidget(_scene(131.5 + frame * 0.01));
+      }
+      final reusedBefore = _reused;
       await tester.pumpWidget(_scene(131.5));
       expect(
-        FlutterGpuGeometryRenderer.debugReusedTextureCount - reusedBefore,
+        _reused - reusedBefore,
         2,
         reason: 'the compared matte and material map must be reused textures',
       );
-      final reused = await _bytes(tester, _layer(tester).debugGeometryImage!);
-      final reusedMaterial = await _bytes(
-        tester,
-        _layer(tester).debugMaterialImage!,
-      );
+      final layer = _layer(tester);
+      final matteSize = layer.debugGeometryMatteBounds.size * 3;
+      final width = matteSize.width.round();
+      final height = matteSize.height.round();
+      final (textureWidth, textureHeight) =
+          layer.gpuGeometryRenderer!.debugMatteTextureSize!;
+      expect(textureWidth * textureHeight, greaterThan(width * height));
+      final reusedImage = layer.debugGeometryImage!.clone();
+      final reusedMaterialImage = layer.debugMaterialImage!.clone();
+      addTearDown(reusedImage.dispose);
+      addTearDown(reusedMaterialImage.dispose);
 
-      // A new layer owns a new renderer, so its first matte is allocated.
+      // A new layer owns a new renderer, whose first textures are
+      // exact-size, so its images are the reference sub-rects.
       await tester.pumpWidget(_scene(131.5, key: UniqueKey()));
-      final fresh = await _bytes(tester, _layer(tester).debugGeometryImage!);
-      final freshMaterial = await _bytes(
+      final fresh = _layer(tester);
+      expect(fresh.debugGeometryImage!.width, width);
+      final materialWidth = fresh.debugMaterialImage!.width;
+      final materialHeight = fresh.debugMaterialImage!.height;
+      expect(
+        reusedMaterialImage.width * reusedMaterialImage.height,
+        greaterThan(materialWidth * materialHeight),
+      );
+      final reused = await _subRect(tester, reusedImage, width, height);
+      final reusedMaterial = await _subRect(
         tester,
-        _layer(tester).debugMaterialImage!,
+        reusedMaterialImage,
+        materialWidth,
+        materialHeight,
+      );
+      final freshMatte = await _subRect(
+        tester,
+        fresh.debugGeometryImage!,
+        width,
+        height,
+      );
+      final freshMaterial = await _subRect(
+        tester,
+        fresh.debugMaterialImage!,
+        materialWidth,
+        materialHeight,
       );
 
-      expect(reused.length, fresh.length);
-      expect(reused, fresh);
+      expect(reused, freshMatte);
       expect(reusedMaterial, freshMaterial);
     },
     skip: skipProperGlassTests,
   );
 
   testWidgets(
-    'retired textures are released once geometry stops changing',
+    'a released texture is claimed by the next layer',
     (tester) async {
-      tester.view
-        ..physicalSize = const Size(1200, 600)
-        ..devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
+      useDpr3(tester);
+      await tester.pumpWidget(_scene(130, key: const ValueKey('a')));
+      await tester.pumpWidget(_scene(130.05, key: const ValueKey('a')));
+      await tester.pumpWidget(const SizedBox());
+      expect(FlutterGpuGeometryRenderer.debugReleasedTextureCount, 4);
+      await tester.pump();
 
-      for (var frame = 0; frame < 2 * _reuseAfter; frame++) {
-        await tester.pumpWidget(_scene(130 + frame * 0.25));
+      final allocatedBefore = _allocated;
+      final droppedBefore = _dropped;
+      await tester.pumpWidget(_scene(130, key: const ValueKey('b')));
+      expect(_allocated - allocatedBefore, 0);
+      expect(_dropped - droppedBefore, 0);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'spare textures are released once geometry stops changing',
+    (tester) async {
+      useDpr3(tester);
+      for (var frame = 0; frame < 4; frame++) {
+        await tester.pumpWidget(_scene(130 + frame * 0.05));
       }
       final renderer = _layer(tester).gpuGeometryRenderer!;
       expect(renderer.debugRetiredTextureCount, greaterThan(0));
-      for (var frame = 0; frame < 40; frame++) {
-        await tester.pump(const Duration(milliseconds: 16));
+      for (var frame = 0; frame < 130; frame++) {
+        await tester.pump(const Duration(milliseconds: 8));
         tester.binding.scheduleFrame();
       }
       expect(renderer.debugRetiredTextureCount, 0);

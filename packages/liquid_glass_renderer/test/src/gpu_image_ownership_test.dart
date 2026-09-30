@@ -22,7 +22,15 @@ void runGpuImageOwnershipTests() {
         addTearDown(renderer.dispose);
         final initialCount = FlutterGpuGeometryRenderer.debugTotalRenderCount;
 
-        ({ui.Image image, int width, int height}) render(int index) {
+        ({
+          ui.Image image,
+          int width,
+          int height,
+          int textureWidth,
+          int textureHeight,
+          int serial,
+        })
+        render(int index) {
           final appearances = List<double>.filled(128, 0);
           for (var shape = 0; shape < 16; shape++) {
             appearances[shape * 4 + (index.isEven ? 0 : 1)] = 1;

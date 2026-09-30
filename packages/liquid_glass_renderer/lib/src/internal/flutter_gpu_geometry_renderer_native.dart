@@ -11,19 +11,19 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
-/// Each changed matte gets a texture no in-flight frame reads: previously
-/// submitted Flutter scenes may still sample the old matte with their old
-/// coordinate uniforms, and rewriting it would mix frames. A replaced texture
-/// is rendered into again only after [reuseAfterFrames] frames, which keeps
-/// Impeller's cached render pass and framebuffer and skips the allocation.
-/// The layer reuses the image without calling [render] when geometry is
-/// unchanged (including uniform translation).
+/// Each output (matte, material map) cycles through a ring of textures that
+/// only grow. A render draws into the top-left sub-rect of a texture no
+/// in-flight frame reads and reports the texture size, so the final shader
+/// scales its UVs to that sub-rect. Resizing geometry therefore reuses the
+/// same textures instead of allocating, which matters because a
+/// `gpu.Texture` is only freed when the GC finalizes its wrapper. The layer
+/// reuses the image without calling [render] when geometry is unchanged
+/// (including uniform translation).
 ///
 /// This renderer owns the image handles returned by [gpu.Texture.asImage].
 /// Replacing/disposal releases those handles; recorded scenes hold independent
-/// native references. Direct callers needing a handle across renders can clone
-/// it and must dispose their clone; its pixels stay valid for
-/// [reuseAfterFrames] frames after replacement, enough for scene submission.
+/// native references. A scene rasterized more than [reuseAfterFrames] frames
+/// after it was recorded may show a newer matte.
 @internal
 class FlutterGpuGeometryRenderer {
   FlutterGpuGeometryRenderer({
@@ -31,7 +31,14 @@ class FlutterGpuGeometryRenderer {
     required gpu.Shader fragmentShader,
     gpu.Shader? materialGradientFragmentShader,
     gpu.Shader? materialTintGradientFragmentShader,
+    gpu.Shader? serialStampFragmentShader,
   }) {
+    if (serialStampFragmentShader != null) {
+      _stampShaders = (
+        vertex: vertexShader,
+        fragment: serialStampFragmentShader,
+      );
+    }
     _pipeline = gpu.gpuContext.createRenderPipeline(
       vertexShader,
       fragmentShader,
@@ -58,6 +65,7 @@ class FlutterGpuGeometryRenderer {
   }
 
   FlutterGpuGeometryRenderer._fromShared(_SharedGeometryResources resources) {
+    _stampShaders = resources.stampShaders;
     _pipeline = resources.pipeline;
     _materialGradientPipeline = resources.materialGradientPipeline;
     _materialTintGradientPipeline = resources.materialTintGradientPipeline;
@@ -114,6 +122,7 @@ class FlutterGpuGeometryRenderer {
           library?['MaterialGradientFragment'];
       final materialTintGradientFragmentShader =
           library?['MaterialTintGradientFragment'];
+      final serialStampFragmentShader = library?['MatteSerialStampFragment'];
       if (vertexShader == null ||
           fragmentShader == null ||
           materialGradientFragmentShader == null ||
@@ -128,6 +137,7 @@ class FlutterGpuGeometryRenderer {
         fragmentShader: fragmentShader,
         materialGradientFragmentShader: materialGradientFragmentShader,
         materialTintGradientFragmentShader: materialTintGradientFragmentShader,
+        serialStampFragmentShader: serialStampFragmentShader,
       );
     }();
     try {
@@ -284,7 +294,7 @@ class FlutterGpuGeometryRenderer {
   int _writtenShapeFloats = 0;
   int _writtenRseFloats = 0;
 
-  // Latest immutable matte. Older scenes retain their own native references.
+  // Latest matte. Older scenes retain their own native references.
   gpu.Texture? _texture;
   ui.Image? _image;
   gpu.RenderTarget? _renderTarget;
@@ -300,7 +310,14 @@ class FlutterGpuGeometryRenderer {
   late final gpu.BufferView _vertexBufferView;
 
   /// Low-resolution contributor map from the latest appearance render.
+  ///
+  /// The map fills the top-left sub-rect of the image; its size follows from
+  /// the matte size, as in the final shader.
   ui.Image? get materialImage => _materialImage;
+
+  final _TextureRing _mattes = _TextureRing();
+  final _TextureRing _materials = _TextureRing();
+  int _serial = 0;
 
   void _bindUniformLayout(gpu.Shader fragmentShader) {
     _uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
@@ -340,11 +357,20 @@ class FlutterGpuGeometryRenderer {
 
   /// Renders a new geometry matte and returns it as a [ui.Image].
   ///
-  /// The returned image is a non-owning wrapper — do NOT dispose it. Its
-  /// texture is not written again until [reuseAfterFrames] frames after a
-  /// later render replaces it; a clone kept longer than that may show a newer
-  /// matte.
-  ({ui.Image image, int width, int height}) render({
+  /// The matte fills the top-left `width` x `height` of the image, which is
+  /// `textureWidth` x `textureHeight`. The returned image is a non-owning
+  /// wrapper — do NOT dispose it. Its texture is written again
+  /// [reuseAfterFrames] frames after a later render replaces it. `serial`
+  /// identifies this render for the [validateMatteOrder] check.
+  ({
+    ui.Image image,
+    int width,
+    int height,
+    int textureWidth,
+    int textureHeight,
+    int serial,
+  })
+  render({
     required int width,
     required int height,
     required List<double> shapeData,
@@ -367,16 +393,19 @@ class FlutterGpuGeometryRenderer {
       _debugTotalRenderCount++;
       return true;
     }(), 'Track geometry submissions in debug builds.');
-    final allocatedWidth = _bucketDimension(width);
-    final allocatedHeight = _bucketDimension(height);
+    final matteWidth = _bucketDimension(width);
+    final matteHeight = _bucketDimension(height);
+    // The order check stores the serial one row below the matte.
+    final matteRows = validateMatteOrder ? matteHeight + 1 : matteHeight;
+    final (viewWidth, viewHeight) = _viewCapacity();
 
     _ensureFrameCounter();
     _lastRenderFrame = _completedFrames;
+    _serial = (_serial + 1) & 0xFFFFFF;
     if (_texture != null) {
       // Release our handle; earlier submitted scenes hold their own.
       _image?.dispose();
       _image = null;
-      _retire(_retiredMattes, _texture!, _renderTarget!);
       _renderTarget = null;
       _texture = null;
       assert(() {
@@ -384,25 +413,40 @@ class FlutterGpuGeometryRenderer {
         return true;
       }(), 'Track replaced geometry textures in debug builds.');
     }
-    // The shader writes every pixel of the full-screen quad, so neither a
-    // fresh nor a reused texture needs a clear or a copy of the old matte.
-    final (matte, matteTarget) = _acquire(
-      _retiredMattes,
-      allocatedWidth,
-      allocatedHeight,
+    // The shader writes every pixel of the sub-rect; the rest of the texture
+    // is undefined and never sampled, so no clear or copy is needed.
+    final matte = _mattes.next(
+      _completedFrames,
+      width: matteWidth,
+      height: matteRows,
+      maxWidth: viewWidth,
+      maxHeight: viewHeight,
     );
-    _texture = matte;
-    _renderTarget = matteTarget;
+    _texture = matte.texture;
+    _renderTarget = matte.renderTarget;
     _image = _texture!.asImage();
     assert(() {
       _debugActiveGeometryTextureCount++;
       return true;
     }(), 'Track live geometry textures in debug builds.');
 
+    final materialMapWidth = math.max(
+      1,
+      (matteWidth + materialRasterScale - 1) ~/ materialRasterScale,
+    );
+    final materialMapHeight = math.max(
+      1,
+      (matteHeight + materialRasterScale - 1) ~/ materialRasterScale,
+    );
+    final materialWidth = writeTintOnly
+        ? materialMapWidth
+        : math.max(16, materialMapWidth);
+    final materialHeight = writeTintOnly
+        ? materialMapHeight
+        : materialMapHeight + 2;
     if (_materialTexture != null) {
       _materialImage?.dispose();
       _materialImage = null;
-      _retire(_retiredMaterials, _materialTexture!, _materialRenderTarget!);
       _materialRenderTarget = null;
       _materialTexture = null;
       assert(() {
@@ -411,64 +455,44 @@ class FlutterGpuGeometryRenderer {
       }(), 'Track replaced material textures in debug builds.');
     }
     if (writeMaterials) {
-      final materialMapWidth = math.max(
-        1,
-        (allocatedWidth + materialRasterScale - 1) ~/ materialRasterScale,
+      final material = _materials.next(
+        _completedFrames,
+        width: materialWidth,
+        height: materialHeight,
+        maxWidth: math.max(
+          16,
+          (viewWidth + materialRasterScale - 1) ~/ materialRasterScale,
+        ),
+        maxHeight:
+            (viewHeight + materialRasterScale - 1) ~/ materialRasterScale + 2,
       );
-      final materialMapHeight = math.max(
-        1,
-        (allocatedHeight + materialRasterScale - 1) ~/ materialRasterScale,
-      );
-      final materialWidth = writeTintOnly
-          ? materialMapWidth
-          : math.max(16, materialMapWidth);
-      final materialHeight = writeTintOnly
-          ? materialMapHeight
-          : materialMapHeight + 2;
-      final (material, materialTarget) = _acquire(
-        _retiredMaterials,
-        materialWidth,
-        materialHeight,
-      );
-      _materialTexture = material;
-      _materialRenderTarget = materialTarget;
+      _materialTexture = material.texture;
+      _materialRenderTarget = material.renderTarget;
       _materialImage = _materialTexture!.asImage();
       assert(() {
         _debugActiveMaterialTextureCount++;
         return true;
       }(), 'Track live material textures in debug builds.');
+    } else {
+      _materials.releaseCurrent(_completedFrames);
     }
-    _trimRetired(_retiredMattes, allocatedWidth, allocatedHeight);
+    if (_mattes.spareCount + _materials.spareCount > 0) {
+      _renderersWithSpares.add(this);
+    }
 
     _packUniformData(
       offsetX: offsetX,
       offsetY: offsetY,
-      textureWidth: allocatedWidth.toDouble(),
-      textureHeight: allocatedHeight.toDouble(),
+      textureWidth: matteWidth.toDouble(),
+      textureHeight: matteHeight.toDouble(),
       refractionHeight: refractionHeight,
       refractionAmount: refractionAmount,
       edgeDistanceRange: edgeDistanceRange ?? math.max(12, refractionHeight),
       refractionFitsShape: refractionFitsShape,
       contourExtent: contourExtent,
       materialScale: writeMaterials ? materialRasterScale.toDouble() : 1.0,
-      materialMapWidth: writeMaterials
-          ? math
-                .max(
-                  1,
-                  (allocatedWidth + materialRasterScale - 1) ~/
-                      materialRasterScale,
-                )
-                .toDouble()
-          : 1.0,
-      materialMapHeight: writeMaterials
-          ? math
-                .max(
-                  1,
-                  (allocatedHeight + materialRasterScale - 1) ~/
-                      materialRasterScale,
-                )
-                .toDouble()
-          : 1.0,
+      materialMapWidth: writeMaterials ? materialMapWidth.toDouble() : 1.0,
+      materialMapHeight: writeMaterials ? materialMapHeight.toDouble() : 1.0,
       geometryAaHalfWidth: _geometryAaHalfWidth,
       numShapes: numShapes.toDouble(),
       shapeData: shapeData,
@@ -486,15 +510,20 @@ class FlutterGpuGeometryRenderer {
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(_vertexBufferView)
-      ..draw(4);
+      ..bindVertexBuffer(_vertexBufferView);
+    _restrictTo(geometryPass, _texture!, matteWidth, matteHeight);
+    geometryPass.draw(4);
+    if (validateMatteOrder) {
+      _stampSerial(geometryPass, row: matteHeight);
+    }
     geometryCommandBuffer.submit();
     if (GpuAllocationDiagnostics.enabled) {
       GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
       GpuAllocationDiagnostics.observe('pass', geometryPass);
       GpuAllocationDiagnostics.observe('texture', _texture!);
       GpuAllocationDiagnostics.allocations.add(
-        '$allocatedWidth x $allocatedHeight ${_texture!.format}',
+        '$matteWidth x $matteHeight in '
+        '${_texture!.width} x ${_texture!.height} ${_texture!.format}',
       );
     }
     if (writeMaterials) {
@@ -508,8 +537,14 @@ class FlutterGpuGeometryRenderer {
             )
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView)
-            ..draw(4);
+            ..bindVertexBuffer(_vertexBufferView);
+      _restrictTo(
+        materialPass,
+        _materialTexture!,
+        materialWidth,
+        materialHeight,
+      );
+      materialPass.draw(4);
       materialCommandBuffer.submit();
       if (GpuAllocationDiagnostics.enabled) {
         GpuAllocationDiagnostics.observe('command', materialCommandBuffer);
@@ -518,7 +553,92 @@ class FlutterGpuGeometryRenderer {
       }
     }
 
-    return (image: _image!, width: allocatedWidth, height: allocatedHeight);
+    return (
+      image: _image!,
+      width: matteWidth,
+      height: matteHeight,
+      textureWidth: _texture!.width,
+      textureHeight: _texture!.height,
+      serial: _serial,
+    );
+  }
+
+  /// Limits [pass] to the top-left [width] x [height] of [texture].
+  ///
+  /// `gl_FragCoord` stays framebuffer-relative, so the shaders need no
+  /// offset for a sub-rect at the origin.
+  static void _restrictTo(
+    gpu.RenderPass pass,
+    gpu.Texture texture,
+    int width,
+    int height,
+  ) {
+    if (texture.width == width && texture.height == height) return;
+    pass
+      ..setViewport(gpu.Viewport(width: width, height: height))
+      ..setScissor(gpu.Scissor(width: width, height: height));
+  }
+
+  /// Writes [_serial] into the texel at (0, [row]) for [validateMatteOrder].
+  void _stampSerial(gpu.RenderPass pass, {required int row}) {
+    // Renderers built from bare shaders (tests) have no stamp and are never
+    // sampled by the final shader.
+    final shaders = _stampShaders;
+    if (shaders == null) return;
+    final stamp = _stampResources ??= _StampResources(shaders);
+    final data = ByteData(stamp.uniformSize)
+      ..setFloat32(0, ((_serial >> 16) & 0xFF) / 255, Endian.host)
+      ..setFloat32(4, ((_serial >> 8) & 0xFF) / 255, Endian.host)
+      ..setFloat32(8, (_serial & 0xFF) / 255, Endian.host)
+      ..setFloat32(12, 1, Endian.host);
+    // Harness-only, so a buffer per stamp keeps it out of the shared
+    // per-frame uniform budget.
+    final buffer = gpu.gpuContext.createDeviceBufferWithCopy(data);
+    // Bindings outlive a draw; the geometry uniforms would shadow the stamp.
+    pass
+      ..clearBindings()
+      ..bindPipeline(stamp.pipeline)
+      ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
+      ..bindUniform(
+        stamp.slot,
+        gpu.BufferView(
+          buffer,
+          offsetInBytes: 0,
+          lengthInBytes: buffer.sizeInBytes,
+        ),
+      )
+      ..bindVertexBuffer(_vertexBufferView)
+      ..setViewport(gpu.Viewport(y: row, width: 1, height: 1))
+      ..setScissor(gpu.Scissor(y: row, width: 1, height: 1))
+      ..draw(4);
+  }
+
+  /// Harness-only render-order check.
+  ///
+  /// Each matte carries its render serial one texel row below the matte,
+  /// and the final shader paints magenta where the matte it samples carries
+  /// a different serial than the frame's uniforms, i.e. where a texture was
+  /// rewritten before a frame that reads it was rasterized.
+  static const bool validateMatteOrder = bool.fromEnvironment(
+    'LIQUID_GLASS_VALIDATE_MATTE_ORDER',
+  );
+
+  /// Added to the serial the final shader expects, so tests can prove that
+  /// a mismatch paints magenta. Test-only.
+  static int debugMatteSerialSkew = 0;
+
+  _StampShaders? _stampShaders;
+  static _StampResources? _stampResources;
+
+  /// Largest view in physical pixels, the cap for texture growth.
+  static (int, int) _viewCapacity() {
+    var width = 0;
+    var height = 0;
+    for (final view in WidgetsBinding.instance.platformDispatcher.views) {
+      width = math.max(width, view.physicalSize.width.ceil());
+      height = math.max(height, view.physicalSize.height.ceil());
+    }
+    return (_bucketDimension(width), _bucketDimension(height));
   }
 
   static int _bucketDimension(int value) => (value + 63) & ~63;
@@ -526,16 +646,18 @@ class FlutterGpuGeometryRenderer {
   /// Frames after its replacement before a texture may be rendered into
   /// again.
   ///
-  /// The last scene that can sample a matte replaced during frame E is
-  /// frame E - 1's. The engine keeps at most two layer trees in flight and
-  /// frees a slot only after rasterizing (`Animator`'s `FramePipeline(2)`),
-  /// so when the UI thread paints frame k, frame k - 2 has been rasterized.
-  /// The Vulkan swapchains (KHR and AHB) wait for the GPU fence of the frame
-  /// two before the one they rasterize, so the GPU has finished frame k - 4.
-  /// Reuse is therefore safe from frame E + 3. Metal tracks the hazard
-  /// itself and GLES submits on the raster thread in order. The extra three
-  /// frames absorb frames rendered outside vsync, such as warm-up frames.
-  static const int reuseAfterFrames = 6;
+  /// A texture replaced during frame E was last sampled by frame E - 1's
+  /// scene. The engine keeps at most two frames in its pipeline and frees a
+  /// slot only after rasterizing and submitting that frame (`Animator`'s
+  /// `FramePipeline(2)`; `Pipeline::Consume` signals after the consumer
+  /// returns), so when frame E + 1 paints, frame E - 1 has been submitted.
+  /// Flutter GPU submits to the same queue as the raster thread (the IO
+  /// manager's context is the platform view's), and the GPU orders a write
+  /// after earlier reads on that queue: Metal tracks hazards on these
+  /// non-heap textures, and every Impeller Vulkan render pass declares an
+  /// external dependency on earlier fragment-shader reads. GLES submits on
+  /// the raster thread in posting order.
+  static const int reuseAfterFrames = 1;
 
   /// Harness switch for A/B builds; production always reuses.
   static const bool _reuseTextures = bool.fromEnvironment(
@@ -543,13 +665,17 @@ class FlutterGpuGeometryRenderer {
     defaultValue: true,
   );
 
-  /// Renderers stop holding retired textures after this many frames
-  /// without a geometry render.
-  static const int _idleFramesBeforeTrim = 30;
+  /// Spare textures are dropped after this many frames without a render,
+  /// and released ones after this many frames unclaimed.
+  static const int _idleFramesBeforeTrim = 120;
+
+  /// Released textures kept for other renderers, app-wide.
+  static const int _maxReleased = 4;
 
   static int _completedFrames = 0;
   static bool _countingFrames = false;
-  static final Set<FlutterGpuGeometryRenderer> _renderersWithRetired = {};
+  static final Set<FlutterGpuGeometryRenderer> _renderersWithSpares = {};
+  static final List<_RingTexture> _released = [];
 
   /// Counts frames that submit a scene, the unit [reuseAfterFrames] is in.
   ///
@@ -561,101 +687,84 @@ class FlutterGpuGeometryRenderer {
     SchedulerBinding.instance.addPersistentFrameCallback((_) {
       if (!RendererBinding.instance.sendFramesToEngine) return;
       _completedFrames++;
-      if (_renderersWithRetired.isEmpty) return;
-      for (final renderer in _renderersWithRetired.toList()) {
+      _released.removeWhere((texture) {
+        final stale =
+            _completedFrames - texture.retiredFrame > _idleFramesBeforeTrim;
+        if (stale) _countDropped();
+        return stale;
+      });
+      if (_renderersWithSpares.isEmpty) return;
+      for (final renderer in _renderersWithSpares.toList()) {
         if (_completedFrames - renderer._lastRenderFrame >
             _idleFramesBeforeTrim) {
-          renderer._releaseRetired();
+          renderer._mattes.dropSpares();
+          renderer._materials.dropSpares();
+          _renderersWithSpares.remove(renderer);
         }
       }
     });
   }
 
   int _lastRenderFrame = 0;
-  final List<_RetiredTarget> _retiredMattes = [];
-  final List<_RetiredTarget> _retiredMaterials = [];
 
-  /// Number of replaced textures this renderer holds for reuse.
+  /// Textures this renderer holds that are not in use.
   @visibleForTesting
   int get debugRetiredTextureCount =>
-      _retiredMattes.length + _retiredMaterials.length;
+      _mattes.spareCount + _materials.spareCount;
+
+  /// Matte textures this renderer holds, including the one in use.
+  @visibleForTesting
+  int get debugMatteTextureCount => _mattes.textureCount;
+
+  /// The latest matte texture, compared by identity in tests.
+  @visibleForTesting
+  Object? get debugMatteTexture => _texture;
+
+  /// Size of the latest matte texture.
+  @visibleForTesting
+  (int, int)? get debugMatteTextureSize => switch (_texture) {
+    final texture? => (texture.width, texture.height),
+    null => null,
+  };
 
   /// Renders that wrote into a reused texture instead of allocating one.
   @visibleForTesting
   static int debugReusedTextureCount = 0;
 
-  void _retire(
-    List<_RetiredTarget> retired,
-    gpu.Texture texture,
-    gpu.RenderTarget target,
-  ) {
-    if (!_reuseTextures) return;
-    retired.add(_RetiredTarget(texture, target, _completedFrames));
-    _renderersWithRetired.add(this);
+  /// Textures allocated, all renderers.
+  @visibleForTesting
+  static int debugAllocatedTextureCount = 0;
+
+  /// Textures dropped, all renderers. Once a texture has lived a few young
+  /// GCs its wrapper is promoted, and dropping it pins its storage until an
+  /// old-generation GC.
+  @visibleForTesting
+  static int debugDroppedTextureCount = 0;
+
+  /// Released textures waiting for another renderer.
+  @visibleForTesting
+  static int get debugReleasedTextureCount => _released.length;
+
+  static void _countDropped() {
+    assert(() {
+      debugDroppedTextureCount++;
+      return true;
+    }(), 'Count dropped geometry textures in debug builds.');
   }
 
-  (gpu.Texture, gpu.RenderTarget) _acquire(
-    List<_RetiredTarget> retired,
-    int width,
-    int height,
-  ) {
-    for (var index = 0; index < retired.length; index++) {
-      final candidate = retired[index];
-      if (_completedFrames - candidate.retiredFrame < reuseAfterFrames) {
-        // Retired in frame order; later entries are younger still.
-        break;
+  /// A mature released texture that holds [width] x [height] without
+  /// wasting more than 1.5x per dimension, or null.
+  static _RingTexture? _claimReleased(int frame, int width, int height) {
+    for (var index = 0; index < _released.length; index++) {
+      final texture = _released[index];
+      if (frame - texture.retiredFrame < reuseAfterFrames) continue;
+      if (texture.covers(width, height) &&
+          texture.texture.width * texture.texture.height * 4 <=
+              width * height * 9) {
+        return _released.removeAt(index);
       }
-      if (candidate.texture.width == width &&
-          candidate.texture.height == height) {
-        retired.removeAt(index);
-        assert(() {
-          debugReusedTextureCount++;
-          return true;
-        }(), 'Count reused geometry textures in debug builds.');
-        return (candidate.texture, candidate.renderTarget);
-      }
     }
-    final texture = gpu.gpuContext.createTexture(
-      gpu.StorageMode.devicePrivate,
-      width,
-      height,
-    );
-    return (
-      texture,
-      gpu.RenderTarget.singleColor(
-        gpu.ColorAttachment(
-          texture: texture,
-          loadAction: gpu.LoadAction.dontCare,
-        ),
-      ),
-    );
-  }
-
-  /// Keeps enough retired mattes to cycle through [reuseAfterFrames] at the
-  /// current size, and a few of other sizes for mattes that oscillate
-  /// between two buckets.
-  void _trimRetired(List<_RetiredTarget> retired, int width, int height) {
-    retired.removeWhere(
-      (entry) =>
-          (entry.texture.width != width || entry.texture.height != height) &&
-          _completedFrames - entry.retiredFrame > 2 * reuseAfterFrames,
-    );
-    const maxRetired = reuseAfterFrames + 2;
-    if (retired.length > maxRetired) {
-      retired.removeRange(0, retired.length - maxRetired);
-    }
-    if (_retiredMaterials.length > maxRetired) {
-      _retiredMaterials.removeRange(
-        0,
-        _retiredMaterials.length - maxRetired,
-      );
-    }
-  }
-
-  void _releaseRetired() {
-    _retiredMattes.clear();
-    _retiredMaterials.clear();
-    _renderersWithRetired.remove(this);
+    return null;
   }
 
   void _packUniformData({
@@ -756,7 +865,9 @@ class FlutterGpuGeometryRenderer {
   /// Callers retaining an output must clone its images before calling this.
   /// Independent clones and submitted native scenes remain valid.
   void releaseOutput() {
-    _releaseRetired();
+    _mattes.release(_completedFrames);
+    _materials.release(_completedFrames);
+    _renderersWithSpares.remove(this);
     _renderTarget = null;
     _image?.dispose();
     _image = null;
@@ -832,14 +943,185 @@ class GpuAllocationDiagnostics {
   }
 }
 
-/// A replaced texture and its render target, stamped with the frame count at
-/// replacement.
-final class _RetiredTarget {
-  _RetiredTarget(this.texture, this.renderTarget, this.retiredFrame);
+/// A texture and its render target.
+final class _RingTexture {
+  _RingTexture(this.texture)
+    : renderTarget = gpu.RenderTarget.singleColor(
+        gpu.ColorAttachment(
+          texture: texture,
+          loadAction: gpu.LoadAction.dontCare,
+        ),
+      );
 
   final gpu.Texture texture;
   final gpu.RenderTarget renderTarget;
-  final int retiredFrame;
+
+  /// Frame count when this texture was last replaced or released.
+  int retiredFrame = 0;
+
+  bool covers(int width, int height) =>
+      texture.width >= width && texture.height >= height;
+}
+
+/// The textures one output of a renderer cycles through.
+///
+/// Every texture is at least the ring's capacity, which only grows: in 1.5x
+/// steps, capped at the view unless one render needs more. A resize within
+/// the capacity reuses the ring; growth drops the smaller textures.
+final class _TextureRing {
+  /// Spares beyond the one a steady ring needs, for frames that render
+  /// twice.
+  static const int _maxSpares = 2;
+
+  _RingTexture? _current;
+  final List<_RingTexture> _spares = [];
+  int _width = 0;
+  int _height = 0;
+
+  int get spareCount => _spares.length;
+  int get textureCount => _spares.length + (_current == null ? 0 : 1);
+
+  /// Replaces the texture in use with one that holds [width] x [height].
+  _RingTexture next(
+    int frame, {
+    required int width,
+    required int height,
+    required int maxWidth,
+    required int maxHeight,
+  }) {
+    final previous = _current;
+    _current = null;
+    if (!FlutterGpuGeometryRenderer._reuseTextures) {
+      if (previous != null) FlutterGpuGeometryRenderer._countDropped();
+      return _current = _allocate(width, height);
+    }
+    if (width > _width || height > _height) {
+      _width = _grow(_width, width, maxWidth);
+      _height = _grow(_height, height, maxHeight);
+      dropSpares(keep: (texture) => texture.covers(_width, _height));
+    }
+    if (previous != null) {
+      if (previous.covers(_width, _height)) {
+        previous.retiredFrame = frame;
+        _spares.add(previous);
+      } else {
+        FlutterGpuGeometryRenderer._countDropped();
+      }
+    }
+    // Spares retire in frame order, so the first is the oldest.
+    if (_spares.isNotEmpty &&
+        frame - _spares.first.retiredFrame >=
+            FlutterGpuGeometryRenderer.reuseAfterFrames) {
+      assert(() {
+        FlutterGpuGeometryRenderer.debugReusedTextureCount++;
+        return true;
+      }(), 'Count reused geometry textures in debug builds.');
+      return _current = _spares.removeAt(0);
+    }
+    while (_spares.length > _maxSpares) {
+      _spares.removeAt(0);
+      FlutterGpuGeometryRenderer._countDropped();
+    }
+    final released = FlutterGpuGeometryRenderer._claimReleased(
+      frame,
+      _width,
+      _height,
+    );
+    if (released != null) {
+      assert(() {
+        FlutterGpuGeometryRenderer.debugReusedTextureCount++;
+        return true;
+      }(), 'Count reused geometry textures in debug builds.');
+      return _current = released;
+    }
+    return _current = _allocate(_width, _height);
+  }
+
+  /// Retires the texture in use without replacing it.
+  void releaseCurrent(int frame) {
+    final previous = _current;
+    _current = null;
+    if (previous == null) return;
+    if (!FlutterGpuGeometryRenderer._reuseTextures) {
+      FlutterGpuGeometryRenderer._countDropped();
+      return;
+    }
+    previous.retiredFrame = frame;
+    _spares.add(previous);
+  }
+
+  /// Drops spare textures, except those [keep] accepts.
+  void dropSpares({bool Function(_RingTexture texture)? keep}) {
+    _spares.removeWhere((texture) {
+      if (keep?.call(texture) ?? false) return false;
+      FlutterGpuGeometryRenderer._countDropped();
+      return true;
+    });
+  }
+
+  /// Hands every texture to the app-wide released list.
+  void release(int frame) {
+    final textures = [..._spares, ?_current];
+    _spares.clear();
+    _current = null;
+    _width = 0;
+    _height = 0;
+    if (!FlutterGpuGeometryRenderer._reuseTextures) {
+      for (var i = 0; i < textures.length; i++) {
+        FlutterGpuGeometryRenderer._countDropped();
+      }
+      return;
+    }
+    final released = FlutterGpuGeometryRenderer._released;
+    for (final texture in textures) {
+      texture.retiredFrame = frame;
+      released.add(texture);
+    }
+    while (released.length > FlutterGpuGeometryRenderer._maxReleased) {
+      released.removeAt(0);
+      FlutterGpuGeometryRenderer._countDropped();
+    }
+  }
+
+  static int _grow(int capacity, int needed, int limit) {
+    if (needed <= capacity) return capacity;
+    if (capacity == 0) return needed;
+    final stepped = (capacity * 3 + 1) >> 1;
+    return math.max(needed, math.min(stepped, limit));
+  }
+
+  static _RingTexture _allocate(int width, int height) {
+    assert(() {
+      FlutterGpuGeometryRenderer.debugAllocatedTextureCount++;
+      return true;
+    }(), 'Count allocated geometry textures in debug builds.');
+    return _RingTexture(
+      gpu.gpuContext.createTexture(
+        gpu.StorageMode.devicePrivate,
+        width,
+        height,
+      ),
+    );
+  }
+}
+
+typedef _StampShaders = ({gpu.Shader vertex, gpu.Shader fragment});
+
+/// Pipeline and uniform slot for the serial stamp of
+/// [FlutterGpuGeometryRenderer.validateMatteOrder].
+final class _StampResources {
+  _StampResources(_StampShaders shaders)
+    : pipeline = gpu.gpuContext.createRenderPipeline(
+        shaders.vertex,
+        shaders.fragment,
+      ),
+      slot = shaders.fragment.getUniformSlot('StampUniforms') {
+    uniformSize = slot.sizeInBytes ?? 16;
+  }
+
+  final gpu.RenderPipeline pipeline;
+  final gpu.UniformSlot slot;
+  late final int uniformSize;
 }
 
 class _SharedGeometryResources {
@@ -848,7 +1130,10 @@ class _SharedGeometryResources {
     required gpu.Shader fragmentShader,
     required gpu.Shader materialGradientFragmentShader,
     required gpu.Shader materialTintGradientFragmentShader,
-  }) {
+    gpu.Shader? serialStampFragmentShader,
+  }) : stampShaders = serialStampFragmentShader == null
+           ? null
+           : (vertex: vertexShader, fragment: serialStampFragmentShader) {
     pipeline = gpu.gpuContext.createRenderPipeline(
       vertexShader,
       fragmentShader,
@@ -892,6 +1177,7 @@ class _SharedGeometryResources {
     );
   }
 
+  final _StampShaders? stampShaders;
   late final gpu.RenderPipeline pipeline;
   late final gpu.RenderPipeline materialGradientPipeline;
   late final gpu.RenderPipeline materialTintGradientPipeline;

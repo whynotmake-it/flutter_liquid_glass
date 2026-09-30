@@ -333,7 +333,7 @@ void main() {
       1,
     );
     final geometryAllocationStart = renderer.indexOf(
-      'final texture = gpu.gpuContext.createTexture(',
+      'gpu.gpuContext.createTexture(',
     );
     final geometryAllocationEnd = renderer.indexOf(
       ');',
