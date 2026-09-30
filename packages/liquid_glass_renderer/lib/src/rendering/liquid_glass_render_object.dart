@@ -348,8 +348,25 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     // Float index 50, after the 44-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
     // unfrosted glass stays alpha-1 and matches the backdrop exactly.
-    shader.setFloat(50, settings.effectiveFrost > 0 ? 1 : 0);
+    shader
+      ..setFloat(50, blurPassSigma > 0 ? 1 : 0)
+      ..setFloat(51, softensInShader ? 1 : 0);
   }
+
+  /// Largest frost, in device pixels, folded into the final pass instead of
+  /// a separate blur pass. Enabling the blur pass costs about four command
+  /// buffers per frame on Metal regardless of its radius.
+  static const double shaderSofteningMaxDeviceSigma = 1.25;
+
+  /// Whether the frost is small enough for the final pass's softening kernel.
+  bool get softensInShader {
+    final frost = settings.effectiveFrost;
+    return frost > 0 &&
+        frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
+  }
+
+  /// Sigma of the separate backdrop blur pass; `0` when there is none.
+  double get blurPassSigma => softensInShader ? 0 : settings.effectiveFrost;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -830,9 +847,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
   /// the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
-    final blur = settings.effectiveFrost > 0
-        ? settings.effectiveFrost * 3 + 1 / devicePixelRatio
-        : 0.0;
+    final blur = blurPassSigma > 0
+        ? blurPassSigma * 3 + 1 / devicePixelRatio
+        : (softensInShader ? 1 / devicePixelRatio : 0.0);
     final displacement =
         settings.effectiveDisplacementScale *
         (1 + settings.effectiveChromaticAberration.abs() * 0.5);
