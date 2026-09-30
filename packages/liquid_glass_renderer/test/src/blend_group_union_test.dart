@@ -119,16 +119,25 @@ void main() {
     return count;
   }
 
-  /// Merged pixels outside the axis-aligned box of the union of [shapes].
-  int pixelsOutsideBounds(_Mask mask, List<_Shape> shapes) {
+  /// How far the merged silhouette rises above the shapes' shared top edge,
+  /// or beyond their outer sides, in pixels (to within one pixel).
+  double rise(_Mask mask, List<_Shape> shapes) {
     final top = shapes.map((s) => s.top).reduce(math.min);
     final bottom = shapes.map((s) => s.bottom).reduce(math.max);
     final left = shapes.map((s) => s.left).reduce(math.min);
     final right = shapes.map((s) => s.right).reduce(math.max);
-    return pixelsWhere(
-      mask,
-      (x, y) => y < top || y > bottom || x < left || x > right,
-    );
+    var result = double.negativeInfinity;
+    pixelsWhere(mask, (x, y) {
+      result = [
+        result,
+        top - y,
+        y - bottom,
+        left - x,
+        x - right,
+      ].reduce(math.max);
+      return false;
+    });
+    return result;
   }
 
   /// Merged pixels that lie outside every primitive by more than half a
@@ -143,22 +152,26 @@ void main() {
     _Shape.rect(128 + 30 + gap / 2, 60, 40, 12),
   ];
 
+  // Apple's iOS 27 GlassEffectContainer captures (example/tool/apple_match,
+  // merge_* scenes) rise under 1 pt where two overlapping rounded corners
+  // meet and never rise for separated pairs. A plain smooth minimum rises by
+  // blend / 4, 10 px here.
+  const joinRise = 3.0;
+  const noRise = 0.5;
+
   group('blend group smooth union', skip: _expectFallback, () {
-    test('two equal rects merge without bulging past their edges', () async {
+    test('two equal rects merge with at most a small rise', () async {
       final shapes = equalRects(-16);
       final mask = await render(shapes);
 
-      expect(pixelsOutsideBounds(mask, shapes), 0);
-      // The straight top and bottom edges stay straight across the join.
+      expect(rise(mask, shapes), lessThan(joinRise));
       for (var x = 100; x < 156; x++) {
         expect(mask[44][x], isTrue, reason: 'top row at x=$x');
         expect(mask[83][x], isTrue, reason: 'bottom row at x=$x');
       }
     });
 
-    test('unbounded smooth union would have bulged the same pair', () {
-      // Guards the scene above: a plain polynomial smooth minimum lifts the
-      // join above the shared edge by up to blend / 4.
+    test('a plain smooth union would have bulged the same pair', () {
       final shapes = equalRects(-16);
       final a = shapes[0];
       final b = shapes[1];
@@ -167,19 +180,19 @@ void main() {
         return math.min(d1, d2) - e * e * 0.25 / _blend;
       }
 
-      expect(smoothMin(a.distance(128, 40), b.distance(128, 40)), lessThan(0));
+      expect(smoothMin(a.distance(128, 36), b.distance(128, 36)), lessThan(0));
     });
 
-    test('separated rects still form a bridge inside their hull', () async {
+    test('separated rects form a bridge that never rises', () async {
       final shapes = equalRects(8);
       final mask = await render(shapes);
 
       expect(mask[64][128], isTrue, reason: 'bridge at the gap center');
       expect(filledPixels(mask, shapes), greaterThan(100));
-      expect(pixelsOutsideBounds(mask, shapes), 0);
+      expect(rise(mask, shapes), lessThan(noRise));
     });
 
-    test('rect and circle keep a smooth fillet', () async {
+    test('rect and circle keep a fillet below the rect edge', () async {
       const shapes = [
         _Shape.rect(100, 100, 70, 16),
         _Shape.circle(160, 44),
@@ -187,7 +200,7 @@ void main() {
       final mask = await render(shapes);
 
       expect(filledPixels(mask, shapes), greaterThan(40));
-      expect(pixelsOutsideBounds(mask, shapes), 0);
+      expect(rise(mask, shapes), lessThan(noRise));
     });
 
     test(
@@ -199,21 +212,21 @@ void main() {
         ];
         final mask = await render(shapes);
 
-        expect(pixelsOutsideBounds(mask, shapes), 0);
+        expect(rise(mask, shapes), lessThan(joinRise));
         expect(filledPixels(mask, shapes), greaterThan(20));
       },
     );
 
-    test('animated separation never bulges and releases the bridge', () async {
+    test('animated separation stays flat and releases the bridge', () async {
       var bridgeSeen = false;
       var released = false;
       for (var gap = -40.0; gap <= 40; gap += 4) {
         final shapes = equalRects(gap);
         final mask = await render(shapes);
         expect(
-          pixelsOutsideBounds(mask, shapes),
-          0,
-          reason: 'bulge at gap $gap',
+          rise(mask, shapes),
+          lessThan(gap >= 8 ? noRise : joinRise),
+          reason: 'rise at gap $gap',
         );
         final bridged = mask[64][128];
         if (gap > 0 && bridged) bridgeSeen = true;
