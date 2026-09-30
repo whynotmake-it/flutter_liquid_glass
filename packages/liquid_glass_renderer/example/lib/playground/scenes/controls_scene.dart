@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/adaptive_controls.dart';
-import 'package:liquid_glass_renderer_example/playground/scenes/simple_bottom_bar.dart';
 
 /// Everyday controls: navigation buttons at the top and a bottom bar. Every
 /// shape samples the one shared backdrop capture.
@@ -16,12 +16,17 @@ class ControlsScene extends StatelessWidget {
     required this.adaptive,
     required this.style,
     required this.source,
+    required this.fake,
     super.key,
   });
 
   final ValueListenable<bool> adaptive;
   final ValueListenable<GlassStyle> style;
   final LiquidGlassBrightnessSource source;
+
+  /// Whether the stage renders fake glass, which the bottom bar's loupe
+  /// layer has to match.
+  final ValueListenable<bool> fake;
 
   @override
   Widget build(BuildContext context) {
@@ -35,11 +40,11 @@ class ControlsScene extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
-          child: const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               children: [
-                AdaptiveGroup(
+                const AdaptiveGroup(
                   child: Row(
                     children: [
                       CircleButton(icon: CupertinoIcons.chevron_left),
@@ -53,13 +58,45 @@ class ControlsScene extends StatelessWidget {
                     ],
                   ),
                 ),
-                Spacer(),
-                // Integration point for the bottom bar.
-                SimpleBottomBar(),
+                const Spacer(),
+                _BottomBar(fake: fake),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The mini player, tab bar and search button, adapting to the backdrop as
+/// one group.
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({required this.fake});
+
+  final ValueListenable<bool> fake;
+
+  static const _tabs = [
+    BottomBarTab(icon: CupertinoIcons.house_fill, label: 'Home'),
+    BottomBarTab(icon: CupertinoIcons.square_grid_2x2_fill, label: 'New'),
+    BottomBarTab(
+      icon: CupertinoIcons.dot_radiowaves_left_right,
+      label: 'Radio',
+    ),
+    BottomBarTab(icon: CupertinoIcons.music_albums_fill, label: 'Library'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AdaptiveScope.of(context);
+    return ValueListenableBuilder(
+      valueListenable: fake,
+      builder: (context, fake, _) => IosBottomBar(
+        tabs: _tabs,
+        accessory: const NowPlayingAccessory(),
+        brightnessSource: scope.source,
+        appearanceFor: scope.style.appearance,
+        fake: fake,
       ),
     );
   }
