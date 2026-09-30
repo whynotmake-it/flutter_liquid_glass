@@ -45,6 +45,13 @@ class _PlaygroundAppState extends State<PlaygroundApp> {
         debugShowCheckedModeBanner: false,
         title: 'Liquid Glass',
         theme: CupertinoThemeData(brightness: brightness),
+        // Shown in every build mode, unlike the checked-mode banner, so a
+        // device build is never mistaken for a release of the example.
+        builder: (context, child) => Banner(
+          message: 'DEBUG',
+          location: BannerLocation.topEnd,
+          child: child,
+        ),
         home: home,
       ),
       child: Playground(state: _state),
