@@ -10,7 +10,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
-import 'package:liquid_glass_renderer_example/widgets/bottom_bar.dart';
+
+import 'support/bottom_bar.dart';
 
 const _runBottomBarGoldens = bool.fromEnvironment('RUN_BOTTOM_BAR_GOLDENS');
 
