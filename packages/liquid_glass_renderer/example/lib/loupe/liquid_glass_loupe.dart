@@ -4,10 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_appearance.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
-import 'package:liquid_glass_renderer/src/liquid_shape.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 /// Connects a [LiquidGlassLoupe] to the [LiquidGlassLoupeSource] whose
 /// content it magnifies.
@@ -52,6 +49,10 @@ class LiquidGlassLoupeSource extends SingleChildRenderObjectWidget {
 /// backdrop the glass captured, so text and vector content stay sharp. The
 /// glass then refracts and lights that magnified content like any other
 /// backdrop.
+///
+/// This is example code, not part of `liquid_glass_renderer`: it composes the
+/// renderer's public [LiquidGlass.withOwnLayer] with Flutter's layer API
+/// ([OffsetLayer.toImageSync]). Copy it into an app to use it.
 ///
 /// Only the region under the lens is re-rendered, once per composited frame
 /// while the loupe is shown.

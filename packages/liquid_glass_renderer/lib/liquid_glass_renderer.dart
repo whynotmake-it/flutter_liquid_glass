@@ -15,8 +15,6 @@ export 'src/liquid_glass_color_model.dart'
         DirectLiquidGlassColorModel,
         Ios27LiquidGlassColorModel,
         LiquidGlassColorModel;
-export 'src/liquid_glass_loupe.dart'
-    show LiquidGlassLoupe, LiquidGlassLoupeLink, LiquidGlassLoupeSource;
 export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
 export 'src/liquid_shape.dart';
