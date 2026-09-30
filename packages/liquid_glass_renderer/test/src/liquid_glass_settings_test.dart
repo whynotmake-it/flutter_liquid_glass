@@ -10,15 +10,75 @@ void main() {
     expect(light.thickness, 12);
     expect(light.frost, 7);
     expect(light.edgeRefraction, closeTo(27.42, .01));
-    expect(light.highlightWidth, .75);
-    expect(light.contourStrength, .15);
+    expect(light.highlight, 1);
+    expect(light.highlightWidth, 1.2);
+    expect(light.highlightOppositeStrength, 1);
+    expect(light.contourStrength, .43);
+    expect(light.contourWidth, .75);
+    expect(light.contourDirectionality, .77);
+    expect(light.bevelShadowStrength, 0);
     expect(light.exteriorShadowSizeResponse, 1);
     expect(dark.thickness, 12);
     expect(dark.frost, 5);
     expect(dark.edgeRefraction, closeTo(27.42, .01));
-    expect(dark.highlightWidth, 0);
-    expect(dark.contourStrength, .25);
+    expect(dark.highlight, light.highlight);
+    expect(dark.highlightWidth, light.highlightWidth);
+    expect(dark.contourStrength, .88);
+    expect(dark.contourDirectionality, 1);
+    expect(dark.bevelShadowStrength, 0);
     expect(dark.exteriorShadowSizeResponse, 0);
+  });
+
+  test('iOS 27 clear preset keeps the toolbar glint shape', () {
+    final clear = LiquidGlassSettings.ios27Clear();
+    const toolbar = LiquidGlassSettings.ios27ToolbarLight();
+
+    expect(clear.frost, closeTo(.35, 1e-9));
+    // Clear glass's slider blur: 0.35/0.67/1.28/4.6/16.4 pt.
+    for (final (position, sigma) in [
+      (0.0, .35),
+      (.25, .67),
+      (.5, 1.28),
+      (.75, 4.6),
+      (1.0, 16.4),
+    ]) {
+      expect(
+        LiquidGlassSettings.ios27Clear(tintAmount: position).frost,
+        closeTo(sigma, sigma * .03),
+      );
+      expect(
+        LiquidGlassSettings.ios27Clear(
+          tintAmount: position,
+        ).frostFor(const LiquidGlassColorModel.ios27Clear()),
+        closeTo(sigma, sigma * .03),
+        reason: 'no generic slider blur on top',
+      );
+    }
+    expect(clear.highlight, 1);
+    expect(clear.highlightWidth, toolbar.highlightWidth);
+    expect(clear.highlightWrap, toolbar.highlightWrap);
+    expect(clear.contourStrength, .36);
+    expect(clear.contourDirectionality, 1);
+    expect(clear.bevelShadowStrength, 0);
+  });
+
+  test('the Liquid Glass slider round-trips and only adds blur', () {
+    const settings = LiquidGlassSettings(frost: 3, tintAmount: .5);
+    expect(LiquidGlassSettings.fromJson(settings.toJson()), settings);
+    expect(settings.copyWith(tintAmount: 1).tintAmount, 1);
+    expect(const LiquidGlassSettings(frost: 3).effectiveFrost, 3);
+    expect(settings.effectiveFrost, greaterThan(3));
+    expect(
+      const LiquidGlassSettings(frost: 3, tintAmount: 1).effectiveFrost,
+      greaterThan(settings.effectiveFrost),
+    );
+    expect(
+      LiquidGlassSettings.ios27Toolbar(
+        brightness: Brightness.dark,
+        tintAmount: .25,
+      ).tintAmount,
+      .25,
+    );
   });
 
   test('brightness-aware toolbar factory selects structural presets', () {

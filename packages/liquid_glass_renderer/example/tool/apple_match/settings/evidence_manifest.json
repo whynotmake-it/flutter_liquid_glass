@@ -239,6 +239,18 @@
         "artifact": "out/clear-lighting-107"
       }]
     },
+    "contourDirectionality": {
+      "status": "qualified",
+      "reason": "Apple's exterior border absorbs b0 + b1 * |normal perpendicular to the light axis|, fitted on the solid black/white probes with the analytic silhouette SDF. Directionality b1 / (b0 + b1) is consistent across shapes within each appearance.",
+      "evidence": [{
+        "axis": "contourDirectionality",
+        "baseline": 0.0,
+        "candidate": {"light": 0.77, "dark": 1.0},
+        "scenes": ["toolbar_capsule", "small_capsule", "material_circle", "toolbar_capsule_dark"],
+        "delta": {"toolbarB0B1": [0.098, 0.328], "smallB0B1": [0.095, 0.327], "circleB0B1": [0.124, 0.347], "toolbarDarkB0B1": [0.0, 0.885]},
+        "artifact": "rim_report.py on references/ios27-iphone17pro-ground-truth-v2/slider-000"
+      }]
+    },
     "bevelShadowStrength": {
       "status": "qualified",
       "reason": "Strength 0.02 paired with the fitted 16px depth improves the frost-zero bevel objective across toolbar, capsule, and card.",
