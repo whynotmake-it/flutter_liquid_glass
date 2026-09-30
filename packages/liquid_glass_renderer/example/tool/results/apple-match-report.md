@@ -125,7 +125,7 @@ refraction or blur regression.
 | saturation | .9 |
 | transmissionGamma | .9 |
 | vibrancy | .15 |
-| chromaticAberration | .005 |
+| dispersion | .005 |
 | highlight | .5 |
 | contourStrength / width / transmittance | .22 / 1.5 px / .90 |
 | bevel shadow strength / depth | .025 / 12 px |
@@ -207,7 +207,7 @@ alter simulator state.
 | Edge refraction | 0, 8, 12, 18.3, 24, 32 | Best small row is 8 but movement is within noise; larger values regress. Keep 18.3. | [`edge candidate`](out/annotated-comparisons/iterations/material-attribution-edge/small_capsule/8p0-rep1.png) |
 | Vibrancy | 0, .075, .15, .225, .30 | Small best combined improves only .8%; no two-scene attribution. Keep .15. | [`vibrancy candidate`](out/annotated-comparisons/iterations/material-attribution-vibrancy/small_capsule/0p3-rep1.png) |
 | Tint alpha | .48, .505, .53, .555, .58 | Small combined improves .6% at .555 but toolbar/large regress and transparency contract is disturbed. Keep .53. | [`tint candidate`](out/annotated-comparisons/iterations/material-attribution-tint/small_capsule/0p555-rep1.png) |
-| Chromatic aberration | 0, .001, .0025, .005, .01, .025, .05, .1 | 0–.01 are byte-identical in A across toolbar/small/large; larger values change a few pixels without score gain. One-read fast path is visually safe. | [`CA candidate`](out/annotated-comparisons/iterations/material-attribution-chromaticAberration-cutoff/small_capsule/0p0-rep1.png) |
+| Chromatic aberration | 0, .001, .0025, .005, .01, .025, .05, .1 | 0–.01 are byte-identical in A across toolbar/small/large; larger values change a few pixels without score gain. One-read fast path is visually safe. | [`CA candidate`](out/annotated-comparisons/iterations/material-attribution-dispersion-cutoff/small_capsule/0p0-rep1.png) |
 | Profile spread | 0, .0625, .125, .25, .5 | Best small combined .063511 at .25, only .25% better and still 1.90× toolbar; reject as generalization fix. | [`spread-grid retained capture`](out/annotated-comparisons/small-spread-grid-last-retained-annotated.png) |
 | Coupled spread/thickness | spread 0–1 × thickness 2–16 | Best small combined .063221, still ≈2.01× toolbar and below historical capsule gate. Reject. | [`coupled candidate`](out/annotated-comparisons/small-coupled-best-annotated.png) |
 | Small geometry registration | width 148.0–150.0 | 148.667 matches Apple’s detected 446 px width and improves shape/flow, but combined worsens 2.6%; retain 150 default. | [`width registration`](out/annotated-comparisons/small-width-148667-annotated.png) |
@@ -245,14 +245,6 @@ best rows, and inspection of A, B, C, and D together.
 - Final same-runner performance ratio and small/toolbar ≤1.25× gate remain
   open.
 
-The settings evidence contract is now executable. The machine-readable
-[`evidence manifest`](settings/evidence_manifest.json) covers every public
-`LiquidGlassSettings` field and records its status as `qualified`, `pending`,
-`rejected`, or API-utility `exempt`, with artifact-backed scene rows where
-available. Run `python3 validate_evidence_manifest.py` for the structural audit;
-`--strict` intentionally exits nonzero until every material knob has qualifying
-two-scene evidence. This prevents the documentation table from being mistaken
-for proof that the gate is closed.
 
 The generalization runner is likewise explicit about its policy: thickness is
 frozen to the toolbar card by default, while `--fit-thickness` is diagnostic

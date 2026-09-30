@@ -6,7 +6,7 @@ visual output and native `phys_footprint` remain regression gates.
 
 ## 2026-09-29 geometry-pass scissor, Flutter GPU object lifetimes (Pixel 10)
 
-Details: `OPTIMIZATION_LOG_2026-09.md` K–M.
+Details: `optimization-log-2026-09.md` K–M.
 
 - **Scissored single-shape geometry passes (rejected).** The scissor needs a
   cleared attachment because the final pass samples the bucket padding, and
@@ -24,7 +24,7 @@ Details: `OPTIMIZATION_LOG_2026-09.md` K–M.
 
 ## 2026-09-15 shadow pass, matte resolution, indicator capture (Pixel 10)
 
-Full log with every measurement and rejection: `OPTIMIZATION_LOG_2026-09.md`.
+Full log with every measurement and rejection: `optimization-log-2026-09.md`.
 
 - **Analytic exterior shadows (rejected 2026-09-22).** Replacing the layer
   shadow pass (saveLayer + MaskFilter blur per shape + dstOut punch) with one
@@ -250,7 +250,7 @@ as unavailable rather than inferred. macOS provides both GPU/frame and peak
 native footprint. The Android frame count, full raster percentiles, total p95,
 and settled PSS independently reject the experiment.
 
-![Annotated Pixel 10 direct-versus-mixed comparison](../../doc/generated/mixed-blur-experiment.png)
+![Annotated Pixel 10 direct-versus-mixed comparison](../../../doc/generated/mixed-blur-experiment.png)
 
 The experiment fails the performance-neutral gate on both platforms and is
 rejected. No clear-versus-blurred per-shape parameter will enter the public

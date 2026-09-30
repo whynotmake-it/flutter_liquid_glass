@@ -13,13 +13,12 @@ import random
 # Default axes mirror the bounds already explored by the staged search; each
 # axis is a small ordered list, so a neighborhood is at most 2 x axes evals.
 DEFAULT_AXES = {
-    "thickness": [0.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0],
-    "blur": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0],
-    "lightIntensity": [0.0, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5],
-    "glassAlpha": [0.45, 0.48, 0.5, 0.52, 0.54, 0.56, 0.6, 0.65],
+    "refractionHeight": [0.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0],
+    "frost": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0],
+    "highlight": [0.0, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5],
+    "tintAlpha": [0.45, 0.48, 0.5, 0.52, 0.54, 0.56, 0.6, 0.65],
     "saturation": [0.8, 1.0, 1.2, 1.5, 1.8],
-    "refractiveIndex": [1.0, 1.1, 1.15, 1.2, 1.25, 1.3],
-    "lightAngle": [0.7853981633974483, 1.5707963267948966, 2.356194490192345],
+    "refractionAmount": [0.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0],
 }
 
 

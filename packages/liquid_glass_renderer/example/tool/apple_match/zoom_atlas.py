@@ -157,8 +157,9 @@ def create_atlas(
     output: Path,
     title: str,
     subtitle: str,
+    detail_zoom: int = 3,
 ) -> dict:
-    regions = derive_regions(scene, stage)
+    regions = derive_regions(scene, stage, detail_zoom)
     images = {
         role: {
             probe: Image.open(directory / f"{probe}.png").convert("RGB")
@@ -270,6 +271,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--subtitle", default="")
+    parser.add_argument("--zoom", type=int, default=3, help="detail crop magnification")
     args = parser.parse_args()
     validate_reference_for_scene(args.reference, args.scene)
     scene = json.loads(args.scene.read_text())
@@ -281,6 +283,7 @@ def main() -> None:
         output=args.output,
         title=args.title,
         subtitle=args.subtitle,
+        detail_zoom=args.zoom,
     )
     print(json.dumps(manifest, indent=2))
 

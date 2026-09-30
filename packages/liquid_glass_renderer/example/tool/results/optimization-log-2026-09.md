@@ -43,7 +43,7 @@ coverage + per-item shapes). Targets for the renderer, by weight: the
 scroll-phase filter cost (readback + blur + shader), the animation phases
 (matte rebuild + shadows on every repaint), and the More-menu coverage.
 
-### Prior package-side measurements (from PERFORMANCE_AUDIT.md, 2026-09-13/14)
+### Prior package-side measurements (from performance-audit.md, 2026-09-13/14)
 
 - Each independent `BackdropFilter` ≈115 mW for Impeller's full-screen readback.
 - Plain blur σ7 ≈165 mW/element, FakeGlass ≈230, real glass ≈335 (single element, scroll scene).
@@ -147,7 +147,7 @@ that the pass is ALU-bound.
 ### F. Idea generation (2026-09-16, independent graphics-engineer review)
 
 An unbiased review of the pipeline produced a ranked list, saved in
-`RENDERER_IDEAS_2026-09-16.md`. Highlights: (1) a bounded "seed" subpass
+`renderer-ideas-2026-09-16.md`. Highlights: (1) a bounded "seed" subpass
 around bar + loupe (passthrough BackdropFilter over the bar region) so the
 loupe's own capture flips a ~0.3 Mpx subpass instead of the 2.6 Mpx screen
 while still refracting the painted bar; (2) a matte-less analytic path for

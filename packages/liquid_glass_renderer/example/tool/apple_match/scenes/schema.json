@@ -16,6 +16,15 @@
   ],
   "properties": {
     "schemaVersion": {"const": 1},
+    "glassTint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "opacity"],
+      "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "opacity": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
     "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
     "profile": {
       "enum": [
@@ -24,7 +33,8 @@
         "large_capsule",
         "material_shape",
         "tab_bar_holdout",
-        "loupe"
+        "loupe",
+        "merge_pair"
       ]
     },
     "canvas": {
@@ -63,6 +73,9 @@
         "appleContentInsetY": {"type": "number", "minimum": 0}
       }
     },
+    "mergeShape": {"$ref": "#/properties/shape"},
+    "containerSpacing": {"type": "number", "minimum": 0},
+    "glassVariant": {"enum": ["regular", "clear"]},
     "appearance": {"enum": ["light", "dark"]},
     "transparency": {
       "type": "object",
@@ -91,7 +104,9 @@
           "uniqueItems": true
         },
         "black": {"type": "string", "pattern": "^[A-Z0-9]$"},
-        "white": {"type": "string", "pattern": "^[A-Z0-9]$"}
+        "white": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "sameHue": {"type": "string", "pattern": "^[A-Z0-9]$"},
+        "complement": {"type": "string", "pattern": "^[A-Z0-9]$"}
       }
     },
     "probes": {

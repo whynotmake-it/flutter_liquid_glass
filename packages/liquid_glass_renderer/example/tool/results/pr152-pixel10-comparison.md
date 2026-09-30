@@ -59,7 +59,7 @@ is 185.6% higher at raster p95 and 159.5% higher at total p95.
   process-level measurements, not Dart heap.
 
 Raw samples are in
-[`results/pixel10_pr152_comparison.tsv`](results/pixel10_pr152_comparison.tsv).
+[`pixel10_pr152_comparison.tsv`](pixel10_pr152_comparison.tsv).
 
 ## Interpretation and limits
 

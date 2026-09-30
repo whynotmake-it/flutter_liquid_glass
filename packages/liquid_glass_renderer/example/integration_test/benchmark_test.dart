@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show FilterQuality, FragmentProgram, ImageFilter, TileMode;
+import 'dart:ui' show ImageFilter, TileMode;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -27,36 +27,7 @@ const _defaultRepetition = int.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_REPETITION',
   defaultValue: 1,
 );
-final _benchmarkBackdropShrink =
-    double.tryParse(
-      const String.fromEnvironment(
-        'LIQUID_GLASS_BENCHMARK_BACKDROP_SHRINK',
-        defaultValue: '0',
-      ),
-    ) ??
-    0;
-final _groupShadowAlpha =
-    double.tryParse(
-      const String.fromEnvironment(
-        'LIQUID_GLASS_BENCHMARK_GROUP_SHADOW_ALPHA',
-        defaultValue: '0',
-      ),
-    ) ??
-    0;
 const _native = MethodChannel('dev.liquid_glass_renderer/benchmark');
-
-FragmentProgram? _passthroughProgram;
-ImageFilter? _passthroughFilter;
-
-Future<void> _ensurePassthroughFilter() async {
-  if (_passthroughFilter != null) return;
-  _passthroughProgram = await FragmentProgram.fromAsset(
-    'shaders/passthrough.frag',
-  );
-  _passthroughFilter = ImageFilter.shader(
-    _passthroughProgram!.fragmentShader(),
-  );
-}
 
 /// Harness-only render-order check: the renderer stamps each matte with a
 /// serial and the glass shader paints magenta where a frame samples a matte
@@ -117,7 +88,6 @@ Future<void> main() async {
   } else {
     WidgetsFlutterBinding.ensureInitialized();
   }
-  await _ensurePassthroughFilter();
   final nativeConfiguration = await _readNativeConfiguration();
   final scenario = BenchmarkScenario.values.byName(
     nativeConfiguration['scenario'] as String? ?? _defaultScenarioName,
@@ -267,6 +237,27 @@ Future<void> main() async {
         ? cooldownStability.slopeMbPerSecond
         : null,
   };
+  if (Platform.isAndroid) {
+    // logcat truncates long lines, so the Android analyzer reads frames and
+    // memory samples from chunked lines instead of the report JSON.
+    _emitChunked(
+      'LIQUID_GLASS_BENCHMARK_FRAMES',
+      [
+        for (final timing in timings)
+          [
+            timing.buildDuration.inMicroseconds,
+            timing.rasterDuration.inMicroseconds,
+          ],
+      ],
+    );
+    _emitChunked(
+      'LIQUID_GLASS_BENCHMARK_MEMORY',
+      [
+        for (final sample in memory)
+          [sample['timestampMicros'], sample['physicalFootprintBytes']],
+      ],
+    );
+  }
   debugPrint(
     'LIQUID_GLASS_BENCHMARK_SUMMARY:${jsonEncode(<String, Object?>{
       'scenario': scenario.name,
@@ -482,7 +473,30 @@ Future<List<Map<String, Object?>>> _stopMemorySampling() async {
   }
 }
 
+void _emitChunked(String tag, List<Object?> rows) {
+  final buffer = StringBuffer();
+  var chunk = 0;
+  for (final row in rows) {
+    final encoded = jsonEncode(row);
+    if (buffer.length + encoded.length > 800) {
+      debugPrint('$tag:${chunk++}:$buffer');
+      buffer.clear();
+    }
+    if (buffer.isNotEmpty) buffer.write(';');
+    buffer.write(encoded);
+  }
+  if (buffer.isNotEmpty) debugPrint('$tag:${chunk++}:$buffer');
+}
+
 enum BenchmarkScenario {
+  pxButtonStatic,
+  pxButtonStretch,
+  pxPillStretch,
+  pxBlend5Motion,
+  pxSheetResize,
+  pxMultiLayer,
+  colorsBlendStatic,
+  colorsBlendMotion,
   baselineMotion,
   staticSingle,
   coloredSingleStatic,
@@ -552,31 +566,12 @@ enum BenchmarkScenario {
   appScrollFakeShadow,
   appIdleReal,
   appIdleOpaque,
-  appScrollRealSharedKey,
-  appScrollPlainBlurSharedKey,
-  appScrollPlainBlurCompose,
-  appScrollPlainBlurColor,
   appScrollRealNoFrost,
-  appScrollRealTopOnly,
-  appScrollPlainBlurTopOnly,
-  appScrollRealPillOnly,
-  appScrollPlainBlurPillOnly,
-  appScrollRealPillSeeded,
-  appScrollRealTabsOwnLoupeStaticSeeded,
   appIdlePlainBlur,
   appIdleFake,
   appScrollRealTabsStatic,
   appScrollRealTabsOwnLoupe,
   appScrollRealTabsOwnLoupeStatic,
-  appScrollPassthroughOnly,
-  appScrollPlainBlurNestedPassthrough,
-  appScrollPlainBlurNestedColor,
-  appScrollPlainBlurSigma4,
-  appScrollPlainBlurSigma20,
-  appScrollMatrixDownsamplePassthrough,
-  appScrollPassthroughTopOnly,
-  appScrollTwoSaveLayers,
-  appScrollColorFilterOnly,
 }
 
 class _BenchmarkApp extends StatefulWidget {
@@ -689,6 +684,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     BenchmarkScenario.grouped16Static ||
     BenchmarkScenario.coloredGrouped16Static ||
     BenchmarkScenario.largeStatic ||
+    BenchmarkScenario.pxButtonStatic ||
+    BenchmarkScenario.colorsBlendStatic ||
     BenchmarkScenario.plainStatic ||
     BenchmarkScenario.fakeStatic ||
     BenchmarkScenario.fakeLarge ||
@@ -700,10 +697,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
   };
 
   Widget _buildScenario(double t) {
-    final settings = LiquidGlassSettings(
+    const settings = LiquidGlassSettings(
       refractionHeight: 30,
       frost: 15,
-      backdropShrink: _benchmarkBackdropShrink,
     );
     const litSettings = LiquidGlassSettings(
       refractionHeight: 30,
@@ -1083,6 +1079,25 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
               )
             : _tile(0, size: 260),
       ),
+      BenchmarkScenario.pxButtonStatic => _pxStretched(t, 44, 44, false),
+      BenchmarkScenario.pxButtonStretch => _pxStretched(t, 44, 44, true),
+      BenchmarkScenario.pxPillStretch => _pxStretched(t, 96, 40, true),
+      BenchmarkScenario.pxBlend5Motion => _pxBlend5(t),
+      BenchmarkScenario.pxSheetResize => _pxSheet(t),
+      BenchmarkScenario.pxMultiLayer => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _pxMultiLayer(120 + 24 * t),
+            const SizedBox(height: 16),
+            _pxMultiLayer(90 + 24 * t, tinted: true),
+            const SizedBox(height: 16),
+            _pxMultiLayer(150 - 24 * t),
+          ],
+        ),
+      ),
+      BenchmarkScenario.colorsBlendStatic => _colorsBlend(0),
+      BenchmarkScenario.colorsBlendMotion => _colorsBlend(t),
       BenchmarkScenario.largeStatic => _largeLayer(
         settings: settings,
         size: 2048,
@@ -1160,74 +1175,10 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         scroll: false,
         chrome: _AppChromeKind.opaque,
       ),
-      BenchmarkScenario.appScrollRealSharedKey => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.realSharedKey,
-      ),
-      BenchmarkScenario.appScrollPlainBlurSharedKey => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurSharedKey,
-      ),
-      BenchmarkScenario.appScrollPlainBlurCompose => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurCompose,
-      ),
-      BenchmarkScenario.appScrollPlainBlurColor => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurColor,
-      ),
       BenchmarkScenario.appScrollRealNoFrost => _AppLikeScene(
         t: t,
         scroll: true,
         chrome: _AppChromeKind.realNoFrost,
-      ),
-      BenchmarkScenario.appScrollRealTopOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.real,
-        showBottom: false,
-      ),
-      BenchmarkScenario.appScrollPlainBlurTopOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlur,
-        showBottom: false,
-      ),
-      BenchmarkScenario.appScrollRealPillOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.real,
-        showTop: false,
-      ),
-      // E1: real - blur increment for a bottom element vs a top element. If
-      // the runtime-effect intermediate is anchored at the pass origin, the
-      // bottom increment is markedly larger than the top one.
-      BenchmarkScenario.appScrollPlainBlurPillOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlur,
-        showTop: false,
-      ),
-      // E3: same elements inside a bar-sized seeded subpass (ClipRect +
-      // passthrough BackdropFilter). Inner backdrop filters then flip the
-      // small seed instead of the screen, and the shader intermediate is
-      // anchored next to the bar.
-      BenchmarkScenario.appScrollRealPillSeeded => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.real,
-        showTop: false,
-        seedBottom: true,
-      ),
-      BenchmarkScenario.appScrollRealTabsOwnLoupeStaticSeeded => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.realTabsOwnLoupeStatic,
-        seedBottom: true,
       ),
       BenchmarkScenario.appIdlePlainBlur => const _AppLikeScene(
         t: 0,
@@ -1253,52 +1204,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         t: t,
         scroll: true,
         chrome: _AppChromeKind.realTabsOwnLoupeStatic,
-      ),
-      BenchmarkScenario.appScrollPassthroughOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.passthroughOnly,
-      ),
-      BenchmarkScenario.appScrollPlainBlurNestedPassthrough => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurNestedPassthrough,
-      ),
-      BenchmarkScenario.appScrollPlainBlurNestedColor => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurNestedColor,
-      ),
-      BenchmarkScenario.appScrollPlainBlurSigma4 => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurSigma4,
-      ),
-      BenchmarkScenario.appScrollPlainBlurSigma20 => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.plainBlurSigma20,
-      ),
-      BenchmarkScenario.appScrollMatrixDownsamplePassthrough => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.matrixDownsamplePassthrough,
-      ),
-      BenchmarkScenario.appScrollPassthroughTopOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.passthroughOnly,
-        showBottom: false,
-      ),
-      BenchmarkScenario.appScrollTwoSaveLayers => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.twoSaveLayers,
-      ),
-      BenchmarkScenario.appScrollColorFilterOnly => _AppLikeScene(
-        t: t,
-        scroll: true,
-        chrome: _AppChromeKind.colorFilterOnly,
       ),
     };
   }
@@ -1384,6 +1289,137 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ),
   );
 
+  static const _pxSettings = LiquidGlassSettings(
+    refractionHeight: 30,
+    frost: 15,
+  );
+
+  Widget _pxStretched(double t, double width, double height, bool animate) {
+    final s = animate ? t : 0.0;
+    return LiquidGlassLayer(
+      settings: _pxSettings,
+      child: Center(
+        child: Transform.scale(
+          scaleX: 1 + .3 * s,
+          scaleY: 1 - .18 * s,
+          child: LiquidGlass(
+            shape: LiquidRoundedSuperellipse(borderRadius: height / 2),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: const Center(child: Icon(Icons.add, size: 22)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pxBlend5(double t) => LiquidGlassLayer(
+    settings: _pxSettings,
+    child: Center(
+      child: SizedBox(
+        width: 400,
+        height: 200,
+        child: LiquidGlassBlendGroup(
+          blend: 40,
+          child: Stack(
+            children: [
+              for (var i = 0; i < 5; i++)
+                Positioned(
+                  left: 8 + i * 78.0,
+                  top: 74 + 30 * math.sin(2 * math.pi * t + i * 1.3),
+                  child: const LiquidGlass.grouped(
+                    shape: LiquidRoundedSuperellipse(borderRadius: 26),
+                    child: SizedBox(width: 72, height: 52),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _pxSheet(double t) {
+    final size = MediaQuery.sizeOf(context);
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: LiquidGlass.withOwnLayer(
+          settings: _pxSettings,
+          shape: const LiquidRoundedSuperellipse(borderRadius: 38),
+          child: SizedBox(
+            width: size.width - 16,
+            height: size.height * (.45 + .45 * t),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pxMultiLayer(double width, {bool tinted = false}) => LiquidGlassLayer(
+    settings: _pxSettings,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: 22),
+          child: SizedBox(width: width, height: 44),
+        ),
+        const SizedBox(width: 8),
+        LiquidGlass(
+          shape: const LiquidOval(),
+          appearance: tinted
+              ? const LiquidGlassAppearance(tint: Color(0x552060FF))
+              : null,
+          child: const SizedBox(width: 44, height: 44),
+        ),
+      ],
+    ),
+  );
+
+  // The #183 Colors scene at 2x: light, dark, clear and blue-tinted glass in
+  // one blend group. Motion breathes the swatches apart and back together.
+  Widget _colorsBlend(double t) {
+    const swatches = [
+      (Offset(-1, -1), LiquidGlassAppearance.ios27RegularLight()),
+      (Offset(1, -1), LiquidGlassAppearance.ios27RegularDark()),
+      (Offset(-1, 1), LiquidGlassAppearance.ios27Clear()),
+      (
+        Offset(1, 1),
+        LiquidGlassAppearance.ios27RegularLight(tint: Color(0xFF0A84FF)),
+      ),
+    ];
+    final spread = 100 + 24 * math.sin(t * math.pi * 2);
+    return LiquidGlassLayer(
+      settings: LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
+      child: Center(
+        child: SizedBox.square(
+          dimension: 560,
+          child: LiquidGlassBlendGroup(
+            blend: 48,
+            child: Stack(
+              children: [
+                for (final (dir, appearance) in swatches)
+                  Positioned(
+                    left: 280 + dir.dx * spread - 108,
+                    top: 280 + dir.dy * spread - 108,
+                    child: LiquidGlass.grouped(
+                      appearance: appearance,
+                      shape: const LiquidOval(),
+                      child: const SizedBox.square(dimension: 216),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _groupedGrid({
     required LiquidGlassSettings settings,
     required int count,
@@ -1427,18 +1463,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
                               : 1,
                         )
                       : null,
-                  shadows: _groupShadowAlpha > 0
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: _groupShadowAlpha,
-                            ),
-                            offset: const Offset(0, 4),
-                            blurRadius: 8,
-                            spreadRadius: -1,
-                          ),
-                        ]
-                      : const [],
                   shape: LiquidRoundedSuperellipse(
                     borderRadius: 8.0 + index,
                   ),
@@ -1690,22 +1714,10 @@ enum _AppChromeKind {
   realShadow,
   realTabs,
   fakeShadow,
-  realSharedKey,
-  plainBlurSharedKey,
-  plainBlurCompose,
-  plainBlurColor,
   realNoFrost,
   realTabsStatic,
   realTabsOwnLoupe,
   realTabsOwnLoupeStatic,
-  passthroughOnly,
-  plainBlurNestedPassthrough,
-  plainBlurNestedColor,
-  plainBlurSigma4,
-  plainBlurSigma20,
-  matrixDownsamplePassthrough,
-  twoSaveLayers,
-  colorFilterOnly,
 }
 
 final _appToolbarSettings = LiquidGlassSettings.ios27ToolbarLight();
@@ -1723,20 +1735,11 @@ class _AppLikeScene extends StatefulWidget {
     required this.t,
     required this.scroll,
     required this.chrome,
-    this.showTop = true,
-    this.showBottom = true,
-    this.seedBottom = false,
   });
 
   final double t;
   final bool scroll;
   final _AppChromeKind chrome;
-  final bool showTop;
-  final bool showBottom;
-
-  /// Wraps the bottom chrome in a pixel-snapped ClipRect + passthrough
-  /// BackdropFilter so nested backdrop filters flip a bar-sized subpass.
-  final bool seedBottom;
 
   @override
   State<_AppLikeScene> createState() => _AppLikeSceneState();
@@ -1744,31 +1747,6 @@ class _AppLikeScene extends StatefulWidget {
 
 class _AppLikeSceneState extends State<_AppLikeScene> {
   late final ScrollController _controller;
-  final Map<(int, int), ImageFilter> _passthroughBySize = {};
-
-  /// Mild saturation boost - same filter *shape* as fake-glass compose.
-  static const _mildSaturation = ColorFilter.matrix(<double>[
-    1.15,
-    -0.075,
-    -0.075,
-    0,
-    0,
-    -0.075,
-    1.15,
-    -0.075,
-    0,
-    0,
-    -0.075,
-    -0.075,
-    1.15,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-  ]);
 
   @override
   void initState() {
@@ -1804,33 +1782,13 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
     }
   }
 
-  bool get _sharesBackdrop =>
-      widget.chrome == _AppChromeKind.realSharedKey ||
-      widget.chrome == _AppChromeKind.plainBlurSharedKey;
-
-  ImageFilter _passthroughAt(Size logical) {
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    final width = math.max(1, (logical.width * dpr).round());
-    final height = math.max(1, (logical.height * dpr).round());
-    return _passthroughBySize.putIfAbsent((width, height), () {
-      final program = _passthroughProgram;
-      if (program == null) {
-        return _passthroughFilter!;
-      }
-      final shader = program.fragmentShader()
-        ..setFloat(0, width.toDouble())
-        ..setFloat(1, height.toDouble());
-      return ImageFilter.shader(shader);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Fixed status-bar inset: MediaQuery padding can be 0 on the first build
     // or change while the harness pins the screen, which would move ~40 px of
     // top-bar filter area between otherwise identical runs.
     const topInset = 48.0;
-    Widget stack = Stack(
+    final stack = Stack(
       fit: StackFit.expand,
       children: [
         const DecoratedBox(
@@ -1854,55 +1812,44 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
         ..._chromeOverlay(topInset),
       ],
     );
-    if (_sharesBackdrop) {
-      stack = BackdropGroup(child: stack);
-    }
     return stack;
   }
 
   List<Widget> _chromeOverlay(double topInset) {
     final topBar = _topBar(topInset);
     final bottomPill = _bottomPill();
-    final topSize = Size(
-      MediaQuery.sizeOf(context).width - 16,
-      56 + topInset,
-    );
-    const pillSize = Size(340, 64);
     if (widget.chrome == _AppChromeKind.realOneLayer) {
       return [
         LiquidGlassLayer(
           settings: _layerSettings,
           defaultAppearance: _appToolbarAppearance,
-          useBackdropGroup: _sharesBackdrop,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (widget.showTop)
-                Positioned(
-                  top: 0,
-                  left: 8,
-                  right: 8,
+              Positioned(
+                top: 0,
+                left: 8,
+                right: 8,
+                child: LiquidGlass(
+                  shape: const LiquidRoundedSuperellipse(
+                    borderRadius: 28,
+                  ),
+                  child: topBar,
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 24,
+                child: Center(
                   child: LiquidGlass(
                     shape: const LiquidRoundedSuperellipse(
-                      borderRadius: 28,
+                      borderRadius: 32,
                     ),
-                    child: topBar,
+                    child: bottomPill,
                   ),
                 ),
-              if (widget.showBottom)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 24,
-                  child: Center(
-                    child: LiquidGlass(
-                      shape: const LiquidRoundedSuperellipse(
-                        borderRadius: 32,
-                      ),
-                      child: bottomPill,
-                    ),
-                  ),
-                ),
+              ),
             ],
           ),
         ),
@@ -1915,42 +1862,26 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
         widget.chrome == _AppChromeKind.realTabsOwnLoupe ||
         widget.chrome == _AppChromeKind.realTabsOwnLoupeStatic;
     return [
-      if (widget.showTop)
-        Positioned(
-          top: 0,
-          left: 8,
-          right: 8,
-          child: _wrapChrome(
-            radius: 28,
-            child: topBar,
-            filterSize: topSize,
-          ),
+      Positioned(
+        top: 0,
+        left: 8,
+        right: 8,
+        child: _wrapChrome(
+          radius: 28,
+          child: topBar,
         ),
-      if (widget.showBottom)
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 24,
-          child: Center(
-            child: _seed(
-              tabs
-                  ? _realTabsPill(bottomPill)
-                  : _wrapChrome(
-                      radius: 32,
-                      child: bottomPill,
-                      filterSize: pillSize,
-                    ),
-            ),
-          ),
+      ),
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 24,
+        child: Center(
+          child: tabs
+              ? _realTabsPill(bottomPill)
+              : _wrapChrome(radius: 32, child: bottomPill),
         ),
+      ),
     ];
-  }
-
-  /// E3: [LiquidGlassCapture] around the chrome; it sizes itself to the
-  /// blur, refraction and shadow reach of the glass inside.
-  Widget _seed(Widget child) {
-    if (!widget.seedBottom) return child;
-    return LiquidGlassCapture(child: child);
   }
 
   Widget _topBar(double topInset) => SizedBox(
@@ -2003,7 +1934,6 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
     return LiquidGlassLayer(
       settings: _layerSettings,
       defaultAppearance: _appToolbarAppearance,
-      useBackdropGroup: _sharesBackdrop,
       child: LiquidGlassBlendGroup(
         child: SizedBox(
           width: 340,
@@ -2071,11 +2001,9 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
       ? _appToolbarSettings.copyWith(frost: 0)
       : _appToolbarSettings;
 
-  static ImageFilter get _sigma7Blur => _blurSigma(7);
-
-  static ImageFilter _blurSigma(double sigma) => ImageFilter.blur(
-    sigmaX: sigma,
-    sigmaY: sigma,
+  static final ImageFilter _sigma7Blur = ImageFilter.blur(
+    sigmaX: 7,
+    sigmaY: 7,
     tileMode: TileMode.mirror,
   );
 
@@ -2083,25 +2011,6 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
     required double radius,
     required Widget child,
     required ImageFilter filter,
-    required bool grouped,
-    double tintAlpha = .45,
-  }) {
-    final content = ColoredBox(
-      color: Colors.white.withValues(alpha: tintAlpha),
-      child: child,
-    );
-    return ClipRSuperellipse(
-      borderRadius: BorderRadius.circular(radius),
-      child: grouped
-          ? BackdropFilter.grouped(filter: filter, child: content)
-          : BackdropFilter(filter: filter, child: content),
-    );
-  }
-
-  Widget _nestedBackdropChrome({
-    required double radius,
-    required Widget child,
-    required ImageFilter inner,
   }) {
     final content = ColoredBox(
       color: Colors.white.withValues(alpha: .45),
@@ -2109,25 +2018,16 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
     );
     return ClipRSuperellipse(
       borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: _sigma7Blur,
-        child: BackdropFilter(
-          filter: inner,
-          blendMode: BlendMode.src,
-          child: content,
-        ),
-      ),
+      child: BackdropFilter(filter: filter, child: content),
     );
   }
 
   Widget _wrapChrome({
     required double radius,
     required Widget child,
-    Size? filterSize,
   }) {
     final shape = LiquidRoundedSuperellipse(borderRadius: radius);
     final shadows = _shadowsFor(widget.chrome);
-    final logical = filterSize ?? Size.zero;
     switch (widget.chrome) {
       case _AppChromeKind.opaque:
         return DecoratedBox(
@@ -2144,103 +2044,6 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
           radius: radius,
           child: child,
           filter: _sigma7Blur,
-          grouped: false,
-        );
-      case _AppChromeKind.plainBlurSharedKey:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: _sigma7Blur,
-          grouped: true,
-        );
-      case _AppChromeKind.plainBlurCompose:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: ImageFilter.compose(
-            inner: _sigma7Blur,
-            outer: _passthroughAt(logical),
-          ),
-          grouped: false,
-        );
-      case _AppChromeKind.plainBlurColor:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: ImageFilter.compose(
-            inner: _sigma7Blur,
-            outer: _mildSaturation,
-          ),
-          grouped: false,
-        );
-      case _AppChromeKind.passthroughOnly:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: _passthroughAt(logical),
-          grouped: false,
-          tintAlpha: 0.08,
-        );
-      case _AppChromeKind.plainBlurNestedPassthrough:
-        return _nestedBackdropChrome(
-          radius: radius,
-          child: child,
-          inner: _passthroughAt(logical),
-        );
-      case _AppChromeKind.plainBlurNestedColor:
-        return _nestedBackdropChrome(
-          radius: radius,
-          child: child,
-          inner: _mildSaturation,
-        );
-      case _AppChromeKind.plainBlurSigma4:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: _blurSigma(4),
-          grouped: false,
-        );
-      case _AppChromeKind.plainBlurSigma20:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: _blurSigma(20),
-          grouped: false,
-        );
-      case _AppChromeKind.matrixDownsamplePassthrough:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: ImageFilter.compose(
-            inner: ImageFilter.matrix(
-              Matrix4.diagonal3Values(0.25, 0.25, 1).storage,
-              filterQuality: FilterQuality.low,
-            ),
-            outer: _passthroughAt(logical),
-          ),
-          grouped: false,
-          tintAlpha: 0.08,
-        );
-      case _AppChromeKind.twoSaveLayers:
-        return ClipRSuperellipse(
-          borderRadius: BorderRadius.circular(radius),
-          child: RepaintBoundary(
-            child: Opacity(
-              opacity: 0.99,
-              child: ColoredBox(
-                color: const Color(0xffe0e0e0),
-                child: child,
-              ),
-            ),
-          ),
-        );
-      case _AppChromeKind.colorFilterOnly:
-        return _plainBlurChrome(
-          radius: radius,
-          child: child,
-          filter: _mildSaturation,
-          grouped: false,
-          tintAlpha: 0.08,
         );
       case _AppChromeKind.fake:
       case _AppChromeKind.fakeShadow:
@@ -2248,7 +2051,6 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
           fake: true,
           settings: _layerSettings,
           defaultAppearance: _appToolbarAppearance,
-          useBackdropGroup: _sharesBackdrop,
           child: LiquidGlass(
             shape: shape,
             shadows: shadows,
@@ -2262,12 +2064,10 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
       case _AppChromeKind.realTabsOwnLoupe:
       case _AppChromeKind.realTabsOwnLoupeStatic:
       case _AppChromeKind.realOneLayer:
-      case _AppChromeKind.realSharedKey:
       case _AppChromeKind.realNoFrost:
         return LiquidGlassLayer(
           settings: _layerSettings,
           defaultAppearance: _appToolbarAppearance,
-          useBackdropGroup: _sharesBackdrop,
           child: LiquidGlass(
             shape: shape,
             shadows: shadows,

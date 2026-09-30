@@ -7,14 +7,15 @@ EXAMPLE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_DIR="$(cd "$EXAMPLE_DIR/../../.." && pwd)"
 PKG="com.example.liquid_glass_renderer_example"
 ACTIVITY="$PKG/.MainActivity"
-DEFAULT_SCENARIOS="appScrollOpaque appScrollPlainBlur appScrollFake appScrollReal appScrollRealOneLayer appScrollRealShadow appScrollRealTabs appScrollFakeShadow appIdleReal appIdleOpaque baselineMotion realToolbarMaterial fakeToolbarMaterial"
+# shellcheck source=bench_scenes.sh
+source "$SCRIPT_DIR/bench_scenes.sh"
 SERIAL="${ANDROID_SERIAL:-}"
 REPETITIONS=3
 WARMUP=5
 MEASURE=20
 SKIP_BUILD=0
 OUT_DIR=""
-SCENARIOS="$DEFAULT_SCENARIOS"
+SCENARIOS="core"
 MEASURE_PACKAGE=""
 MEASURE_SECONDS=30
 MEASURE_LABEL="foreground"
@@ -25,7 +26,7 @@ ADB=(adb)
 usage() {
   cat <<'EOF'
 Usage:
-  android_gpu_bench.sh scenarios [--serial SERIAL] [--scenarios "a b c"]
+  android_gpu_bench.sh scenarios [--serial SERIAL] [--scenarios core|app|micro|pixel|all|"a b c"]
       [--repetitions N] [--warmup S] [--measure S] [--skip-build] [--out DIR]
       [--pin PIN]
   android_gpu_bench.sh measure --package PKG --seconds S --label NAME
@@ -368,6 +369,7 @@ parse_common_args() {
         ;;
     esac
   done
+  [[ -n "$SERIAL" ]] || SERIAL="$(adb get-serialno | tr -d '\r')"
   ADB=(adb -s "$SERIAL")
 }
 
@@ -409,7 +411,8 @@ cmd_scenarios() {
   trap restore_device EXIT
   local -a scenario_list
   # shellcheck disable=SC2206
-  scenario_list=($SCENARIOS)
+  scenario_list=($(bench_resolve_scenes "$SCENARIOS"))
+  [[ ${#scenario_list[@]} -gt 0 ]] || die "no scenes"
   local uid
   uid="$(package_uid "$PKG" || true)"
   python3 - "$OUT_DIR/meta.json" "$SERIAL" "$PKG" "$WARMUP" "$MEASURE" "$REPETITIONS" "$uid" <<'PY'

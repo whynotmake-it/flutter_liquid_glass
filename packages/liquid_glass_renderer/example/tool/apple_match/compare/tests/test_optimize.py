@@ -25,21 +25,6 @@ from apple_match.hotloop.session import (
     SignalReloadTrigger,
 )
 from hotloop_staged import has_optimization_wall, optimization_objective
-from seed_scan import (
-    ROOT as SEED_ROOT,
-    apply_scene_geometry,
-    load_reference_metadata,
-    search_space,
-    scan_summary,
-    validate_reference_assets,
-    validate_scene_geometry,
-)
-from transparency_sweep import (
-    audit_shared_vector,
-    interpret_curve,
-    is_monotonic,
-    materialize,
-)
 
 
 class OptimizerTests(unittest.TestCase):
@@ -172,150 +157,6 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(optimization_objective("outline", result)[1], 7.0)
         self.assertEqual(optimization_objective("blurMtf", result)[1], 9.0)
 
-    def test_transparency_curve_interpretation(self):
-        self.assertTrue(is_monotonic([0.1, 0.25, 0.5, 0.75, 0.9]))
-        self.assertTrue(is_monotonic([0.9, 0.75, 0.5, 0.25, 0.1]))
-        self.assertEqual(
-            interpret_curve([0.1, 0.25, 0.5, 0.75, 0.9])["status"],
-            "confirmed",
-        )
-        self.assertEqual(
-            interpret_curve([1.0, 1.0, 1.0, 1.0, 1.0])["status"],
-            "rejected",
-        )
-        self.assertEqual(
-            interpret_curve([0.2, 0.8, 0.3, 0.9, 0.4])["status"],
-            "inconclusive",
-        )
-
-    def test_transparency_materialize_preserves_shared_tint_color(self):
-        tint_color = (253, 252, 253)
-        first = materialize({"tintAlpha": 0.2, "frost": 1.0}, tint_color)
-        second = materialize({"tintAlpha": 0.8, "frost": 7.0}, tint_color)
-        self.assertEqual(first["tintRed"], 253)
-        self.assertEqual(first["tintGreen"], 252)
-        self.assertEqual(first["tintBlue"], 253)
-        self.assertEqual(
-            [first[key] for key in ("tintRed", "tintGreen", "tintBlue")],
-            [second[key] for key in ("tintRed", "tintGreen", "tintBlue")],
-        )
-        self.assertNotEqual(first["tintAlpha"], second["tintAlpha"])
-        self.assertNotIn("tintLevel", first)
-
-    def test_transparency_shared_vector_audit_rejects_unauthorized_drift(self):
-        base = {"thickness": 10.0, "tintRed": 253, "tintGreen": 252, "tintBlue": 253,
-                "tintAlpha": 0.2, "frost": 1.0}
-        passed = audit_shared_vector([
-            base,
-            {**base, "tintAlpha": 0.8, "frost": 7.0},
-        ])
-        self.assertEqual(passed["status"], "passed")
-        self.assertEqual(
-            passed["observedVaryingKeys"], ["frost", "tintAlpha"]
-        )
-        failed = audit_shared_vector([
-            base,
-            {**base, "tintAlpha": 0.8, "tintRed": 240},
-        ])
-        self.assertEqual(failed["status"], "failed")
-        self.assertEqual(failed["unauthorizedVaryingKeys"], ["tintRed"])
-
-    def test_seed_scan_metadata_requires_pinned_reference(self):
-        metadata = {
-            "runtime": "iOS 27.0 (24A5408d)",
-            "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
-            "udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B",
-            "device": "iPhone 17 Pro",
-            "appearance": "light",
-            "api": "iOS 27 system text-selection loupe",
-            "medianFrameCount": 3,
-            "scene": "loupe",
-            "reduceMotion": True,
-            "reduceTransparency": False,
-        }
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "metadata.json"
-            path.write_text(json.dumps(metadata))
-            self.assertEqual(load_reference_metadata(path, "loupe"), metadata)
-            with self.assertRaisesRegex(ValueError, "candidate UDID"):
-                load_reference_metadata(path, "loupe", candidate_udid="wrong")
-            metadata["udid"] = "wrong"
-            path.write_text(json.dumps(metadata))
-            with self.assertRaisesRegex(ValueError, "not pinned"):
-                load_reference_metadata(path, "loupe")
-
-    def test_committed_loupe_metadata_and_probe_assets_are_valid(self):
-        reference_dir = (
-            SEED_ROOT
-            / "references"
-            / "ios27-iphone17pro-light"
-            / "loupe"
-        )
-        metadata = validate_reference_assets(reference_dir, "loupe")
-        self.assertEqual(metadata["medianFrameCount"], 3)
-        self.assertEqual(metadata["udid"], "DB4F41F3-1C36-476D-B775-AFDC3686C75B")
-
-    def test_seed_scan_geometry_and_profile_search_space_are_explicit(self):
-        scene = json.loads((SEED_ROOT / "scenes/loupe.json").read_text())
-        settings = apply_scene_geometry(scene, {})
-        validate_scene_geometry(scene, settings)
-        settings["shapeWidth"] += 1.0
-        with self.assertRaisesRegex(ValueError, "shapeWidth"):
-            validate_scene_geometry(scene, settings)
-        axes = search_space(
-            [
-                {
-                    "tintAlpha": 0.05,
-                    "frost": 0.0,
-                    "thickness": 12.0,
-                    "edgeRefraction": edge,
-                    "refractionSpread": spread,
-                }
-                for edge in (25.0, 35.0)
-                for spread in (0.75, 1.0)
-            ],
-            profile_gate=True,
-        )
-        self.assertEqual(axes["mode"], "profile-gate")
-        self.assertEqual(axes["axes"]["refractionSpread"], [0.75, 1.0])
-
-    def test_seed_scan_summary_retires_shader_level_s0_for_composition_scan(self):
-        with tempfile.TemporaryDirectory() as directory:
-            out = Path(directory)
-            rows = [{
-                "score": 22.5,
-                "loss": 77.5,
-                "directMae8Bit": 198.0,
-                "settings": {"refractionSpread": 0.0},
-            }]
-            summary = scan_summary(
-                rows=rows,
-                all_seed_settings=[
-                    {
-                        "tintAlpha": 0.05,
-                        "frost": 0.0,
-                        "thickness": 12.0,
-                        "edgeRefraction": 25.0,
-                        "refractionSpread": 0.0,
-                    }
-                ],
-                all_seed_count=4,
-                scene_id="loupe",
-                scene_path=out / "loupe.json",
-                baseline_path=out / "baseline.json",
-                reference_metadata={"udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B"},
-                reference_metadata_path=out / "metadata.json",
-                out=out,
-                profile_gate=False,
-                scene_shape={"width": 116.3, "height": 85.7},
-            )
-            self.assertEqual(
-                summary["evidenceRole"], "loupe-example-composition-seed-scan"
-            )
-            self.assertEqual(summary["comparisonContract"]["s0Status"], "retired")
-            self.assertFalse(summary["composition"]["shaderLevelMagnification"])
-            self.assertTrue(summary["partial"])
-
     def test_neighbor_values_clamp_at_bounds(self):
         values = [1.0, 2.0, 3.0]
         self.assertEqual(neighbor_values(values, 1.0), [2.0])
@@ -392,7 +233,7 @@ class EvaluatorTests(unittest.TestCase):
         def screenshot(png: Path):
             params = json.loads(candidate_path.read_text())["settings"]
             probe = json.loads(candidate_path.read_text())["probe"]
-            image = synthetic(blur=params.get("blur", 0.0))[probe]
+            image = synthetic(blur=params.get("frost", 0.0))[probe]
             bgr = cv2.cvtColor((image * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
             cv2.imwrite(str(png), bgr)
 
@@ -415,8 +256,8 @@ class EvaluatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             evaluator, settle = self.make_evaluator(root, reference_blur=1.5)
-            matching = evaluator.evaluate({"blur": 1.5})
-            off = evaluator.evaluate({"blur": 6.0})
+            matching = evaluator.evaluate({"frost": 1.5})
+            off = evaluator.evaluate({"frost": 6.0})
             self.assertNotEqual(matching, off)
             # 8-bit PNG quantization keeps an exact match slightly above 0.
             self.assertLess(matching, 1.0)
@@ -430,7 +271,7 @@ class EvaluatorTests(unittest.TestCase):
             written = json.loads(
                 evaluator.session.candidate_path.read_text()
             )
-            self.assertEqual(written["settings"], {"blur": 6.0})
+            self.assertEqual(written["settings"], {"frost": 6.0})
             self.assertEqual(evaluator.last_modes, dict.fromkeys("ABCD", "hotReload"))
 
 

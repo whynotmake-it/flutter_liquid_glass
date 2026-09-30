@@ -50,7 +50,9 @@ TRACE_WAIT_FOR_READY="${LIQUID_GLASS_BENCHMARK_TRACE_WAIT_FOR_READY:-true}"
 REPETITIONS="${LIQUID_GLASS_BENCHMARK_REPETITIONS:-3}"
 ENFORCE_THRESHOLDS="${LIQUID_GLASS_BENCHMARK_ENFORCE:-false}"
 SKIP_BUILD="${LIQUID_GLASS_BENCHMARK_SKIP_BUILD:-false}"
-SCENARIOS="${LIQUID_GLASS_BENCHMARK_SCENARIOS:-baselineMotion staticSingle realLightingOnly fakeLightingOnly realBlurOnly fakeBlurOnly realHighBlurOnly fakeHighBlurOnly realSaturationOnly fakeSaturationOnly realBlurSaturation fakeBlurSaturation realToolbarMaterial fakeToolbarMaterial realToFakeTransition translatedSingle ancestorTranslatedLayer scaledRotatedSingle grouped4Motion fakeGrouped4Motion fakeUngrouped4Motion grouped8Motion grouped16Motion independent4Motion independent8Motion independent16Motion independent16SharedBackdrop sparse16Motion relativeBlendMotion dynamicBlend16 resizeAnimated layerChurn largeStatic largeResize largeShrinkSettled fakeStatic fakeLarge}"
+# A suite from bench_scenes.sh (core, app, micro, all) or scene names.
+source "$SCRIPT_DIR/bench_scenes.sh"
+SCENARIOS="$(bench_resolve_scenes "${LIQUID_GLASS_BENCHMARK_SCENARIOS:-core}")"
 # Metal tracing is opt-in for on-demand attribution: the kdebug rolling
 # buffer retains a fixed event count, not a fixed duration, so xctrace GPU
 # capture density varies per run by design and cannot gate. Default runs

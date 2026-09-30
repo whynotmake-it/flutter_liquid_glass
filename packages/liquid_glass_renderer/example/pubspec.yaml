@@ -26,8 +26,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  shaders:
-    - shaders/passthrough.frag
-
   assets:
     - assets/backdrops/
