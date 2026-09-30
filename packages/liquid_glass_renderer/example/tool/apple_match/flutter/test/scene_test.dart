@@ -100,18 +100,20 @@ void main() {
 
   test('maps core optical settings', () {
     const values = <String, Object?>{
-      'blur': 9.0,
-      'thickness': 12.0,
-      'lightIntensity': 0.4,
-      'edgeAlpha': 0.2,
-      'edgeWidth': 1.0,
-      'contourTransmissionRatio': 0.75,
+      'frost': 9.0,
+      'refractionHeight': 12.0,
+      'refractionAmount': 54.5,
+      'backdropShrink': 0.1,
+      'dispersion': -0.06,
+      'highlight': 0.4,
+      'contourStrength': 0.2,
+      'contourWidth': 1.0,
+      'contourTransmittance': 0.75,
       'contourOffset': 0.5,
       'curvatureLighting': 0.4,
-      'innerShadowStrength': 0.025,
-      'innerShadowDepth': 12.0,
+      'bevelShadowStrength': 0.025,
+      'bevelShadowDepth': 12.0,
       'exteriorShadowSizeResponse': 0.8,
-      'refractiveIndex': 1.15,
       'saturation': 1.2,
     };
     final settings = matchGlassSettings(values);
@@ -127,7 +129,9 @@ void main() {
     expect(settings.bevelShadowStrength, 0.025);
     expect(settings.bevelShadowDepth, 12.0);
     expect(settings.exteriorShadowSizeResponse, 0.8);
-    expect(settings.refractionAmount, closeTo(54.5, 0.1));
+    expect(settings.refractionAmount, 54.5);
+    expect(settings.backdropShrink, 0.1);
+    expect(settings.dispersion, -0.06);
     expect(appearance.saturation, 1.2);
   });
 }

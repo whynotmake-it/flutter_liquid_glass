@@ -43,13 +43,20 @@ class MaterialSections extends StatelessWidget {
                       edit(settings.copyWith(refractionAmount: v)),
                 ),
                 SliderRow(
-                  title: 'Dispersion',
-                  value: settings.chromaticAberration,
+                  title: 'Backdrop Shrink',
+                  value: settings.backdropShrink,
                   min: 0,
-                  max: 0.05,
+                  max: 0.5,
+                  format: (v) => v.toStringAsFixed(2),
+                  onChanged: (v) => edit(settings.copyWith(backdropShrink: v)),
+                ),
+                SliderRow(
+                  title: 'Dispersion',
+                  value: settings.dispersion,
+                  min: -0.1,
+                  max: 0.1,
                   format: (v) => v.toStringAsFixed(3),
-                  onChanged: (v) =>
-                      edit(settings.copyWith(chromaticAberration: v)),
+                  onChanged: (v) => edit(settings.copyWith(dispersion: v)),
                 ),
                 SliderRow(
                   title: 'Blur',

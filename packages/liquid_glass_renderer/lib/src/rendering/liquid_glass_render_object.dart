@@ -304,10 +304,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setColor(tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
-          settings.effectiveChromaticAberration,
+          settings.effectiveDispersion,
           settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.effectiveHighlight,
-          settings.effectiveMagnification,
+          1 - settings.effectiveBackdropShrink,
           saturation,
         ])
         ..setOffset(
@@ -874,20 +874,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// How far outside the material the composed filter reads the backdrop:
   /// the blur kernel (3 sigma), the peak edge displacement including its
-  /// chromatic split, and, below unit magnification, the extra content
-  /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
-  /// the filter samples its own edge.
+  /// dispersion, and, with [LiquidGlassSettings.backdropShrink], the extra
+  /// content revealed on the face. A `LiquidGlassCapture` must contain this
+  /// reach or the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
     final blur = blurPassSigma > 0
         ? blurPassSigma * 3 + 1 / devicePixelRatio
         : (softensInShader ? 1 / devicePixelRatio : 0.0);
     final displacement =
         settings.effectiveDisplacementScale *
-        (1 + settings.effectiveChromaticAberration.abs() * 0.5);
-    final scale = settings.effectiveMagnification;
-    final revealed = scale < 1
-        ? (1 / scale - 1) * max(material.width, material.height) / 2
-        : 0.0;
+        (1 + settings.effectiveDispersion.abs() * 0.5);
+    final scale = 1 - settings.effectiveBackdropShrink;
+    final revealed = (1 / scale - 1) * max(material.width, material.height) / 2;
     return blur + displacement + revealed;
   }
 

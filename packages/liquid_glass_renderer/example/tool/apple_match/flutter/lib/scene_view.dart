@@ -1,17 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'dart:math' as math;
-
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import 'scene.dart';
-
-/// Edge displacement of the retired Snell-cap profile, which harness vectors
-/// written before `edgeRefraction` stored as `thickness` + `refractiveIndex`.
-double _legacyEdgeRefraction(double thickness, double refractiveIndex) =>
-    8.0 *
-    thickness *
-    math.sqrt(math.max(0.0, refractiveIndex * refractiveIndex - 1));
 
 /// Maps a harness settings JSON object onto structural renderer settings.
 ///
@@ -22,38 +13,16 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       (settings[key] as num?)?.toDouble() ?? fallback;
   const defaults = LiquidGlassSettings();
   return LiquidGlassSettings(
-    refractionHeight: number(
-      'refractionHeight',
-      number('thickness', defaults.refractionHeight),
-    ),
-    refractionAmount: number(
-      'refractionAmount',
-      number(
-        'edgeRefraction',
-        settings.containsKey('refractiveIndex')
-            ? _legacyEdgeRefraction(
-                number('thickness', defaults.refractionHeight),
-                number('refractiveIndex', 1),
-              )
-            : defaults.refractionAmount,
-      ),
-    ),
-    // ignore: deprecated_member_use
-    magnification: number(
-      'magnification',
-      // ignore: deprecated_member_use
-      number('backdropScale', defaults.magnification),
-    ),
+    refractionHeight: number('refractionHeight', defaults.refractionHeight),
+    refractionAmount: number('refractionAmount', defaults.refractionAmount),
+    backdropShrink: number('backdropShrink', defaults.backdropShrink),
     refractionFitsShape:
         settings['refractionFitsShape'] as bool? ??
         defaults.refractionFitsShape,
     smoothRefraction:
         settings['smoothRefraction'] as bool? ?? defaults.smoothRefraction,
-    frost: number('frost', number('blur', defaults.frost)),
-    highlight: number(
-      'highlight',
-      number('lightIntensity', defaults.highlight),
-    ),
+    frost: number('frost', defaults.frost),
+    highlight: number('highlight', defaults.highlight),
     highlightWidth: number('highlightWidth', defaults.highlightWidth),
     highlightWrap: number('highlightWrap', defaults.highlightWrap),
     highlightOppositeStrength: number(
@@ -61,18 +30,12 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       defaults.highlightOppositeStrength,
     ),
     curvatureLighting: number('curvatureLighting', defaults.curvatureLighting),
-    contourStrength: number(
-      'contourStrength',
-      number('edgeAlpha', defaults.contourStrength),
-    ),
-    contourWidth: number(
-      'contourWidth',
-      number('edgeWidth', defaults.contourWidth),
-    ),
+    contourStrength: number('contourStrength', defaults.contourStrength),
+    contourWidth: number('contourWidth', defaults.contourWidth),
     contourOffset: number('contourOffset', defaults.contourOffset),
     contourTransmittance: number(
       'contourTransmittance',
-      number('contourTransmissionRatio', defaults.contourTransmittance),
+      defaults.contourTransmittance,
     ),
     contourDirectionality: number(
       'contourDirectionality',
@@ -80,16 +43,10 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     ),
     bevelShadowStrength: number(
       'bevelShadowStrength',
-      number('innerShadowStrength', defaults.bevelShadowStrength),
+      defaults.bevelShadowStrength,
     ),
-    bevelShadowDepth: number(
-      'bevelShadowDepth',
-      number('innerShadowDepth', defaults.bevelShadowDepth),
-    ),
-    bevelShadowOffset: number(
-      'bevelShadowOffset',
-      number('innerShadowOffset', defaults.bevelShadowOffset),
-    ),
+    bevelShadowDepth: number('bevelShadowDepth', defaults.bevelShadowDepth),
+    bevelShadowOffset: number('bevelShadowOffset', defaults.bevelShadowOffset),
     bevelShadowDirectionality: number(
       'bevelShadowDirectionality',
       defaults.bevelShadowDirectionality,
@@ -102,10 +59,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'exteriorShadowSizeResponse',
       defaults.exteriorShadowSizeResponse,
     ),
-    chromaticAberration: number(
-      'chromaticAberration',
-      defaults.chromaticAberration,
-    ),
+    dispersion: number('dispersion', defaults.dispersion),
     tintAmount: number('tintAmount', defaults.tintAmount),
   );
 }
@@ -492,7 +446,7 @@ class _MatchLoupe extends StatelessWidget {
         // The system text-selection loupe is a clear lens. Never let a
         // candidate's ordinary material vector turn this holdout into a
         // frosted, opaque pill or a full-face shader zoom.
-        settings: settings.copyWith(magnification: 1, frost: 0),
+        settings: settings.copyWith(backdropShrink: 0, frost: 0),
         appearance: const LiquidGlassAppearance(),
         shadows: shadows,
       ),

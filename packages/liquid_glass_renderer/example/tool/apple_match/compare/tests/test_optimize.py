@@ -203,7 +203,7 @@ class OptimizerTests(unittest.TestCase):
         self.assertNotIn("tintLevel", first)
 
     def test_transparency_shared_vector_audit_rejects_unauthorized_drift(self):
-        base = {"thickness": 10.0, "tintRed": 253, "tintGreen": 252, "tintBlue": 253,
+        base = {"refractionHeight": 10.0, "tintRed": 253, "tintGreen": 252, "tintBlue": 253,
                 "tintAlpha": 0.2, "frost": 1.0}
         passed = audit_shared_vector([
             base,
@@ -267,8 +267,8 @@ class OptimizerTests(unittest.TestCase):
                 {
                     "tintAlpha": 0.05,
                     "frost": 0.0,
-                    "thickness": 12.0,
-                    "edgeRefraction": edge,
+                    "refractionHeight": 12.0,
+                    "refractionAmount": edge,
                     "refractionSpread": spread,
                 }
                 for edge in (25.0, 35.0)
@@ -294,8 +294,8 @@ class OptimizerTests(unittest.TestCase):
                     {
                         "tintAlpha": 0.05,
                         "frost": 0.0,
-                        "thickness": 12.0,
-                        "edgeRefraction": 25.0,
+                        "refractionHeight": 12.0,
+                        "refractionAmount": 25.0,
                         "refractionSpread": 0.0,
                     }
                 ],
@@ -392,7 +392,7 @@ class EvaluatorTests(unittest.TestCase):
         def screenshot(png: Path):
             params = json.loads(candidate_path.read_text())["settings"]
             probe = json.loads(candidate_path.read_text())["probe"]
-            image = synthetic(blur=params.get("blur", 0.0))[probe]
+            image = synthetic(blur=params.get("frost", 0.0))[probe]
             bgr = cv2.cvtColor((image * 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
             cv2.imwrite(str(png), bgr)
 
@@ -415,8 +415,8 @@ class EvaluatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             evaluator, settle = self.make_evaluator(root, reference_blur=1.5)
-            matching = evaluator.evaluate({"blur": 1.5})
-            off = evaluator.evaluate({"blur": 6.0})
+            matching = evaluator.evaluate({"frost": 1.5})
+            off = evaluator.evaluate({"frost": 6.0})
             self.assertNotEqual(matching, off)
             # 8-bit PNG quantization keeps an exact match slightly above 0.
             self.assertLess(matching, 1.0)
@@ -430,7 +430,7 @@ class EvaluatorTests(unittest.TestCase):
             written = json.loads(
                 evaluator.session.candidate_path.read_text()
             )
-            self.assertEqual(written["settings"], {"blur": 6.0})
+            self.assertEqual(written["settings"], {"frost": 6.0})
             self.assertEqual(evaluator.last_modes, dict.fromkeys("ABCD", "hotReload"))
 
 

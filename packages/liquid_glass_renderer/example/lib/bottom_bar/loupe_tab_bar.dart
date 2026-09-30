@@ -58,7 +58,7 @@ class LoupeTabBar extends StatefulWidget {
   /// Settings of the loupe's own glass layer.
   ///
   /// Apple's loupe appears to shrink what it covers slightly; set
-  /// `magnification` here for that. Never enlarge: the
+  /// `backdropShrink` here for that. Never enlarge: the
   /// icons already scale up while the bar is held.
   final LiquidGlassSettings loupeSettings;
 
@@ -68,7 +68,7 @@ class LoupeTabBar extends StatefulWidget {
   static const defaultLoupeSettings = LiquidGlassSettings(
     refractionHeight: 24,
     refractionAmount: 40,
-    chromaticAberration: .1,
+    dispersion: .1,
     frost: 0,
     contourStrength: .1,
     contourWidth: 1,

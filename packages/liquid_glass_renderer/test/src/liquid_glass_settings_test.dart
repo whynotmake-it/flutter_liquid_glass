@@ -11,7 +11,7 @@ void main() {
     expect(light.frost, 7);
     expect(light.refractionAmount, 60);
     expect(light.refractionFitsShape, isTrue);
-    expect(light.chromaticAberration, 0);
+    expect(light.dispersion, 0);
     expect(light.highlight, 1);
     expect(light.highlightWidth, 1.2);
     expect(light.highlightOppositeStrength, 1);
@@ -102,9 +102,9 @@ void main() {
     const settings = LiquidGlassSettings(
       refractionHeight: 40,
       refractionAmount: 80,
-      magnification: .75,
+      backdropShrink: .25,
       frost: 12,
-      chromaticAberration: 2,
+      dispersion: 2,
       highlight: .6,
       highlightWidth: 2.5,
       highlightWrap: .3,
@@ -121,11 +121,11 @@ void main() {
     );
     expect(settings.effectiveRefractionHeight, 40);
     expect(settings.effectiveRefractionAmount, 80);
-    expect(settings.effectiveMagnification, .75);
+    expect(settings.effectiveBackdropShrink, .25);
     expect(settings.effectiveDisplacementScale, 80);
     expect(settings.effectiveEdgeDistanceRange, 40);
     expect(settings.effectiveFrost, 12);
-    expect(settings.effectiveChromaticAberration, 2);
+    expect(settings.effectiveDispersion, 2);
     expect(settings.effectiveHighlight, .6);
     expect(settings.effectiveHighlightWidth, 2.5);
     expect(settings.effectiveContourStrength, .3);
@@ -141,9 +141,9 @@ void main() {
       refractionAmount: 42,
       refractionFitsShape: false,
       smoothRefraction: false,
-      magnification: .8,
+      backdropShrink: .2,
       frost: 7,
-      chromaticAberration: .2,
+      dispersion: .2,
       highlight: .4,
       highlightWidth: 3,
       highlightWrap: .2,
@@ -162,18 +162,15 @@ void main() {
     expect(LiquidGlassSettings.fromJson(original.toJson()), original);
   });
 
-  test('JSON written before the refraction model change still loads', () {
-    final restored = LiquidGlassSettings.fromJson(const {
-      'thickness': 12.0,
-      'edgeRefraction': 27.42,
-      'refractionSpread': 0.5,
-      'backdropScale': 0.9,
-    });
-    expect(restored.refractionHeight, 12);
-    expect(restored.refractionAmount, 27.42);
-    expect(restored.magnification, .9);
-    expect(restored.refractionFitsShape, isTrue);
-    expect(restored.smoothRefraction, isTrue);
+  test('backdrop shrink never enlarges the backdrop', () {
+    expect(
+      const LiquidGlassSettings(backdropShrink: -1).effectiveBackdropShrink,
+      0,
+    );
+    expect(
+      const LiquidGlassSettings(backdropShrink: 2).effectiveBackdropShrink,
+      .75,
+    );
   });
 
   test('refraction and lighting depth stay independent', () {
