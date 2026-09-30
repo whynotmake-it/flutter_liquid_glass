@@ -425,6 +425,7 @@ enum BenchmarkScenario {
   realClearMaterial,
   realClearUnfrosted,
   realClearSmooth,
+  realToolbarSmooth,
   fakeLightingOnly,
   fakeBlurOnly,
   fakeHighBlurOnly,
@@ -727,6 +728,13 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         ).copyWith(smoothRefraction: true),
         t,
         appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realToolbarSmooth => _realLayer(
+        const LiquidGlassSettings.ios27ToolbarLight().copyWith(
+          smoothRefraction: true,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
       BenchmarkScenario.fakeLightingOnly => _fakeLayer(
         const LiquidGlassSettings(
