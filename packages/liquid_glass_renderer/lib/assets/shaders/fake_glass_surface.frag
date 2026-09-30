@@ -72,6 +72,13 @@ vec2 shapeNormal(vec2 p) {
   return q.x > q.y ? vec2(sign(p.x), 0.0) : vec2(0.0, sign(p.y));
 }
 
+// Integral of the border ramp from the silhouette to outward distance t, all
+// in physical pixels. See contourIntegral in the final render shader.
+float contourIntegral(float t, float offset, float width) {
+  float u = clamp(t - offset, 0.0, width);
+  return u - u * u / (2.0 * width);
+}
+
 void main() {
   vec2 position = FlutterFragCoord().xy - uSize * 0.5;
   float distance = shapeDistance(position);
@@ -85,15 +92,28 @@ void main() {
   // liquid_glass_final_render_core.glsl): a one-sided exterior border and a
   // glint line anchored at the silhouette.
   float tangency = abs(dot(normal, vec2(-lightDirection.y, lightDirection.x)));
-  float outward = distance - uContourOffset;
-  float contourBand = uContourWidth > 0.0
-      ? (outward >= 0.0
-          ? clamp(1.0 - outward / uContourWidth, 0.0, 1.0)
-          : clamp(1.0 + outward * 2.0 / uPixelSize, 0.0, 1.0))
-      : 0.0;
+  // The border is box-filtered over one physical pixel, split at the
+  // silhouette, so a sub-pixel border does not alias into a dotted line.
+  float outwardPixels = distance / uPixelSize;
+  float contourOffsetPixels = uContourOffset / uPixelSize;
+  float contourWidthPixels = uContourWidth / uPixelSize;
+  vec2 contourBand = vec2(0.0);
+  if (uContourWidth > 0.0) {
+    float lower = outwardPixels - 0.5;
+    float upper = outwardPixels + 0.5;
+    contourBand = vec2(
+      contourIntegral(max(upper, 0.0), contourOffsetPixels, contourWidthPixels) -
+          contourIntegral(max(lower, 0.0), contourOffsetPixels, contourWidthPixels),
+      contourIntegral(min(upper, 0.0), contourOffsetPixels, contourWidthPixels) -
+          contourIntegral(min(lower, 0.0), contourOffsetPixels, contourWidthPixels)
+    );
+  }
+  float contourStrength = clamp(uContourStrength, 0.0, 1.0) *
+      mix(1.0, tangency, clamp(uContourDirectionality, 0.0, 1.0));
+  float silhouetteCoverage = clamp(0.5 - outwardPixels, 0.0, 1.0);
+  // In-material share of the border, relative to the material's coverage.
   float contourAbsorption = clamp(
-    contourBand * clamp(uContourStrength, 0.0, 1.0) *
-        mix(1.0, tangency, clamp(uContourDirectionality, 0.0, 1.0)),
+    contourBand.y / max(silhouetteCoverage, 0.001) * contourStrength,
     0.0,
     1.0
   );
@@ -164,8 +184,7 @@ void main() {
       (1.0 - backdropContourAbsorption) * (1.0 - bevelShadow);
   float materialAlpha = 1.0 - (1.0 - tintAlpha) *
       (1.0 - backdropAbsorption);
-  float exteriorContourAlpha = contourAbsorption *
-      (1.0 - materialCoverage);
+  float exteriorContourAlpha = clamp(contourBand.x * contourStrength, 0.0, 1.0);
   vec3 litPremultiplied =
       uTint.rgb * tintAlpha * (1.0 - contourAbsorption) *
       (1.0 - bevelShadow);
