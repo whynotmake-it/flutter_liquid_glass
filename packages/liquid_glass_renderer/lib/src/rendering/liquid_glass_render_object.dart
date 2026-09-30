@@ -375,9 +375,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
   double get blurPassSigma => softensInShader ? 0 : _frostSigma;
 
-  /// Frost for the layer's color model, including the Liquid Glass slider's
-  /// diffusion (see [LiquidGlassSettings.frostFor]).
-  double get _frostSigma => settings.frostFor(defaultAppearance.colorModel);
+  double get _frostSigma => settings.effectiveFrost;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,

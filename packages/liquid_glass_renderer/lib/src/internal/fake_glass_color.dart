@@ -142,7 +142,7 @@ ImageFilter? fakeGlassBackdropFilter(
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
-  final frost = settings.frostFor(appearance.colorModel);
+  final frost = settings.effectiveFrost;
   final blur = frost != 0
       ? ImageFilter.blur(
           sigmaX: frost,

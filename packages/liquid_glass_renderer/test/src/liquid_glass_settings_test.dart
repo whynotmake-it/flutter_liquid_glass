@@ -4,11 +4,11 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 void main() {
   test('iOS 27 toolbar presets contain structural renderer settings', () {
-    const light = LiquidGlassSettings.ios27ToolbarLight();
-    const dark = LiquidGlassSettings.ios27ToolbarDark();
+    final light = LiquidGlassSettings.ios27ToolbarLight();
+    final dark = LiquidGlassSettings.ios27ToolbarDark();
 
     expect(light.refractionHeight, 20);
-    expect(light.frost, 7);
+    expect(light.frost, closeTo(3.7, 1e-9));
     expect(light.refractionAmount, 60);
     expect(light.refractionFitsShape, isTrue);
     expect(light.dispersion, 0);
@@ -24,7 +24,7 @@ void main() {
     expect(light.bevelShadowDirectionality, .5);
     expect(light.exteriorShadowSizeResponse, 1);
     expect(dark.refractionHeight, 20);
-    expect(dark.frost, 5);
+    expect(dark.frost, light.frost);
     expect(dark.refractionAmount, 60);
     expect(dark.highlight, light.highlight);
     expect(dark.highlightWidth, light.highlightWidth);
@@ -39,7 +39,7 @@ void main() {
 
   test('iOS 27 clear preset keeps the toolbar glint shape', () {
     final clear = LiquidGlassSettings.ios27Clear();
-    const toolbar = LiquidGlassSettings.ios27ToolbarLight();
+    final toolbar = LiquidGlassSettings.ios27ToolbarLight();
 
     expect(clear.refractionHeight, 20);
     expect(clear.refractionAmount, 60);
@@ -59,11 +59,8 @@ void main() {
         closeTo(sigma, sigma * .03),
       );
       expect(
-        LiquidGlassSettings.ios27Clear(
-          tintAmount: position,
-        ).frostFor(const LiquidGlassColorModel.ios27Clear()),
+        LiquidGlassSettings.ios27Clear(tintAmount: position).effectiveFrost,
         closeTo(sigma, sigma * .03),
-        reason: 'no generic slider blur on top',
       );
     }
     expect(clear.highlight, 1);
@@ -74,16 +71,12 @@ void main() {
     expect(clear.bevelShadowStrength, 0);
   });
 
-  test('the Liquid Glass slider round-trips and only adds blur', () {
+  test('the Liquid Glass slider round-trips and leaves frost alone', () {
     const settings = LiquidGlassSettings(frost: 3, tintAmount: .5);
     expect(LiquidGlassSettings.fromJson(settings.toJson()), settings);
     expect(settings.copyWith(tintAmount: 1).tintAmount, 1);
-    expect(const LiquidGlassSettings(frost: 3).effectiveFrost, 3);
-    expect(settings.effectiveFrost, greaterThan(3));
-    expect(
-      const LiquidGlassSettings(frost: 3, tintAmount: 1).effectiveFrost,
-      greaterThan(settings.effectiveFrost),
-    );
+    expect(settings.effectiveFrost, 3);
+    expect(const LiquidGlassSettings(frost: -1).effectiveFrost, 0);
     expect(
       LiquidGlassSettings.ios27Toolbar(
         brightness: Brightness.dark,
@@ -93,14 +86,44 @@ void main() {
     );
   });
 
+  test('iOS 27 regular glass blurs along the fitted slider curve', () {
+    // 3.7 pt at Clear, 6.1 at the middle tick, full frost at Tinted.
+    for (final (position, sigma) in [
+      (0.0, 3.7),
+      (.25, 4.75),
+      (.5, 6.1),
+      (.75, 10.06),
+      (1.0, 16.58),
+    ]) {
+      expect(
+        LiquidGlassSettings.ios27RegularFrost(position),
+        closeTo(sigma, .01),
+      );
+      for (final brightness in Brightness.values) {
+        final toolbar = LiquidGlassSettings.ios27Toolbar(
+          brightness: brightness,
+          tintAmount: position,
+        );
+        expect(toolbar.frost, LiquidGlassSettings.ios27RegularFrost(position));
+        expect(toolbar.tintAmount, position);
+      }
+    }
+    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(3.7, 1e-9));
+    expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
+    expect(
+      LiquidGlassSettings.ios27ToolbarLight(tintAmount: 1, frost: 2).frost,
+      2,
+    );
+  });
+
   test('brightness-aware toolbar factory selects structural presets', () {
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
-      const LiquidGlassSettings.ios27ToolbarLight(),
+      LiquidGlassSettings.ios27ToolbarLight(),
     );
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
-      const LiquidGlassSettings.ios27ToolbarDark(),
+      LiquidGlassSettings.ios27ToolbarDark(),
     );
   });
 
