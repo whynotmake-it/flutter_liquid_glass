@@ -67,6 +67,19 @@ struct MatchView: View {
                         height: scene.canvas.logicalHeight
                     )
                     .accessibilityIdentifier("loupe-field")
+            } else if scene.profile == "merge_pair", #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: scene.containerSpacing ?? 40) {
+                    ZStack(alignment: .topLeading) {
+                        glassShape(scene.shape)
+                        glassShape(scene.mergeShape!)
+                    }
+                    .frame(
+                        width: scene.canvas.logicalWidth,
+                        height: scene.canvas.logicalHeight,
+                        alignment: .topLeading
+                    )
+                }
+                .accessibilityIdentifier("official-glass-merge")
             } else if scene.profile == "material_shape", #available(iOS 26.0, *) {
                 Color.clear
                     .frame(
@@ -107,11 +120,29 @@ struct MatchView: View {
     }
 
     @available(iOS 26.0, *)
+    private func glassShape(_ shape: Scene.ShapeSpec) -> some View {
+        Color.clear
+            .frame(width: shape.width, height: shape.height)
+            .glassEffect(
+                materialGlass,
+                in: ReferenceGlassShape(
+                    kind: shape.kind,
+                    cornerRadius: shape.cornerRadius
+                )
+            )
+            .position(
+                x: shape.x + shape.width / 2,
+                y: shape.y + shape.height / 2
+            )
+    }
+
+    @available(iOS 26.0, *)
     private var materialGlass: Glass {
+        let base: Glass = scene.glassVariant == "clear" ? .clear : .regular
         guard let tint = scene.glassTint else {
-            return .regular
+            return base
         }
-        return .regular.tint(
+        return base.tint(
             Color(srgbHex: tint.color).opacity(tint.opacity)
         )
     }

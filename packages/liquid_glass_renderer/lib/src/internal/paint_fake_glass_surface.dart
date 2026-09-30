@@ -22,9 +22,7 @@ double fakeGlassHighlightBandWidth(LiquidGlassSettings settings) {
 double fakeGlassSurfaceOutset(LiquidGlassSettings settings) {
   return math
       .max(
-        settings.effectiveContourOffset +
-            settings.effectiveContourWidth * 0.5 +
-            1,
+        settings.effectiveContourOffset + settings.effectiveContourWidth + 1,
         0,
       )
       .toDouble();
@@ -39,6 +37,8 @@ void paintFakeGlassSurface(
   required LiquidShape shape,
   required LiquidGlassSettings settings,
   required LiquidGlassAppearance appearance,
+  required double devicePixelRatio,
+  bool exteriorOnly = false,
 }) {
   final appearanceVisibility = appearance.visibility.clamp(0.0, 1.0);
   final surfaceTint = appearance.colorModel.approximateSurfaceTint(
@@ -74,17 +74,26 @@ void paintFakeGlassSurface(
         opticalThickness,
         settings.effectiveHighlightWrap,
         settings.effectiveHighlightOppositeStrength * appearanceVisibility,
-        settings.effectiveContourStrength * appearanceVisibility,
+        settings.effectiveContourStrength *
+            appearance.colorModel.contourScale(
+              size.shortestSide,
+              settings.effectiveTintAmount,
+            ) *
+            appearanceVisibility,
         settings.effectiveContourWidth,
         settings.effectiveContourTransmittance,
         settings.effectiveContourOffset,
+        settings.effectiveContourDirectionality,
         settings.effectiveBevelShadowStrength * appearanceVisibility,
         bevelDepth,
         settings.effectiveBevelShadowOffset,
         settings.effectiveBevelShadowDirectionality,
         settings.effectiveBevelShadowSizeResponse,
       ])
-      ..setOffset(const Offset(0, 1));
+      ..setOffset(const Offset(0, 1))
+      ..setFloat(1 / math.max(devicePixelRatio, 0.01))
+      ..setFloat(exteriorOnly ? 1 : 0)
+      ..setFloat(appearance.colorModel.fakeGlintLuminance);
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(
