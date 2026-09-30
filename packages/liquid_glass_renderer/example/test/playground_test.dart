@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/app.dart';
+import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/inspector.dart';
+import 'package:liquid_glass_renderer_example/playground/inspector/material_sections.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
 
@@ -90,6 +92,55 @@ void main() {
         isNot(contains('smoothRefraction')),
       ),
     );
+  });
+
+  test('the dispersion track is fine near zero and reaches ±2', () {
+    expect(trackToDispersion(0.02), 0);
+    expect(trackToDispersion(1), maxDispersion);
+    expect(trackToDispersion(-1), -maxDispersion);
+    expect(trackToDispersion(1 / 3).abs(), lessThan(0.08));
+    for (final dispersion in [-1.5, -0.07, 0.0, 0.3, 2.0]) {
+      expect(
+        trackToDispersion(dispersionToTrack(dispersion)),
+        closeTo(dispersion, 1e-9),
+      );
+    }
+  });
+
+  testWidgets('the lighting section edits the inner shadow', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1280, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final material = ValueNotifier(
+      GlassMaterial.preset(
+        style: GlassStyle.regular,
+        brightness: Brightness.light,
+      ),
+    );
+    addTearDown(material.dispose);
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: SingleChildScrollView(
+          child: MaterialSections(material: material),
+        ),
+      ),
+    );
+
+    expect(find.text('Inner Shadow'), findsOneWidget);
+    expect(find.text('Shadow Depth'), findsOneWidget);
+    final slider = find.descendant(
+      of: find.ancestor(
+        of: find.text('Inner Shadow'),
+        matching: find.byType(SliderRow),
+      ),
+      matching: find.byType(CupertinoSlider),
+    );
+    tester.widget<CupertinoSlider>(slider).onChanged!(0.5);
+    await tester.pump();
+    expect(material.value.settings.bevelShadowStrength, 0.5);
+    expect(material.value.edited, isTrue);
   });
 
   testWidgets('the playground renders one stage layer and switches scenes', (

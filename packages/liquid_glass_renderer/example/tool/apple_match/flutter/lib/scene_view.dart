@@ -77,7 +77,7 @@ LiquidGlassAppearance matchGlassAppearance(Map<String, Object?> settings) {
   const defaults = LiquidGlassAppearance();
   final tint = settings['tint'] is num
       ? Color((settings['tint']! as num).toInt())
-      : color('tint', color('glass', defaults.tint));
+      : color('tint', defaults.tint);
   final colorModel = settings.containsKey('colorModel')
       ? LiquidGlassColorModel.fromJson(settings['colorModel'])
       : defaults.colorModel;

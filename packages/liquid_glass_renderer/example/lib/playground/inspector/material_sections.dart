@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
@@ -52,11 +54,12 @@ class MaterialSections extends StatelessWidget {
                 ),
                 SliderRow(
                   title: 'Dispersion',
-                  value: settings.dispersion,
-                  min: -0.1,
-                  max: 0.1,
-                  format: (v) => v.toStringAsFixed(3),
-                  onChanged: (v) => edit(settings.copyWith(dispersion: v)),
+                  value: dispersionToTrack(settings.dispersion),
+                  min: -1,
+                  max: 1,
+                  format: (t) => trackToDispersion(t).toStringAsFixed(3),
+                  onChanged: (t) =>
+                      edit(settings.copyWith(dispersion: trackToDispersion(t))),
                 ),
                 SliderRow(
                   title: 'Blur',
@@ -100,6 +103,24 @@ class MaterialSections extends StatelessWidget {
                   format: (v) => v.toStringAsFixed(2),
                   onChanged: (v) => edit(settings.copyWith(contourStrength: v)),
                 ),
+                SliderRow(
+                  title: 'Inner Shadow',
+                  value: settings.bevelShadowStrength,
+                  min: 0,
+                  max: 1,
+                  format: (v) => v.toStringAsFixed(2),
+                  onChanged: (v) =>
+                      edit(settings.copyWith(bevelShadowStrength: v)),
+                ),
+                SliderRow(
+                  title: 'Shadow Depth',
+                  value: settings.bevelShadowDepth,
+                  min: 0,
+                  max: 40,
+                  format: _points,
+                  onChanged: (v) =>
+                      edit(settings.copyWith(bevelShadowDepth: v)),
+                ),
               ],
             ),
             const SizedBox(height: 28),
@@ -111,3 +132,20 @@ class MaterialSections extends StatelessWidget {
 }
 
 String _points(double value) => '${value.toStringAsFixed(1)} pt';
+
+/// Largest dispersion on the slider. At ±2 one channel no longer refracts and
+/// the other refracts twice as far; beyond it the channels cross over.
+const maxDispersion = 2.0;
+
+/// Maps dispersion onto a cubic track so the middle third covers the subtle
+/// values real glass uses (iOS 27's loupe is about −0.07).
+double dispersionToTrack(double dispersion) {
+  final normalized = (dispersion / maxDispersion).clamp(-1.0, 1.0);
+  return normalized.sign * math.pow(normalized.abs(), 1 / 3);
+}
+
+/// Inverse of [dispersionToTrack], snapping the centre of the track to `0`.
+double trackToDispersion(double track) {
+  if (track.abs() < 0.05) return 0;
+  return maxDispersion * track * track * track;
+}

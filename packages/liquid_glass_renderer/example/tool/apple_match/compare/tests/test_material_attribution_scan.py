@@ -28,7 +28,7 @@ class MaterialAttributionScanTest(unittest.TestCase):
         self.assertIn(0.005, scan.AXES["dispersion"])
         self.assertIn(0.1, scan.AXES["dispersion"])
 
-    def test_candidate_preserves_geometry_and_spread(self) -> None:
+    def test_candidate_preserves_geometry(self) -> None:
         toolbar = {
             "shapeWidth": 224.5,
             "shapeHeight": 94.0,
@@ -37,7 +37,6 @@ class MaterialAttributionScanTest(unittest.TestCase):
             "cornerRadius": 50.5,
             "shapeProfile": "superellipse",
             "refractionHeight": 12.0,
-            "refractionSpread": 0.0,
             "frost": 7.0,
         }
         geometry = dict(toolbar, shapeWidth=150.0, shapeHeight=70.0, cornerRadius=35.0)
@@ -45,7 +44,6 @@ class MaterialAttributionScanTest(unittest.TestCase):
         self.assertEqual(candidate["shapeWidth"], 150.0)
         self.assertEqual(candidate["shapeHeight"], 70.0)
         self.assertEqual(candidate["cornerRadius"], 35.0)
-        self.assertEqual(candidate["refractionSpread"], 0.0)
         self.assertEqual(candidate["frost"], 5.0)
 
 
