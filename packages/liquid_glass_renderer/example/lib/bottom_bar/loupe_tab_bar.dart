@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/listenable_transform.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/tab_selection.dart';
@@ -151,6 +152,10 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   /// The finger's last position in tabs, without rubber banding.
   double _finger = 0;
 
+  /// The latest drag position the springs have not been retargeted to yet.
+  Offset? _pendingDrag;
+  int? _pendingDragFrame;
+
   int get _lastTab => widget.tabs.length - 1;
   double get _slot => (_size.width - 2 * _padding) / widget.tabs.length;
 
@@ -179,6 +184,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 
   @override
   void dispose() {
+    _cancelPendingDrag();
     _position
       ..removeListener(_onPositionTick)
       ..dispose();
@@ -231,25 +237,37 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     return overdrag.sign * resisted / (1 + resisted / _overdragLimit);
   }
 
+  /// Retargets [controller], switching to [motion] only if it differs:
+  /// setting a motion restarts the running simulation.
+  static void _springTo<T extends Object>(
+    MotionController<T> controller,
+    Motion motion,
+    T target,
+  ) {
+    if (controller.motion != motion) controller.motion = motion;
+    controller.animateTo(target);
+  }
+
   void _track(Offset local, {required Motion motion}) {
     _finger = _positionAt(local);
     final clamped = _finger.clamp(0.0, _lastTab.toDouble());
     final overdrag = _finger - clamped;
-    _position
-      ..motion = motion
-      ..animateTo(clamped + _rubberBand(overdrag));
+    _springTo(_position, motion, clamped + _rubberBand(overdrag));
 
     // Pulling past the capsule stretches it toward that side, which is how it
     // reaches and merges with a neighboring segment.
     final below = local.dy - widget.height;
     final overY = local.dy < 0 ? local.dy : (below > 0 ? below : 0.0);
-    _stretch
-      ..motion = _follow
-      ..animateTo(Offset(overdrag * _slot, overY).withResistance(.08) * .5);
+    _springTo(
+      _stretch,
+      _follow,
+      Offset(overdrag * _slot, overY).withResistance(.08) * .5,
+    );
   }
 
   void _onDown(DragDownDetails details) {
     if (_size.isEmpty) return;
+    _cancelPendingDrag();
     _held = true;
     _dragging = false;
     _track(details.localPosition, motion: _settle);
@@ -259,7 +277,36 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   void _onDragUpdate(Offset local) {
     if (!_held) return;
     _dragging = true;
-    _track(local, motion: _follow);
+    _finger = _positionAt(local);
+    final scheduled = _pendingDrag != null;
+    _pendingDrag = local;
+    if (!scheduled) {
+      _pendingDragFrame = SchedulerBinding.instance.scheduleFrameCallback(
+        _flushDrag,
+      );
+    }
+  }
+
+  /// Retargets the springs to the latest drag position, once per frame.
+  ///
+  /// `animateTo` restarts a spring, and one restarted outside a frame starts
+  /// its clock on the next frame, which still shows the start value. Drag
+  /// updates arrive about once per frame, so retargeting on each of them
+  /// held the loupe still until the finger stopped. Restarted during a
+  /// frame, the spring advances on the very next one.
+  void _flushDrag(Duration timeStamp) {
+    final local = _pendingDrag;
+    _pendingDrag = null;
+    _pendingDragFrame = null;
+    if (local != null && _held) _track(local, motion: _follow);
+  }
+
+  void _cancelPendingDrag() {
+    if (_pendingDragFrame case final id?) {
+      SchedulerBinding.instance.cancelFrameCallbackWithId(id);
+    }
+    _pendingDrag = null;
+    _pendingDragFrame = null;
   }
 
   void _onDragEnd(DragEndDetails details) {
@@ -285,20 +332,17 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   }
 
   void _release(int tab) {
+    _cancelPendingDrag();
     _held = false;
     _dragging = false;
-    _stretch
-      ..motion = _settle
-      ..animateTo(Offset.zero);
+    _springTo(_stretch, _settle, Offset.zero);
     _moveTo(tab);
     _select(tab);
   }
 
   void _moveTo(int tab) {
     _target = tab;
-    _position
-      ..motion = _settle
-      ..animateTo(tab.toDouble());
+    _springTo(_position, _settle, tab.toDouble());
     _updatePress();
   }
 

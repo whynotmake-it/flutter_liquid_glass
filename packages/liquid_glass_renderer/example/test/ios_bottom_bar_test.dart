@@ -82,6 +82,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the loupe keeps up with a finger that moves every frame', (
+    tester,
+  ) async {
+    await pumpBar(tester);
+    final home = tabCenter(tester, 'Home');
+    final library = tabCenter(tester, 'Library');
+
+    final gesture = await tester.startGesture(home);
+    await tester.pump(const Duration(milliseconds: 16));
+    for (var i = 1; i <= 30; i++) {
+      await gesture.moveTo(Offset.lerp(home, library, i / 30)!);
+      await tester.pump(const Duration(milliseconds: 8));
+    }
+
+    final slot = tabCenter(tester, 'New').dx - home.dx;
+    final loupe = tester.getCenter(find.byKey(LoupeTabBar.loupeKey));
+    expect((library.dx - loupe.dx).abs(), lessThan(slot));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('moving the finger rebuilds nothing', (tester) async {
     await pumpBar(tester);
 
