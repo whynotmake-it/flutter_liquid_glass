@@ -23,9 +23,10 @@
   with 60 pt edge displacement, and the new `refractionFitsShape` (default
   `true`) limits the lens on small shapes like regular glass does; use
   `false` for clear glass. `chromaticAberration` now defaults to `0`.
-- Add `LiquidGlassSettings.smoothRefraction`: bilinear instead of
-  nearest backdrop sampling, so refracted lines stop snapping to whole
-  pixels. Undisplaced glass still reproduces the backdrop exactly.
+- Add `LiquidGlassSettings.smoothRefraction`, on by default: bilinear
+  instead of nearest backdrop sampling, so refracted lines stop snapping to
+  whole pixels. Undisplaced glass still reproduces the backdrop exactly.
+  Set it to `false` for the previous nearest sampling.
 - Add `LiquidGlassSettings.ios27Clear(tintAmount:)` (the full lens plus
   the fitted clear-glass blur) and `LiquidGlassSettings.ios27ClearFrost`,
   the blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at 0).

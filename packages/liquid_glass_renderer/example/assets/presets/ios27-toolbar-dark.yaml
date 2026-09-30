@@ -2,6 +2,7 @@
 settings.refractionHeight: 20.0
 settings.refractionAmount: 60.0
 settings.refractionFitsShape: true
+settings.smoothRefraction: true
 settings.magnification: 1.0
 settings.frost: 5.0
 settings.chromaticAberration: 0.0

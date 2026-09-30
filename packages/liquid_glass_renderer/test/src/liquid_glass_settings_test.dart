@@ -98,7 +98,7 @@ void main() {
       refractionHeight: 31,
       refractionAmount: 42,
       refractionFitsShape: false,
-      smoothRefraction: true,
+      smoothRefraction: false,
       magnification: .8,
       frost: 7,
       chromaticAberration: .2,
@@ -131,7 +131,7 @@ void main() {
     expect(restored.refractionAmount, 27.42);
     expect(restored.magnification, .9);
     expect(restored.refractionFitsShape, isTrue);
-    expect(restored.smoothRefraction, isFalse);
+    expect(restored.smoothRefraction, isTrue);
   });
 
   test('refraction and lighting depth stay independent', () {
