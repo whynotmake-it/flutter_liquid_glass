@@ -262,11 +262,16 @@ void main() {
       'lib/src/internal/flutter_gpu_geometry_renderer_native.dart',
     ).readAsStringSync();
 
+    // Mattes and material maps share one allocation site.
+    expect(
+      'gpu.gpuContext.createTexture('.allMatches(renderer).length,
+      1,
+    );
     final geometryAllocationStart = renderer.indexOf(
-      '_texture = gpu.gpuContext.createTexture(',
+      'final texture = gpu.gpuContext.createTexture(',
     );
     final geometryAllocationEnd = renderer.indexOf(
-      '_image = _texture!.asImage()',
+      ');',
       geometryAllocationStart,
     );
     final geometryAllocation = renderer.substring(
