@@ -77,8 +77,6 @@ const clearLensSettings = LiquidGlassSettings(
   refractionHeight: 8,
   refractionAmount: 16,
   frost: 0,
-  highlight: 0.7,
-  highlightWidth: 2,
   contourStrength: 0.2,
   contourWidth: 1,
 );

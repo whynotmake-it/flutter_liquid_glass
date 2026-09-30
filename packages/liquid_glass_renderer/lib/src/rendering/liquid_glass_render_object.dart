@@ -214,6 +214,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
 
+  /// Shorter side in logical pixels of the smallest shape in this layer.
+  /// Adaptive color models use it to choose the material density; it is
+  /// resolved once per geometry update, never per fragment.
+  double _materialShortSide = 10000;
+
   /// The pre-rendered geometry texture in screen space.
   ///
   /// Exposed for subclasses that render additional passes (such as the separate
@@ -323,6 +328,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setFloats([
           settings.effectiveContourWidth * devicePixelRatio,
           settings.effectiveContourTransmittance,
+          settings.effectiveContourDirectionality,
         ])
         ..setFloats([
           settings.effectiveContourOffset * devicePixelRatio,
@@ -333,6 +339,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setFloats([
           transmissionGamma,
           vibrancy,
+          settings.effectiveTintAmount,
         ])
         ..setFloats([
           settings.effectiveBevelShadowStrength,
@@ -343,14 +350,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           appearance.colorModel.shaderValue,
           appearanceVisibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
+          _materialShortSide,
         ]);
     });
-    // Float index 50, after the 44-float common block and the 6-float
-    // filter->matte mapping: frosted glass cross-fades its blur away, while
-    // unfrosted glass stays alpha-1 and matches the backdrop exactly.
+    // Float indices 53 and 54, after the 47-float common block and the
+    // 6-float filter->matte mapping: frosted glass cross-fades its blur away,
+    // while unfrosted glass stays alpha-1 and matches the backdrop exactly.
     shader
-      ..setFloat(50, blurPassSigma > 0 ? 1 : 0)
-      ..setFloat(51, softensInShader ? 1 : 0);
+      ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
+      ..setFloat(54, softensInShader ? 1 : 0);
   }
 
   /// Largest frost, in device pixels, folded into the final pass instead of
@@ -360,13 +368,17 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// Whether the frost is small enough for the final pass's softening kernel.
   bool get softensInShader {
-    final frost = settings.effectiveFrost;
+    final frost = _frostSigma;
     return frost > 0 &&
         frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
   }
 
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
-  double get blurPassSigma => softensInShader ? 0 : settings.effectiveFrost;
+  double get blurPassSigma => softensInShader ? 0 : _frostSigma;
+
+  /// Frost for the layer's color model, including the Liquid Glass slider's
+  /// diffusion (see [LiquidGlassSettings.frostFor]).
+  double get _frostSigma => settings.frostFor(defaultAppearance.colorModel);
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -387,7 +399,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         at(i).saturation / 4,
         at(i).transmissionGamma / 4,
         at(i).vibrancy / 4,
-        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 5,
+        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 7,
       ],
     ];
   }
@@ -771,7 +783,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
           ..setSize(_geometryMatteBounds.size * devicePixelRatio);
       })
-      ..setFloatUniforms(initialIndex: 33, (value) {
+      ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
       // Sampler 0 is the image-filter input. The engine replaces its texture
@@ -1202,7 +1214,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
   ) {
-    shader.setFloatUniforms(initialIndex: 44, (value) {
+    shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,
@@ -1286,6 +1298,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   final List<double> _shapeData = [];
   final List<double> _rseData = [];
+  final List<double> _boundsData = [];
   static final Matrix4 _identity = Matrix4.identity();
 
   double get _contourOutset {
@@ -1293,7 +1306,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return max(
       0.5 / devicePixelRatio,
       settings.effectiveContourOffset +
-          settings.effectiveContourWidth * 0.5 +
+          settings.effectiveContourWidth +
           1.0 / devicePixelRatio,
     );
   }
@@ -1395,8 +1408,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return <double>[
       topN,
       rightN,
-      topSpan,
-      rightSpan,
+      // The shader tests each cap's angular span as 1 - cos(span).
+      1.0 - cos(topSpan),
+      1.0 - cos(rightSpan),
       topCenter.dx,
       topCenter.dy,
       rightCenter.dx,
@@ -1406,6 +1420,38 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       topRadius,
       rightRadius,
     ];
+  }
+
+  /// Half-extents along the matte axes of a shape with local half-size
+  /// [halfSize] mapped by the affine basis ([axisX], [axisY]). The geometry
+  /// shader culls with these boxes instead of mapping every pixel into each
+  /// shape's local space. Ellipses and rounded rectangles are exact;
+  /// continuous corners extend further into the corner than a circular arc of
+  /// the same radius, so they use their box.
+  static Size _matteHalfExtents(
+    RawShapeType type,
+    Size halfSize,
+    double cornerRadius,
+    Offset axisX,
+    Offset axisY,
+  ) {
+    double extent(double x, double y) {
+      switch (type) {
+        case RawShapeType.ellipse:
+          return sqrt(
+            pow(x * halfSize.width, 2) + pow(y * halfSize.height, 2),
+          );
+        case RawShapeType.roundedRectangle:
+          final radius = min(cornerRadius, halfSize.shortestSide);
+          return x.abs() * (halfSize.width - radius) +
+              y.abs() * (halfSize.height - radius) +
+              radius * sqrt(x * x + y * y);
+        case RawShapeType.squircle:
+          return x.abs() * halfSize.width + y.abs() * halfSize.height;
+      }
+    }
+
+    return Size(extent(axisX.dx, axisY.dx), extent(axisX.dy, axisY.dy));
   }
 
   // The encoder's drawable-shape decision. Called only while preparing
@@ -1469,8 +1515,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       // unrelated standalone glass widgets together.
       _shapeData.clear();
       _rseData.clear();
+      _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
+      var shortSide = double.infinity;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
@@ -1529,6 +1577,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           _rseData.addAll(
             _rseParameters(size, shape.rawCornerRadius, devicePixelRatio),
           );
+          final center = centerInMatte * devicePixelRatio;
+          final halfExtents = _matteHalfExtents(
+            shape.rawShapeType,
+            size * devicePixelRatio / 2,
+            shape.rawCornerRadius * devicePixelRatio,
+            axisX,
+            axisY,
+          );
+          _boundsData
+            ..add(center.dx - halfExtents.width)
+            ..add(center.dy - halfExtents.height)
+            ..add(center.dx + halfExtents.width)
+            ..add(center.dy + halfExtents.height);
           final blendMarker = firstInGroup
               ? -(geometry.blend * devicePixelRatio + 1)
               : geometry.blend * devicePixelRatio;
@@ -1554,6 +1615,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
             ..add(distanceScale)
             ..add(blendMarker);
           appearances.add(shape.appearance);
+          shortSide = min(shortSide, size.shortestSide);
           numShapes++;
           firstInGroup = false;
         }
@@ -1561,6 +1623,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
       if (numShapes == 0) {
         throw StateError('No invertible liquid-glass shapes to render.');
+      }
+      if (shortSide != _materialShortSide) {
+        _materialShortSide = shortSide;
+        _updateShaderSettings();
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);
@@ -1570,6 +1636,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         height: textureHeight,
         shapeData: _shapeData,
         rseData: _rseData,
+        boundsData: _boundsData,
         numShapes: numShapes,
         refractionHeight: settings.effectiveRefractionHeight * devicePixelRatio,
         refractionAmount: settings.effectiveRefractionAmount * devicePixelRatio,

@@ -14,10 +14,25 @@ set -euo pipefail
 #   FORCE_REFERENCE 1 = replace an existing pinned reference
 #   LOUPE_TOUCH_X / LOUPE_TOUCH_Y  long-press point in logical pt
 #   LOUPE_HOLD_MS   long-press duration (default 4500)
+#   REDUCE_MOTION   1 (default, historical references) or 0; see capture.sh
+#   CAPTURE_SETTLE_SECONDS  wait after each launch before verifying the probe
+#   LOUPE_CAPTURE_DELAY     wait between long-press start and screenshot
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to the pinned iOS 27 simulator UDID}"
-: "${REFERENCE_SET:=ios27-iphone17pro-light}"
+: "${REDUCE_MOTION:=1}"
+case "$REDUCE_MOTION" in
+  1) REDUCE_MOTION_DEFAULT=YES
+     : "${REFERENCE_SET:=ios27-iphone17pro-light}"
+     : "${CAPTURE_SETTLE_SECONDS:=1.8}"
+     : "${LOUPE_CAPTURE_DELAY:=1.5}" ;;
+  0) REDUCE_MOTION_DEFAULT=NO
+     : "${REFERENCE_SET:=ios27-iphone17pro-light-reduce-motion-off}"
+     : "${CAPTURE_SETTLE_SECONDS:=4}"
+     : "${LOUPE_CAPTURE_DELAY:=2.5}" ;;
+  *) echo "REDUCE_MOTION must be 0 or 1" >&2; exit 2 ;;
+esac
+export REDUCE_MOTION CAPTURE_SETTLE_SECONDS LOUPE_CAPTURE_DELAY
 : "${CAPTURE_FRAMES:=3}"
 : "${LOUPE_TOUCH_X:=201}"
 : "${LOUPE_TOUCH_Y:=620}"
@@ -50,12 +65,28 @@ fi
 mkdir -p "$OUT/frames"
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
+# System processes read accessibility defaults at startup; reboot before any
+# other setting or install, as in capture.sh.
+PREVIOUS_REDUCE_MOTION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo unset)"
+xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
+  ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
+if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
+  xcrun simctl shutdown "$IOS_27_UDID"
+  xcrun simctl boot "$IOS_27_UDID"
+  xcrun simctl bootstatus "$IOS_27_UDID" -b
+  sleep 5
+fi
+REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled)"
+if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
+  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
+  exit 4
+fi
 xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
 xcrun simctl ui "$IOS_27_UDID" appearance light
 xcrun simctl ui "$IOS_27_UDID" content_size large
 xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
-  ReduceMotionEnabled -bool YES
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceTransparencyEnabled -bool NO
 cleanup() {

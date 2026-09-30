@@ -605,7 +605,6 @@ class _TabIndicatorState extends State<_TabIndicator>
                           magnification: .92,
                           chromaticAberration: .1,
                           frost: 0,
-                          highlight: .4,
                           contourStrength: .1,
                           contourWidth: 1,
                         ),

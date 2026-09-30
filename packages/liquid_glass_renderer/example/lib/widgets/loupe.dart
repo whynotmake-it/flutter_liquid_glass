@@ -11,9 +11,8 @@ const loupeGlassSettings = LiquidGlassSettings(
   refractionHeight: 8,
   refractionAmount: 28,
   frost: 0,
-  // Keep only a hairline dielectric rim. The lens body must remain the
-  // magnified backdrop, not a translucent white fill.
-  highlight: 0.25,
+  // Keep only the default glint and a hairline rim. The lens body must remain
+  // the magnified backdrop, not a translucent white fill.
   contourStrength: 0.08,
   contourWidth: 0.75,
 );

@@ -66,6 +66,7 @@ class FlutterGpuGeometryRenderer {
     _offsetRseData = resources.offsetRseData;
     _offsetShapeTints = resources.offsetShapeTints;
     _offsetShapeResponses = resources.offsetShapeResponses;
+    _offsetShapeBounds = resources.offsetShapeBounds;
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
@@ -273,6 +274,7 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetRseData;
   late final int _offsetShapeTints;
   late final int _offsetShapeResponses;
+  late final int _offsetShapeBounds;
   late final ByteData _uniformData;
   int _writtenShapeFloats = 0;
   int _writtenRseFloats = 0;
@@ -310,6 +312,8 @@ class FlutterGpuGeometryRenderer {
     _offsetShapeTints = _uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     _offsetShapeResponses =
         _uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    _offsetShapeBounds =
+        _uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
   }
 
   void _createVertexBuffer() {
@@ -349,6 +353,7 @@ class FlutterGpuGeometryRenderer {
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) {
     assert(() {
       debugRenderCount++;
@@ -474,6 +479,7 @@ class FlutterGpuGeometryRenderer {
       shapeData: shapeData,
       rseData: rseData,
       appearanceData: appearanceData,
+      boundsData: boundsData,
     );
 
     final uniformView = _hostBufferForUniformSize(
@@ -540,6 +546,7 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required List<double> rseData,
     required List<double> appearanceData,
+    required List<double> boundsData,
   }) {
     final floatData = _uniformData.buffer.asFloat32List();
 
@@ -602,6 +609,15 @@ class FlutterGpuGeometryRenderer {
         floatData[shapeTintsStartIndex + i] = appearanceData[i];
         floatData[shapeResponsesStartIndex + i] = appearanceData[16 * 4 + i];
       }
+    }
+
+    // Shapes without bounds are never culled.
+    final boundsStartIndex = _offsetShapeBounds ~/ 4;
+    final boundsFloats = math.min(boundsData.length, 16 * 4);
+    for (var i = 0; i < 16 * 4; i++) {
+      floatData[boundsStartIndex + i] = i < boundsFloats
+          ? boundsData[i]
+          : (i % 4 < 2 ? -1e9 : 1e9);
     }
   }
 
@@ -718,6 +734,7 @@ class _SharedGeometryResources {
     offsetShapeTints = uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     offsetShapeResponses =
         uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    offsetShapeBounds = uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
     final vertices = Float32List.fromList([
       -1.0, -1.0, 0.0, 0.0, //
       1.0, -1.0, 1.0, 0.0, //
@@ -747,6 +764,7 @@ class _SharedGeometryResources {
   late final int offsetRseData;
   late final int offsetShapeTints;
   late final int offsetShapeResponses;
+  late final int offsetShapeBounds;
   late final gpu.DeviceBuffer vertexBuffer;
   late final gpu.BufferView vertexBufferView;
 }
