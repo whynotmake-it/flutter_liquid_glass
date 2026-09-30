@@ -258,7 +258,7 @@ final class Ios27ClearLiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   double sliderDetail(double tintAmount) =>
-      sliderKeyframes(tintAmount, 1, 0.76, 0.02);
+      sliderKeyframes(tintAmount, 1, 0.95, 0.02);
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})
