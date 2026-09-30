@@ -622,7 +622,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       return _cachedFilter!;
     }
     final shader = ImageFilter.shader(renderShader);
-    final frostSigma = settings.effectiveFrost;
+    final frostSigma = settings.frostFor(defaultAppearance.colorModel);
     final filter = frostSigma > 0
         ? ImageFilter.compose(
             inner: ImageFilter.blur(
