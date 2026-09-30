@@ -14,9 +14,10 @@
 ### Fixes
 
 - Blended shapes in a `LiquidGlassBlendGroup` no longer bulge outward at the
-  join. The smooth union still rounds concave joins and bridges nearby shapes,
-  but never extends past the box around each pair, so shared straight edges
-  stay straight.
+  join. The smooth-union radius now scales with the angle between the two
+  shapes' surfaces, so shared straight edges stay straight while concave joins
+  and bridges between nearby shapes still round, matching iOS 27's
+  `GlassEffectContainer`.
 
 ## 1.0.0-dev.1
 

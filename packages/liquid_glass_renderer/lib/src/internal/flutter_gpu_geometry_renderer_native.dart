@@ -618,7 +618,7 @@ class FlutterGpuGeometryRenderer {
       }
     }
 
-    // Shapes without bounds leave their smooth union unbounded.
+    // Shapes without bounds are never culled.
     final boundsStartIndex = _offsetShapeBounds ~/ 4;
     final boundsFloats = math.min(boundsData.length, 16 * 4);
     for (var i = 0; i < 16 * 4; i++) {

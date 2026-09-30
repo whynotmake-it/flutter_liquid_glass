@@ -159,51 +159,48 @@ struct SceneSample {
     float distance;
     float halfMinor;
     float curvatureFactor;
-    // Bounds of the primitive with the smallest exact distance, i.e. the
-    // group member a newly blended shape is joining at this pixel. Carried by
-    // value because a data-dependent uniform index is far slower than the
-    // loop's own indices.
-    vec4 nearestBounds;
-    float nearestDistance;
+    // Outward unit normal of the primitive, or the smooth-union blend of
+    // the members' normals for a group.
+    vec2 normal;
 };
 
-// Signed distance to the box around two primitives' matte-space bounds
-// (min.xy, max.zw). The box contains the pair's convex hull, and its edges are
-// hull edges wherever the pair shares a side, as in rows and columns.
-float pairHullDistance(vec4 boundsA, vec4 boundsB, vec2 p) {
-    vec2 lower = min(boundsA.xy, boundsB.xy);
-    vec2 upper = max(boundsA.zw, boundsB.zw);
-    vec2 q = abs(p - (lower + upper) * 0.5) - (upper - lower) * 0.5;
-    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+// Outward normal of a primitive in scene space. Rounded rectangles and
+// continuous corners use the rounded-rectangle gradient of the same radius;
+// ellipses use the gradient of their implicit equation. Only the angle
+// between two shapes' normals is used, so this approximation is enough.
+vec2 getShapeNormal(vec4 primitive, vec4 inverseBasis, vec2 localPoint) {
+    vec2 halfSize = primitive.yz * 0.5;
+    vec2 localNormal;
+    if (primitive.x == 2.0) {
+        localNormal = localPoint / max(halfSize * halfSize, 1e-4);
+    } else {
+        float radius = min(primitive.w, min(halfSize.x, halfSize.y));
+        vec2 q = abs(localPoint) - halfSize + radius;
+        vec2 corner = max(q, 0.0);
+        vec2 side = q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        localNormal = sign(localPoint) *
+            (corner.x > 0.0 && corner.y > 0.0 ? corner : side);
+    }
+    // Distances transform with the inverse basis, so normals use its
+    // transpose.
+    vec2 normal = vec2(
+        inverseBasis.x * localNormal.x + inverseBasis.z * localNormal.y,
+        inverseBasis.y * localNormal.x + inverseBasis.w * localNormal.y
+    );
+    float normalLength = length(normal);
+    return normalLength > 1e-6 ? normal / normalLength : vec2(0.0);
 }
 
-// Material a polynomial smooth union adds between two primitives, limited so
-// the merged contour never leaves the box around the pair. The unbounded fill
-// also lifts collinear edges near the join by up to k/4, which reads as a
-// bulge; merged glass should keep those edges straight and only fill the
-// concave join. `room` is how far the hard union lies inside the box. A
-// narrow smooth minimum keeps the transition C1, so the refraction normals
-// stay continuous where the fillet meets a box edge.
-float hullBoundedFill(
-    float d1,
-    float d2,
-    float k,
-    vec4 boundsA,
-    vec4 boundsB,
-    vec2 p
-) {
-    float e = max(k - abs(d1 - d2), 0.0);
-    float fill = e * e * 0.25 / k;
-    if (fill <= 0.0) {
-        return 0.0;
-    }
-    float room = min(d1, d2) - pairHullDistance(boundsA, boundsB, p);
-    float softness = 0.1 * k;
-    float overlap = max(softness - abs(fill - room), 0.0);
-    return max(
-        min(fill, room) - overlap * overlap * 0.25 / softness,
-        0.0
-    );
+// Smooth-union radius for two surfaces with normals na and nb. It scales with
+// the chord between the normals: zero where the surfaces are aligned, such as
+// the collinear sides of shapes in a row, and the full blend where they face
+// each other across a gap. A plain smooth minimum lifts aligned edges near a
+// join by up to k/4; this keeps them straight while concave joins and
+// bridges still round. The iOS 27 GlassEffectContainer captures in
+// example/tool/apple_match follow this within half a point, including the
+// sub-point rise it leaves where two rounded corners meet.
+float angularBlendRadius(float k, vec2 na, vec2 nb) {
+    return k * 0.5 * length(na - nb);
 }
 
 float getShapeCurvatureFactor(
@@ -287,14 +284,10 @@ bool cannotAffectGroup(vec4 bounds, vec2 p, float reach) {
 
 // Squared outside distance for the complete scene plus its maximum possible
 // smooth-union expansion. Comparing squared values avoids one square root per
-// shape in the empty-pixel fast path. Smooth unions stay inside the box around
-// their pair, so outside the box around every shape there is no expansion to
-// budget for.
+// shape in the empty-pixel fast path.
 vec2 sceneBoundsOutsideSquared(vec2 p, int numShapes) {
     float lowerBoundSquared = 1e18;
     float smoothingBudget = 0.0;
-    vec2 sceneLower = vec2(1e18);
-    vec2 sceneUpper = vec2(-1e18);
     int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (i >= shapeCount) break;
@@ -307,12 +300,8 @@ vec2 sceneBoundsOutsideSquared(vec2 p, int numShapes) {
         if (marker >= 0.0) {
             smoothingBudget += marker * 0.25;
         }
-        sceneLower = min(sceneLower, bounds.xy);
-        sceneUpper = max(sceneUpper, bounds.zw);
     }
-    bool outsideScene = any(lessThan(p, sceneLower)) ||
-        any(greaterThan(p, sceneUpper));
-    return vec2(lowerBoundSquared, outsideScene ? 0.0 : smoothingBudget);
+    return vec2(lowerBoundSquared, smoothingBudget);
 }
 
 SceneSample getShapeSampleFromArray(int index, vec2 p) {
@@ -340,28 +329,26 @@ SceneSample getShapeSampleFromArray(int index, vec2 p) {
     // continuous-superellipse primitives use the shallower response. Smooth
     // unions interpolate this value below.
     resultSample.curvatureFactor = primitive.x == 2.0 ? 1.0 : 0.0;
-    resultSample.nearestBounds = uShapeBounds[index];
-    resultSample.nearestDistance = resultSample.distance;
+    vec2 delta = p - placement.xy;
+    resultSample.normal = getShapeNormal(
+        primitive,
+        inverseBasis,
+        vec2(
+            inverseBasis.x * delta.x + inverseBasis.y * delta.y,
+            inverseBasis.z * delta.x + inverseBasis.w * delta.y
+        )
+    );
     return resultSample;
 }
 
-SceneSample smoothUnionSample(
-    SceneSample a,
-    SceneSample b,
-    float k,
-    vec2 p
-) {
+SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
     if (k <= 0.0) {
         return a.distance <= b.distance ? a : b;
     }
-    float distance = min(a.distance, b.distance) - hullBoundedFill(
-        a.distance,
-        b.distance,
-        k,
-        a.nearestBounds,
-        b.nearestBounds,
-        p
-    );
+    float blend = angularBlendRadius(k, a.normal, b.normal);
+    float e = max(blend - abs(a.distance - b.distance), 0.0);
+    float distance = min(a.distance, b.distance) -
+        e * e * 0.25 / max(blend, 1e-4);
     // Follow the same bounded smooth-min blend used for the distance field so
     // the shape-relative profile remains continuous at a smooth group seam.
     float weightA = clamp(0.5 + (b.distance - a.distance) / (2.0 * k), 0.0, 1.0);
@@ -373,9 +360,7 @@ SceneSample smoothUnionSample(
         a.curvatureFactor,
         weightA
     );
-    bool nearestIsA = a.nearestDistance <= b.nearestDistance;
-    result.nearestBounds = nearestIsA ? a.nearestBounds : b.nearestBounds;
-    result.nearestDistance = min(a.nearestDistance, b.nearestDistance);
+    result.normal = mix(b.normal, a.normal, weightA);
     return result;
 }
 
@@ -384,8 +369,7 @@ SceneSample sceneSample(vec2 p, int numShapes) {
     empty.distance = 1e9;
     empty.halfMinor = 0.0;
     empty.curvatureFactor = 0.0;
-    empty.nearestBounds = vec4(0.0);
-    empty.nearestDistance = 1e9;
+    empty.normal = vec2(0.0);
     if (numShapes <= 0) {
         return empty;
     }
@@ -423,8 +407,7 @@ SceneSample sceneSample(vec2 p, int numShapes) {
             groupResult = smoothUnionSample(
                 groupResult,
                 shapeValue,
-                groupBlend,
-                p
+                groupBlend
             );
         }
     }

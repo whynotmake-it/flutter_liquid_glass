@@ -1384,10 +1384,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   /// Half-extents along the matte axes of a shape with local half-size
-  /// [halfSize] mapped by the affine basis ([axisX], [axisY]). They bound the
-  /// smooth union of blended shapes in the geometry shader. Ellipses and
-  /// rounded rectangles are exact; continuous corners extend further into the
-  /// corner than a circular arc of the same radius, so they use their box.
+  /// [halfSize] mapped by the affine basis ([axisX], [axisY]). The geometry
+  /// shader culls with these boxes instead of mapping every pixel into each
+  /// shape's local space. Ellipses and rounded rectangles are exact;
+  /// continuous corners extend further into the corner than a circular arc of
+  /// the same radius, so they use their box.
   static Size _matteHalfExtents(
     RawShapeType type,
     Size halfSize,
