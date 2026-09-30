@@ -241,9 +241,8 @@ Widget captureSceneWidget(
 }) {
   const settings = LiquidGlassSettings(
     frost: 6,
-    edgeRefraction: 30,
+    refractionAmount: 30,
     highlight: 0.5,
-    chromaticAberration: 0,
   );
   final shadows = scene.shadow
       ? const [
@@ -296,10 +295,9 @@ Widget captureSceneWidget(
                     fake: fake,
                     settings: const LiquidGlassSettings(
                       frost: 0,
-                      edgeRefraction: 24,
-                      backdropScale: 0.92,
+                      refractionAmount: 24,
+                      magnification: 0.92,
                       highlight: 0.4,
-                      chromaticAberration: 0,
                     ),
                     child: const LiquidGlass(
                       shape: LiquidRoundedRectangle(borderRadius: 14),

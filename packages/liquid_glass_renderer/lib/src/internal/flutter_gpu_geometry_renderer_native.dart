@@ -71,6 +71,7 @@ class FlutterGpuGeometryRenderer {
     _offsetRseData = resources.offsetRseData;
     _offsetShapeTints = resources.offsetShapeTints;
     _offsetShapeResponses = resources.offsetShapeResponses;
+    _offsetShapeBounds = resources.offsetShapeBounds;
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
@@ -278,6 +279,7 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetRseData;
   late final int _offsetShapeTints;
   late final int _offsetShapeResponses;
+  late final int _offsetShapeBounds;
   late final ByteData _uniformData;
   int _writtenShapeFloats = 0;
   int _writtenRseFloats = 0;
@@ -315,6 +317,8 @@ class FlutterGpuGeometryRenderer {
     _offsetShapeTints = _uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     _offsetShapeResponses =
         _uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    _offsetShapeBounds =
+        _uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
   }
 
   void _createVertexBuffer() {
@@ -345,17 +349,18 @@ class FlutterGpuGeometryRenderer {
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) {
     assert(() {
       debugRenderCount++;
@@ -440,18 +445,10 @@ class FlutterGpuGeometryRenderer {
       offsetY: offsetY,
       textureWidth: allocatedWidth.toDouble(),
       textureHeight: allocatedHeight.toDouble(),
-      opticalIndex: opticalIndex,
-      refractionSpread: refractionSpread,
-      displacementScale:
-          displacementScale ??
-          math.max(
-            1e-3,
-            1.05 *
-                8.0 *
-                thickness *
-                math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
-          ),
-      thickness: thickness,
+      refractionHeight: refractionHeight,
+      refractionAmount: refractionAmount,
+      edgeDistanceRange: edgeDistanceRange ?? math.max(12, refractionHeight),
+      refractionFitsShape: refractionFitsShape,
       contourExtent: contourExtent,
       materialScale: writeMaterials ? materialRasterScale.toDouble() : 1.0,
       materialMapWidth: writeMaterials
@@ -477,6 +474,7 @@ class FlutterGpuGeometryRenderer {
       shapeData: shapeData,
       rseData: rseData,
       appearanceData: appearanceData,
+      boundsData: boundsData,
     );
 
     final uniformView = _hostBufferForUniformSize(
@@ -665,10 +663,10 @@ class FlutterGpuGeometryRenderer {
     required double offsetY,
     required double textureWidth,
     required double textureHeight,
-    required double opticalIndex,
-    required double refractionSpread,
-    required double displacementScale,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
+    required double edgeDistanceRange,
+    required bool refractionFitsShape,
     required double contourExtent,
     required double materialScale,
     required double materialMapWidth,
@@ -678,6 +676,7 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required List<double> rseData,
     required List<double> appearanceData,
+    required List<double> boundsData,
   }) {
     final floatData = _uniformData.buffer.asFloat32List();
 
@@ -686,17 +685,18 @@ class FlutterGpuGeometryRenderer {
     floatData[uOffsetIndex + 1] = offsetY;
 
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
-    // Reuse the existing vec2 slot for profile spread and codec scale.
-    floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
-    floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
+    // X selects shape-fitted refraction; Y is the bevel's edge displacement,
+    // which is also the codec scale.
+    floatData[textureSizeIndex] = refractionFitsShape ? 1 : 0;
+    floatData[textureSizeIndex + 1] = math.max(1e-3, refractionAmount);
 
     final opticalPropsIndex = _offsetOpticalProps ~/ 4;
-    floatData[opticalPropsIndex] = opticalIndex;
+    floatData[opticalPropsIndex] = math.max(0, refractionHeight);
     // The Y slot is a harness-only centered-AA half-width. It defaults to
     // 0.5, matching Flutter's one-pixel transition; keeping it in the
     // existing reserved slot avoids changing the uniform ABI.
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
-    floatData[opticalPropsIndex + 2] = thickness;
+    floatData[opticalPropsIndex + 2] = math.max(1, edgeDistanceRange);
     floatData[opticalPropsIndex + 3] = numShapes;
 
     final contourPropsIndex = _offsetContourProps ~/ 4;
@@ -739,6 +739,15 @@ class FlutterGpuGeometryRenderer {
         floatData[shapeTintsStartIndex + i] = appearanceData[i];
         floatData[shapeResponsesStartIndex + i] = appearanceData[16 * 4 + i];
       }
+    }
+
+    // Shapes without bounds are never culled.
+    final boundsStartIndex = _offsetShapeBounds ~/ 4;
+    final boundsFloats = math.min(boundsData.length, 16 * 4);
+    for (var i = 0; i < 16 * 4; i++) {
+      floatData[boundsStartIndex + i] = i < boundsFloats
+          ? boundsData[i]
+          : (i % 4 < 2 ? -1e9 : 1e9);
     }
   }
 
@@ -866,6 +875,7 @@ class _SharedGeometryResources {
     offsetShapeTints = uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     offsetShapeResponses =
         uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    offsetShapeBounds = uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
     final vertices = Float32List.fromList([
       -1.0, -1.0, 0.0, 0.0, //
       1.0, -1.0, 1.0, 0.0, //
@@ -895,6 +905,7 @@ class _SharedGeometryResources {
   late final int offsetRseData;
   late final int offsetShapeTints;
   late final int offsetShapeResponses;
+  late final int offsetShapeBounds;
   late final gpu.DeviceBuffer vertexBuffer;
   late final gpu.BufferView vertexBufferView;
 }

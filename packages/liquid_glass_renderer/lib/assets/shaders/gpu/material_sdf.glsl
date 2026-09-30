@@ -10,10 +10,11 @@ struct MaterialSceneSample {
     float primaryDistance;
     float secondaryDistance;
     float blendWidth;
+    vec2 normal;
 };
 
 MaterialSceneSample materialShapeSample(int index, vec2 p) {
-    SceneSample shape = getShapeSampleFromArray(index, p);
+    SceneSample shape = getShapeSampleFromArray(index, p, true);
     MaterialSceneSample result;
     result.distance = shape.distance;
     result.halfMinor = shape.halfMinor;
@@ -23,6 +24,7 @@ MaterialSceneSample materialShapeSample(int index, vec2 p) {
     result.primaryDistance = shape.distance;
     result.secondaryDistance = 1e9;
     result.blendWidth = 0.0;
+    result.normal = shape.normal;
     return result;
 }
 
@@ -34,7 +36,6 @@ MaterialSceneSample materialSmoothUnion(
     if (k <= 0.0) {
         return composite.distance <= next.distance ? composite : next;
     }
-    float e = max(k - abs(composite.distance - next.distance), 0.0);
     float geometryWeight = clamp(
         0.5 + (next.distance - composite.distance) / (2.0 * k),
         0.0,
@@ -42,8 +43,15 @@ MaterialSceneSample materialSmoothUnion(
     );
 
     MaterialSceneSample result;
+    float blend = angularBlendRadius(k, composite.normal, next.normal);
+    float e = max(blend - abs(composite.distance - next.distance), 0.0);
     result.distance = min(composite.distance, next.distance) -
-        e * e * 0.25 / k;
+        e * e * 0.25 / max(blend, 1e-4);
+    result.normal = mix(
+        next.normal,
+        composite.normal,
+        smoothMinWeight(composite.distance, next.distance, blend)
+    );
     result.halfMinor = mix(
         next.halfMinor,
         composite.halfMinor,
@@ -82,6 +90,7 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
     empty.primaryDistance = 1e9;
     empty.secondaryDistance = 1e9;
     empty.blendWidth = 0.0;
+    empty.normal = vec2(0.0);
     if (numShapes <= 0) return empty;
 
     MaterialSceneSample result = empty;
@@ -94,8 +103,11 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
         float groupBlend = startsGroup ? -marker - 1.0 : marker;
         if (
             !startsGroup &&
-            getShapeBoundsDistanceFromArray(i, p) >=
+            cannotAffectGroup(
+                uShapeBounds[i],
+                p,
                 groupResult.distance + groupBlend
+            )
         ) {
             continue;
         }
