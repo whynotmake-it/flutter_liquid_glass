@@ -21,7 +21,7 @@ class LiquidGlassSettings with Equatable {
     this.refractionHeight = 20.0,
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
-    this.smoothRefraction = false,
+    this.smoothRefraction = true,
     this.magnification = 1.0,
     this.frost = 5.0,
     this.chromaticAberration = 0.0,
@@ -65,8 +65,8 @@ class LiquidGlassSettings with Equatable {
       },
       smoothRefraction: switch (json['smoothRefraction']) {
         final bool value => value,
-        'true' => true,
-        _ => false,
+        'false' => false,
+        _ => true,
       },
       magnification: legacy('magnification', 'backdropScale', 1),
       frost: number('frost', 5),
@@ -100,7 +100,7 @@ class LiquidGlassSettings with Equatable {
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
-       smoothRefraction = false,
+       smoothRefraction = true,
        magnification = 1.0,
        chromaticAberration = 0.0,
        highlight = 0.25,
@@ -128,7 +128,7 @@ class LiquidGlassSettings with Equatable {
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
-       smoothRefraction = false,
+       smoothRefraction = true,
        magnification = 1.0,
        chromaticAberration = 0.0,
        highlight = 0.25,
@@ -252,13 +252,14 @@ class LiquidGlassSettings with Equatable {
   final bool refractionFitsShape;
 
   /// Whether the backdrop is sampled bilinearly instead of from the nearest
-  /// pixel.
+  /// pixel. On by default.
   ///
   /// Refraction samples the backdrop at fractional positions. With nearest
   /// sampling, refracted lines snap to whole device pixels and read as
   /// jagged; bilinear sampling moves them smoothly, as on Apple's glass.
   /// Undisplaced glass still reproduces the backdrop exactly. It uses the
-  /// same single texture fetch and no extra pass.
+  /// same single texture fetch and no extra pass, and measured within noise
+  /// on Metal. Set it to `false` for the previous nearest sampling.
   final bool smoothRefraction;
 
   /// Magnification of the backdrop seen through the whole face, about the

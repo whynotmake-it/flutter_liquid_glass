@@ -236,7 +236,7 @@ bevel refracts, pulling content inward:
   content near the rim is mirrored, as on Apple's glass.
 - `magnification` scales the backdrop seen through the whole face about its
   center.
-- `smoothRefraction` (default `false`) samples the backdrop bilinearly, so
+- `smoothRefraction` (default `true`) samples the backdrop bilinearly, so
   refracted lines move smoothly instead of snapping to whole pixels.
   Undisplaced glass still copies the backdrop exactly, and it costs no extra
   fetch or pass.
