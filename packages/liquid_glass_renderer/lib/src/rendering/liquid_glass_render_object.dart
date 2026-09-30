@@ -17,6 +17,7 @@ import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
+import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
@@ -216,6 +217,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
 
+  /// Shorter side in logical pixels of the smallest shape in this layer.
+  /// Adaptive color models use it to choose the material density; it is
+  /// resolved once per geometry update, never per fragment.
+  double _materialShortSide = 10000;
+
   /// The pre-rendered geometry texture in screen space.
   ///
   /// Exposed for subclasses that render additional passes (such as the separate
@@ -285,24 +291,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     LiquidGlassAppearance appearance,
     Offset materialCenter,
   ) {
-    final appearanceVisibility = appearance.visibility;
-    final tint = appearance.tint.withValues(
-      alpha: appearance.tint.a * appearanceVisibility,
-    );
-    final saturation = 1 + (appearance.saturation - 1) * appearanceVisibility;
-    final transmissionGamma =
-        1 + (appearance.transmissionGamma - 1) * appearanceVisibility;
-    final vibrancy = appearance.vibrancy * appearanceVisibility;
+    // The final shader fades the whole material with visibility, so the
+    // color factors are written at full strength.
     shader.setFloatUniforms(initialIndex: 6, (value) {
       value
-        ..setColor(tint)
+        ..setColor(appearance.tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
           settings.effectiveChromaticAberration,
           settings.effectiveThickness * devicePixelRatio,
           settings.effectiveHighlight,
           settings.effectiveBackdropScale,
-          saturation,
+          appearance.saturation,
         ])
         ..setOffset(
           const Offset(0, 1),
@@ -325,6 +325,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setFloats([
           settings.effectiveContourWidth * devicePixelRatio,
           settings.effectiveContourTransmittance,
+          settings.effectiveContourDirectionality,
         ])
         ..setFloats([
           settings.effectiveContourOffset * devicePixelRatio,
@@ -333,8 +334,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           settings.effectiveHighlightWrap,
         ])
         ..setFloats([
-          transmissionGamma,
-          vibrancy,
+          appearance.transmissionGamma,
+          appearance.vibrancy,
+          settings.effectiveTintAmount,
         ])
         ..setFloats([
           settings.effectiveBevelShadowStrength,
@@ -343,15 +345,21 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ])
         ..setFloats([
           appearance.colorModel.shaderValue,
-          appearanceVisibility,
+          appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
+          _materialShortSide,
         ]);
     });
-    // Float index 50, after the 44-float common block and the 6-float
+    // Float index 53, after the 47-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
-    // unfrosted glass stays alpha-1 and matches the backdrop exactly.
-    shader.setFloat(50, settings.effectiveFrost > 0 ? 1 : 0);
+    // unfrosted glass stays alpha-1 and cross-fades its material in the
+    // shader, so both match the backdrop exactly at visibility 0.
+    shader.setFloat(53, _blurFades ? 1 : 0);
   }
+
+  /// Whether the composed filter blurs the backdrop, with the same frost as
+  /// the layer's blur.
+  bool get _blurFades => settings.effectiveFrost > 0;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -372,7 +380,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         at(i).saturation / 4,
         at(i).transmissionGamma / 4,
         at(i).vibrancy / 4,
-        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 5,
+        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 7,
       ],
     ];
   }
@@ -757,7 +765,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
           ..setSize(_geometryMatteBounds.size * devicePixelRatio);
       })
-      ..setFloatUniforms(initialIndex: 33, (value) {
+      ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
       ..setImageSampler(1, geometryImage);
@@ -1176,7 +1184,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
   ) {
-    shader.setFloatUniforms(initialIndex: 44, (value) {
+    shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,
@@ -1267,119 +1275,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return max(
       0.5 / devicePixelRatio,
       settings.effectiveContourOffset +
-          settings.effectiveContourWidth * 0.5 +
+          settings.effectiveContourWidth +
           1.0 / devicePixelRatio,
     );
-  }
-
-  // Flutter 3.47 computes these RSE parameters when its geometry changes and
-  // uploads them to the symmetric RSE shader. Mirror that construction here
-  // so lookup-table interpolation and circle fitting are not repeated per
-  // fragment.
-  static (double, double) _rseNAndXj(double ratio) {
-    const table = <(double, double)>[
-      (2.00000000, 1.13276676),
-      (2.18349805, 1.20311921),
-      (2.33888662, 1.28698796),
-      (2.48660575, 1.36351941),
-      (2.62226596, 1.44717976),
-      (2.75148990, 1.53385819),
-      (3.36298265, 1.98288283),
-      (4.08649929, 2.23811846),
-      (4.85481134, 2.47563463),
-      (5.62945551, 2.72948597),
-      (6.43023796, 2.98020421),
-    ];
-    if (ratio > 5.0) {
-      final n = 1.559599389 * (ratio - 5.0) + table.last.$1;
-      final kXj = 0.522807185 * (ratio - 5.0) + table.last.$2;
-      return (n, 1.0 - 1.0 / kXj);
-    }
-    final clampedRatio = ratio.clamp(2.0, 5.0);
-    final steps = clampedRatio < 2.5
-        ? (clampedRatio - 2.0) * 10.0
-        : (clampedRatio - 2.5) * 2.0 + 5.0;
-    final left = steps.floor().clamp(0, table.length - 2);
-    final fraction = steps - left;
-    final a = table[left];
-    final b = table[left + 1];
-    final n = a.$1 + (b.$1 - a.$1) * fraction;
-    final kXj = a.$2 + (b.$2 - a.$2) * fraction;
-    return (n, 1.0 - 1.0 / kXj);
-  }
-
-  static (double, double, Offset, double) _rseOctant(
-    double axis,
-    double radius,
-  ) {
-    if (radius <= 1e-3) return (0.0, 0.0, Offset.zero, 0.0);
-    final (n, xJOverA) = _rseNAndXj(2.0 * axis / radius);
-    final xJ = xJOverA * axis;
-    final yJ =
-        pow(
-          max(1.0 - pow(xJOverA, n).toDouble(), 0.0),
-          1.0 / n,
-        ).toDouble() *
-        axis;
-    final tanPhi = pow(xJ / max(yJ, 1e-6), n - 1.0).toDouble();
-    final d = (xJ - tanPhi * yJ) / (1.0 - tanPhi);
-    final gap = (1.0 - cos(pi / 4.0)) * radius;
-    final circleRadius = (axis - d - gap) * sqrt2;
-    final pointJ = Offset(xJ, yJ);
-    final pointM = Offset(axis - gap, axis - gap);
-    final chord = pointM - pointJ;
-    final midpoint = (pointJ + pointM) / 2.0;
-    final perpendicular = Offset(-chord.dy, chord.dx);
-    final perpendicularLength = perpendicular.distance;
-    final halfChord = chord.distance / 2.0;
-    final centerDistance = sqrt(
-      max(circleRadius * circleRadius - halfChord * halfChord, 0.0),
-    );
-    final circleCenter = perpendicularLength <= 1e-6
-        ? midpoint
-        : midpoint - perpendicular * (centerDistance / perpendicularLength);
-    final fromM = pointM - circleCenter;
-    final fromJ = pointJ - circleCenter;
-    final span = atan2(
-      fromM.dx * fromJ.dy - fromM.dy * fromJ.dx,
-      fromM.dx * fromJ.dx + fromM.dy * fromJ.dy,
-    ).abs();
-    return (n, span, circleCenter, circleRadius);
-  }
-
-  static List<double> _rseParameters(
-    Size size,
-    double rawCornerRadius,
-    double devicePixelRatio,
-  ) {
-    final halfWidth = size.width * devicePixelRatio / 2.0;
-    final halfHeight = size.height * devicePixelRatio / 2.0;
-    final radius = min(
-      rawCornerRadius * devicePixelRatio,
-      min(halfWidth, halfHeight),
-    );
-    final (topN, topSpan, topCenter, topRadius) = _rseOctant(
-      halfWidth,
-      radius,
-    );
-    final (rightN, rightSpan, rightCenter, rightRadius) = _rseOctant(
-      halfHeight,
-      radius,
-    );
-    return <double>[
-      topN,
-      rightN,
-      topSpan,
-      rightSpan,
-      topCenter.dx,
-      topCenter.dy,
-      rightCenter.dx,
-      rightCenter.dy,
-      halfWidth,
-      halfHeight,
-      topRadius,
-      rightRadius,
-    ];
   }
 
   // The encoder's drawable-shape decision. Called only while preparing
@@ -1445,6 +1343,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       _rseData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
+      var shortSide = double.infinity;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
@@ -1501,7 +1400,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           // shapes in a blend group.
           final size = shape.renderObject.size;
           _rseData.addAll(
-            _rseParameters(size, shape.rawCornerRadius, devicePixelRatio),
+            roundedSuperellipseParameters(
+              size,
+              shape.rawCornerRadius,
+              scale: devicePixelRatio,
+            ),
           );
           final blendMarker = firstInGroup
               ? -(geometry.blend * devicePixelRatio + 1)
@@ -1528,6 +1431,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
             ..add(distanceScale)
             ..add(blendMarker);
           appearances.add(shape.appearance);
+          shortSide = min(shortSide, size.shortestSide);
           numShapes++;
           firstInGroup = false;
         }
@@ -1535,6 +1439,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
       if (numShapes == 0) {
         throw StateError('No invertible liquid-glass shapes to render.');
+      }
+      if (shortSide != _materialShortSide) {
+        _materialShortSide = shortSide;
+        _updateShaderSettings();
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);

@@ -4,11 +4,27 @@ import 'dart:ui';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
+/// Interpolates linearly between the Liquid Glass slider keyframes: Clear
+/// (`0`), the Settings middle tick (`0.5`) and Tinted (`1`).
+@internal
+double sliderKeyframes(
+  double tintAmount,
+  double clear,
+  double middle,
+  double tinted,
+) {
+  final s = tintAmount.clamp(0.0, 1.0);
+  return s <= 0.5
+      ? clear + (middle - clear) * s * 2
+      : middle + (tinted - middle) * (s * 2 - 1);
+}
+
 /// Defines how a glass tint is combined with transmitted backdrop content.
 ///
 /// The model owns its transfer functions and renderer encoding. Use
 /// [LiquidGlassColorModel.direct] for unrestricted manual color controls or
-/// [LiquidGlassColorModel.ios27] for Apple's backdrop-adaptive tint behavior.
+/// [LiquidGlassColorModel.ios27] or [LiquidGlassColorModel.ios27Clear] for
+/// Apple's backdrop-adaptive behavior.
 sealed class LiquidGlassColorModel with Equatable {
   const LiquidGlassColorModel();
 
@@ -20,6 +36,10 @@ sealed class LiquidGlassColorModel with Equatable {
     required Brightness brightness,
   }) = Ios27LiquidGlassColorModel;
 
+  /// iOS 27 `Glass.clear`, which is identical in light and dark appearance.
+  const factory LiquidGlassColorModel.ios27Clear() =
+      Ios27ClearLiquidGlassColorModel;
+
   /// Restores a model identifier emitted by [toJson].
   factory LiquidGlassColorModel.fromJson(Object? value) => switch (value) {
     'ios27Light' => const LiquidGlassColorModel.ios27(
@@ -28,6 +48,7 @@ sealed class LiquidGlassColorModel with Equatable {
     'ios27Dark' => const LiquidGlassColorModel.ios27(
       brightness: Brightness.dark,
     ),
+    'ios27Clear' => const LiquidGlassColorModel.ios27Clear(),
     _ => const LiquidGlassColorModel.direct(),
   };
 
@@ -38,9 +59,26 @@ sealed class LiquidGlassColorModel with Equatable {
   @internal
   double get shaderValue;
 
-  /// Neutral material wash underneath an adaptive tint.
+  /// The untinted face for a shape whose shorter side is [shortSide] logical
+  /// pixels, or `null` when transmitted content is composited per channel.
+  ///
+  /// The face is `emission + transmittance * lum(Y) + chromaGain *
+  /// (backdrop - Y)` with `lum(Y) = Y + lift * Y * (1 - Y)`; `emission` is
+  /// premultiplied. Mirrors `ios27NeutralTint` and `ios27FaceTransfer` in the
+  /// final shader.
   @internal
-  Color get neutralMaterialTint;
+  ({Color emission, double transmittance, double lift, double chromaGain})?
+  faceTransfer(double shortSide, {double tintAmount = 0});
+
+  /// Factor applied to the border strength at the Liquid Glass slider
+  /// position [tintAmount]. Mirrors the dark branch of the final shader.
+  @internal
+  double contourScale(double shortSide, double tintAmount) => 1;
+
+  /// Luminance of the neutral glint target FakeGlass composites, which
+  /// cannot scale with the face it does not sample.
+  @internal
+  double get fakeGlintLuminance => 1.6;
 
   /// Maps one opaque tint to the tone selected for backdrop [luminance].
   ///
@@ -49,11 +87,12 @@ sealed class LiquidGlassColorModel with Equatable {
   @visibleForTesting
   Color tintTone(Color tint, double luminance);
 
-  /// Resolves the single-color approximation used by FakeGlass.
+  /// Resolves the single-color surface tint painted by FakeGlass.
   ///
   /// FakeGlass cannot inspect backdrop luminance in its analytic surface
-  /// shader, so adaptive models evaluate their tonal ramp at a midtone while
-  /// retaining the exact neutral-plus-tint alpha composition.
+  /// shader, so adaptive models evaluate their tonal ramp at a midtone. Their
+  /// neutral face is applied by the backdrop color filter instead, so it is
+  /// not part of this color.
   @internal
   Color approximateSurfaceTint(Color tint);
 }
@@ -70,7 +109,8 @@ final class DirectLiquidGlassColorModel extends LiquidGlassColorModel {
   double get shaderValue => 0;
 
   @override
-  Color get neutralMaterialTint => const Color(0x00000000);
+  ({Color emission, double transmittance, double lift, double chromaGain})?
+  faceTransfer(double shortSide, {double tintAmount = 0}) => null;
 
   @override
   Color tintTone(Color tint, double luminance) => tint;
@@ -97,19 +137,62 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
   double get shaderValue => brightness == Brightness.dark ? 2 : 1;
 
   @override
-  Color get neutralMaterialTint => brightness == Brightness.dark
-      ? const Color.from(
-          alpha: 0.56,
-          red: 57.142857 / 255,
-          green: 57.142857 / 255,
-          blue: 57.142857 / 255,
-        )
-      : const Color.from(
-          alpha: 0.407,
-          red: 253 / 255,
-          green: 252 / 255,
-          blue: 253 / 255,
-        );
+  ({Color emission, double transmittance, double lift, double chromaGain})
+  faceTransfer(double shortSide, {double tintAmount = 0}) {
+    if (brightness == Brightness.light) {
+      // The Liquid Glass slider makes the near-white wash more opaque and
+      // desaturates the transmitted backdrop.
+      final alpha = 1 - sliderKeyframes(tintAmount, 0.592, 0.468, 0.286);
+      return (
+        emission: Color.from(
+          alpha: 1,
+          red: alpha * 253 / 255,
+          green: alpha * 252 / 255,
+          blue: alpha * 253 / 255,
+        ),
+        transmittance: 1 - alpha,
+        lift: 0.13,
+        chromaGain: sliderKeyframes(tintAmount, 1.17, 0.982, 0.751),
+      );
+    }
+    // Dark glass keeps its emission, becomes denser with size and slider,
+    // and compresses its highlights up to the middle tick.
+    return (
+      emission: const Color.from(
+        alpha: 1,
+        red: 32 / 255,
+        green: 32 / 255,
+        blue: 32 / 255,
+      ),
+      transmittance: _darkTransmittance(shortSide, tintAmount),
+      lift: sliderKeyframes(tintAmount, 1, 1.58, 1.13),
+      chromaGain: sliderKeyframes(tintAmount, 1.02, 0.955, 0.572),
+    );
+  }
+
+  @override
+  double contourScale(double shortSide, double tintAmount) {
+    if (brightness == Brightness.light) return 1;
+    final added =
+        _darkTransmittance(shortSide, 0) -
+        _darkTransmittance(shortSide, tintAmount);
+    return 1 + 0.95 * added;
+  }
+
+  /// Controls up to 75 pt keep light-mode density until the middle tick;
+  /// surfaces from 105 pt are denser from the start. Both roughly halve by
+  /// Tinted.
+  static double _darkTransmittance(double shortSide, double tintAmount) {
+    final t = ((shortSide - 75) / 30).clamp(0.0, 1.0);
+    final large = t * t * (3 - 2 * t);
+    double blend(double small, double big) => small + (big - small) * large;
+    return sliderKeyframes(
+      tintAmount,
+      blend(0.597, 0.447),
+      blend(0.596, 0.346),
+      blend(0.295, 0.195),
+    );
+  }
 
   @override
   Color tintTone(Color tint, double luminance) {
@@ -128,23 +211,8 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   Color approximateSurfaceTint(Color tint) {
-    final neutral = neutralMaterialTint;
-    final tone = tintTone(tint, 0.5);
-    final tintWeight = tint.a;
-    final alpha = 1 - (1 - neutral.a) * (1 - tintWeight);
-    if (alpha <= 0) return const Color(0x00000000);
-    return Color.from(
-      alpha: alpha,
-      red:
-          ((1 - tintWeight) * neutral.r * neutral.a + tintWeight * tone.r) /
-          alpha,
-      green:
-          ((1 - tintWeight) * neutral.g * neutral.a + tintWeight * tone.g) /
-          alpha,
-      blue:
-          ((1 - tintWeight) * neutral.b * neutral.a + tintWeight * tone.b) /
-          alpha,
-    );
+    if (tint.a <= 0) return const Color(0x00000000);
+    return tintTone(tint, 0.5).withValues(alpha: tint.a);
   }
 
   static double _lightTone(double channel, double luminance) =>
@@ -162,4 +230,52 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   List<Object?> get props => [brightness];
+}
+
+/// iOS 27 `Glass.clear`.
+///
+/// Measured on the pinned solid palettes, clear glass lifts black to 32/255,
+/// transmits 0.954 of the backdrop's luminance, passes chroma through at
+/// 1.057 and is identical in light and dark appearance.
+final class Ios27ClearLiquidGlassColorModel extends LiquidGlassColorModel {
+  /// Creates the appearance-independent clear-glass model.
+  const Ios27ClearLiquidGlassColorModel();
+
+  @override
+  String toJson() => 'ios27Clear';
+
+  @override
+  double get shaderValue => 3;
+
+  @override
+  double get fakeGlintLuminance => 3.26;
+
+  @override
+  ({Color emission, double transmittance, double lift, double chromaGain})
+  faceTransfer(double shortSide, {double tintAmount = 0}) => (
+    emission: const Color.from(
+      alpha: 1,
+      red: 0.126,
+      green: 0.126,
+      blue: 0.126,
+    ),
+    transmittance: 0.954,
+    lift: 0,
+    chromaGain: 1.057,
+  );
+
+  @override
+  Color tintTone(Color tint, double luminance) =>
+      const Ios27LiquidGlassColorModel(
+        brightness: Brightness.light,
+      ).tintTone(tint, luminance);
+
+  @override
+  Color approximateSurfaceTint(Color tint) {
+    if (tint.a <= 0) return const Color(0x00000000);
+    return tintTone(tint, 0.5).withValues(alpha: tint.a);
+  }
+
+  @override
+  List<Object?> get props => const [];
 }

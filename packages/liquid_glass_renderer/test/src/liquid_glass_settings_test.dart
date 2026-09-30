@@ -4,31 +4,120 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 void main() {
   test('iOS 27 toolbar presets contain structural renderer settings', () {
-    const light = LiquidGlassSettings.ios27ToolbarLight();
-    const dark = LiquidGlassSettings.ios27ToolbarDark();
+    final light = LiquidGlassSettings.ios27ToolbarLight();
+    final dark = LiquidGlassSettings.ios27ToolbarDark();
 
     expect(light.thickness, 12);
-    expect(light.frost, 7);
+    expect(light.frost, closeTo(3.7, 1e-9));
     expect(light.edgeRefraction, closeTo(27.42, .01));
-    expect(light.highlightWidth, .75);
-    expect(light.contourStrength, .15);
+    expect(light.highlight, 1);
+    expect(light.highlightWidth, 1.2);
+    expect(light.highlightOppositeStrength, 1);
+    expect(light.contourStrength, .43);
+    expect(light.contourWidth, .75);
+    expect(light.contourDirectionality, .77);
+    expect(light.bevelShadowStrength, .036);
+    expect(light.bevelShadowDepth, 16);
+    expect(light.bevelShadowOffset, 6);
+    expect(light.bevelShadowDirectionality, .5);
     expect(light.exteriorShadowSizeResponse, 1);
     expect(dark.thickness, 12);
-    expect(dark.frost, 5);
+    expect(dark.frost, light.frost);
     expect(dark.edgeRefraction, closeTo(27.42, .01));
-    expect(dark.highlightWidth, 0);
-    expect(dark.contourStrength, .25);
+    expect(dark.highlight, light.highlight);
+    expect(dark.highlightWidth, light.highlightWidth);
+    expect(dark.contourStrength, .88);
+    expect(dark.contourDirectionality, 1);
+    expect(dark.bevelShadowStrength, light.bevelShadowStrength);
+    expect(dark.bevelShadowDepth, light.bevelShadowDepth);
+    expect(dark.bevelShadowOffset, light.bevelShadowOffset);
+    expect(dark.bevelShadowDirectionality, light.bevelShadowDirectionality);
     expect(dark.exteriorShadowSizeResponse, 0);
+  });
+
+  test('iOS 27 clear preset keeps the toolbar glint shape', () {
+    final clear = LiquidGlassSettings.ios27Clear();
+    final toolbar = LiquidGlassSettings.ios27ToolbarLight();
+
+    expect(clear.frost, closeTo(.35, 1e-9));
+    // Clear glass's slider blur: 0.35/0.67/1.28/4.6/16.4 pt.
+    for (final (position, sigma) in [
+      (0.0, .35),
+      (.25, .67),
+      (.5, 1.28),
+      (.75, 4.6),
+      (1.0, 16.4),
+    ]) {
+      expect(
+        LiquidGlassSettings.ios27Clear(tintAmount: position).frost,
+        closeTo(sigma, sigma * .03),
+      );
+      expect(
+        LiquidGlassSettings.ios27Clear(tintAmount: position).effectiveFrost,
+        closeTo(sigma, sigma * .03),
+      );
+    }
+    expect(clear.highlight, 1);
+    expect(clear.highlightWidth, toolbar.highlightWidth);
+    expect(clear.highlightWrap, toolbar.highlightWrap);
+    expect(clear.contourStrength, .36);
+    expect(clear.contourDirectionality, 1);
+    expect(clear.bevelShadowStrength, 0);
+  });
+
+  test('the Liquid Glass slider round-trips and leaves frost alone', () {
+    const settings = LiquidGlassSettings(frost: 3, tintAmount: .5);
+    expect(LiquidGlassSettings.fromJson(settings.toJson()), settings);
+    expect(settings.copyWith(tintAmount: 1).tintAmount, 1);
+    expect(settings.effectiveFrost, 3);
+    expect(const LiquidGlassSettings(frost: -1).effectiveFrost, 0);
+    expect(
+      LiquidGlassSettings.ios27Toolbar(
+        brightness: Brightness.dark,
+        tintAmount: .25,
+      ).tintAmount,
+      .25,
+    );
+  });
+
+  test('iOS 27 regular glass blurs along the fitted slider curve', () {
+    // 3.7 pt at Clear, 6.1 at the middle tick, full frost at Tinted.
+    for (final (position, sigma) in [
+      (0.0, 3.7),
+      (.25, 4.75),
+      (.5, 6.1),
+      (.75, 10.06),
+      (1.0, 16.58),
+    ]) {
+      expect(
+        LiquidGlassSettings.ios27RegularFrost(position),
+        closeTo(sigma, .01),
+      );
+      for (final brightness in Brightness.values) {
+        final toolbar = LiquidGlassSettings.ios27Toolbar(
+          brightness: brightness,
+          tintAmount: position,
+        );
+        expect(toolbar.frost, LiquidGlassSettings.ios27RegularFrost(position));
+        expect(toolbar.tintAmount, position);
+      }
+    }
+    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(3.7, 1e-9));
+    expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
+    expect(
+      LiquidGlassSettings.ios27ToolbarLight(tintAmount: 1, frost: 2).frost,
+      2,
+    );
   });
 
   test('brightness-aware toolbar factory selects structural presets', () {
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
-      const LiquidGlassSettings.ios27ToolbarLight(),
+      LiquidGlassSettings.ios27ToolbarLight(),
     );
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
-      const LiquidGlassSettings.ios27ToolbarDark(),
+      LiquidGlassSettings.ios27ToolbarDark(),
     );
   });
 

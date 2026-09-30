@@ -15,19 +15,19 @@ void main() {
     test('uses the real renderer fallback for highlight width', () {
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarDark(),
+          const LiquidGlassSettings(highlightWidth: 0, contourWidth: .5),
         ),
         .5,
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarLight(),
+          LiquidGlassSettings.ios27ToolbarLight(),
         ),
-        .75,
+        1.2,
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings(),
+          const LiquidGlassSettings(highlightWidth: 0),
         ),
         0,
       );
@@ -366,7 +366,7 @@ Widget _offsetComparisonSurface({
 }) => Center(
   child: LiquidGlassLayer(
     fake: fake,
-    settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
+    settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
       edgeRefraction: 0,
       chromaticAberration: 0,
       contourOffset: offset,

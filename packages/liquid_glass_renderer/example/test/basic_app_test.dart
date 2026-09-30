@@ -73,13 +73,13 @@ void main() {
 
     expect(
       settingsNotifier.value,
-      const LiquidGlassSettings.ios27ToolbarDark(),
+      LiquidGlassSettings.ios27ToolbarDark(),
     );
     expect(find.byKey(const ValueKey('glass-layer-0-0')), findsOneWidget);
   });
 
   test('bundled presets round-trip and include fitted fields', () {
-    const settings = LiquidGlassSettings.ios27ToolbarLight();
+    final settings = LiquidGlassSettings.ios27ToolbarLight();
     const appearance = LiquidGlassAppearance.ios27ToolbarLight();
     final restored = PresetStore.fromYaml(
       PresetStore.toYaml((settings: settings, appearance: appearance)),
