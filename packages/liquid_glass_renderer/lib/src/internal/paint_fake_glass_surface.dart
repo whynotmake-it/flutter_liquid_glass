@@ -50,6 +50,14 @@ void paintFakeGlassSurface(
   final tint = surfaceTint.withValues(
     alpha: surfaceTint.a * appearanceVisibility,
   );
+  final faceEmission =
+      appearance.colorModel
+          .faceTransfer(
+            size.shortestSide,
+            tintAmount: settings.effectiveTintAmount,
+          )
+          ?.emission ??
+      const Color(0x00000000);
   final shapeType = switch (shape) {
     LiquidOval() => 0.0,
     LiquidRoundedRectangle() => 1.0,
@@ -93,6 +101,11 @@ void paintFakeGlassSurface(
       ..setFloat(1 / math.max(devicePixelRatio, 0.01))
       ..setFloat(exteriorOnly ? 1 : 0)
       ..setFloat(appearance.colorModel.fakeGlintLuminance)
+      ..setFloats([
+        faceEmission.r * appearanceVisibility,
+        faceEmission.g * appearanceVisibility,
+        faceEmission.b * appearanceVisibility,
+      ])
       ..setFloats(
         shape is LiquidRoundedSuperellipse
             ? roundedSuperellipseParameters(size, cornerRadius)

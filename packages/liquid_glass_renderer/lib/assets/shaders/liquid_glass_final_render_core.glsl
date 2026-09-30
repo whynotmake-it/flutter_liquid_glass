@@ -33,8 +33,10 @@ uniform vec3 uBevelShadowConfig;
 uniform vec4 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
-// 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
-// glass opaque so visibility 0 is an exact identity of the backdrop.
+// 1.0 lets material alpha cross-fade the frost away, and the rest of the
+// material with it; 0.0 keeps unfrosted glass opaque and cross-fades the
+// material to the refracted backdrop instead, so visibility 0 is an exact
+// identity of the backdrop.
 uniform float uBlurFade;
 // 1.0 folds sub-pixel frost into this pass: the refracted texel plus its two
 // diagonal neighbours, weighted 1/2, 1/4, 1/4 (sigma ~0.7 device px), instead
@@ -422,18 +424,21 @@ vec3 applySpecularHighlights(
         // the face. Small controls retain the configured strength; larger
         // surfaces grow smoothly up to 2x. This avoids the broad matte wash
         // produced by globally increasing strength or band depth.
-        float shadowOffset = max(uBevelShadowOffset, 0.0);
-        shadowOffset = min(
-            shadowOffset,
-            max(sizeAwareBevelDepth - 0.001, 0.0)
-        );
-        float bevelLeadingEdge = shadowOffset > 0.001
-            ? smoothstep(0.0, shadowOffset, inwardDistance)
+        // The raised rim shades the face like a wall lit along the light
+        // axis: its band is displaced by the offset along the light. Below
+        // the lit wall it falls inside the face, along the sides it starts
+        // at the rim, and below the far wall it is pushed out past the rim.
+        // The penumbra is as wide as the displacement.
+        float lightFacing = dot(normalXY, -uLightDirection);
+        float shadowShift = max(uBevelShadowOffset, 0.0) * lightFacing;
+        float penumbra = 2.0 * shadowShift;
+        float bevelLeadingEdge = penumbra > 0.001
+            ? smoothstep(0.0, penumbra, inwardDistance)
             : 1.0;
         float bevelFalloff = 1.0 - smoothstep(
-            shadowOffset,
-            max(sizeAwareBevelDepth, shadowOffset + 0.001),
-            inwardDistance
+            0.0,
+            sizeAwareBevelDepth,
+            inwardDistance - shadowShift
         );
         float bevelBand = bevelLeadingEdge * bevelFalloff;
         // Remap the signed SDF-normal response across the full contour before
@@ -446,31 +451,18 @@ vec3 applySpecularHighlights(
         float wrappedLightFacing = smoothstep(
             0.0,
             1.0,
-            dot(normalXY, -uLightDirection) * 0.5 + 0.5
+            lightFacing * 0.5 + 0.5
         );
         float bevelDirection = mix(
             1.0,
             wrappedLightFacing,
             clamp(uBevelShadowDirectionality, 0.0, 1.0)
         );
-        float baseLuminance = dot(
-            baseColor,
-            vec3(0.2126, 0.7152, 0.0722)
-        );
-        // Incident shadow remains visible over dark transmitted content, but
-        // does not apply a constant wash to it. A fourth-root response matches
-        // the black/white wall-energy ratio while remaining exactly zero for
-        // a truly black surface and one for white.
-        float luminanceResponse = pow(
-            clamp(baseLuminance, 0.0, 1.0),
-            0.25
-        );
         bevelShadow = clamp(
             bevelBand *
                 bevelDirection *
                 uBevelShadowStrength *
-                sizeEnergy *
-                luminanceResponse,
+                sizeEnergy,
             0.0,
             1.0
         );
@@ -486,7 +478,12 @@ vec3 applySpecularHighlights(
         uContourColor.rgb * edgeAbsorption +
         transmittedColor * edgeAbsorption *
             clamp(uContourTransmittance, 0.0, 1.0);
-    result *= 1.0 - bevelShadow;
+    // The shadow absorbs only light that came through the glass: the wash
+    // emits the same over any backdrop, so over black the face is unshaded.
+    result = max(
+        result - transmittedColor * (1.0 - edgeAbsorption) * bevelShadow,
+        vec3(0.0)
+    );
     // The glint recolors the lit face rather than adding white: it pulls
     // luminance toward a target above SDR white and amplifies the face's own
     // chroma, so glass over color glints in that color.
@@ -534,6 +531,11 @@ void main() {
     
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
+    // Weight of the material over the refracted backdrop. Frosted glass
+    // renders the material in full and its alpha fades it with the frost;
+    // opaque unfrosted glass fades it here. Either way it fades linearly,
+    // never twice.
+    float materialVisibility = mix(appearanceVisibility, 1.0, uBlurFade);
     vec3 colorModelShares = colorModelSharesOf(uAppearanceConfig.x);
     #if SHAPE_TINT
     {
@@ -651,14 +653,10 @@ void main() {
             colorModelSharesOf(primaryColorModel),
             primaryWeight
         );
-        materialTint.a *= appearanceVisibility;
-        uSaturation = mix(1.0, appearance.x, appearanceVisibility);
-        uTransmissionGamma = mix(
-            1.0,
-            appearance.y,
-            appearanceVisibility
-        );
-        uVibrancy = appearance.z * appearanceVisibility;
+        materialVisibility = mix(appearanceVisibility, 1.0, uBlurFade);
+        uSaturation = appearance.x;
+        uTransmissionGamma = appearance.y;
+        uVibrancy = appearance.z;
     }
     #endif
 
@@ -905,13 +903,16 @@ void main() {
         signedEdgeDistance,
         surfaceNormal
     );
-    // Highlights, bevel shadow, and in-material contour are incident effects
-    // of the glass: they fade to the untinted transmitted material as
-    // visibility reaches zero instead of ghosting a hidden shape.
-    vec3 finalColor = mix(baseColor, litColor, appearanceVisibility);
+    // The lit material (face, tint, saturation, lighting and in-material
+    // contour) cross-fades to the refracted backdrop, whose refraction
+    // scales with visibility. Fading the output rather than each parameter
+    // keeps coupled factors, such as the dark face's wash and lift, linear
+    // and monotonic.
+    vec3 finalColor = mix(refractColor.rgb, litColor, materialVisibility);
     // Inside the material, contour absorption is handled before highlights so
     // specular light can eclipse it. Only the part outside the material is
-    // composited as a translucent attached boundary.
+    // composited as a translucent attached boundary. It lies outside the
+    // alpha fade, so it always scales with visibility.
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
