@@ -23,13 +23,17 @@ void main() {
     expect(dark.exteriorShadowSizeResponse, 0);
   });
 
-  test('iOS 27 clear preset keeps the full lens without frost', () {
+  test('iOS 27 clear preset keeps the full lens with the fitted frost', () {
     final clear = LiquidGlassSettings.ios27Clear();
     expect(clear.refractionHeight, 20);
     expect(clear.refractionAmount, 60);
     expect(clear.refractionFitsShape, isFalse);
-    expect(clear.frost, 0);
-    expect(LiquidGlassSettings.ios27Clear(frost: .35).frost, .35);
+    expect(clear.frost, closeTo(.35, 1e-9));
+    expect(
+      LiquidGlassSettings.ios27Clear(tintAmount: .5).frost,
+      closeTo(1.28, .01),
+    );
+    expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
   });
 
   test('clear-glass frost follows the fitted slider curve', () {

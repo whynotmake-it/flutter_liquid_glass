@@ -712,17 +712,19 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
       BenchmarkScenario.realClearMaterial => _realLayer(
-        LiquidGlassSettings.ios27Clear(frost: .35),
-        t,
-        appearance: const LiquidGlassAppearance(),
-      ),
-      BenchmarkScenario.realClearUnfrosted => _realLayer(
         LiquidGlassSettings.ios27Clear(),
         t,
         appearance: const LiquidGlassAppearance(),
       ),
+      BenchmarkScenario.realClearUnfrosted => _realLayer(
+        LiquidGlassSettings.ios27Clear(frost: 0),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
       BenchmarkScenario.realClearSmooth => _realLayer(
-        LiquidGlassSettings.ios27Clear().copyWith(smoothRefraction: true),
+        LiquidGlassSettings.ios27Clear(
+          frost: 0,
+        ).copyWith(smoothRefraction: true),
         t,
         appearance: const LiquidGlassAppearance(),
       ),
