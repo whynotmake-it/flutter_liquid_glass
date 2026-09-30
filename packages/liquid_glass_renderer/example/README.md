@@ -27,7 +27,8 @@ past its top drags it closed. The sheet controls:
   or Auto, where the top controls and the bottom bar each flip as a group with
   the brightness of the backdrop behind them
   (`LiquidGlassAdaptiveBrightness`). The Liquid Glass slider sets
-  `LiquidGlassSettings.tintAmount`.
+  `LiquidGlassSettings.tintAmount` and the preset's blur
+  (`ios27RegularFrost`, `ios27ClearFrost`). The loupe ignores it, as on iOS.
 - **FakeGlass** instead of the full renderer, plus **Refraction** and
   **Lighting** controls. **Copy as Dart** puts the current
   `LiquidGlassSettings` on the clipboard.

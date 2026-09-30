@@ -20,17 +20,24 @@ enum GlassStyle {
   /// Whether the style has distinct light and dark variants.
   bool get followsBrightness => this == regular || this == toolbar;
 
+  /// Whether the Liquid Glass slider changes the style. The iOS 27 loupe is
+  /// identical at every slider position.
+  bool get followsSlider => this != loupe;
+
   LiquidGlassSettings settings({
     required Brightness brightness,
     required double tintAmount,
   }) => switch (this) {
-    regular => LiquidGlassSettings(tintAmount: tintAmount),
+    regular => LiquidGlassSettings(
+      tintAmount: tintAmount,
+      frost: LiquidGlassSettings.ios27RegularFrost(tintAmount),
+    ),
     toolbar => LiquidGlassSettings.ios27Toolbar(
       brightness: brightness,
       tintAmount: tintAmount,
     ),
     clear => LiquidGlassSettings.ios27Clear(tintAmount: tintAmount),
-    loupe => loupeSettings.copyWith(tintAmount: tintAmount),
+    loupe => loupeSettings,
   };
 
   LiquidGlassAppearance appearance(Brightness brightness) => switch (this) {

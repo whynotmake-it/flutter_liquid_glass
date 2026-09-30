@@ -149,18 +149,19 @@ class _MaterialControls extends StatelessWidget {
             const SizedBox(height: 4),
             InspectorCard(
               children: [
-                SliderRow(
-                  title: 'Liquid Glass',
-                  value: material.tintAmount,
-                  min: 0,
-                  max: 1,
-                  minLabel: 'Clear',
-                  maxLabel: 'Tinted',
-                  onChanged: (amount) => state.material.value = state
-                      .material
-                      .value
-                      .withTintAmount(amount),
-                ),
+                if (material.style.followsSlider)
+                  SliderRow(
+                    title: 'Liquid Glass',
+                    value: material.tintAmount,
+                    min: 0,
+                    max: 1,
+                    minLabel: 'Clear',
+                    maxLabel: 'Tinted',
+                    onChanged: (amount) => state.material.value = state
+                        .material
+                        .value
+                        .withTintAmount(amount),
+                  ),
                 if (scene.usesBlending)
                   ValueListenableBuilder(
                     valueListenable: state.blend,

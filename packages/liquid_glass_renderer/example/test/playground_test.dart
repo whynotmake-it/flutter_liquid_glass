@@ -38,26 +38,42 @@ void main() {
       );
     });
 
-    test('the Liquid Glass slider keeps edits and owns clear glass blur', () {
-      final edited =
-          GlassMaterial.preset(
-            style: GlassStyle.clear,
-            brightness: Brightness.light,
-          ).withSettings(
-            LiquidGlassSettings.ios27Clear().copyWith(refractionAmount: 12),
-          );
+    test('the Liquid Glass slider keeps edits and owns the blur', () {
+      for (final (style, frost) in [
+        (GlassStyle.clear, LiquidGlassSettings.ios27ClearFrost(1)),
+        (GlassStyle.toolbar, LiquidGlassSettings.ios27RegularFrost(1)),
+        (GlassStyle.regular, LiquidGlassSettings.ios27RegularFrost(1)),
+      ]) {
+        final preset = GlassMaterial.preset(
+          style: style,
+          brightness: Brightness.light,
+        );
+        final tinted = preset
+            .withSettings(preset.settings.copyWith(refractionAmount: 12))
+            .withTintAmount(1);
 
-      final tinted = edited.withTintAmount(1);
+        expect(tinted.edited, isTrue);
+        expect(tinted.settings.refractionAmount, 12);
+        expect(tinted.settings.tintAmount, 1);
+        expect(
+          tinted.settings.frost,
+          withTestFrost(LiquidGlassSettings(frost: frost)).frost,
+          reason: '$style',
+        );
+      }
+    });
 
-      expect(tinted.edited, isTrue);
-      expect(tinted.settings.refractionAmount, 12);
-      expect(tinted.settings.tintAmount, 1);
-      expect(
-        tinted.settings.frost,
-        withTestFrost(
-          LiquidGlassSettings(frost: LiquidGlassSettings.ios27ClearFrost(1)),
-        ).frost,
+    test('the loupe ignores the Liquid Glass slider', () {
+      final loupe = GlassMaterial.preset(
+        style: GlassStyle.loupe,
+        brightness: Brightness.light,
       );
+      expect(GlassStyle.loupe.followsSlider, isFalse);
+      expect(loupe.withTintAmount(1).settings, loupe.settings);
+      final edited = loupe.withSettings(
+        loupe.settings.copyWith(refractionAmount: 20),
+      );
+      expect(edited.withTintAmount(1).settings, edited.settings);
     });
 
     test('reset restores the preset at the current slider position', () {
