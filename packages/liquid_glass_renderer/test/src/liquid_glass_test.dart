@@ -1234,7 +1234,7 @@ void main() {
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount);
 
-          settings.value = settings.value.copyWith(magnification: .8);
+          settings.value = settings.value.copyWith(backdropShrink: .2);
           await tester.pump();
           expect(
             renderer.debugRenderCount,

@@ -23,11 +23,7 @@ class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.smoothRefraction = true,
-    @Deprecated(
-      'Resamples the captured backdrop and zooms about the layer center. '
-      'Use LiquidGlassLoupe for magnifiers.',
-    )
-    this.magnification = 1.0,
+    this.backdropShrink = 0.0,
     this.frost = 5.0,
     this.dispersion = 0.0,
     this.highlight = 1.0,
@@ -50,32 +46,15 @@ class LiquidGlassSettings with Equatable {
   });
 
   /// Restores a material vector produced by [toJson].
-  ///
-  /// Vectors written before the refraction model was simplified are still
-  /// accepted: `thickness` maps to [refractionHeight], `edgeRefraction` to
-  /// [refractionAmount] (both describe the displacement at the silhouette)
-  /// and `backdropScale` to [magnification]. `refractionSpread` has no
-  /// equivalent and is ignored; a [refractionHeight] of at least half the
-  /// shape's short side gives the same full-face lens.
   factory LiquidGlassSettings.fromJson(Map<String, Object?> json) {
     double number(String key, double fallback) =>
         (json[key] as num?)?.toDouble() ?? fallback;
-    double legacy(String key, String legacyKey, double fallback) =>
-        number(key, number(legacyKey, fallback));
     return LiquidGlassSettings(
-      refractionHeight: legacy('refractionHeight', 'thickness', 20),
-      refractionAmount: legacy('refractionAmount', 'edgeRefraction', 60),
-      refractionFitsShape: switch (json['refractionFitsShape']) {
-        final bool value => value,
-        'false' => false,
-        _ => true,
-      },
-      smoothRefraction: switch (json['smoothRefraction']) {
-        final bool value => value,
-        'false' => false,
-        _ => true,
-      },
-      magnification: legacy('magnification', 'backdropScale', 1),
+      refractionHeight: number('refractionHeight', 20),
+      refractionAmount: number('refractionAmount', 60),
+      refractionFitsShape: json['refractionFitsShape'] as bool? ?? true,
+      smoothRefraction: json['smoothRefraction'] as bool? ?? true,
+      backdropShrink: number('backdropShrink', 0),
       frost: number('frost', 5),
       dispersion: number('dispersion', 0),
       highlight: number('highlight', 1),
@@ -116,7 +95,7 @@ class LiquidGlassSettings with Equatable {
        refractionAmount = 60.0,
        refractionFitsShape = true,
        smoothRefraction = true,
-       magnification = 1.0,
+       backdropShrink = 0.0,
        dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
@@ -148,7 +127,7 @@ class LiquidGlassSettings with Equatable {
        refractionAmount = 60.0,
        refractionFitsShape = true,
        smoothRefraction = true,
-       magnification = 1.0,
+       backdropShrink = 0.0,
        dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
@@ -196,7 +175,7 @@ class LiquidGlassSettings with Equatable {
        refractionAmount = 60.0,
        refractionFitsShape = false,
        smoothRefraction = true,
-       magnification = 1.0,
+       backdropShrink = 0.0,
        dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
@@ -315,29 +294,30 @@ class LiquidGlassSettings with Equatable {
   /// on Metal. Set it to `false` for the previous nearest sampling.
   final bool smoothRefraction;
 
-  /// Magnification of the backdrop seen through the whole face, about the
-  /// center of all glass in the layer.
+  /// How much the backdrop seen through the face is shrunk, about the center
+  /// of the layer's glass: `0` keeps its size, `0.08` shows it at 92%.
   ///
-  /// `1` preserves the backdrop, values above `1` magnify and values below
-  /// `1` reveal more content. The bevel's [refractionAmount] is applied on
-  /// top.
+  /// Clamped to `0` to `0.75`, so the glass can reveal more of its
+  /// surroundings but never enlarges (and pixelates) the captured backdrop.
+  /// Use `LiquidGlassLoupe` for magnifiers; it re-renders content at full
+  /// resolution. The bevel's [refractionAmount] is applied on top.
   ///
-  /// This resamples the backdrop the glass already captured, so magnified
-  /// content pixelates, and a layer with several shapes zooms about their
-  /// common center rather than each shape's. Use `LiquidGlassLoupe` for
-  /// magnifiers: it re-renders the content at full resolution.
-  @Deprecated(
-    'Resamples the captured backdrop and zooms about the layer center. Use '
-    'LiquidGlassLoupe for magnifiers.',
-  )
-  final double magnification;
+  /// All glass in one layer shares the center, so give a shrinking shape its
+  /// own layer when it should shrink about itself.
+  final double backdropShrink;
 
   /// Backdrop blur sigma in logical pixels.
   ///
   /// The value is absolute and does not change with the material's size.
   final double frost;
 
-  /// Wavelength separation for the edge displacement.
+  /// Separation of the color channels in the refracted edge.
+  ///
+  /// Red is displaced by `1 + dispersion / 2` and blue by
+  /// `1 - dispersion / 2` times the edge displacement. Negative values bend
+  /// blue more, as real glass does; the iOS 27 loupe measures about `-0.07`
+  /// and other iOS 27 glass `0`. At `0` the glass reads the backdrop once
+  /// per pixel instead of three times.
   final double dispersion;
 
   /// Strength of the glint along the light axis.
@@ -459,8 +439,8 @@ class LiquidGlassSettings with Equatable {
   /// Effective backdrop sampling mode.
   bool get effectiveSmoothRefraction => smoothRefraction;
 
-  /// Effective magnification constrained to the supported range.
-  double get effectiveMagnification => magnification.clamp(.25, 4.0);
+  /// [backdropShrink] constrained to the supported range.
+  double get effectiveBackdropShrink => backdropShrink.clamp(0.0, 0.75);
 
   /// Effective slider position, clamped to `0...1`.
   double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
@@ -553,7 +533,7 @@ class LiquidGlassSettings with Equatable {
     double? refractionAmount,
     bool? refractionFitsShape,
     bool? smoothRefraction,
-    double? magnification,
+    double? backdropShrink,
     double? frost,
     double? dispersion,
     double? highlight,
@@ -578,7 +558,7 @@ class LiquidGlassSettings with Equatable {
     refractionAmount: refractionAmount ?? this.refractionAmount,
     refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
     smoothRefraction: smoothRefraction ?? this.smoothRefraction,
-    magnification: magnification ?? this.magnification,
+    backdropShrink: backdropShrink ?? this.backdropShrink,
     frost: frost ?? this.frost,
     dispersion: dispersion ?? this.dispersion,
     highlight: highlight ?? this.highlight,
@@ -610,7 +590,7 @@ class LiquidGlassSettings with Equatable {
     'refractionAmount': refractionAmount,
     'refractionFitsShape': refractionFitsShape,
     'smoothRefraction': smoothRefraction,
-    'magnification': magnification,
+    'backdropShrink': backdropShrink,
     'frost': frost,
     'dispersion': dispersion,
     'highlight': highlight,
@@ -638,7 +618,7 @@ class LiquidGlassSettings with Equatable {
     refractionAmount,
     refractionFitsShape,
     smoothRefraction,
-    magnification,
+    backdropShrink,
     frost,
     dispersion,
     highlight,

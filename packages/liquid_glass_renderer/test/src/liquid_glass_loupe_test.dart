@@ -61,7 +61,6 @@ void main() {
     expect(settings.refractionHeight, 8);
     expect(settings.refractionAmount, 28);
     expect(settings.frost, 0);
-    // ignore: deprecated_member_use_from_same_package
-    expect(settings.magnification, 1);
+    expect(settings.backdropShrink, 0);
   });
 }

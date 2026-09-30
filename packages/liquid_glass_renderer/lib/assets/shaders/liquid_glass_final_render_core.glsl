@@ -687,14 +687,15 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // Magnification is one lens over the whole face, about the material
-        // center, uniform up to the silhouette as on the iOS 27 loupe. The
-        // bevel displacement adds on top of it.
+        // backdropShrink is one lens over the whole face, about the material
+        // center of the layer, uniform up to the silhouette. The bevel
+        // displacement adds on top of it. It never enlarges: magnifiers
+        // re-render their content instead (LiquidGlassLoupe).
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis
         );
-        float magnification = clamp(uBackdropScale, 0.25, 4.0);
+        float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
             filterDeltaFromCenter *
             (1.0 / magnification - 1.0) *

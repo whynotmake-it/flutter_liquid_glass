@@ -296,7 +296,7 @@ Widget captureSceneWidget(
                     settings: const LiquidGlassSettings(
                       frost: 0,
                       refractionAmount: 24,
-                      magnification: 0.92,
+                      backdropShrink: 0.08,
                       highlight: 0.4,
                     ),
                     child: const LiquidGlass(

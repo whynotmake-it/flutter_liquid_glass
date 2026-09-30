@@ -25,14 +25,14 @@ const _defaultRepetition = int.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_REPETITION',
   defaultValue: 1,
 );
-final _benchmarkBackdropScale =
+final _benchmarkBackdropShrink =
     double.tryParse(
       const String.fromEnvironment(
-        'LIQUID_GLASS_BENCHMARK_BACKDROP_SCALE',
-        defaultValue: '1',
+        'LIQUID_GLASS_BENCHMARK_BACKDROP_SHRINK',
+        defaultValue: '0',
       ),
     ) ??
-    1;
+    0;
 final _groupShadowAlpha =
     double.tryParse(
       const String.fromEnvironment(
@@ -632,8 +632,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     final settings = LiquidGlassSettings(
       refractionHeight: 30,
       frost: 15,
-      // ignore: deprecated_member_use
-      magnification: _benchmarkBackdropScale,
+      backdropShrink: _benchmarkBackdropShrink,
     );
     const litSettings = LiquidGlassSettings(
       refractionHeight: 30,
@@ -1967,8 +1966,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                           frost: 0,
                           refractionHeight: 24,
                           refractionAmount: 40,
-                          // ignore: deprecated_member_use
-                          magnification: .92,
+                          backdropShrink: .08,
                           dispersion: .1,
                           highlight: .4,
                           contourStrength: .1,

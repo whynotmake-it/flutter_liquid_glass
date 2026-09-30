@@ -38,12 +38,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
             : defaults.refractionAmount,
       ),
     ),
-    // ignore: deprecated_member_use
-    magnification: number(
-      'magnification',
-      // ignore: deprecated_member_use
-      number('backdropScale', defaults.magnification),
-    ),
+    backdropShrink: number('backdropShrink', defaults.backdropShrink),
     refractionFitsShape:
         settings['refractionFitsShape'] as bool? ??
         defaults.refractionFitsShape,
@@ -489,7 +484,7 @@ class _MatchLoupe extends StatelessWidget {
         // The system text-selection loupe is a clear lens. Never let a
         // candidate's ordinary material vector turn this holdout into a
         // frosted, opaque pill or a full-face shader zoom.
-        settings: settings.copyWith(magnification: 1, frost: 0),
+        settings: settings.copyWith(backdropShrink: 0, frost: 0),
         appearance: const LiquidGlassAppearance(),
         shadows: shadows,
       ),

@@ -47,11 +47,11 @@ class LiquidGlassLoupeSource extends SingleChildRenderObjectWidget {
 
 /// A liquid glass magnifier, like the iOS 27 text-selection loupe.
 ///
-/// Unlike [LiquidGlassSettings.magnification], which enlarges the backdrop
-/// the glass already captured, the loupe re-renders the source content under
-/// the lens at `magnification` times the device resolution, so text and
-/// vector content stay sharp. The glass then refracts and lights that
-/// magnified content like any other backdrop.
+/// The loupe re-renders the source content under the lens at
+/// [magnification] times the device resolution instead of enlarging the
+/// backdrop the glass captured, so text and vector content stay sharp. The
+/// glass then refracts and lights that magnified content like any other
+/// backdrop.
 ///
 /// Only the region under the lens is re-rendered, once per composited frame
 /// while the loupe is shown.
@@ -113,8 +113,7 @@ class LiquidGlassLoupe extends StatelessWidget {
   /// the touch point and shows it: `Offset(0, 75)` there.
   final Offset focalPointOffset;
 
-  /// The glass optics and lighting. Do not set
-  /// [LiquidGlassSettings.magnification]; [magnification] replaces it.
+  /// The glass optics and lighting.
   final LiquidGlassSettings settings;
 
   /// The glass appearance.

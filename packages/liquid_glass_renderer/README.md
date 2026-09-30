@@ -205,7 +205,7 @@ Independent `LiquidGlass` children may share a layer without blending.
 
 `LiquidGlassSettings` groups controls by purpose:
 
-- Optics: `refractionHeight`, `refractionAmount`, `magnification`, and
+- Optics: `refractionHeight`, `refractionAmount`, `backdropShrink`, and
   `dispersion`.
 - Frost: `frost`, expressed as a logical-pixel blur sigma.
 - Highlight: `highlight`, `highlightWidth`, `highlightWrap`,
@@ -241,8 +241,15 @@ bevel refracts, pulling content inward:
   quarter circle and reaches zero, without a crease, at `refractionHeight`.
   Its ratio to `refractionHeight` sets how rod-like the rim looks: above `1`,
   content near the rim is mirrored, as on Apple's glass.
-- `magnification` scales the backdrop seen through the whole face about its
-  center.
+- `backdropShrink` shrinks the backdrop seen through the whole face: `0`
+  keeps its size, `0.08` shows it at 92%. It never enlarges; use
+  `LiquidGlassLoupe` for magnifiers. All glass in one layer shrinks about the
+  center of the layer's glass, so give a shape its own layer to shrink it
+  about itself.
+- `dispersion` separates the color channels in the refracted edge: red moves
+  by `1 + dispersion / 2` and blue by `1 - dispersion / 2` times the edge
+  displacement. Negative values bend blue more, as real glass does. At `0`
+  the glass reads the backdrop once per pixel.
 - `smoothRefraction` (default `true`) samples the backdrop bilinearly, so
   refracted lines move smoothly instead of snapping to whole pixels.
   Undisplaced glass still copies the backdrop exactly, and it costs no extra
@@ -258,14 +265,38 @@ Values measured on iOS 27 (Reduce Motion off):
 | --- | --- | --- | --- |
 | Regular glass, buttons, toolbars (default) | `20` | `60` | |
 | Clear glass (`LiquidGlassSettings.ios27Clear(tintAmount: slider)`) | `20` | `60` | `refractionFitsShape: false`, `frost: LiquidGlassSettings.ios27ClearFrost(slider)` (0.35 at slider 0, applied in the final pass) |
-| Text loupe | `8` | `28` | `magnification: 1.25` |
+| Text loupe (`LiquidGlassLoupe.defaultSettings`) | `8` | `34.5` | `dispersion: -0.06`, 1.25× magnification from `LiquidGlassLoupe` |
 
-iOS 27 shows no chromatic dispersion in refraction, so `dispersion`
-defaults to `0`. Frost up to 1.25 device pixels (such as clear glass's 0.35 pt on
-a 3x screen) is applied as a three-texel kernel inside the final pass instead
-of a separate blur pass. Strong magnification enlarges an already captured image and
-loses detail; for a large zoom, paint the backdrop with Flutter's
-`RawMagnifier` before applying glass.
+iOS 27 regular and clear glass show no dispersion, so `dispersion` defaults
+to `0`; only the loupe measures some. Frost up to 1.25 device pixels (such as
+clear glass's 0.35 pt on a 3x screen) is applied as a three-texel kernel inside
+the final pass instead of a separate blur pass.
+
+### Loupe
+
+`LiquidGlassLoupe` is a magnifier like the iOS 27 text loupe. Wrap the content
+in a `LiquidGlassLoupeSource`, connect both with a `LiquidGlassLoupeLink`, and
+place the loupe above the source. It re-renders only the content under the
+lens at the magnified resolution, then refracts and lights it with glass, so
+text stays sharp.
+
+```dart
+final link = LiquidGlassLoupeLink();
+
+Stack(
+  children: [
+    LiquidGlassLoupeSource(link: link, child: content),
+    Positioned(
+      left: x,
+      top: y,
+      child: LiquidGlassLoupe(
+        link: link,
+        focalPointOffset: const Offset(0, 75),
+      ),
+    ),
+  ],
+);
+```
 
 ### HDR highlights
 
