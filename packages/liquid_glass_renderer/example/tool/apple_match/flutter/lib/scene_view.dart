@@ -63,6 +63,10 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'contourTransmittance',
       number('contourTransmissionRatio', defaults.contourTransmittance),
     ),
+    contourDirectionality: number(
+      'contourDirectionality',
+      defaults.contourDirectionality,
+    ),
     bevelShadowStrength: number(
       'bevelShadowStrength',
       number('innerShadowStrength', defaults.bevelShadowStrength),
@@ -91,6 +95,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'chromaticAberration',
       defaults.chromaticAberration,
     ),
+    tintAmount: number('tintAmount', defaults.tintAmount),
   );
 }
 

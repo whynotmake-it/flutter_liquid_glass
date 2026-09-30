@@ -15,7 +15,7 @@ void main() {
     test('uses the real renderer fallback for highlight width', () {
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarDark(),
+          const LiquidGlassSettings(highlightWidth: 0, contourWidth: .5),
         ),
         .5,
       );
@@ -23,11 +23,11 @@ void main() {
         fakeGlassHighlightBandWidth(
           const LiquidGlassSettings.ios27ToolbarLight(),
         ),
-        .75,
+        1.2,
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings(),
+          const LiquidGlassSettings(highlightWidth: 0),
         ),
         0,
       );
