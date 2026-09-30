@@ -1,7 +1,7 @@
 // Geometry matte generation implemented directly with Flutter GPU.
 // Geometry encoding revision 5: the shared uniform layout carries the compact
 // appearance lookup table used by the low-resolution material pass.
-// Refraction model 2: quarter-circle bevel displacement (height + amount).
+// Refraction model 3: quarter-circle bevel, optionally fitted to the shape.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
@@ -39,6 +39,7 @@ layout(std140) uniform GeometryUniforms {
 float uRefractionHeight = uOpticalProps.x;
 float uEdgeDistanceRange = uOpticalProps.z;
 float uRefractionAmount = uTextureSize.y;
+float uRefractionFitsShape = uTextureSize.x;
 float uContourExtent = uContourProps.x;
 out vec4 fragColor;
 
@@ -95,19 +96,28 @@ void main() {
         : vec2(0.0);
 
     // A flat face with a quarter-circle bevel: only the bevel refracts, and
-    // its displacement joins the undisplaced face with zero slope. Shapes
-    // narrower than two bevels scale the whole lens so the displacement
-    // reaches zero at the medial axis instead of flipping direction there.
-    // The exterior half of the AA ramp keeps the silhouette's displacement.
-    float lensScale = min(
-        1.0,
-        scene.halfMinor / max(uRefractionHeight, 0.001)
-    );
-    float bevel = uRefractionHeight * lensScale;
+    // its displacement joins the undisplaced face with zero slope. The
+    // exterior half of the AA ramp keeps the silhouette's displacement.
+    float bevel;
+    float amount;
+    if (uRefractionFitsShape > 0.5) {
+        // iOS 27 regular glass: the bevel spans at most half of the half
+        // short side and the rim samples no deeper than the center line.
+        bevel = min(uRefractionHeight, 0.5 * scene.halfMinor);
+        amount = min(uRefractionAmount, scene.halfMinor);
+    } else {
+        // Clear glass keeps its lens until the bevel would pass the center
+        // line, then scales the whole lens so displacement never flips there.
+        float lensScale = min(
+            1.0,
+            scene.halfMinor / max(uRefractionHeight, 0.001)
+        );
+        bevel = uRefractionHeight * lensScale;
+        amount = uRefractionAmount * lensScale;
+    }
     float bevelX = 1.0 - clamp(max(-sd, 0.0) / max(bevel, 0.001), 0.0, 1.0);
     float displacementMagnitude = bevel > 0.001
-        ? -uRefractionAmount * lensScale *
-            (1.0 - sqrt(1.0 - bevelX * bevelX))
+        ? -amount * (1.0 - sqrt(1.0 - bevelX * bevelX))
         : 0.0;
 
     fragColor = encodeDisplacementData(

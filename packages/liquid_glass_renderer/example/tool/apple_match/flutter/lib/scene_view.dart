@@ -42,6 +42,9 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'magnification',
       number('backdropScale', defaults.magnification),
     ),
+    refractionFitsShape:
+        settings['refractionFitsShape'] as bool? ??
+        defaults.refractionFitsShape,
     frost: number('frost', number('blur', defaults.frost)),
     highlight: number(
       'highlight',

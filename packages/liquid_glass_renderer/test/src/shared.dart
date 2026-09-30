@@ -20,7 +20,6 @@ bool get skipGoldenTests => skipProperGlassTests || !Platform.isMacOS;
 final testScenarioConstraints = BoxConstraints.tight(const Size(500, 500));
 
 const settingsWithoutLighting = LiquidGlassSettings(
-  chromaticAberration: 0,
   highlight: 0,
   frost: 0,
 );
