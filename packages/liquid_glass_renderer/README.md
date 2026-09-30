@@ -235,12 +235,24 @@ bevel refracts, pulling content inward:
   Its ratio to `refractionHeight` sets how rod-like the rim looks: above `1`,
   content near the rim is mirrored, as on Apple's glass.
 - `magnification` scales the backdrop seen through the whole face about its
-  center; the iOS 27 text loupe measures `1.25`.
+  center.
+- `refractionFitsShape` (default `true`) shrinks the lens on small shapes the
+  way iOS 27 regular glass does: the bevel is at most a quarter of the short
+  side and the rim samples no deeper than the center line. Set it to `false`
+  for clear glass, which keeps its full lens.
 
-Shapes narrower than two bevels scale the whole lens down, so one setting keeps
-its look on small and large controls. Strong magnification enlarges an already
-captured image and loses detail; for a large zoom, paint the backdrop with
-Flutter's `RawMagnifier` before applying glass.
+Values measured on iOS 27 (Reduce Motion off):
+
+| Look | `refractionHeight` | `refractionAmount` | Other |
+| --- | --- | --- | --- |
+| Regular glass, buttons, toolbars (default) | `20` | `60` | |
+| Clear glass | `20` | `60` | `refractionFitsShape: false` |
+| Text loupe | `8` | `28` | `magnification: 1.25` |
+
+iOS 27 shows no chromatic dispersion in refraction, so `chromaticAberration`
+defaults to `0`. Strong magnification enlarges an already captured image and
+loses detail; for a large zoom, paint the backdrop with Flutter's
+`RawMagnifier` before applying glass.
 
 ## Shapes, children, and shadows
 
