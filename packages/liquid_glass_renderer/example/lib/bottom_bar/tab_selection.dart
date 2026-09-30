@@ -19,8 +19,7 @@ class TabSelection {
     required this.backdropShrink,
   });
 
-  /// Center of the indicator in tab indices. Fractional while it moves, and
-  /// slightly outside `0..tabCount - 1` while overdragged.
+  /// Center of the indicator in tab indices, fractional while it moves.
   final SingleMotionController position;
 
   /// `0` for the resting platter, `1` for the loupe. Also the loupe's glass
@@ -53,14 +52,14 @@ class TabSelection {
     );
   }
 
-  /// Squash along the motion and stretch across it, from
-  /// `buildJellyTransform` in the original example bottom bar.
+  /// Indicator speed in tabs per second at which [jellyScale] is strongest.
+  static const _jellySpeed = 8.0;
+
+  /// Stretch along the motion and a lesser squash across it, like a drop
+  /// pulled along by the finger.
   ({double x, double y}) get jellyScale {
-    // That bar measured velocity in alignment units, where -1 to 1 spans
-    // the first to the last tab.
-    final alignmentVelocity = jelly.value * 2 / math.max(tabCount - 1, 1);
-    final distortion = (alignmentVelocity.abs() / 10).clamp(0.0, 1.0) * .8;
-    return (x: 1 - distortion * .5, y: 1 + distortion * .3);
+    final amount = (jelly.value.abs() / _jellySpeed).clamp(0.0, 1.0);
+    return (x: 1 + amount * .2, y: 1 - amount * .1);
   }
 
   /// The indicator within a tab row of [size].
