@@ -14,15 +14,17 @@
   `refractionHeight` (bevel width), `edgeRefraction` becomes
   `refractionAmount` (displacement at the silhouette, now with a
   quarter-circle falloff instead of the Snell/circular-cap profile), and
-  `backdropScale` becomes `magnification`, which now stays uniform up to the
+  `backdropScale` becomes `backdropShrink`, which only shrinks (`0` keeps
+  the size, `0.08` shows the backdrop at 92%) and stays uniform up to the
   silhouette. Remove `refractionSpread`; a `refractionHeight` of half the
   shape's short side gives a full-face lens. `refractionHeight: 0` now means
-  flat glass instead of no glass. `LiquidGlassSettings.fromJson` still reads
-  the old keys.
+  flat glass instead of no glass. `LiquidGlassSettings.fromJson` reads only
+  the new keys.
 - Refit refraction to iOS 27: defaults and toolbar presets use a 20 pt bevel
   with 60 pt edge displacement, and the new `refractionFitsShape` (default
   `true`) limits the lens on small shapes like regular glass does; use
-  `false` for clear glass. `chromaticAberration` now defaults to `0`.
+  `false` for clear glass. `chromaticAberration` is renamed to
+  `dispersion` and now defaults to `0`.
 - Add `LiquidGlassSettings.smoothRefraction`, on by default: bilinear
   instead of nearest backdrop sampling, so refracted lines stop snapping to
   whole pixels. Undisplaced glass still reproduces the backdrop exactly.
@@ -32,10 +34,6 @@
   the blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at 0).
   Frost up to 1.25 device pixels now runs as a three-texel kernel in the
   final pass instead of a separate blur pass.
-- Deprecate `LiquidGlassSettings.magnification`. It resamples the backdrop
-  the glass already captured, so magnified content pixelates, and a layer
-  with several shapes zooms about their common center. Use
-  `LiquidGlassLoupe` for magnifiers.
 
 ### Added
 
@@ -43,9 +41,10 @@
   loupe. Wrap the content in a `LiquidGlassLoupeSource` and connect both with
   a `LiquidGlassLoupeLink`. The loupe re-renders only the content under the
   lens at the magnified resolution, then refracts and lights it with the
-  glass. Defaults match the iOS 27 loupe: 116 × 86 capsule, 1.25×, 8 / 28
-  bevel; set `focalPointOffset: Offset(0, 75)` to show the touch point below
-  the lens as iOS does.
+  glass. Defaults match the iOS 27 loupe: 116 × 86 capsule, 1.25×, an
+  8 pt / 34.5 pt bevel and `dispersion: -0.06`; set
+  `focalPointOffset: Offset(0, 75)` to show the touch point below the lens
+  as iOS does.
 
 ### Fixes
 

@@ -29,7 +29,7 @@ class SeedScanTest(unittest.TestCase):
         )
 
         self.assertEqual(len(seeds), 12)
-        self.assertEqual(axes, ("thickness", "edgeRefraction"))
+        self.assertEqual(axes, ("refractionHeight", "refractionAmount"))
         self.assertEqual(forced, seed_scan.LOUPE_FORCED_SETTINGS)
         self.assertEqual(
             len({json.dumps(seed, sort_keys=True) for seed in seeds}), len(seeds)
@@ -68,8 +68,8 @@ class SeedScanTest(unittest.TestCase):
             (
                 "tintAlpha",
                 "frost",
-                "thickness",
-                "edgeRefraction",
+                "refractionHeight",
+                "refractionAmount",
                 "refractionSpread",
             ),
         )

@@ -32,7 +32,11 @@ class PresetStore {
       if (separator <= 0) continue;
       final key = line.substring(0, separator).trim();
       final raw = line.substring(separator + 1).trim();
-      final value = num.tryParse(raw) ?? raw;
+      final value = switch (raw) {
+        'true' => true,
+        'false' => false,
+        _ => num.tryParse(raw) ?? raw,
+      };
       if (key.startsWith('settings.')) {
         settings[key.substring('settings.'.length)] = value;
       } else if (key.startsWith('appearance.')) {

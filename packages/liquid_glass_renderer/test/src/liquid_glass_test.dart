@@ -1234,7 +1234,7 @@ void main() {
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount);
 
-          settings.value = settings.value.copyWith(magnification: .8);
+          settings.value = settings.value.copyWith(backdropShrink: .2);
           await tester.pump();
           expect(
             renderer.debugRenderCount,
@@ -1503,7 +1503,7 @@ Widget _dprOpticsRegressionScene() => Directionality(
         settings: settingsWithoutLighting.copyWith(
           refractionHeight: 24,
           refractionAmount: 64,
-          chromaticAberration: .5,
+          dispersion: .5,
         ),
         appearance: const LiquidGlassAppearance(),
         shape: const LiquidRoundedSuperellipse(borderRadius: 80),

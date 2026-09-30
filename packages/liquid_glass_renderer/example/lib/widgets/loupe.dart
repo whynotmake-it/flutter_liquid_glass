@@ -3,19 +3,8 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
 /// Apple's loupe is a clear lens: its backdrop is enlarged, but it does not
-/// inherit the toolbar's milky tint or frost. Keep the edge optics and contour
-/// from the matched toolbar while neutralizing transmission.
-const loupeGlassSettings = LiquidGlassSettings(
-  // Measured on the iOS 27 loupe with Reduce Motion off: a narrow bevel on
-  // top of the 1.25x magnification.
-  refractionHeight: 8,
-  refractionAmount: 28,
-  frost: 0,
-  // Keep only the default glint and a hairline rim. The lens body must remain
-  // the magnified backdrop, not a translucent white fill.
-  contourStrength: 0.08,
-  contourWidth: 0.75,
-);
+/// inherit the toolbar's milky tint or frost.
+const loupeGlassSettings = LiquidGlassLoupe.defaultSettings;
 
 const loupeGlassAppearance = LiquidGlassAppearance();
 

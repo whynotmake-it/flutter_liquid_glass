@@ -20,7 +20,7 @@ def row(scene: str, spread: float, thickness: float, loss: float) -> dict:
     return {
         "scene": scene,
         "spread": spread,
-        "thickness": thickness,
+        "refractionHeight": thickness,
         "repetition": 1,
         "score": 100.0 - loss,
         "fitLoss": loss,
@@ -47,7 +47,7 @@ class CoupledSpreadScanTest(unittest.TestCase):
             for scene in scan.SCENES:
                 key = "toolbar" if scene == "toolbar_capsule" else scene
                 selected = summary["selectedBySpread"][spread][key]
-                self.assertEqual(selected["thickness"], 8.0)
+                self.assertEqual(selected["refractionHeight"], 8.0)
 
     def test_optics_loss_weights_flow_and_combined(self) -> None:
         self.assertAlmostEqual(scan.optics_loss({"flow": 0.5, "combined": 0.25}), 0.7)

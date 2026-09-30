@@ -160,9 +160,9 @@ class MetricTests(unittest.TestCase):
             score_images(reference, blank)
 
     def test_rejects_settings_not_wired_to_live_renderer(self):
-        validate_settings({"blur": 6.0, "shapeProfile": "roundedRectangle"})
+        validate_settings({"frost": 6.0, "shapeProfile": "roundedRectangle"})
         with self.assertRaisesRegex(ValueError, "not wired"):
-            validate_settings({"blur": 6.0, "faceFill": 0.2})
+            validate_settings({"frost": 6.0, "faceFill": 0.2})
         with self.assertRaisesRegex(ValueError, "shapeProfile"):
             validate_settings({"shapeProfile": "squircle-ish"})
 

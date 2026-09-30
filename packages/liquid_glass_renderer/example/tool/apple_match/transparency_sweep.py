@@ -203,8 +203,8 @@ def save_fit(
         "sharedVector": {
             key: settings[key]
             for key in (
-                "thickness", "edgeRefraction", "refractionSpread",
-                "chromaticAberration", "saturation", "transmissionGamma",
+                "refractionHeight", "refractionAmount", "refractionSpread",
+                "dispersion", "saturation", "transmissionGamma",
                 "vibrancy", "highlight", "contourStrength", "contourWidth",
             )
         },
@@ -513,7 +513,7 @@ def fit_sweep(args) -> dict:
         "sharedVector": {
             key: baseline[key]
             for key in (
-                "thickness", "edgeRefraction", "refractionSpread", "chromaticAberration",
+                "refractionHeight", "refractionAmount", "refractionSpread", "dispersion",
                 "saturation", "transmissionGamma", "vibrancy", "highlight",
                 "contourStrength", "contourWidth",
             )

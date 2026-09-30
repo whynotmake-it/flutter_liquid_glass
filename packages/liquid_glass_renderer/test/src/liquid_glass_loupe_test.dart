@@ -59,9 +59,9 @@ void main() {
   test('the default optics are the iOS 27 loupe fit', () {
     const settings = LiquidGlassLoupe.defaultSettings;
     expect(settings.refractionHeight, 8);
-    expect(settings.refractionAmount, 28);
+    expect(settings.refractionAmount, 34.5);
+    expect(settings.dispersion, -0.06);
     expect(settings.frost, 0);
-    // ignore: deprecated_member_use_from_same_package
-    expect(settings.magnification, 1);
+    expect(settings.backdropShrink, 0);
   });
 }

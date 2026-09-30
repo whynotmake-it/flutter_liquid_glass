@@ -46,7 +46,7 @@ def _settings_for_scene(
         "shapeOffsetY",
         "cornerRadius",
         "shapeProfile",
-        "thickness",
+        "refractionHeight",
     ):
         settings[key] = scene_card[key]
     settings["refractionSpread"] = spread
