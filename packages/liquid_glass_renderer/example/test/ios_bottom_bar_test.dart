@@ -118,7 +118,8 @@ void main() {
     final library = tabCenter(tester, 'Library');
 
     final gesture = await tester.startGesture(home);
-    for (var frame = 0; frame < 20; frame++) {
+    // Past the loupe's pop on touch down.
+    for (var frame = 0; frame < 90; frame++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
     final rest = tester.getRect(find.byKey(LoupeTabBar.loupeKey)).size;
@@ -167,6 +168,45 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
   });
+
+  for (final label in ['New', 'Home']) {
+    testWidgets(
+      'pressing the selected $label pops the loupe taller, then settles',
+      (
+        tester,
+      ) async {
+        await pumpBar(tester);
+        // Apple's reference presses are on the selected tab.
+        await tester.tapAt(tabCenter(tester, label));
+        await tester.pumpAndSettle();
+        final gesture = await tester.startGesture(tabCenter(tester, label));
+        final heights = <(int, double)>[];
+        for (var frame = 1; frame <= 60; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          heights.add((
+            frame * 16,
+            tester.getRect(find.byKey(LoupeTabBar.loupeKey)).height,
+          ));
+        }
+        final rest = heights.last.$2;
+        if (_dynamicsOut.isNotEmpty) {
+          File(_dynamicsOut.replaceFirst('.csv', '-press-$label.csv'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync(
+              [
+                'ms,height,rest_height',
+                for (final (ms, height) in heights) '$ms,$height,$rest',
+              ].join('\n'),
+            );
+        }
+        final (peakAt, peak) = heights.reduce((a, b) => b.$2 > a.$2 ? b : a);
+        expect(peak / rest, greaterThan(1.08), reason: 'pops taller');
+        expect(peakAt, inInclusiveRange(100, 300), reason: 'peaks like Apple');
+        await gesture.up();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   testWidgets('moving the finger rebuilds nothing', (tester) async {
     await pumpBar(tester);

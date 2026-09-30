@@ -90,11 +90,11 @@ class LoupeTabBar extends StatefulWidget {
   final LiquidGlassSettings loupeSettings;
 
   /// A clear, unfrosted lens like the iOS 27 tab bar's: it shows the bar
-  /// 1:1 in its middle and bends and splits the colors along its rim, with
-  /// the bevel of the iOS 27 text loupe.
+  /// 1:1 and bends and splits the colors only in a 3–4 pt band along its
+  /// rim, strongly enough there to fold the content, like Apple's.
   static const defaultLoupeSettings = LiquidGlassSettings(
-    refractionHeight: 8,
-    refractionAmount: 28,
+    refractionHeight: 4,
+    refractionAmount: 24,
     dispersion: -.07,
     frost: 0,
     contourStrength: .1,
@@ -143,12 +143,29 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     duration: Duration(milliseconds: 150),
   );
 
-  /// Springs the loupe back once the indicator slows down: quickly, past
-  /// rest to taller than at rest, then a soft jiggle.
+  /// Springs the loupe's shape back to rest, fitted to the iOS 27 loupe
+  /// timeline (`references/bottom-bar-refs`, `loupe-dynamics/`): damping
+  /// ratio 0.55 with a 0.74 s period (1.35 Hz), so it passes rest once and
+  /// comes back with an undershoot 1/7.8 the size of the overshoot.
   static const _recover = Motion.cupertino(
-    duration: Duration(milliseconds: 350),
-    bounce: .7,
+    duration: Duration(milliseconds: 618),
+    bounce: .45,
   );
+
+  /// Velocity of [TabSelection.jelly] that pops the loupe as it appears:
+  /// on top of the loupe growing out of the platter, it peaks 13% taller
+  /// than at rest about 0.17 s after the touch, like Apple's over the middle
+  /// tabs (72 → 81.3 pt), then settles within about half a second.
+  static const _popVelocity = -3.2;
+
+  /// At the end tabs Apple's loupe pops without an undershoot (+17% at the
+  /// first tab, +6% at the last): the same frequency, damping ratio 0.8,
+  /// peaking 13% taller about 0.18 s after the touch.
+  static const _endRecover = Motion.cupertino(
+    duration: Duration(milliseconds: 618),
+    bounce: .2,
+  );
+  static const _endPopVelocity = -4.2;
 
   late final _position = SingleMotionController(
     motion: _settle,
@@ -158,6 +175,9 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   late final _press = SingleMotionController(motion: _thickness, vsync: this);
   late final _jelly = SingleMotionController(motion: _recover, vsync: this);
   double _jellyTarget = 0;
+
+  /// The strongest flattening since the loupe last sprang back.
+  double _speedPeak = 0;
   late final _stretch = MotionController<Offset>(
     motion: _follow,
     vsync: this,
@@ -200,7 +220,9 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   @override
   void initState() {
     super.initState();
-    _position.addListener(_onPositionTick);
+    _position
+      ..addListener(_onPositionTick)
+      ..addStatusListener(_onPositionStatus);
     _press.addListener(_onPressTick);
   }
 
@@ -221,6 +243,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     _cancelPendingDrag();
     _position
       ..removeListener(_onPositionTick)
+      ..removeStatusListener(_onPositionStatus)
       ..dispose();
     _press
       ..removeListener(_onPressTick)
@@ -234,15 +257,31 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 
   void _onPositionTick() {
     final speed = _position.velocity.abs() * _slot;
-    final target = speed < 20 ? 0.0 : TabSelection.jellyTarget(speed);
-    // Retargeting restarts the spring, so small changes are left alone and
-    // the recovery can ring out.
-    if ((target - _jellyTarget).abs() > .01 ||
-        (target == 0 && _jellyTarget != 0)) {
-      _jellyTarget = target;
-      _springTo(_jelly, target > _jelly.value ? _squash : _recover, target);
+    final target = TabSelection.jellyTarget(speed);
+    if (target > _speedPeak && target > .05) {
+      // Flattening follows the indicator while it speeds up.
+      _speedPeak = target;
+      if (target - _jellyTarget > .01) {
+        _jellyTarget = target;
+        _springTo(_jelly, _squash, target);
+      }
+    } else if (_jellyTarget != 0 && target < _speedPeak * .85) {
+      // Once it slows down, the shape springs straight back to rest instead
+      // of following the speed down, so it overshoots and rings out.
+      _speedPeak = 0;
+      _jellyTarget = 0;
+      _springTo<double>(_jelly, _recover, 0);
     }
     _updatePress();
+  }
+
+  /// The indicator has come to rest, so the loupe springs back even if the
+  /// last tick still reported some speed.
+  void _onPositionStatus(AnimationStatus status) {
+    if (status.isAnimating || _jellyTarget == 0) return;
+    _speedPeak = 0;
+    _jellyTarget = 0;
+    _springTo<double>(_jelly, _recover, 0);
   }
 
   void _onPressTick() {
@@ -258,6 +297,17 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     if (target == _pressTarget) return;
     _pressTarget = target;
     _press.animateTo(target);
+    if (target == 1) {
+      final tab = (_held ? _finger : _position.value).round();
+      final atEnd = tab <= 0 || tab >= _lastTab;
+      final motion = atEnd ? _endRecover : _recover;
+      if (_jelly.motion != motion) _jelly.motion = motion;
+      _jellyTarget = 0;
+      _jelly.animateTo(
+        0,
+        withVelocity: atEnd ? _endPopVelocity : _popVelocity,
+      );
+    }
     _onPressTick();
   }
 
