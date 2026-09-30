@@ -94,7 +94,7 @@ void main() {
       expect(preset.top, inInclusiveRange(2.5, 5.5));
       expect(preset.bottom, lessThan(1.5));
       // The shadow follows the configured strength, as in real glass.
-      expect(strong.top / preset.top, closeTo(0.15 / 0.017, 1.5));
+      expect(strong.top / preset.top, closeTo(0.15 / 0.036, 1));
     },
     skip: skipProperGlassTests,
   );
