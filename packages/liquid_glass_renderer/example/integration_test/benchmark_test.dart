@@ -632,6 +632,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     final settings = LiquidGlassSettings(
       refractionHeight: 30,
       frost: 15,
+      // ignore: deprecated_member_use
       magnification: _benchmarkBackdropScale,
     );
     const litSettings = LiquidGlassSettings(
@@ -1966,6 +1967,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                           frost: 0,
                           refractionHeight: 24,
                           refractionAmount: 40,
+                          // ignore: deprecated_member_use
                           magnification: .92,
                           chromaticAberration: .1,
                           highlight: .4,
