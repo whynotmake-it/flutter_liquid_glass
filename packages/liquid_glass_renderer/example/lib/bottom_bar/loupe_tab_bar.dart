@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/listenable_transform.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/tab_selection.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/vibrant_tint.dart';
 import 'package:motor/motor.dart';
 
 @immutable
@@ -42,6 +43,8 @@ class LoupeTabBar extends StatefulWidget {
     this.fake = false,
     this.height = 62,
     this.pressScale = .05,
+    this.tint,
+    this.tintBrightness,
     this.loupeSettings = defaultLoupeSettings,
     super.key,
   }) : assert(tabs.length > 0, 'A tab bar needs at least one tab.');
@@ -65,6 +68,19 @@ class LoupeTabBar extends StatefulWidget {
 
   /// How much the whole bar grows while held.
   final double pressScale;
+
+  /// Color of the selected tab, or `null` for the theme's primary color.
+  ///
+  /// It blends with the glass per pixel ([vibrantTintBlendMode]), so it
+  /// follows the backdrop instantly and shows its detail.
+  final Color? tint;
+
+  /// The appearance the [tint] is matched to, or `null` for the theme's.
+  ///
+  /// Pass the app's appearance when the theme around the bar follows an
+  /// estimated backdrop brightness: the blend already adapts per pixel, and
+  /// the estimate lags behind the backdrop.
+  final Brightness? tintBrightness;
 
   /// Settings of the loupe's own glass layer.
   ///
@@ -383,7 +399,9 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 
   @override
   Widget build(BuildContext context) {
-    final tint = CupertinoTheme.of(context).primaryColor;
+    final tint = widget.tint ?? CupertinoTheme.of(context).primaryColor;
+    final tintBrightness =
+        widget.tintBrightness ?? CupertinoTheme.brightnessOf(context);
     final platter = _platterColor.resolveFrom(context);
     return MotionBuilder(
       motion: const CupertinoMotion.smooth(),
@@ -402,7 +420,12 @@ class _LoupeTabBarState extends State<LoupeTabBar>
               child: Padding(
                 padding: const EdgeInsets.all(_padding),
                 child: RepaintBoundary(
-                  child: _buildRows(label: label, tint: tint, platter: platter),
+                  child: _buildRows(
+                    label: label,
+                    tint: tint,
+                    tintBrightness: tintBrightness,
+                    platter: platter,
+                  ),
                 ),
               ),
             ),
@@ -441,6 +464,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   Widget _buildRows({
     required Color label,
     required Color tint,
+    required Brightness tintBrightness,
     required Color platter,
   }) {
     return Stack(
@@ -461,7 +485,10 @@ class _LoupeTabBarState extends State<LoupeTabBar>
                   _selection.rect(size).center,
                   _selection.tintScale,
                 ),
-                child: _buildRow(tint),
+                child: _buildRow(
+                  vibrantTintSource(tint, tintBrightness),
+                  blendMode: vibrantTintBlendMode,
+                ),
               ),
             ),
           ),
@@ -470,7 +497,11 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     );
   }
 
-  Widget _buildRow(Color color, {bool semantics = false}) {
+  Widget _buildRow(
+    Color color, {
+    bool semantics = false,
+    BlendMode? blendMode,
+  }) {
     return Row(
       children: [
         for (final (index, tab) in widget.tabs.indexed)
@@ -483,7 +514,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
               onTap: semantics ? () => _activate(index) : null,
               excludeSemantics: true,
               child: RepaintBoundary(
-                child: _TabItem(tab: tab, color: color),
+                child: _TabItem(tab: tab, color: color, blendMode: blendMode),
               ),
             ),
           ),
@@ -534,17 +565,48 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 }
 
 class _TabItem extends StatelessWidget {
-  const _TabItem({required this.tab, required this.color});
+  const _TabItem({required this.tab, required this.color, this.blendMode});
 
   final BottomBarTab tab;
   final Color color;
 
+  /// How the glyphs composite with what is painted beneath them, or `null`
+  /// to paint [color] over it.
+  final BlendMode? blendMode;
+
   @override
   Widget build(BuildContext context) {
+    final blendMode = this.blendMode;
+    final foreground = blendMode == null
+        ? null
+        : (Paint()
+            ..color = color
+            ..blendMode = blendMode);
+    final icon = tab.icon;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(tab.icon, color: color, size: 24),
+        // An Icon cannot take a paint, so the glyph is laid out as Icon does.
+        SizedBox.square(
+          dimension: 24,
+          child: Center(
+            child: Text(
+              String.fromCharCode(icon.codePoint),
+              overflow: TextOverflow.visible,
+              style: TextStyle(
+                inherit: false,
+                color: foreground == null ? color : null,
+                foreground: foreground,
+                fontSize: 24,
+                fontFamily: icon.fontFamily,
+                package: icon.fontPackage,
+                fontFamilyFallback: icon.fontFamilyFallback,
+                height: 1,
+                leadingDistribution: TextLeadingDistribution.even,
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 2),
         Text(
           tab.label,
@@ -552,7 +614,8 @@ class _TabItem extends StatelessWidget {
           softWrap: false,
           overflow: TextOverflow.visible,
           style: TextStyle(
-            color: color,
+            color: foreground == null ? color : null,
+            foreground: foreground,
             fontSize: 10,
             fontWeight: FontWeight.w600,
             letterSpacing: 0,

@@ -79,20 +79,30 @@ class IosBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The selected tab's tint blends with the glass per pixel, so it keeps
+    // the app's appearance instead of following the lagging estimate.
+    final theme = CupertinoTheme.of(context);
+    final tint = (theme.primaryColor, CupertinoTheme.brightnessOf(context));
     final source = brightnessSource;
-    if (source == null) return _buildBar(null);
+    if (source == null) return _buildBar(null, tint);
     return LiquidGlassAdaptiveBrightness(
       source: source,
       builder: (context, estimate, _) => CupertinoTheme(
         data: CupertinoTheme.of(
           context,
         ).copyWith(brightness: estimate.brightness),
-        child: _buildBar(appearanceFor?.call(estimate.brightness)),
+        child: _buildBar(
+          appearanceFor?.call(estimate.brightness),
+          tint,
+        ),
       ),
     );
   }
 
-  Widget _buildBar(LiquidGlassAppearance? appearance) {
+  Widget _buildBar(
+    LiquidGlassAppearance? appearance,
+    (Color, Brightness) tint,
+  ) {
     return LiquidGlassBlendGroup(
       blend: blend,
       child: Column(
@@ -121,6 +131,8 @@ class IosBottomBar extends StatelessWidget {
                   shadows: shadows,
                   fake: fake,
                   loupeSettings: loupeSettings,
+                  tint: tint.$1,
+                  tintBrightness: tint.$2,
                 ),
               ),
               const SizedBox(width: spacing),
