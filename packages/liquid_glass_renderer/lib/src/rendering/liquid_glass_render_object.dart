@@ -532,6 +532,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ],
   ];
 
+  /// Bounds of the clips between this object and its shapes that are
+  /// re-applied around the glass filter, in local coordinates, or `null`.
+  @protected
+  Rect? get retainedClipBounds =>
+      _idleComposition ? null : _ancestorClips.ownerBounds;
+
   @protected
   void syncAncestorClips() =>
       (_idleComposition ? _idleAncestorClips : _ancestorClips).sync();
@@ -1195,6 +1201,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// outside the clip the filter input is transparent.
   @protected
   Rect? get backdropSampleBounds => null;
+
+  /// The [backdropSampleBounds] last written to the shader.
+  @visibleForTesting
+  Rect? get debugBackdropSampleBounds => _backdropBounds;
 
   @protected
   bool syncCoordinateMapping() {
