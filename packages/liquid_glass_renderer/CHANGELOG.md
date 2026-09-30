@@ -19,6 +19,10 @@
   shape's short side gives a full-face lens. `refractionHeight: 0` now means
   flat glass instead of no glass. `LiquidGlassSettings.fromJson` still reads
   the old keys.
+- Refit refraction to iOS 27: defaults and toolbar presets use a 20 pt bevel
+  with 60 pt edge displacement, and the new `refractionFitsShape` (default
+  `true`) limits the lens on small shapes like regular glass does; use
+  `false` for clear glass. `chromaticAberration` now defaults to `0`.
 
 ## 1.0.0-dev.1
 
