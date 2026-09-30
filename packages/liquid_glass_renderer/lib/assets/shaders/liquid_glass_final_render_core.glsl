@@ -85,10 +85,11 @@ float gContourAlpha = uContourColor.a;
 // iOS 27 glint recolor, measured on the pinned solid-palette probes in both
 // appearances: the glint mixes the lit face toward a bright target whose
 // luminance sits above SDR white and whose chroma is the face chroma
-// amplified. Mask peak at highlight = 1 is Apple's measured mix weight.
+// amplified. The simulator captures give a mix weight of 0.14; an iPhone
+// renders the same glass 1.8x stronger, so highlight = 1 matches the device.
 const float kGlintLuminance = 1.6;
 const float kGlintVibrancy = 2.85;
-const float kGlintPeak = 0.14;
+const float kGlintPeak = 0.252;
 // A faint inward bleed four glint widths deep carries a fifth of the line's
 // weight.
 const float kGlintBleed = 0.21;
