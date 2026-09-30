@@ -36,36 +36,45 @@ class TabSelection {
 
   late final Listenable listenable = Listenable.merge([position, press, jelly]);
 
-  /// How far the loupe reaches past the platter on every side.
-  static const loupeOutset = 14.0;
+  /// How far the loupe reaches past the platter on each side: a 97 × 72 pt
+  /// loupe over the 72 × 54 pt platter of the iOS 27 tab bar.
+  static const loupeOutset = Size(13, 9);
 
   double get _pressAmount => math.max(press.value, 0);
 
   /// The indicator within a tab row of [size], before squash and stretch.
   Rect restingRect(Size size, {double? pressAmount}) {
     final slot = size.width / tabCount;
-    final grow = 2 * loupeOutset * (pressAmount ?? _pressAmount);
+    final grow = loupeOutset * 2 * (pressAmount ?? _pressAmount);
     return Rect.fromCenter(
       center: Offset((position.value + .5) * slot, size.height / 2),
-      width: slot + grow,
-      height: size.height + grow,
+      width: slot + grow.width,
+      height: size.height + grow.height,
     );
   }
 
-  /// Indicator speed in tabs per second at which [jellyScale] is strongest.
-  static const _jellySpeed = 8.0;
+  /// How much the indicator's aspect ratio grows per point per second: the
+  /// 97 × 72 pt loupe of iOS 27 is twice as wide as tall at 1100 pt/s.
+  static const _jellyAspectPerSpeed = (2 / (97 / 72) - 1) / 1100;
 
-  /// Stretch along the motion and a lesser squash across it, like a drop
-  /// pulled along by the finger.
-  ({double x, double y}) get jellyScale {
-    final amount = (jelly.value.abs() / _jellySpeed).clamp(0.0, 1.0);
-    return (x: 1 + amount * .2, y: 1 - amount * .1);
+  static const _maxJellyAspect = 2.0;
+
+  /// Stretch along the motion and squash across it, keeping the area, for
+  /// tabs [slot] points wide.
+  ({double x, double y}) jellyScale(double slot) {
+    final speed = jelly.value.abs() * slot;
+    final aspect = math.min(
+      1 + speed * _jellyAspectPerSpeed,
+      _maxJellyAspect,
+    );
+    final x = math.sqrt(aspect);
+    return (x: x, y: 1 / x);
   }
 
   /// The indicator within a tab row of [size].
   Rect rect(Size size) {
     final rect = restingRect(size);
-    final (:x, :y) = jellyScale;
+    final (:x, :y) = jellyScale(size.width / tabCount);
     return Rect.fromCenter(
       center: rect.center,
       width: rect.width * x,

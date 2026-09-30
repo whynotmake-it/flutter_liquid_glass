@@ -42,7 +42,7 @@ class LoupeTabBar extends StatefulWidget {
     this.shadows = const [],
     this.fake = false,
     this.height = 62,
-    this.pressGrowth = 6,
+    this.pressScale = 1.042,
     this.tint,
     this.tintBrightness,
     this.loupeSettings = defaultLoupeSettings,
@@ -66,17 +66,14 @@ class LoupeTabBar extends StatefulWidget {
 
   final double height;
 
-  /// How many points the bar's width grows while held.
-  ///
-  /// The bar scales uniformly, so it grows by a fixed amount rather than a
-  /// fraction of its width, which would swell a wide bar far more than
-  /// its height.
-  final double pressGrowth;
+  /// How much the whole bar grows while held; the iOS 27 tab bar grows by
+  /// 4.2%.
+  final double pressScale;
 
   /// Color of the selected tab, or `null` for the theme's primary color.
   ///
-  /// It blends with the glass per pixel ([vibrantTintBlendMode]), so it
-  /// follows the backdrop instantly and shows its detail.
+  /// It blends with the glass per pixel ([VibrantTint]), so it follows the
+  /// backdrop instantly and shows its detail.
   final Color? tint;
 
   /// The appearance the [tint] is matched to, or `null` for the theme's.
@@ -91,14 +88,13 @@ class LoupeTabBar extends StatefulWidget {
   /// Its `backdropShrink` is how much smaller the bar looks inside the loupe.
   final LiquidGlassSettings loupeSettings;
 
-  /// A clear, unfrosted lens with a wide bevel, after the loupe in the
-  /// original example bottom bar (`test/support/bottom_bar.dart`), showing
-  /// the bar a little smaller inside it.
+  /// A clear, unfrosted lens like the iOS 27 tab bar's: it shows the bar
+  /// 1:1 and only bends and splits the colors in a 3–4 pt band along its
+  /// rim.
   static const defaultLoupeSettings = LiquidGlassSettings(
-    refractionHeight: 24,
-    refractionAmount: 40,
-    backdropShrink: .19,
-    dispersion: .1,
+    refractionHeight: 4,
+    refractionAmount: 12,
+    dispersion: -.07,
     frost: 0,
     contourStrength: .1,
     contourWidth: 1,
@@ -123,9 +119,9 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     BoxShadow(color: Color(0x1A000000), blurRadius: 30),
   ];
 
-  /// Pulling past the bar stretches it by at most `1 / _stretchResistance`
-  /// points.
-  static const _stretchResistance = .2;
+  /// Pulling past either end stretches the bar sideways by at most
+  /// `1 / _stretchResistance` points, 10–12 pt for a long pull as on iOS 27.
+  static const _stretchResistance = 1 / 12;
 
   static const _follow = Motion.interactiveSpring(snapToEnd: true);
   static const _settle = Motion.bouncySpring(snapToEnd: true);
@@ -267,16 +263,13 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     // The loupe stays within the bar.
     _springTo(_position, motion, clamped);
 
-    // Pulling past the capsule gives it a little toward that side.
-    double past(double value, double extent) =>
-        value < 0 ? value : math.max(value - extent, 0);
+    // Pulling past either end gives the capsule a little toward that side.
+    final dx = local.dx;
+    final past = dx < 0 ? dx : math.max(dx - _size.width, 0).toDouble();
     _springTo(
       _stretch,
       _follow,
-      Offset(
-        past(local.dx, _size.width),
-        past(local.dy, widget.height),
-      ).withResistance(_stretchResistance),
+      Offset(past, 0).withResistance(_stretchResistance),
     );
   }
 
@@ -372,9 +365,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     _select(tab);
   }
 
-  double get _swell => _size.width == 0
-      ? 1
-      : 1 + widget.pressGrowth / _size.width * math.max(_press.value, 0);
+  double get _swell => 1 + (widget.pressScale - 1) * math.max(_press.value, 0);
 
   /// The bar's swell and stretch, both about its center.
   Matrix4 _barMatrix(Size size) {
@@ -490,8 +481,8 @@ class _LoupeTabBarState extends State<LoupeTabBar>
                   _selection.tintScale,
                 ),
                 child: _buildRow(
-                  vibrantTintSource(tint, tintBrightness),
-                  blendMode: vibrantTintBlendMode,
+                  tint,
+                  foregrounds: VibrantTint.of(tint, tintBrightness).paints,
                 ),
               ),
             ),
@@ -504,7 +495,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   Widget _buildRow(
     Color color, {
     bool semantics = false,
-    BlendMode? blendMode,
+    List<Paint>? foregrounds,
   }) {
     return Row(
       children: [
@@ -518,7 +509,11 @@ class _LoupeTabBarState extends State<LoupeTabBar>
               onTap: semantics ? () => _activate(index) : null,
               excludeSemantics: true,
               child: RepaintBoundary(
-                child: _TabItem(tab: tab, color: color, blendMode: blendMode),
+                child: _TabItem(
+                  tab: tab,
+                  color: color,
+                  foregrounds: foregrounds,
+                ),
               ),
             ),
           ),
@@ -538,7 +533,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
             child: ListenableTransform(
               listenable: _jelly,
               transform: (size) {
-                final (:x, :y) = _selection.jellyScale;
+                final (:x, :y) = _selection.jellyScale(_slot);
                 return scaleAbout(size.center(Offset.zero), x, y);
               },
               child: RepaintBoundary(
@@ -569,60 +564,66 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 }
 
 class _TabItem extends StatelessWidget {
-  const _TabItem({required this.tab, required this.color, this.blendMode});
+  const _TabItem({required this.tab, required this.color, this.foregrounds});
 
   final BottomBarTab tab;
   final Color color;
 
-  /// How the glyphs composite with what is painted beneath them, or `null`
-  /// to paint [color] over it.
-  final BlendMode? blendMode;
+  /// Paints the glyphs are drawn with, one over the other, or `null` to
+  /// paint [color] over what is beneath them.
+  final List<Paint>? foregrounds;
 
   @override
   Widget build(BuildContext context) {
-    final blendMode = this.blendMode;
-    final foreground = blendMode == null
-        ? null
-        : (Paint()
-            ..color = color
-            ..blendMode = blendMode);
+    final paints = foregrounds ?? <Paint?>[null];
     final icon = tab.icon;
+    Widget layered(Widget Function(Paint? foreground) glyph) =>
+        paints.length == 1
+        ? glyph(paints.single)
+        : Stack(
+            alignment: Alignment.center,
+            children: [for (final paint in paints) glyph(paint)],
+          );
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // An Icon cannot take a paint, so the glyph is laid out as Icon does.
         SizedBox.square(
           dimension: 24,
-          child: Center(
-            child: Text(
-              String.fromCharCode(icon.codePoint),
-              overflow: TextOverflow.visible,
-              style: TextStyle(
-                inherit: false,
-                color: foreground == null ? color : null,
-                foreground: foreground,
-                fontSize: 24,
-                fontFamily: icon.fontFamily,
-                package: icon.fontPackage,
-                fontFamilyFallback: icon.fontFamilyFallback,
-                height: 1,
-                leadingDistribution: TextLeadingDistribution.even,
+          child: layered(
+            (foreground) => Center(
+              child: Text(
+                String.fromCharCode(icon.codePoint),
+                overflow: TextOverflow.visible,
+                style: TextStyle(
+                  inherit: false,
+                  color: foreground == null ? color : null,
+                  foreground: foreground,
+                  fontSize: 24,
+                  fontFamily: icon.fontFamily,
+                  package: icon.fontPackage,
+                  fontFamilyFallback: icon.fontFamilyFallback,
+                  height: 1,
+                  leadingDistribution: TextLeadingDistribution.even,
+                ),
               ),
             ),
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          tab.label,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.visible,
-          style: TextStyle(
-            color: foreground == null ? color : null,
-            foreground: foreground,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0,
+        layered(
+          (foreground) => Text(
+            tab.label,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: TextStyle(
+              color: foreground == null ? color : null,
+              foreground: foreground,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
           ),
         ),
       ],
