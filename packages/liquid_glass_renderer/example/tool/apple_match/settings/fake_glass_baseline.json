@@ -24,5 +24,11 @@
   "bevelShadowOffset": 4.0,
   "bevelShadowDirectionality": 0.75,
   "shadowAlpha": 0.0,
-  "contactShadowAlpha": 0.0
+  "contactShadowAlpha": 0.0,
+  "shapeWidth": 224.0,
+  "shapeHeight": 94.0,
+  "shapeOffsetX": 0.0,
+  "shapeOffsetY": 0.0,
+  "cornerRadius": 50.5,
+  "shapeProfile": "superellipse"
 }

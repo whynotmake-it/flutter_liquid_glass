@@ -205,13 +205,13 @@ Independent `LiquidGlass` children may share a layer without blending.
 
 `LiquidGlassSettings` groups controls by purpose:
 
-- Optics: `thickness`, `edgeRefraction`, `refractionSpread`,
-  `backdropScale`, and `chromaticAberration`.
+- Optics: `refractionHeight`, `refractionAmount`, `magnification`, and
+  `chromaticAberration`.
 - Frost: `frost`, expressed as a logical-pixel blur sigma.
 - Highlight: `highlight`, `highlightWidth`, `highlightWrap`,
   `highlightOppositeStrength`, and `curvatureLighting`.
-- Outline: `contourStrength`, `contourWidth`, `contourOffset`, and
-  `contourTransmittance`.
+- Outline: `contourStrength`, `contourWidth`, `contourOffset`,
+  `contourTransmittance`, and `contourDirectionality`.
 - Inner shading: `bevelShadowStrength`, `bevelShadowDepth`,
   `bevelShadowOffset`, `bevelShadowDirectionality`, and
   `bevelShadowSizeResponse`.
@@ -222,9 +222,72 @@ Independent `LiquidGlass` children may share a layer without blending.
 its transfer function; the remaining fields stay available for custom looks
 and for fitting materials that are not covered by the toolbar presets.
 
-Keep `backdropScale` near `1`. Strong magnification enlarges an already
-captured image and loses detail. Build a loupe with Flutter's `RawMagnifier`
-before applying glass, then use glass only for edge optics and lighting.
+The iOS 27 color models reproduce Apple's measured face. Dark regular glass
+gets denser with size: shapes up to 75 pt on their short side transmit like
+light glass, and shapes from 105 pt settle at Apple's denser dark material.
+Within one layer, the smallest shape decides. `LiquidGlassColorModel.ios27Clear`
+(used by `LiquidGlassSettings.ios27Clear` and
+`LiquidGlassAppearance.ios27Clear`) is identical in light and dark.
+
+### Refraction
+
+Glass is modeled as a flat face with a rounded bevel along its edge. Only the
+bevel refracts, pulling content inward:
+
+- `refractionHeight` is the bevel width in logical pixels, measured inward
+  from the silhouette.
+- `refractionAmount` is how far inside the silhouette the outermost pixel
+  samples the backdrop. The displacement falls off across the bevel as a
+  quarter circle and reaches zero, without a crease, at `refractionHeight`.
+  Its ratio to `refractionHeight` sets how rod-like the rim looks: above `1`,
+  content near the rim is mirrored, as on Apple's glass.
+- `magnification` scales the backdrop seen through the whole face about its
+  center.
+- `smoothRefraction` (default `true`) samples the backdrop bilinearly, so
+  refracted lines move smoothly instead of snapping to whole pixels.
+  Undisplaced glass still copies the backdrop exactly, and it costs no extra
+  fetch or pass.
+- `refractionFitsShape` (default `true`) shrinks the lens on small shapes the
+  way iOS 27 regular glass does: the bevel is at most a quarter of the short
+  side and the rim samples no deeper than the center line. Set it to `false`
+  for clear glass, which keeps its full lens.
+
+Values measured on iOS 27 (Reduce Motion off):
+
+| Look | `refractionHeight` | `refractionAmount` | Other |
+| --- | --- | --- | --- |
+| Regular glass, buttons, toolbars (default) | `20` | `60` | |
+| Clear glass (`LiquidGlassSettings.ios27Clear(tintAmount: slider)`) | `20` | `60` | `refractionFitsShape: false`, `frost: LiquidGlassSettings.ios27ClearFrost(slider)` (0.35 at slider 0, applied in the final pass) |
+| Text loupe | `8` | `28` | `magnification: 1.25` |
+
+iOS 27 shows no chromatic dispersion in refraction, so `chromaticAberration`
+defaults to `0`. Frost up to 1.25 device pixels (such as clear glass's 0.35 pt on
+a 3x screen) is applied as a three-texel kernel inside the final pass instead
+of a separate blur pass. Strong magnification enlarges an already captured image and
+loses detail; for a large zoom, paint the backdrop with Flutter's
+`RawMagnifier` before applying glass.
+
+### HDR highlights
+
+The iOS 27 glint pulls the lit face toward a target 1.6× brighter than SDR
+white. Real glass writes that value unclamped; whether it reaches the display
+depends on the surface Flutter renders into:
+
+- **iOS**: set `FLTEnableWideGamut` to `true` in `Info.plist`. Impeller then
+  renders into an extended-range sRGB `BGRA10_XR` surface, which holds values
+  up to about 1.25, so the brightest part of the glint is compressed.
+- **macOS**: with `FLTEnableWideGamut` enabled on capable hardware and
+  displays, the surface is `RGBA16Float`, which keeps the full range.
+- **Android and other platforms**: 8-bit surfaces, so the glint is SDR.
+
+On an SDR surface each channel clips at white. This reproduces Apple's own
+SDR screenshots. Whether iOS or macOS shows the values above 1.0 brighter than
+SDR white depends on the platform's extended dynamic range handling; this has
+not been verified on a device yet.
+
+FakeGlass draws a neutral glint. Under Impeller it keeps the same headroom at
+no extra cost. On Skia, or on an 8-bit target, it clips to white, so it cannot
+shift hue.
 
 ## Shapes, children, and shadows
 

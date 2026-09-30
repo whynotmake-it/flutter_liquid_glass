@@ -51,17 +51,18 @@ class FlutterGpuGeometryRenderer {
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}

@@ -92,7 +92,7 @@ The liquid glass effect works by capturing and distorting background pixels thro
 ### Key Components
 
 - **Shapes** (`lib/src/liquid_shape.dart`): Defines glass shape types (RoundedSuperellipse, Oval, RoundedRectangle)
-- **Settings** (`lib/src/liquid_glass_settings.dart`): Configures glass appearance (thickness, blur, color, lighting)
+- **Settings** (`lib/src/liquid_glass_settings.dart`): Configures glass appearance (refraction, frost, lighting)
 - **FakeGlass** (`lib/src/fake_glass.dart`): Lightweight alternative using backdrop filters instead of shaders
 - **GlassGlow** (`lib/src/glass_glow.dart`): Touch-responsive glow effects
 - **LiquidStretch** (`lib/src/stretch.dart`): Squash and stretch animations

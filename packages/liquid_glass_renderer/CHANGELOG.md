@@ -10,6 +10,36 @@
   and its shapes; it only faded the shapes' children, not the glass. Fade
   glass with `LiquidGlassVisibility` or `LiquidGlassAppearance.visibility`
   instead. Opacity above a whole `LiquidGlassLayer` is still supported.
+- Replace the refraction settings with a bevel model: `thickness` becomes
+  `refractionHeight` (bevel width), `edgeRefraction` becomes
+  `refractionAmount` (displacement at the silhouette, now with a
+  quarter-circle falloff instead of the Snell/circular-cap profile), and
+  `backdropScale` becomes `magnification`, which now stays uniform up to the
+  silhouette. Remove `refractionSpread`; a `refractionHeight` of half the
+  shape's short side gives a full-face lens. `refractionHeight: 0` now means
+  flat glass instead of no glass. `LiquidGlassSettings.fromJson` still reads
+  the old keys.
+- Refit refraction to iOS 27: defaults and toolbar presets use a 20 pt bevel
+  with 60 pt edge displacement, and the new `refractionFitsShape` (default
+  `true`) limits the lens on small shapes like regular glass does; use
+  `false` for clear glass. `chromaticAberration` now defaults to `0`.
+- Add `LiquidGlassSettings.smoothRefraction`, on by default: bilinear
+  instead of nearest backdrop sampling, so refracted lines stop snapping to
+  whole pixels. Undisplaced glass still reproduces the backdrop exactly.
+  Set it to `false` for the previous nearest sampling.
+- Add `LiquidGlassSettings.ios27Clear(tintAmount:)` (the full lens plus
+  the fitted clear-glass blur) and `LiquidGlassSettings.ios27ClearFrost`,
+  the blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at 0).
+  Frost up to 1.25 device pixels now runs as a three-texel kernel in the
+  final pass instead of a separate blur pass.
+
+### Fixes
+
+- Blended shapes in a `LiquidGlassBlendGroup` no longer bulge outward at the
+  join. The smooth-union radius now scales with the angle between the two
+  shapes' surfaces, so shared straight edges stay straight while concave joins
+  and bridges between nearby shapes still round, matching iOS 27's
+  `GlassEffectContainer`.
 
 ## 1.0.0-dev.1
 

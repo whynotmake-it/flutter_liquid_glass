@@ -228,7 +228,7 @@ Widget _scene({
   final inner = ownLayer
       ? LiquidGlass.withOwnLayer(
           fake: fake,
-          settings: const LiquidGlassSettings(thickness: 10, frost: 0),
+          settings: const LiquidGlassSettings(refractionHeight: 10, frost: 0),
           shape: shape,
           child: innerContent,
         )
@@ -251,7 +251,10 @@ Widget _scene({
           Positioned.fill(
             child: LiquidGlassLayer(
               fake: fake,
-              settings: const LiquidGlassSettings(thickness: 18, frost: 4),
+              settings: const LiquidGlassSettings(
+                refractionHeight: 18,
+                frost: 4,
+              ),
               defaultAppearance: const LiquidGlassAppearance(
                 tint: Color(0x403090FF),
               ),
