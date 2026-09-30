@@ -325,7 +325,8 @@ void main() {
       'lib/assets/shaders/gpu/geometry_fragment.glsl',
     ).readAsStringSync();
 
-    expect(source, contains('-signedEdgeDistance - uContourOffset'));
+    expect(source, contains('clamp(t - uContourOffset, 0.0, uEdgeWidth)'));
+    expect(source, contains('float outward = -signedEdgeDistance;'));
     expect(source, contains('externalContourAlpha'));
     expect(source, contains('contourDirection(surfaceNormal)'));
     expect(geometrySource, contains('uContourExtent'));
