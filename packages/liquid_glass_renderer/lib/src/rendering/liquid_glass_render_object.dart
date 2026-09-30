@@ -757,6 +757,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ..setFloatUniforms(initialIndex: 33, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
+      // Nearest: the matte packs 12-bit normal angle and displacement codes
+      // across byte boundaries, which filtering between texels would mix.
       ..setImageSampler(1, geometryImage);
     if (_materialImage case final materialImage?) {
       if (_usesTintOnlyAppearance) {
