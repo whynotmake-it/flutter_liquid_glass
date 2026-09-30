@@ -8,7 +8,7 @@ REPO_DIR="$(cd "$EXAMPLE_DIR/../../.." && pwd)"
 PKG="com.example.liquid_glass_renderer_example"
 ACTIVITY="$PKG/.MainActivity"
 DEFAULT_SCENARIOS="appScrollOpaque appScrollPlainBlur appScrollFake appScrollReal appScrollRealOneLayer appScrollRealShadow appScrollRealTabs appScrollFakeShadow appIdleReal appIdleOpaque baselineMotion realToolbarMaterial fakeToolbarMaterial"
-SERIAL="${ANDROID_SERIAL:-$ANDROID_SERIAL}"
+SERIAL="${ANDROID_SERIAL:-}"
 REPETITIONS=3
 WARMUP=5
 MEASURE=20
@@ -19,7 +19,7 @@ MEASURE_PACKAGE=""
 MEASURE_SECONDS=30
 MEASURE_LABEL="foreground"
 MEASURE_SCROLL=0
-UNLOCK_PIN="${UNLOCK_PIN:-$UNLOCK_PIN}"
+UNLOCK_PIN="${UNLOCK_PIN:-}"
 ADB=(adb)
 
 usage() {

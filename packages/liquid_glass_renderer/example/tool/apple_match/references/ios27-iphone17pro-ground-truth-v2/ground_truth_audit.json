@@ -29,7 +29,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/small_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/small_capsule/metadata.json"
     },
     {
       "slider": 0.0,
@@ -58,7 +58,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule/metadata.json"
     },
     {
       "slider": 0.0,
@@ -87,7 +87,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/large_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/large_capsule/metadata.json"
     },
     {
       "slider": 0.0,
@@ -116,7 +116,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_capsule/metadata.json"
     },
     {
       "slider": 0.0,
@@ -145,7 +145,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_circle/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_circle/metadata.json"
     },
     {
       "slider": 0.0,
@@ -174,7 +174,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card/metadata.json"
     },
     {
       "slider": 0.0,
@@ -203,7 +203,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule_dark/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule_dark/metadata.json"
     },
     {
       "slider": 0.0,
@@ -232,7 +232,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card_dark/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/material_card_dark/metadata.json"
     },
     {
       "slider": 0.0,
@@ -261,7 +261,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/tab_bar_holdout/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-000/tab_bar_holdout/metadata.json"
     },
     {
       "slider": 0.5,
@@ -290,7 +290,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule/metadata.json"
     },
     {
       "slider": 0.5,
@@ -319,7 +319,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule_dark/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-050/toolbar_capsule_dark/metadata.json"
     },
     {
       "slider": 1.0,
@@ -348,7 +348,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule/metadata.json"
     },
     {
       "slider": 1.0,
@@ -377,7 +377,7 @@
           "maxAbsoluteDeviation8Bit": 0.0
         }
       },
-      "metadata": "/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule_dark/metadata.json"
+      "metadata": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/slider-100/toolbar_capsule_dark/metadata.json"
     }
   ],
   "crossChecks": [

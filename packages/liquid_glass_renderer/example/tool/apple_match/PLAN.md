@@ -53,7 +53,7 @@ composition, example shell, generalization, and non-regressing performance work.
   replace it or close unrelated simulators.)
 - Xcode-27.0.0-Beta.5.app installed; DEVELOPER_DIR needed for builds
 - compare/.venv READY (numpy/opencv/jsonschema + Pillow/scipy added)
-- flutter: /Users/tim/fvm/default/bin/flutter
+- flutter: ~/fvm/default/bin/flutter
 - Harness layout: apple_match/{apple(SwiftUI ref app),flutter(match app),compare(py),
   scenes,settings,references,out}
 - Candidate JSON keys → LiquidGlassSettings mapping: flutter/lib/scene_view.dart

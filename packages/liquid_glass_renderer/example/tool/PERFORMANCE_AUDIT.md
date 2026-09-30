@@ -671,7 +671,7 @@ recorded 86.3452 small-capsule pre-change score. This rejects the current
 spread axis as the generalization fix. The complete raw rows, repeatability,
 and pinned metadata are recorded in
 `apple_match/out/spread-grid-current/summary.json`. The final `.5` small
-capture is available as [spread-grid candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/spread-grid-current/small_capsule/live/A.png), with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png).
+capture is available as [spread-grid candidate](packages/liquid_glass_renderer/example/tool/apple_match/out/spread-grid-current/small_capsule/live/A.png), with the [Apple reference](packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png).
 
 ## Coupled spread/thickness probe (2026-08-26)
 
@@ -697,7 +697,7 @@ rows were:
 
 Small remains about 2.01x the same-spread toolbar error and below the recorded
 86.3452 capsule gate at every candidate. No public setting or shader change is
-justified by this result. A representative retained image is [coupled candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/coupled-spread-scan/small_capsule/candidates/spread-1/thickness-2/rep-1/A.png); compare it with the [Apple reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full numeric rows and selection details are in `out/coupled-spread-scan/summary.json`.
+justified by this result. A representative retained image is [coupled candidate](packages/liquid_glass_renderer/example/tool/apple_match/out/coupled-spread-scan/small_capsule/candidates/spread-1/thickness-2/rep-1/A.png); compare it with the [Apple reference](packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full numeric rows and selection details are in `out/coupled-spread-scan/summary.json`.
 
 ## Shared material attribution probes (2026-08-26)
 
@@ -727,4 +727,4 @@ toolbar/large scores and conflicts with the transparency contract.
 
 These controls therefore remain at their validated defaults; no renderer
 change is inferred from sub-threshold movement. Representative pairs are the
-[frost candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-frost/small_capsule/candidates/frost-5/rep-1/A.png), [gamma candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-gamma/small_capsule/candidates/transmissionGamma-0p85/rep-1/A.png), and [edge candidate](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-edge/small_capsule/candidates/edgeRefraction-8/rep-1/A.png), each compared against the pinned [Apple small-capsule reference](/Users/tim/Developer/flutter_liquid_glass/packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full rows are in the corresponding `out/material-attribution-*` summaries.
+[frost candidate](packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-frost/small_capsule/candidates/frost-5/rep-1/A.png), [gamma candidate](packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-gamma/small_capsule/candidates/transmissionGamma-0p85/rep-1/A.png), and [edge candidate](packages/liquid_glass_renderer/example/tool/apple_match/out/material-attribution-edge/small_capsule/candidates/edgeRefraction-8/rep-1/A.png), each compared against the pinned [Apple small-capsule reference](packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-light/small_capsule/A.png). Full rows are in the corresponding `out/material-attribution-*` summaries.

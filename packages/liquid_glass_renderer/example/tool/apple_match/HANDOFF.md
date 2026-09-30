@@ -50,7 +50,7 @@ code.
 - UDID: `DB4F41F3-1C36-476D-B775-AFDC3686C75B`
 - Runtime: iOS 27.0 `24A5408d`
 - Xcode: `/Applications/Xcode-27.0.0-Beta.5.app`
-- Flutter: `/Users/tim/fvm/default/bin/flutter`; harness default 3.47.1 exists
+- Flutter: `~/fvm/default/bin/flutter`; harness default 3.47.1 exists
 - Python venv: `compare/.venv`
 - `agent-device 0.17.5` and `/opt/homebrew/bin/ffmpeg` are installed
 - macOS does not have GNU `timeout`; use tool-level timeouts or `gtimeout` if

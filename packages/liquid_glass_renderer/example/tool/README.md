@@ -61,10 +61,10 @@ Default scenario family (app-like scrolling chrome plus a few existing
 baselines), three interleaved repetitions, 5 s warmup / 20 s measure:
 
 ```sh
-./tool/android_gpu_bench.sh scenarios --serial $ANDROID_SERIAL
+./tool/android_gpu_bench.sh scenarios --serial <serial>
 ```
 
-Both subcommands take `--pin PIN` (default `$UNLOCK_PIN`). Before the session
+Both subcommands take `--pin PIN` (no default; set `UNLOCK_PIN`). Before the session
 the harness sends `KEYCODE_WAKEUP` only (never `KEYCODE_POWER` / sleep).
 If `dumpsys window` still reports `isKeyguardShowing=true`, it swipes up
 and types the PIN. Each scenario launch also passes
@@ -121,7 +121,7 @@ A short smoke on the same device:
 
 ```sh
 ./tool/android_gpu_bench.sh scenarios \
-  --serial $ANDROID_SERIAL \
+  --serial <serial> \
   --scenarios "appScrollOpaque appScrollPlainBlur appScrollReal" \
   --repetitions 1 --warmup 3 --measure 8
 ```
@@ -136,7 +136,7 @@ synthetic scrolling:
 
 ```sh
 ./tool/android_gpu_bench.sh measure \
-  --serial $ANDROID_SERIAL \
+  --serial <serial> \
   --package com.clickup.app \
   --seconds 30 \
   --label clickup_scroll \
