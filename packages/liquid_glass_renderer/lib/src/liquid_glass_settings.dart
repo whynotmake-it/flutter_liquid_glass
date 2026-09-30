@@ -87,8 +87,9 @@ class LiquidGlassSettings with Equatable {
   /// The lighting is the measured iOS 27 rim: a 1.2 pt glint on both walls
   /// along the light axis and a 0.75 pt dark border outside the silhouette
   /// that concentrates where the glint fades, plus a faint inner shadow
-  /// (about 1.7% on white, strongest below the top wall and gone at the
-  /// bottom) fitted on the Reduce Motion off references.
+  /// cast by the rim along the light (3.6% of the transmitted light, 6 pt
+  /// below the top wall, at the rim on the sides, none at the bottom),
+  /// fitted on the Reduce Motion off references.
   const LiquidGlassSettings.ios27ToolbarLight({
     this.frost = 7.0,
     this.tintAmount = 0.0,
@@ -108,10 +109,10 @@ class LiquidGlassSettings with Equatable {
        contourOffset = 0.0,
        contourTransmittance = 0.0,
        contourDirectionality = 0.77,
-       bevelShadowStrength = 0.017,
-       bevelShadowDepth = 25.0,
-       bevelShadowOffset = 2.5,
-       bevelShadowDirectionality = 0.8,
+       bevelShadowStrength = 0.036,
+       bevelShadowDepth = 16.0,
+       bevelShadowOffset = 6.0,
+       bevelShadowDirectionality = 0.5,
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 1.0;
 
@@ -140,10 +141,10 @@ class LiquidGlassSettings with Equatable {
        contourOffset = 0.0,
        contourTransmittance = 0.0,
        contourDirectionality = 1.0,
-       bevelShadowStrength = 0.017,
-       bevelShadowDepth = 25.0,
-       bevelShadowOffset = 2.5,
-       bevelShadowDirectionality = 0.8,
+       bevelShadowStrength = 0.036,
+       bevelShadowDepth = 16.0,
+       bevelShadowOffset = 6.0,
+       bevelShadowDirectionality = 0.5,
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 0.0;
 
@@ -388,13 +389,20 @@ class LiquidGlassSettings with Equatable {
   /// glint sits, as in iOS 27 dark mode.
   final double contourDirectionality;
 
-  /// Strength of the ambient shadow immediately inside the raised bevel.
+  /// Fraction of the light transmitted through the glass that the inner
+  /// shadow absorbs at its peak. The glass's own emission is not shaded.
   final double bevelShadowStrength;
 
   /// Distance in logical pixels over which the bevel shadow fades inward.
   final double bevelShadowDepth;
 
-  /// Inward offset of the inner-shadow peak from the boundary.
+  /// How far the inner shadow is displaced along the light direction, in
+  /// logical pixels.
+  ///
+  /// The raised rim shades the face like a wall lit along the light: the
+  /// shadow band moves inside the face below the lit wall, with a penumbra
+  /// as wide as the displacement, stays at the rim where the wall runs along
+  /// the light, and is pushed out past the rim below the far wall.
   final double bevelShadowOffset;
 
   /// How strongly the inner bevel shadow follows the configured light.
