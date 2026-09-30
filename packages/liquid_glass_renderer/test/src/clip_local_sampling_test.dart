@@ -144,79 +144,101 @@ void main() {
       runtimeCodec,
       contains('-displacementMagnitude / maxDisplacement'),
     );
-    expect(
-      runtimeCodec,
-      contains(
-        'normalizedMagnitude = '
-        '1.0 - inverseMagnitude * inverseMagnitude',
-      ),
-    );
+    expect(runtimeCodec, contains('angleHigh / 255.0'));
+    expect(runtimeCodec, contains('magnitudeLow / 255.0'));
   });
 
-  test('displacement compander spends precision at the optical rim', () {
-    // Model the RGBA8 quantization performed between the geometry and final
-    // passes. The former signed encoding used only codes 0...127 for the
-    // physically reachable displacement direction, so its normalized step
-    // was approximately 2 / 255 everywhere.
-    const formerSignedStep = 2 / 255;
-
-    double decode(int code) {
-      final inverse = 1 - code / 255;
-      return 1 - inverse * inverse;
-    }
-
-    final steps = <double>[
-      for (var code = 1; code <= 255; code++) decode(code) - decode(code - 1),
-    ];
-
-    // Low displacement is never coarser than the old codec, while precision
-    // increases monotonically toward the high-displacement rim where source
-    // pixel jumps are most visible.
-    expect(steps.first, lessThanOrEqualTo(formerSignedStep));
-    for (var index = 1; index < steps.length; index++) {
-      expect(steps[index], lessThanOrEqualTo(steps[index - 1]));
-    }
-    expect(
-      steps.last,
-      lessThan(formerSignedStep / 500),
-      reason: 'peak refraction should not jump by a visible source pixel',
+  // Dart mirror of the packed RGBA8 codec in displacement_encoding.glsl:
+  // R = angle[11:4], G = angle[3:0] | magnitude[11:8], A = magnitude[7:0].
+  ({int r, int g, int a}) encodePacked(double angle, double magnitude) {
+    final x = math.cos(angle);
+    final y = math.sin(angle);
+    final manhattan = x.abs() + y.abs();
+    final dx = x / manhattan;
+    final dy = y / manhattan;
+    final diamond = dy >= 0
+        ? (dx >= 0 ? dy : 1 - dx)
+        : (dx < 0 ? 2 - dy : 3 + dx);
+    final angleCode = (diamond * 1024).round() % 4096;
+    final magnitudeCode = (magnitude.clamp(0.0, 1.0) * 4095).round();
+    return (
+      r: angleCode ~/ 16,
+      g: (angleCode % 16) * 16 + magnitudeCode ~/ 256,
+      a: magnitudeCode % 256,
     );
+  }
+
+  ({double x, double y, double magnitude}) decodePacked(
+    ({int r, int g, int a}) texel,
+  ) {
+    final diamond = (texel.r * 16 + texel.g ~/ 16) / 1024;
+    final dx = diamond < 2 ? 1 - diamond : diamond - 3;
+    final dy = diamond < 1
+        ? diamond
+        : (diamond < 3 ? 2 - diamond : diamond - 4);
+    final length = math.sqrt(dx * dx + dy * dy);
+    final magnitudeCode = (texel.g % 16) * 256 + texel.a;
+    return (
+      x: dx / length,
+      y: dy / length,
+      magnitude: magnitudeCode / 4095,
+    );
+  }
+
+  test('packed codec keeps refracted content steps far below a pixel', () {
+    // iOS 27's 60 pt edge displacement at 3x. The former 8-bit compander
+    // stepped by up to 2 / 255 of this (1.4 device pixels) deep in the bevel,
+    // which drew refracted lines as staircases.
+    const maxDisplacement = 180.0;
+    var maximumError = 0.0;
+    for (var index = 0; index <= 10000; index++) {
+      final magnitude = index / 10000;
+      final decoded = decodePacked(encodePacked(0, magnitude)).magnitude;
+      maximumError = math.max(
+        maximumError,
+        (decoded - magnitude).abs() * maxDisplacement,
+      );
+    }
+    expect(maximumError, lessThan(0.05));
+
+    for (var code = 0; code < 4096; code++) {
+      final texel = encodePacked(0, code / 4095);
+      expect(
+        (decodePacked(texel).magnitude * 4095).round(),
+        code,
+        reason: 'every magnitude code must survive the byte packing',
+      );
+    }
   });
 
   test('normal codec represents cardinal optical walls exactly', () {
-    ({double x, double y}) decode(double x, double y) {
-      final xCode = (x * 127 + 127).round();
-      final yCode = (y * 127 + 127).round();
-      final decodedX = (xCode - 127) / 127;
-      final decodedY = (yCode - 127) / 127;
-      final length = math.sqrt(
-        decodedX * decodedX + decodedY * decodedY,
-      );
-      return (x: decodedX / length, y: decodedY / length);
+    for (final (angle, x, y) in [
+      (0.0, 1.0, 0.0),
+      (math.pi / 2, 0.0, 1.0),
+      (math.pi, -1.0, 0.0),
+      (-math.pi / 2, 0.0, -1.0),
+    ]) {
+      final decoded = decodePacked(encodePacked(angle, 0));
+      expect(decoded.x, x);
+      expect(decoded.y, y);
     }
 
-    expect(decode(1, 0), (x: 1.0, y: 0.0));
-    expect(decode(-1, 0), (x: -1.0, y: 0.0));
-    expect(decode(0, 1), (x: 0.0, y: 1.0));
-    expect(decode(0, -1), (x: 0.0, y: -1.0));
-
-    // At the deliberately strong 160-pixel diagnostic displacement, the
-    // asymmetric signed mapping also improves the worst angular lookup error
-    // over conventional UNORM8 (measured at about 0.854 source pixels).
+    // At the deliberately strong 160-pixel diagnostic displacement the
+    // 12-bit diamond angle keeps the worst lateral error far below a pixel
+    // (the former two 8-bit components reached about 0.85 pixels).
     var maximumVectorError = 0.0;
     for (var index = 0; index < 36000; index++) {
       final angle = index * 2 * math.pi / 36000;
-      final x = math.cos(angle);
-      final y = math.sin(angle);
-      final decoded = decode(x, y);
+      final decoded = decodePacked(encodePacked(angle, 1));
       final error =
           160 *
           math.sqrt(
-            math.pow(decoded.x - x, 2) + math.pow(decoded.y - y, 2),
+            math.pow(decoded.x - math.cos(angle), 2) +
+                math.pow(decoded.y - math.sin(angle), 2),
           );
       maximumVectorError = math.max(maximumVectorError, error);
     }
-    expect(maximumVectorError, lessThan(0.85));
+    expect(maximumVectorError, lessThan(0.2));
   });
 
   test('magnification is one uniform lens about the material center', () {

@@ -1,7 +1,8 @@
 // Geometry matte generation implemented directly with Flutter GPU.
 // Geometry encoding revision 5: the shared uniform layout carries the compact
 // appearance lookup table used by the low-resolution material pass.
-// Refraction model 3: quarter-circle bevel, optionally fitted to the shape.
+// Refraction model 3: quarter-circle bevel, optionally fitted to the shape;
+// 12-bit normal angle and displacement codes.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
@@ -9,6 +10,9 @@
 // - Replaced FlutterFragCoord().xy with gl_FragCoord.xy
 // - Uniforms declared in a named uniform block instead of layout(location=N)
 // - Removed dead screenUV code (Y-flip was unused)
+
+// The matte packs 12-bit integer codes; fp16 cannot represent them exactly.
+precision highp float;
 
 #define MAX_SHAPES 16
 
