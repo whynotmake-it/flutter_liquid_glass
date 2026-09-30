@@ -23,6 +23,8 @@
   with 60 pt edge displacement, and the new `refractionFitsShape` (default
   `true`) limits the lens on small shapes like regular glass does; use
   `false` for clear glass. `chromaticAberration` now defaults to `0`.
+- Add `LiquidGlassSettings.ios27Clear()`: the full lens plus a 0.35 pt
+  backdrop blur that matches the softness of iOS 27 clear glass.
 
 ## 1.0.0-dev.1
 

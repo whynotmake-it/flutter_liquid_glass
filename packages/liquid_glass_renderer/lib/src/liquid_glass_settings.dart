@@ -151,6 +151,18 @@ class LiquidGlassSettings with Equatable {
           frost: frost ?? 7.0,
         );
 
+  /// Optics of iOS 27 `.clear` glass.
+  ///
+  /// The full 20 pt / 60 pt lens is kept on small shapes, and a slight
+  /// 0.35 pt backdrop blur matches the softness of Apple's clear glass:
+  /// against the Reduce Motion off references it cuts face error by more
+  /// than half and rim error by 5 to 17 percent. The blur adds a
+  /// full-resolution blur pass that unfrosted glass skips; pass `frost: 0`
+  /// where that cost matters more than the match. Lighting uses the
+  /// defaults.
+  factory LiquidGlassSettings.ios27Clear({double frost = 0.35}) =>
+      LiquidGlassSettings(frost: frost, refractionFitsShape: false);
+
   /// Creates settings from Figma-style percentage controls.
   ///
   /// [refraction] and [dispersion] use a `0` to `100` scale. [depth] and
