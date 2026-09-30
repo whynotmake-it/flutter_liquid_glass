@@ -274,7 +274,7 @@ Pixel 10 re-measurement with the auto-sized capture (Flutter 3.47 build,
 −17 % / −18 % GPU, −16 % DDR, CPU +10…16 mW (within noise): the automatic
 region reproduces the hand-sized seed's result (383 → 329, 910 → 736).
 
-### K. Scissored single-shape geometry passes — KEPT (2026-09-29)
+### K. Scissored single-shape geometry passes — REJECTED on device (2026-09-29, Pixel 10 2026-09-30)
 
 Target: geometry-pass fragments on rebuild frames. Mattes are allocated in
 64-texel buckets; the padding (up to 63 texels right and bottom) was shaded
@@ -294,7 +294,8 @@ would depend on the blend formula.
 
 Evidence (Linux host, Flutter 3.47.1, Impeller/Vulkan on SwiftShader):
 
-- `geometry_scissor_test.dart`: scissored and full mattes byte-identical for
+- `geometry_scissor_test.dart` (removed with the revert): scissored and full
+  mattes byte-identical for
   superellipse, oval, rounded rectangle, with and without contour, and under
   rotation + anisotropic scale. With the margin forced to −6 texels the test
   fails (2 080–7 910 differing bytes); at 0 it still passes, so the shipped
@@ -311,8 +312,29 @@ Evidence (Linux host, Flutter 3.47.1, Impeller/Vulkan on SwiftShader):
   overstates a TBDR GPU; the device gain is only on frames that rebuild a
   single-shape matte (press/stretch/resize, sheet morphs).
 
-Needs a device: rebuild-frame GPU time on Pixel 10 / iPhone
-(`resizeAnimated`, a single-shape stretch scenario).
+Pixel 10 (PR #170, 5 reps, 120 Hz, profile, `gpu_work_period` cycles): the
+clear costs the frame, the scissor saves almost nothing.
+
+| button stretch | fps | build p50 / p95 ms | GPU Mcycles/frame |
+|---|---:|---:|---:|
+| base | 103.2 | 3.07 / 12.5 | 2.92 |
+| scissor + clear (as proposed) | **92.0** | **3.86 / 19.4** | 2.85 |
+| clear only, no scissor | **94.3** | **3.83 / 18.3** | 2.88 |
+| scissor, `dontCare` | 102.9 | 3.08 / 12.5 | 2.92 |
+
+Tab-pill stretch and `resizeAnimated` show the same pattern (104.5 → 93.8 and
+100.6 → 92.3 fps). A clearing attachment adds ~1.5 ms to the UI-thread
+`PAINT` slice on every rebuild frame (Flutter GPU / Impeller render-pass
+setup; `QueueSubmit` and driver slices unchanged). The scissor halves the
+button's rebuild increment (0.073 → 0.035 Mcycles), about 0.1 ms or 1 % of
+the frame, below the harness' noise floor. Scissor with `dontCare` is not an
+option: the final pass maps the whole bucketed texture (`uGeometrySize` is the
+allocated size) and the 64 px filter clip can cover the padding, so undefined
+texels would be sampled. Zeroing them with a shader early-out (running the
+existing bounds rejection for single shapes too) would recover at most that
+1 %. Reverted; the host SwiftShader timing overstated the GPU share of a
+rebuild, which on device is dominated by UI-thread encode + submit (~2.6 ms
+per single-shape rebuild vs 0.07–0.13 Mcycles of GPU).
 
 ### L. Flutter GPU object lifetimes and transient matte memory — measured, not shipped (2026-09-29)
 
