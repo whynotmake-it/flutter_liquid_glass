@@ -600,7 +600,8 @@ The scan validates `metadata.json` against the pinned runtime/UDID and emits
 `best/scorecard.json`. For the loupe it evaluates the only effective material
 axes (`refractionHeight` and `refractionAmount`); `_MatchLoupe`-forced clear
 settings are recorded as overrides rather than falsely searched. The loupe is
-composed with `LiquidGlassLoupe` and never applies shader-level zoom.
+composed with the example app's `LiquidGlassLoupe` (`example/lib/loupe/`) and
+never applies shader-level zoom.
 
 To attribute the remaining capsule residual to an existing shared material
 control, run one bounded axis at a time. Every candidate is freshly rendered

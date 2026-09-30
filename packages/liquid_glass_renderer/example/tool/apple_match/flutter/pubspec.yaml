@@ -12,6 +12,9 @@ dependencies:
     sdk: flutter
   liquid_glass_renderer:
     path: ../../../..
+  # For the example app's LiquidGlassLoupe (example/lib/loupe/).
+  liquid_glass_renderer_example:
+    path: ../../..
 
 dev_dependencies:
   flutter_test:

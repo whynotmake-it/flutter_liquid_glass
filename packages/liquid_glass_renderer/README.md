@@ -242,8 +242,9 @@ bevel refracts, pulling content inward:
   Its ratio to `refractionHeight` sets how rod-like the rim looks: above `1`,
   content near the rim is mirrored, as on Apple's glass.
 - `backdropShrink` shrinks the backdrop seen through the whole face: `0`
-  keeps its size, `0.08` shows it at 92%. It never enlarges; use
-  `LiquidGlassLoupe` for magnifiers. All glass in one layer shrinks about the
+  keeps its size, `0.08` shows it at 92%. It never enlarges; for magnifiers,
+  re-render the content under the lens instead (see [Loupe](#loupe)). All
+  glass in one layer shrinks about the
   center of the layer's glass, so give a shape its own layer to shrink it
   about itself.
 - `dispersion` separates the color channels in the refracted edge: red moves
@@ -265,7 +266,7 @@ Values measured on iOS 27 (Reduce Motion off):
 | --- | --- | --- | --- |
 | Regular glass, buttons, toolbars (default) | `20` | `60` | |
 | Clear glass (`LiquidGlassSettings.ios27Clear(tintAmount: slider)`) | `20` | `60` | `refractionFitsShape: false`, `frost: LiquidGlassSettings.ios27ClearFrost(slider)` (0.35 at slider 0, applied in the final pass) |
-| Text loupe (`LiquidGlassLoupe.defaultSettings`) | `8` | `34.5` | `dispersion: -0.06`, 1.25× magnification from `LiquidGlassLoupe` |
+| Text loupe (the example's `LiquidGlassLoupe.defaultSettings`) | `8` | `34.5` | `dispersion: -0.06`, 1.25× magnification from re-rendering the content |
 
 iOS 27 regular and clear glass show no dispersion, so `dispersion` defaults
 to `0`; only the loupe measures some. Frost up to 1.25 device pixels (such as
@@ -274,29 +275,12 @@ the final pass instead of a separate blur pass.
 
 ### Loupe
 
-`LiquidGlassLoupe` is a magnifier like the iOS 27 text loupe. Wrap the content
-in a `LiquidGlassLoupeSource`, connect both with a `LiquidGlassLoupeLink`, and
-place the loupe above the source. It re-renders only the content under the
-lens at the magnified resolution, then refracts and lights it with glass, so
-text stays sharp.
-
-```dart
-final link = LiquidGlassLoupeLink();
-
-Stack(
-  children: [
-    LiquidGlassLoupeSource(link: link, child: content),
-    Positioned(
-      left: x,
-      top: y,
-      child: LiquidGlassLoupe(
-        link: link,
-        focalPointOffset: const Offset(0, 75),
-      ),
-    ),
-  ],
-);
-```
+The renderer has no magnifier widget. The example app shows how to build one
+like the iOS 27 text loupe from public pieces, in
+[`example/lib/loupe/liquid_glass_loupe.dart`](example/lib/loupe/liquid_glass_loupe.dart).
+It re-renders only the content under the lens at the magnified resolution with
+`OffsetLayer.toImageSync`, and draws a `LiquidGlass.withOwnLayer` on top, so
+text stays sharp. Copy it into your app if you need one.
 
 ### HDR highlights
 

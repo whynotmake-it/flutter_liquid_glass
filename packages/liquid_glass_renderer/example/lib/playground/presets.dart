@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 
 /// The glass styles the playground starts from.
 ///

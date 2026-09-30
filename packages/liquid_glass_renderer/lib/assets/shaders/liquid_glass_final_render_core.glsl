@@ -690,7 +690,7 @@ void main() {
         // backdropShrink is one lens over the whole face, about the material
         // center of the layer, uniform up to the silhouette. The bevel
         // displacement adds on top of it. It never enlarges: magnifiers
-        // re-render their content instead (LiquidGlassLoupe).
+        // re-render their content instead (see the example's loupe).
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis

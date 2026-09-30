@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/app.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/inspector.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/material_sections.dart';

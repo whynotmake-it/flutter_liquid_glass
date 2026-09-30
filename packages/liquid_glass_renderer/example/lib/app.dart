@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 import 'package:liquid_glass_renderer_example/performance_probe.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
