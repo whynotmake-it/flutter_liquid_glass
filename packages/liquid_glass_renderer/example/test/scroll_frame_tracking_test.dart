@@ -61,6 +61,9 @@ void main() {
                   )
                   .every((s) => !s.consolidatesFakeBackdrop),
               isTrue,
+              reason:
+                  'Real glass falls back to fake glass unless the tests run '
+                  'with --enable-impeller --enable-flutter-gpu.',
             );
           }
           final position = tester
