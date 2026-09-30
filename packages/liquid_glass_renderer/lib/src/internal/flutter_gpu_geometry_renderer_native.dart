@@ -375,23 +375,12 @@ class FlutterGpuGeometryRenderer {
       allocatedHeight,
     );
     _image = _texture!.asImage();
-    final geometryScissor = _singleShapeScissor(
-      numShapes: numShapes,
-      shapeData: shapeData,
-      width: width,
-      height: height,
-      allocatedWidth: allocatedWidth,
-      allocatedHeight: allocatedHeight,
-      contourExtent: contourExtent,
-    );
-    // Unscissored, the shader writes every pixel of the full-screen quad and
-    // nothing needs clearing. A scissored pass clears to the empty encoding.
+    // The shader writes every pixel of the full-screen quad; no clear or
+    // copy of the previous matte is needed.
     _renderTarget = gpu.RenderTarget.singleColor(
       gpu.ColorAttachment(
         texture: _texture!,
-        loadAction: geometryScissor == null
-            ? gpu.LoadAction.dontCare
-            : gpu.LoadAction.clear,
+        loadAction: gpu.LoadAction.dontCare,
       ),
     );
     assert(() {
@@ -504,15 +493,8 @@ class FlutterGpuGeometryRenderer {
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(_vertexBufferView);
-    if (geometryScissor case final scissor?) {
-      geometryPass.setScissor(scissor);
-      assert(() {
-        debugScissoredRenderCount++;
-        return true;
-      }(), 'Count scissored geometry passes in debug builds.');
-    }
-    geometryPass.draw(4);
+      ..bindVertexBuffer(_vertexBufferView)
+      ..draw(4);
     geometryCommandBuffer.submit();
     if (GpuAllocationDiagnostics.enabled) {
       GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
@@ -547,60 +529,6 @@ class FlutterGpuGeometryRenderer {
   }
 
   static int _bucketDimension(int value) => (value + 63) & ~63;
-
-  /// Renders single-shape mattes over the whole bucketed texture, for tests
-  /// that prove the scissored pass writes the same texels.
-  @visibleForTesting
-  static bool debugDisableGeometryScissor = false;
-
-  /// Counts geometry passes that skipped bucket padding.
-  @visibleForTesting
-  static int debugScissoredRenderCount = 0;
-
-  /// Limits a single-shape geometry pass to the texels it can cover.
-  ///
-  /// Bucketing pads the matte by up to 63 texels on the right and bottom, and
-  /// a lone shape has no empty-pixel rejection, so the padding would run the
-  /// full SDF. Outside the shape's layout box the local SDF is at least the
-  /// box distance (the bound the multi-shape culling relies on too), and the
-  /// matte basis stretches distances by at most its anisotropy, so every
-  /// padding texel beyond that reach writes zero, the value the cleared
-  /// attachment already holds.
-  static gpu.Scissor? _singleShapeScissor({
-    required int numShapes,
-    required List<double> shapeData,
-    required int width,
-    required int height,
-    required int allocatedWidth,
-    required int allocatedHeight,
-    required double contourExtent,
-  }) {
-    if (debugDisableGeometryScissor) return null;
-    if (numShapes != 1 || shapeData.length < 8) return null;
-    // Vec4 1 is the inverse basis from matte to shape texels; its singular
-    // values are the reciprocals of the forward stretches.
-    final a = shapeData[4];
-    final b = shapeData[5];
-    final c = shapeData[6];
-    final d = shapeData[7];
-    final sumSquares = a * a + b * b + c * c + d * d;
-    final determinant = (a * d - b * c).abs();
-    final root = math.sqrt(
-      math.max(0.0, sumSquares * sumSquares - 4 * determinant * determinant),
-    );
-    final largest = math.sqrt(math.max(0.0, (sumSquares + root) / 2));
-    final smallest = math.sqrt(math.max(0.0, (sumSquares - root) / 2));
-    if (smallest <= 1e-6) return null;
-    // Coverage reaches the contour extent plus the AA feather.
-    final reach = (math.max(contourExtent, 0.5) + 2) * (largest / smallest);
-    final margin = reach.ceil() + 1;
-    final scissorWidth = math.min(allocatedWidth, width + margin);
-    final scissorHeight = math.min(allocatedHeight, height + margin);
-    if (scissorWidth == allocatedWidth && scissorHeight == allocatedHeight) {
-      return null;
-    }
-    return gpu.Scissor(width: scissorWidth, height: scissorHeight);
-  }
 
   void _packUniformData({
     required double offsetX,
