@@ -35,17 +35,6 @@
   Frost up to 1.25 device pixels now runs as a three-texel kernel in the
   final pass instead of a separate blur pass.
 
-### Added
-
-- Add `LiquidGlassLoupe`, a liquid glass magnifier like the iOS 27 text
-  loupe. Wrap the content in a `LiquidGlassLoupeSource` and connect both with
-  a `LiquidGlassLoupeLink`. The loupe re-renders only the content under the
-  lens at the magnified resolution, then refracts and lights it with the
-  glass. Defaults match the iOS 27 loupe: 116 × 86 capsule, 1.25×, an
-  8 pt / 34.5 pt bevel and `dispersion: -0.06`; set
-  `focalPointOffset: Offset(0, 75)` to show the touch point below the lens
-  as iOS does.
-
 ### Fixes
 
 - Blended shapes in a `LiquidGlassBlendGroup` no longer bulge outward at the
