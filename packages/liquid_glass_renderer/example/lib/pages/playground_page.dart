@@ -71,12 +71,13 @@ class PlaygroundPage extends HookWidget {
                   _SettingsPanel(
                     children: [
                       _SliderSetting(
-                        label: 'Thickness',
-                        value: settings.thickness,
+                        label: 'Refraction height',
+                        value: settings.refractionHeight,
                         min: 0,
-                        max: 160,
-                        onChanged: (value) =>
-                            setSettings(settings.copyWith(thickness: value)),
+                        max: 60,
+                        onChanged: (value) => setSettings(
+                          settings.copyWith(refractionHeight: value),
+                        ),
                       ),
                       _SliderSetting(
                         label: 'Frost',
@@ -105,12 +106,12 @@ class PlaygroundPage extends HookWidget {
                   _SettingsPanel(
                     children: [
                       _SliderSetting(
-                        label: 'Edge refraction',
-                        value: settings.edgeRefraction,
+                        label: 'Refraction amount',
+                        value: settings.refractionAmount,
                         min: 0,
                         max: 160,
                         onChanged: (value) => setSettings(
-                          settings.copyWith(edgeRefraction: value),
+                          settings.copyWith(refractionAmount: value),
                         ),
                       ),
                       _SliderSetting(
@@ -124,12 +125,12 @@ class PlaygroundPage extends HookWidget {
                         ),
                       ),
                       _SliderSetting(
-                        label: 'Backdrop scale',
-                        value: settings.backdropScale,
+                        label: 'Magnification',
+                        value: settings.magnification,
                         min: 0.5,
                         max: 1.5,
                         onChanged: (value) => setSettings(
-                          settings.copyWith(backdropScale: value),
+                          settings.copyWith(magnification: value),
                         ),
                       ),
                     ],

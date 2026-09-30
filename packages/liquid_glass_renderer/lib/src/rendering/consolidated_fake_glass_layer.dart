@@ -43,6 +43,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) =>
       RenderConsolidatedFakeGlassLayer(
+        devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1,
         link: link,
         settings: settings,
         defaultAppearance: defaultAppearance,
@@ -56,6 +57,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
     RenderConsolidatedFakeGlassLayer renderObject,
   ) {
     renderObject
+      ..devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1
       ..link = link
       ..settings = settings
       ..defaultAppearance = defaultAppearance
@@ -70,12 +72,21 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     with TransformTrackingRenderObjectMixin
     implements LiquidGlassLayerRenderObject {
   RenderConsolidatedFakeGlassLayer({
+    required this._devicePixelRatio,
     required this._link,
     required this._settings,
     required this._defaultAppearance,
     required this._backdropKey,
     required this._surfaceShader,
   });
+
+  double _devicePixelRatio;
+  double get devicePixelRatio => _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
+    markNeedsPaint();
+  }
 
   GeometryRenderLink _link;
   GeometryRenderLink get link => _link;
@@ -136,6 +147,9 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   final Map<LiquidGlassShapeRenderObject, _FadingShapeLayers>
   _fadingShapeLayers = {};
   ImageFilter? _cachedFilter;
+
+  /// Shorter side of the smallest shape sharing the consolidated filter.
+  double _shortSide = 10000;
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
   final List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>
@@ -155,7 +169,8 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   bool get _hasBlur => settings.effectiveFrost > 0;
   bool get _hasColorTransfer =>
       defaultAppearance.saturation != 1 ||
-      defaultAppearance.transmissionGamma != 1;
+      defaultAppearance.transmissionGamma != 1 ||
+      defaultAppearance.colorModel.faceTransfer(_shortSide) != null;
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
   @override
@@ -287,6 +302,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
 
     if (!_clipInputsMatch(geometries)) {
       Rect? rebuiltBounds;
+      var rebuiltShortSide = double.infinity;
       final rebuiltPath = Path();
       final rebuiltClasses = <int>[];
       for (final (_, geometry, transform) in geometries) {
@@ -298,6 +314,10 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
               ? transform
               : transform.multiplied(shape.shapeToGeometry!);
           final shapeBounds = Offset.zero & shape.renderObject.size;
+          rebuiltShortSide = math.min(
+            rebuiltShortSide,
+            shape.renderObject.size.shortestSide,
+          );
           final transformedBounds = MatrixUtils.transformRect(
             shapeToLayer,
             shapeBounds,
@@ -315,6 +335,10 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
             );
           }
         }
+      }
+      if (rebuiltShortSide != _shortSide) {
+        _shortSide = rebuiltShortSide;
+        _cachedFilter = null;
       }
       _cachedClipPath = rebuiltPath;
       _cachedClipBounds = rebuiltBounds;
@@ -424,6 +448,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
           shape: shape.shape,
           settings: settings,
           appearance: shape.appearance,
+          devicePixelRatio: devicePixelRatio,
         );
         canvas.restore();
       }
@@ -443,7 +468,11 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     for (final (_, geometry, geometryToLayer) in geometries) {
       for (final shape in geometry.shapes) {
         if (_visibilityClass(shape.appearance) != 1) continue;
-        final filter = fakeGlassBackdropFilter(settings, shape.appearance);
+        final filter = fakeGlassBackdropFilter(
+          settings,
+          shape.appearance,
+          shortSide: shape.renderObject.size.shortestSide,
+        );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
         active.add(renderObject);
@@ -603,7 +632,11 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   }
 
   ImageFilter _buildBackdropFilter() {
-    return fakeGlassBackdropFilter(settings, defaultAppearance)!;
+    return fakeGlassBackdropFilter(
+      settings,
+      defaultAppearance,
+      shortSide: _shortSide,
+    )!;
   }
 
   Rect _expandForEffects(

@@ -24,7 +24,8 @@
         "large_capsule",
         "material_shape",
         "tab_bar_holdout",
-        "loupe"
+        "loupe",
+        "merge_pair"
       ]
     },
     "canvas": {
@@ -63,6 +64,9 @@
         "appleContentInsetY": {"type": "number", "minimum": 0}
       }
     },
+    "mergeShape": {"$ref": "#/properties/shape"},
+    "containerSpacing": {"type": "number", "minimum": 0},
+    "glassVariant": {"enum": ["regular", "clear"]},
     "appearance": {"enum": ["light", "dark"]},
     "transparency": {
       "type": "object",

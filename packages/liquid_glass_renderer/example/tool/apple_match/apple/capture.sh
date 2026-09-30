@@ -3,7 +3,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to the pinned iOS 27 simulator UDID}"
-: "${REFERENCE_SET:=ios27-iphone17pro-ground-truth-v2/slider-000}"
+# REDUCE_MOTION=1 reproduces the historical references. Reduce Motion also
+# removes Liquid Glass lensing, so REDUCE_MOTION=0 captures the full effect
+# and relies on CAPTURE_SETTLE_SECONDS (plus the frame-stability gate in
+# reference_provenance.py) to exclude launch and materialization animation.
+: "${REDUCE_MOTION:=1}"
+case "$REDUCE_MOTION" in
+  1) REDUCE_MOTION_DEFAULT=YES
+     : "${REFERENCE_SET:=ios27-iphone17pro-ground-truth-v2/slider-000}"
+     : "${CAPTURE_SETTLE_SECONDS:=1}" ;;
+  0) REDUCE_MOTION_DEFAULT=NO
+     : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/slider-000}"
+     : "${CAPTURE_SETTLE_SECONDS:=4}" ;;
+  *) echo "REDUCE_MOTION must be 0 or 1" >&2; exit 2 ;;
+esac
 : "${CAPTURE_FRAMES:=3}"
 : "${CAPTURE_FRAME_DELAY:=0.25}"
 : "${SCENE_ID:=toolbar_capsule}"
@@ -36,6 +49,7 @@ FINAL_OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
 API="SwiftUI PrimitiveButtonStyle.glass"
 [[ "$SCENE_ID" == "tab_bar_holdout" ]] && API="SwiftUI TabView system tab bar"
 [[ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SCENE")" == "material_shape" ]] && API="SwiftUI View.glassEffect(_:in:)"
+[[ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SCENE")" == "merge_pair" ]] && API="SwiftUI GlassEffectContainer + View.glassEffect(_:in:)"
 APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE")"
 ACTUAL_TINT_POSITION=""
 # Slider defaults live inside the simulated device. Boot a cold pinned device
@@ -44,6 +58,27 @@ ACTUAL_TINT_POSITION=""
 # have launched the simulator first.
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
+# Accessibility defaults are read by system processes at startup, so a changed
+# Reduce Motion value only takes effect for glass rendering after a reboot.
+# Reboot before any other defaults write or app install: both can be lost
+# when the device shuts down immediately after them.
+PREVIOUS_REDUCE_MOTION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo unset)"
+xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
+  ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
+if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
+  xcrun simctl shutdown "$IOS_27_UDID"
+  xcrun simctl boot "$IOS_27_UDID"
+  xcrun simctl bootstatus "$IOS_27_UDID" -b
+  sleep 5
+fi
+REDUCE_MOTION_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.Accessibility ReduceMotionEnabled)"
+if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
+  echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
+  exit 4
+fi
+export REDUCE_MOTION
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
   UIViewGlassTintAmount -float "$LIQUID_GLASS_TINT_POSITION"
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
@@ -77,8 +112,6 @@ xcrun simctl ui "$IOS_27_UDID" appearance "$APPEARANCE"
 xcrun simctl ui "$IOS_27_UDID" content_size large
 xcrun simctl ui "$IOS_27_UDID" increase_contrast disabled
 xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
-  ReduceMotionEnabled -bool YES
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceTransparencyEnabled -bool NO
 screenshot_frame() {
   local probe="$1"
@@ -99,7 +132,7 @@ screenshot_frame() {
 for probe in $CAPTURE_PROBES; do
   xcrun simctl launch --terminate-running-process "$IOS_27_UDID" \
     dev.liquidglass.applematch --args --scene-id "$SCENE_ID" --probe "$probe"
-  sleep 1
+  sleep "$CAPTURE_SETTLE_SECONDS"
   for frame in $(seq 1 "$CAPTURE_FRAMES"); do
     screenshot_frame "$probe" "$OUT/frames/${probe}_$frame.png"
     sleep "$CAPTURE_FRAME_DELAY"
@@ -123,7 +156,9 @@ python3 "$ROOT/reference_provenance.py" "$OUT" "$SCENE" \
   --slider "$LIQUID_GLASS_TINT_POSITION" \
   --slider-readback "$ACTUAL_TINT_POSITION" \
   --slider-method "$LIQUID_GLASS_TINT_CONTROL_METHOD" \
-  --frames "$CAPTURE_FRAMES"
+  --frames "$CAPTURE_FRAMES" \
+  --reduce-motion "$REDUCE_MOTION" \
+  --settle-seconds "$CAPTURE_SETTLE_SECONDS"
 
 mkdir -p "$(dirname "$FINAL_OUT")"
 if [[ -d "$FINAL_OUT" ]]; then

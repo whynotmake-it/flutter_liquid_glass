@@ -114,7 +114,7 @@ void main() {
     final settings = matchGlassSettings(values);
     final appearance = matchGlassAppearance(values);
     expect(settings.frost, 9);
-    expect(settings.thickness, 12);
+    expect(settings.refractionHeight, 12);
     expect(settings.highlight, 0.4);
     expect(settings.contourStrength, 0.2);
     expect(settings.contourWidth, 1.0);
@@ -124,7 +124,7 @@ void main() {
     expect(settings.bevelShadowStrength, 0.025);
     expect(settings.bevelShadowDepth, 12.0);
     expect(settings.exteriorShadowSizeResponse, 0.8);
-    expect(settings.edgeRefraction, closeTo(54.5, 0.1));
+    expect(settings.refractionAmount, closeTo(54.5, 0.1));
     expect(appearance.saturation, 1.2);
   });
 }

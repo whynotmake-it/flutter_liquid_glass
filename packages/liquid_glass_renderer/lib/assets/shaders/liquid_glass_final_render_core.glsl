@@ -26,33 +26,39 @@ uniform vec2 uLightDirection;
 uniform vec4 uHighlightColor;
 uniform vec4 uContourColor;
 uniform vec4 uLightingShapeConfig;
-uniform vec2 uContourConfig;
+uniform vec3 uContourConfig;
 uniform vec4 uProfileConfig;
-uniform vec2 uMaterialConfig;
+uniform vec3 uMaterialConfig;
 uniform vec3 uBevelShadowConfig;
-uniform vec3 uAppearanceConfig;
+uniform vec4 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
 // 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
 // glass opaque so visibility 0 is an exact identity of the backdrop.
 uniform float uBlurFade;
+// 1.0 folds sub-pixel frost into this pass: the refracted texel plus its two
+// diagonal neighbours, weighted 1/2, 1/4, 1/4 (sigma ~0.7 device px), instead
+// of a blur pass. Whole-texel offsets, because the filter input is sampled
+// nearest.
+uniform float uSoften;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
+// Rim lighting depth; the matte encodes edge distance up to 4x this.
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
 float uBackdropScale = uLightConfig.y;
-float uAmbientStrength = 0.0;
 float uSaturation = uLightConfig.z;
 float uEdgeWidth = uContourConfig.x;
 float uContourTransmittance = uContourConfig.y;
+float uContourDirectionality = uContourConfig.z;
 float uContourOffset = uProfileConfig.x;
 vec2 uMaterialCenter = uProfileConfig.yz;
-float uEdgeInset = 0.25;
-float uBleedStrength = 0.375;
 float uSpecularWrap = uProfileConfig.w;
 float uTransmissionGamma = uMaterialConfig.x;
 float uVibrancy = uMaterialConfig.y;
+// iOS 27 Liquid Glass slider: 0 = Clear, 1 = Tinted.
+float uTintAmount = clamp(uMaterialConfig.z, 0.0, 1.0);
 float uBevelShadowStrength = uBevelShadowConfig.x;
 float uBevelShadowDepth = uBevelShadowConfig.y;
 float uBevelShadowOffset = uBevelShadowConfig.z;
@@ -68,7 +74,25 @@ float uHighlightOppositeStrength = uLightingShapeConfig.w;
 // visible dispersion. The threshold is a conservative quarter-pixel total
 // red-to-blue spread (an eighth pixel on either side of green).
 const float kChromaticAberrationSubpixelThreshold = 0.25;
-const float kEdgeFeather = 0.75;
+// Border strength; the dark iOS 27 face raises it with the slider.
+float gContourAlpha = uContourColor.a;
+// iOS 27 glint recolor, measured on the pinned solid-palette probes in both
+// appearances: the glint mixes the lit face toward a bright target whose
+// luminance sits above SDR white and whose chroma is the face chroma
+// amplified. Mask peak at highlight = 1 is Apple's measured mix weight.
+const float kGlintLuminance = 1.6;
+const float kGlintVibrancy = 2.85;
+const float kGlintPeak = 0.14;
+// A faint inward bleed four glint widths deep carries a fifth of the line's
+// weight.
+const float kGlintBleed = 0.21;
+const float kGlintBleedReach = 4.0;
+// The glint target is Lh + faceGain * face + vibrancy * face chroma. Regular
+// glass pulls toward a fixed bright target; clear glass instead brightens
+// its own face. Set per color model in main().
+float gGlintLuminance = kGlintLuminance;
+float gGlintFaceGain = 0.0;
+float gGlintVibrancy = kGlintVibrancy;
 // The contour is reconstructed from a sampled SDF. Test a wider coverage
 // transition independently from the encoded exterior range so distance
 // decoding and geometry placement remain bit-for-bit unchanged.
@@ -101,12 +125,68 @@ vec4 shapeLookup(
 }
 #endif
 
-vec4 ios27NeutralTint(float darkWeight) {
-    return mix(
-        vec4(vec3(253.0, 252.0, 253.0) / 255.0, 0.407),
-        vec4(vec3(57.142857 / 255.0), 0.56),
-        darkWeight
+// Neutral wash of the untinted face. Light glass transmits 0.592 at every
+// size. Dark glass keeps its 32/255 emission but becomes denser with size:
+// controls up to 75 pt transmit like light glass and surfaces from 105 pt
+// transmit 0.447. Clear glass is appearance-independent.
+// The Liquid Glass slider moves every iOS 27 material parameter linearly
+// between three keyframes: Clear (0), the Settings middle tick (0.5) and
+// Tinted (1).
+float sliderKeyframes(float s, float clearValue, float middle, float tinted) {
+    return s <= 0.5
+        ? mix(clearValue, middle, s * 2.0)
+        : mix(middle, tinted, s * 2.0 - 1.0);
+}
+
+// Transmittance of the dark regular face. Controls up to 75 pt keep the
+// light-mode density until the middle tick; surfaces from 105 pt are denser
+// from the start. Both roughly halve by Tinted.
+float ios27DarkTransmittance(float shortSide, float tintAmount) {
+    float large = smoothstep(75.0, 105.0, shortSide);
+    return sliderKeyframes(
+        tintAmount,
+        mix(0.597, 0.447, large),
+        mix(0.596, 0.346, large),
+        mix(0.295, 0.195, large)
     );
+}
+
+// Neutral wash of the untinted face. Light glass keeps its near-white
+// color and becomes more opaque; dark glass keeps its 32/255 emission, so
+// its wash darkens as it becomes opaque. Clear glass has no slider response.
+vec4 ios27NeutralTint(
+    float darkWeight,
+    float shortSide,
+    bool clearGlass,
+    float tintAmount
+) {
+    if (clearGlass) {
+        return vec4(vec3(0.126 / 0.046), 0.046);
+    }
+    float lightAlpha =
+        1.0 - sliderKeyframes(tintAmount, 0.592, 0.468, 0.286);
+    float darkTransmittance = ios27DarkTransmittance(shortSide, tintAmount);
+    vec4 dark = vec4(
+        vec3((32.0 / 255.0) / (1.0 - darkTransmittance)),
+        1.0 - darkTransmittance
+    );
+    vec4 light = vec4(vec3(253.0, 252.0, 253.0) / 255.0, lightAlpha);
+    return mix(light, dark, darkWeight);
+}
+
+// Luminance lift and chroma gain of the untinted face. The slider
+// desaturates both appearances and compresses dark highlights up to the
+// middle tick.
+vec2 ios27FaceTransfer(float darkWeight, bool clearGlass, float tintAmount) {
+    if (clearGlass) {
+        return vec2(0.0, 1.057);
+    }
+    vec2 light = vec2(0.13, sliderKeyframes(tintAmount, 1.17, 0.982, 0.751));
+    vec2 dark = vec2(
+        sliderKeyframes(tintAmount, 1.0, 1.58, 1.13),
+        sliderKeyframes(tintAmount, 1.02, 0.955, 0.572)
+    );
+    return mix(light, dark, darkWeight);
 }
 
 vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
@@ -141,26 +221,35 @@ vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
 float contourExtent() {
     return max(
         kContourCoverageFeather,
-        uContourOffset + uEdgeWidth * 0.5 + kContourCoverageFeather
+        uContourOffset + uEdgeWidth + kContourCoverageFeather
     );
 }
 
+// The dark border starts at the silhouette (shifted outward by
+// contourOffset) and fades linearly outward over contourWidth. Inward it
+// ends within a sub-pixel feather, so the glass face keeps its own
+// transmittance right up to the glint.
 float contourCoverage(float signedEdgeDistance) {
     if (uEdgeWidth <= 0.0) {
         return 0.0;
     }
-    // Positive contour offsets move the band center outside the mathematical
-    // edge, where signedEdgeDistance is negative. This remains attached to
-    // the same SDF as refraction and highlights instead of approximating the
-    // boundary with a broad canvas shadow.
-    float distanceFromContourCenter = abs(
-        signedEdgeDistance + uContourOffset
-    );
-    float halfWidth = uEdgeWidth * 0.5;
-    return 1.0 - smoothstep(
-        max(halfWidth - kContourCoverageFeather, 0.0),
-        halfWidth + kContourCoverageFeather,
-        distanceFromContourCenter
+    float outward = -signedEdgeDistance - uContourOffset;
+    return outward >= 0.0
+        ? clamp(1.0 - outward / uEdgeWidth, 0.0, 1.0)
+        : clamp(1.0 + outward * 2.0, 0.0, 1.0);
+}
+
+// The fraction of the normal perpendicular to the light axis. The glint
+// lives where it is zero; the dark border concentrates where it is one.
+float lightAxisTangency(vec2 surfaceNormal) {
+    return abs(dot(surfaceNormal, vec2(-uLightDirection.y, uLightDirection.x)));
+}
+
+float contourDirection(vec2 surfaceNormal) {
+    return mix(
+        1.0,
+        lightAxisTangency(surfaceNormal),
+        clamp(uContourDirectionality, 0.0, 1.0)
     );
 }
 
@@ -195,63 +284,32 @@ vec3 applySpecularHighlights(
 ) {
     if (
         uLightIntensity < 0.01 &&
-        uAmbientStrength < 0.01 &&
-        uContourColor.a < 0.01 &&
+        gContourAlpha < 0.01 &&
         uBevelShadowStrength < 0.001
     ) {
         return baseColor;
     }
 
-    float opticalThickness = max(uThickness, 1.0);
     float inwardDistance = max(signedEdgeDistance, 0.0);
-    float configuredHighlightWidth = uHighlightWidth > 0.0
-        ? uHighlightWidth
-        : uEdgeWidth;
-    float edgeWidth = min(
-        max(configuredHighlightWidth, 0.0),
-        opticalThickness * 0.5
+    float glintWidth = max(
+        uHighlightWidth > 0.0 ? uHighlightWidth : uEdgeWidth,
+        0.001
     );
-    float highlightInset = edgeWidth * clamp(uEdgeInset, 0.0, 1.0);
-    // Flutter runtime-effect shaders do not expose fragment derivatives, even
-    // when Impeller is the active renderer. Use a fixed half-pixel feather;
-    // this is cheaper than fwidth(), but does not adapt to local scaling.
-    float edgeFeather = kEdgeFeather;
-
-    float innerRimMask = edgeWidth > 0.0
-        ? smoothstep(
-            highlightInset - edgeFeather,
-            highlightInset + edgeFeather,
-            inwardDistance
-        )
-        : 1.0;
     float outlineCoverage = contourCoverage(signedEdgeDistance);
-
-    float thicknessScale = clamp(40.0 / max(uThickness, 1.0), 1.0, 4.0);
-    float edgeThreshold = mix(0.8, 0.5, 1.0 / thicknessScale);
-
-    float shiftedDistance = max(inwardDistance - highlightInset, 0.0);
-    float shiftedDistanceRatio = clamp(
-        shiftedDistance / opticalThickness,
-        0.0,
-        1.0
-    );
-    float shiftedHeight = sqrt(
-        max(0.0, shiftedDistanceRatio * (2.0 - shiftedDistanceRatio))
-    );
-    float edgeFactor =
-        (1.0 - smoothstep(0.0, edgeThreshold, shiftedHeight)) *
-        innerRimMask;
-
-    float bleedThreshold = clamp(edgeThreshold * 2.2, 0.0, 1.0);
-    float bleedBand =
-        (1.0 - smoothstep(0.0, bleedThreshold, shiftedHeight)) *
-        innerRimMask;
+    // The glint is a thin line anchored at the silhouette with a faint
+    // inward bleed. Both are linear ramps in logical distance, so the line
+    // stays crisp at every size and scale factor.
+    float glintProfile =
+        clamp(1.0 - inwardDistance / glintWidth, 0.0, 1.0) +
+        kGlintBleed * clamp(
+            1.0 - inwardDistance / (glintWidth * kGlintBleedReach),
+            0.0,
+            1.0
+        );
 
     if (
         outlineCoverage < 0.01 &&
-        edgeFactor < 0.01 &&
-        bleedBand < 0.01 &&
-        uContourColor.a < 0.001 &&
+        glintProfile < 0.001 &&
         uBevelShadowStrength < 0.001
     ) {
         return baseColor;
@@ -259,52 +317,22 @@ vec3 applySpecularHighlights(
 
     vec2 normalXY = surfaceNormal;
 
-    // A dielectric rim catches light at both silhouette-facing walls. Use the
-    // absolute SDF-normal projection to produce the paired source and return
-    // highlights without a second pass. Keeping one smooth envelope avoids
-    // the old multiplied-threshold ridge at straight-to-corner transitions.
-    float signedLightFacing = dot(normalXY, -uLightDirection);
-    float primaryLightFacing = max(signedLightFacing, 0.0);
-    float oppositeLightFacing = max(-signedLightFacing, 0.0);
-
-    float wrap = clamp(uSpecularWrap, 0.0, 1.0);
-    float wrapCenter = mix(0.96, -0.3, wrap);
-    float wrapSoftness = mix(0.04, 0.3, wrap);
-    // highlightWrap has one predictable job: choosing how far both highlights
-    // travel around the SDF contour.
-    float primaryEnvelope = smoothstep(
-        wrapCenter - wrapSoftness,
-        1.0,
-        primaryLightFacing
+    // Both walls along the light axis catch the glint; it fades linearly
+    // with the normal's tangential component. highlightWrap = 0.5 is the
+    // linear falloff measured on iOS 27; lower values narrow the lobes and
+    // higher values carry them further around corners.
+    float wrapExponent = exp2(2.0 - 4.0 * clamp(uSpecularWrap, 0.0, 1.0));
+    float axisAlignment = 1.0 - lightAxisTangency(normalXY);
+    float lobe = pow(max(axisAlignment, 0.0), wrapExponent);
+    float returnWeight = dot(normalXY, -uLightDirection) >= 0.0
+        ? 1.0
+        : clamp(uHighlightOppositeStrength, 0.0, 1.0);
+    float glint = clamp(
+        max(uLightIntensity, 0.0) * kGlintPeak * lobe * returnWeight *
+            glintProfile,
+        0.0,
+        1.0
     );
-    float oppositeEnvelope = smoothstep(
-        wrapCenter - wrapSoftness,
-        1.0,
-        oppositeLightFacing
-    );
-    float specularEnvelope = primaryEnvelope +
-        oppositeEnvelope * clamp(uHighlightOppositeStrength, 0.0, 1.0);
-    float lightIntensity = max(uLightIntensity, 0.0);
-    float highlightMask = specularEnvelope;
-    float highlightFactor = edgeFactor;
-    float highlightCoverage =
-        highlightFactor * highlightMask * lightIntensity * 0.8;
-    float ambientCoverage =
-        edgeFactor * clamp(uAmbientStrength, 0.0, 1.0) * 0.35;
-    float bleed =
-        bleedBand *
-        specularEnvelope *
-        lightIntensity *
-        uBleedStrength *
-        0.5;
-    float highlightAmount = max(
-        highlightCoverage + ambientCoverage + bleed,
-        0.0
-    );
-    // Specular light is an incident-light color, not a tint of the transmitted
-    // backdrop. Deriving it from baseColor creates colored perimeter residuals
-    // on checkerboard/reference probes and makes highlights depend on blur.
-    vec3 highlightColor = uHighlightColor.rgb;
     // Both branches are uniform across the draw. Disabled lighting layers skip
     // their ALU without introducing fragment divergence, texture samples, or
     // another compositor pass.
@@ -381,25 +409,29 @@ vec3 applySpecularHighlights(
             1.0
         );
     }
-    // Contour transmittance is evaluated in the material pass, below the
-    // specular addition. Highlights therefore eclipse the dark contour
-    // naturally without an independent canvas stroke.
+    // The border absorbs the transmitted backdrop only where the material
+    // still overlaps it; its exterior part is composited in main().
     float edgeAbsorption = clamp(
-        outlineCoverage * uContourColor.a,
+        outlineCoverage * gContourAlpha * contourDirection(normalXY),
         0.0,
         1.0
     );
-    float edgeTransmittance = 1.0 - edgeAbsorption;
-    vec3 result = baseColor * edgeTransmittance +
-        uContourColor.rgb * edgeAbsorption;
-    // Preserve only the configured fraction of the backdrop component. The
-    // material/tint emission remains fully affected by contour absorption,
-    // which keeps black-probe response independent from transmittance.
-    result += transmittedColor *
-        edgeAbsorption *
-        clamp(uContourTransmittance, 0.0, 1.0);
+    vec3 result = baseColor * (1.0 - edgeAbsorption) +
+        uContourColor.rgb * edgeAbsorption +
+        transmittedColor * edgeAbsorption *
+            clamp(uContourTransmittance, 0.0, 1.0);
     result *= 1.0 - bevelShadow;
-    result += highlightColor * highlightAmount;
+    // The glint recolors the lit face rather than adding white: it pulls
+    // luminance toward a target above SDR white and amplifies the face's own
+    // chroma, so glass over color glints in that color.
+    float resultLuminance = dot(result, LUMA_WEIGHTS);
+    vec3 glintTarget = uHighlightColor.rgb * gGlintLuminance +
+        result * gGlintFaceGain +
+        (result - vec3(resultLuminance)) * gGlintVibrancy;
+    // Only the lower bound is clamped: amplified chroma must not produce
+    // negative (out-of-gamut) channels, while the upper side keeps its
+    // headroom above SDR white for extended-range surfaces.
+    result = max(mix(result, glintTarget, glint), vec3(0.0));
 
     return result;
 }
@@ -512,8 +544,8 @@ void main() {
         );
         primaryResponse.xyz *= 4.0;
         secondaryResponse.xyz *= 4.0;
-        float primaryPackedResponse = primaryResponse.w * 5.0;
-        float secondaryPackedResponse = secondaryResponse.w * 5.0;
+        float primaryPackedResponse = primaryResponse.w * 7.0;
+        float secondaryPackedResponse = secondaryResponse.w * 7.0;
         float primaryColorModel = floor(primaryPackedResponse * 0.5);
         float secondaryColorModel = floor(secondaryPackedResponse * 0.5);
         primaryResponse.w = primaryPackedResponse - primaryColorModel * 2.0;
@@ -554,17 +586,16 @@ void main() {
     float maxDisplacement = max(uDisplacementScale, 0.001);
     float signedEdgeDistance = decodeSignedEdgeDistance(
         geometryData,
-        max(uThickness, 1.0),
+        4.0 * max(uThickness, 1.0),
         contourExtent()
     );
-    float materialAlpha = smoothstep(
-        -kEdgeFeather,
-        kEdgeFeather,
-        signedEdgeDistance
-    );
+    // Box-filtered coverage of one physical pixel, as Core Animation
+    // rasterizes the silhouette: a pixel-aligned edge stays hard, so the
+    // glint's first row is not diluted by a wider feather.
+    float materialAlpha = clamp(signedEdgeDistance + 0.5, 0.0, 1.0);
     if (
         materialAlpha < 0.01 &&
-        contourCoverage(signedEdgeDistance) * uContourColor.a < 0.01
+        contourCoverage(signedEdgeDistance) * gContourAlpha < 0.01
     ) {
         fragColor = vec4(0.0);
         return;
@@ -577,35 +608,17 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // Treat face scaling and edge refraction as one source-coordinate
-        // mapping. The scale is exactly identity at the mathematical contour,
-        // then approaches the requested face scale continuously without a
-        // clipped cutoff. Complementing the actual displacement field lets
-        // edge refraction own the optical wall for every SDF/blended shape.
-        float inwardDistance = max(signedEdgeDistance, 0.0);
-        float transitionDepth = max(uThickness * 0.25, 1.0);
-        float inwardDistanceSquared = inwardDistance * inwardDistance;
-        float transitionDepthSquared = transitionDepth * transitionDepth;
-        float distanceWeight =
-            inwardDistanceSquared /
-            (inwardDistanceSquared + transitionDepthSquared);
-        float displacementRatio = clamp(
-            length(displacement) / maxDisplacement,
-            0.0,
-            1.0
-        );
-        float refractionComplement =
-            1.0 - smoothstep(0.0, 1.0, displacementRatio);
-        float scaleWeight = distanceWeight * refractionComplement;
+        // Magnification is one lens over the whole face, about the material
+        // center, uniform up to the silhouette as on the iOS 27 loupe. The
+        // bevel displacement adds on top of it.
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis
         );
-        float backdropScale = clamp(uBackdropScale, 0.25, 4.0);
+        float magnification = clamp(uBackdropScale, 0.25, 4.0);
         backdropScaleOffset =
             filterDeltaFromCenter *
-            (1.0 / backdropScale - 1.0) *
-            scaleWeight *
+            (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
     vec4 refractColor;
@@ -616,11 +629,36 @@ void main() {
         abs(uChromaticAberration) * maxDisplacement <=
         kChromaticAberrationSubpixelThreshold
     ) {
-        vec2 refractedUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + displacement) * invUSize,
-            invUSize
-        );
-        refractColor = texture(uBackgroundTexture, refractedUV);
+        vec2 sourceOffset = backdropScaleOffset + displacement;
+        vec2 refractedUV = screenUV + sourceOffset * invUSize;
+        if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
+            // Undisplaced glass fetches its own texel, bypassing the sampler,
+            // so it reproduces the backdrop exactly even when the sampler is
+            // bilinear (whose fixed-point sub-texel weights are never exactly
+            // zero at texel centres).
+            refractedUV = (floor(fragCoord) + 0.5) * invUSize;
+            refractColor = texelFetch(
+                uBackgroundTexture,
+                ivec2(floor(fragCoord)),
+                0
+            );
+        } else {
+            refractColor = texture(
+                uBackgroundTexture,
+                mirrorBackgroundUV(refractedUV, invUSize)
+            );
+        }
+        if (uSoften > 0.5) {
+            // The offset scales with visibility, so hidden glass collapses
+            // the kernel onto the unfiltered backdrop.
+            vec2 softenTap = vec2(appearanceVisibility) * invUSize;
+            vec2 tapA = mirrorBackgroundUV(refractedUV + softenTap, invUSize);
+            vec2 tapB = mirrorBackgroundUV(refractedUV - softenTap, invUSize);
+            refractColor = 0.5 * refractColor + 0.25 * (
+                texture(uBackgroundTexture, tapA) +
+                texture(uBackgroundTexture, tapB)
+            );
+        }
     } else {
         float dispersionStrength = uChromaticAberration * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);
@@ -646,12 +684,13 @@ void main() {
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
     }
     
-    vec3 transmittedColor = pow(
-        max(refractColor.rgb, vec3(0.0)),
-        vec3(max(uTransmissionGamma, 0.01))
-    );
+    vec3 transmittedColor;
     vec3 baseColor;
     if (colorModel < 0.5) {
+        transmittedColor = pow(
+            max(refractColor.rgb, vec3(0.0)),
+            vec3(max(uTransmissionGamma, 0.01))
+        );
         vec3 materialColor = materialTint.rgb * materialTint.a;
         transmittedColor *= 1.0 - materialTint.a;
         baseColor = materialColor + transmittedColor;
@@ -667,14 +706,53 @@ void main() {
         // Apple's public tint is not a flat source-over wash. Its documented
         // "range of tones" is selected from backdrop brightness, while tint
         // opacity linearly mixes that opaque tonal result with the untinted
-        // material. The six native solid-palette captures in the harness
-        // validate both properties. This adds no backdrop read or extra pass.
-        float darkWeight = clamp(colorModel - 1.0, 0.0, 1.0);
-        vec4 neutralTint = ios27NeutralTint(darkWeight);
-        vec3 neutralTransmission = transmittedColor * (1.0 - neutralTint.a);
-        vec3 neutralBase = neutralTint.rgb * neutralTint.a +
-            neutralTransmission;
-        neutralBase = applySaturation(neutralBase, uSaturation);
+        // material. The untinted material itself treats luminance and
+        // chroma separately (see ios27FaceTransfer). Saturation and gamma
+        // stay available as relative adjustments where 1 is Apple's face.
+        bool clearGlass = colorModel > 2.5;
+        float darkWeight = clearGlass ? 0.0 : clamp(colorModel - 1.0, 0.0, 1.0);
+        vec4 neutralTint = ios27NeutralTint(
+            darkWeight,
+            uAppearanceConfig.w,
+            clearGlass,
+            uTintAmount
+        );
+        if (!clearGlass && darkWeight > 0.0) {
+            // The dark border strengthens with the opacity the slider adds.
+            float addedOpacity =
+                ios27DarkTransmittance(uAppearanceConfig.w, 0.0) -
+                ios27DarkTransmittance(uAppearanceConfig.w, uTintAmount);
+            gContourAlpha *= 1.0 + 0.95 * addedOpacity * darkWeight;
+        }
+        vec2 faceTransfer = ios27FaceTransfer(
+            darkWeight,
+            clearGlass,
+            uTintAmount
+        );
+        if (clearGlass) {
+            gGlintLuminance = 2.34;
+            gGlintFaceGain = 3.58;
+            gGlintVibrancy = 0.78;
+        }
+        float backdropLuminance = dot(refractColor.rgb, LUMA_WEIGHTS);
+        float transmittedLuminance = pow(
+            clamp(
+                backdropLuminance *
+                    (1.0 + faceTransfer.x * (1.0 - backdropLuminance)),
+                0.0,
+                1.0
+            ),
+            max(uTransmissionGamma, 0.01)
+        );
+        vec3 neutralTransmission =
+            vec3(transmittedLuminance * (1.0 - neutralTint.a)) +
+            (refractColor.rgb - vec3(backdropLuminance)) *
+                (faceTransfer.y * uSaturation);
+        vec3 neutralBase = clamp(
+            neutralTint.rgb * neutralTint.a + neutralTransmission,
+            0.0,
+            1.0
+        );
         float neutralChroma =
             max(max(neutralBase.r, neutralBase.g), neutralBase.b) -
             min(min(neutralBase.r, neutralBase.g), neutralBase.b);
@@ -687,7 +765,7 @@ void main() {
         if (materialTint.a >= 0.001) {
             vec3 tintTone = ios27TintTone(
                 materialTint.rgb,
-                dot(refractColor.rgb, LUMA_WEIGHTS),
+                backdropLuminance,
                 darkWeight
             );
             baseColor = mix(neutralBase, tintTone, materialTint.a);
@@ -715,7 +793,8 @@ void main() {
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
         contourCoverage(signedEdgeDistance) *
-        uContourColor.a *
+        gContourAlpha *
+        contourDirection(surfaceNormal) *
         (1.0 - materialAlpha) *
         appearanceVisibility;
     float alpha = visibleMaterialAlpha + externalContourAlpha;

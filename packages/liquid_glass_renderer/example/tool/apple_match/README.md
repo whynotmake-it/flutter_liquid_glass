@@ -62,6 +62,21 @@ prints its exact UDID. Captures are portrait, 402×874 logical points at 3×,
 light appearance, Reduce Motion enabled, and Reduce Transparency off. The
 scene JSON records the remaining geometry and transparency metadata.
 
+Reduce Motion removes Liquid Glass lensing, so references captured with it
+enabled contain no refraction. `REDUCE_MOTION=0` (for `apple/capture.sh` and
+`apple/capture_loupe.sh`) captures with it disabled, waits
+`CAPTURE_SETTLE_SECONDS` (default 4) after each launch instead, and writes to
+`references/ios27-iphone17pro-reduce-motion-off/slider-000` (loupe:
+`references/ios27-iphone17pro-light-reduce-motion-off`). Changing the value
+reboots the target simulator so system processes pick it up. Every
+`metadata.json` records `reduceMotion`; fit refraction only against `false`
+references.
+
+```bash
+REDUCE_MOTION=0 LIQUID_GLASS_TINT_POSITION=0 SCENE_ID=toolbar_capsule \
+  bash apple/capture.sh
+```
+
 ## Tests
 
 Run comparator/schema tests before trusting any optimization:
@@ -203,6 +218,46 @@ the contour and cast-shadow rasterization, so promote host winners through the
 pinned iOS three-frame path before changing defaults. `--host-capture` changes
 only registration: it excludes the simulator display clip's four physical
 corner pixels; the scored material crop and every metric remain unchanged.
+
+### Rim, glint and face color
+
+`rim_report.py` scores lighting and color with the probes where blur and
+refraction cannot move content, so a blur mismatch never drives lighting
+parameters. `compare/apple_match/rim.py` splits the black (C) and white (D)
+probes into per-pixel emission and transmittance and bins them by edge ring
+and normal angle. From that it reports glint peak, width and shape, border
+depth, and face level. `--palette` scores isolated solid-color probes on the
+face and on the first glint rows. Every composite shows Apple, before and
+after, with 5x nearest-neighbour crops of the glint, end-cap border and
+45-degree corner.
+
+```bash
+compare/.venv/bin/python rim_report.py \
+  --reference references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_capsule \
+  --candidate before=out/host-candidates/before \
+  --candidate after=out/host-candidates/after \
+  --title "Toolbar, light" --output out/rim/toolbar-light.png
+compare/.venv/bin/python rim_report.py \
+  --reference references/ios27-iphone17pro-ground-truth-v2/slider-000/toolbar_solid_palette \
+  --candidate after=out/host-candidates/palette \
+  --palette R O Y G C B P N L M H K W \
+  --title "Palette, light" --output out/rim/palette-light.png
+```
+
+Capture palettes with `CAPTURE_PROBES="R O Y G C B P N L M H K W"`.
+`settings/apple-lighting-{light,dark}.json` hold the measured iOS 27 rim and
+the `ios27` color model with identity adjustments. The toolbar geometry is
+224 x 94 pt at zero offset, where Apple's silhouette lands on pixel
+boundaries. `host_capture.sh` also runs on Linux, where `flutter_tester`
+provides Impeller and Flutter GPU. This supersedes the earlier FakeGlass note
+above: FakeGlass now evaluates the whole iOS 27 face in its backdrop color
+matrix.
+
+Both sides are SDR. The Apple references are simulator screenshots
+(`captureEncoding: SDR tone-mapped 8-bit PNG`), and host captures read back
+8-bit RGBA, so glint values above 1.0 clip identically on both sides. The
+glint's 1.6 target luminance is inferred only from channels that did not clip.
+Verifying the headroom itself needs an extended-range capture from a device.
 
 ### Pinned iOS promotion and final validation
 
