@@ -74,10 +74,11 @@ void main() {
     expect(source, contains('baseColor = mix(neutralBase, tintTone'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
-      5,
+      6,
       reason:
           'the tint response must reuse the existing refracted sample; the '
-          'only additions are the two optional sub-pixel softening taps',
+          'only additions are the two optional sub-pixel softening taps and '
+          "the GLES stages' texel-centre read, which replaces texelFetch",
     );
   });
 
@@ -255,6 +256,8 @@ void main() {
     // Undisplaced pixels bypass the sampler.
     expect(source, contains('texelFetch('));
     expect(source, contains('sourceOffset.x == 0.0 && sourceOffset.y == 0.0'));
+    // GLSL ES 1.00 has no texelFetch; the GLES stages read the texel centre.
+    expect(source, contains('#ifdef IMPELLER_TARGET_OPENGLES'));
   });
 
   test('displaced samples mirror at the captured backdrop edge', () {
