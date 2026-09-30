@@ -14,7 +14,7 @@ struct MaterialSceneSample {
 };
 
 MaterialSceneSample materialShapeSample(int index, vec2 p) {
-    SceneSample shape = getShapeSampleFromArray(index, p);
+    SceneSample shape = getShapeSampleFromArray(index, p, true);
     MaterialSceneSample result;
     result.distance = shape.distance;
     result.halfMinor = shape.halfMinor;
@@ -47,7 +47,11 @@ MaterialSceneSample materialSmoothUnion(
     float e = max(blend - abs(composite.distance - next.distance), 0.0);
     result.distance = min(composite.distance, next.distance) -
         e * e * 0.25 / max(blend, 1e-4);
-    result.normal = mix(next.normal, composite.normal, geometryWeight);
+    result.normal = mix(
+        next.normal,
+        composite.normal,
+        smoothMinWeight(composite.distance, next.distance, blend)
+    );
     result.halfMinor = mix(
         next.halfMinor,
         composite.halfMinor,

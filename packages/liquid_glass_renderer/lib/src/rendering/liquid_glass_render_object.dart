@@ -1370,8 +1370,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return <double>[
       topN,
       rightN,
-      topSpan,
-      rightSpan,
+      // The shader tests each cap's angular span as 1 - cos(span).
+      1.0 - cos(topSpan),
+      1.0 - cos(rightSpan),
       topCenter.dx,
       topCenter.dy,
       rightCenter.dx,
