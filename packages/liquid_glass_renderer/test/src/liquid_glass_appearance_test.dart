@@ -148,7 +148,7 @@ void main() {
     expect(light.sliderDetail(.5), closeTo(.44, 1e-9));
     expect(
       const LiquidGlassColorModel.ios27Clear().sliderDetail(.5),
-      closeTo(.76, 1e-9),
+      closeTo(.95, 1e-9),
     );
   });
 

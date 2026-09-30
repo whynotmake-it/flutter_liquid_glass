@@ -369,12 +369,13 @@ class LiquidGlassSettings with Equatable {
   /// Apple fades backdrop detail with [tintAmount] by mixing toward a fully
   /// diffused face; clear glass keeps more detail until the middle tick. A
   /// single Gaussian cannot mix, so the slider adds the blur that attenuates
-  /// detail with a 26 pt period by the same measured fraction.
+  /// detail with a 23 pt period by the same fraction, calibrated against
+  /// Apple's toolbar captures.
   double frostFor(LiquidGlassColorModel colorModel) {
     final amount = effectiveTintAmount;
     if (amount <= 0) return frost;
     final detail = colorModel.sliderDetail(amount);
-    const referenceVariance = 26.0 * 26.0 / (2 * math.pi * math.pi);
+    const referenceVariance = 23.0 * 23.0 / (2 * math.pi * math.pi);
     return math.sqrt(frost * frost - referenceVariance * math.log(detail));
   }
 
