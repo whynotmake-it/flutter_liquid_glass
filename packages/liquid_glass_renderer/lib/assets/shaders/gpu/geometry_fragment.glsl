@@ -1,6 +1,6 @@
 // Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 7: smooth unions scale their radius with the
-// angle between the shapes' normals, so collinear edges no longer bulge.
+// Geometry encoding revision 8: analytic normals, with corner normals taken
+// from a 1.5x corner radius.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:
@@ -51,19 +51,17 @@ void main() {
     float spread = clamp(uRefractionSpread, 0.0, 1.0);
     bool hasFaceSpread = spread > 0.0;
     // Most of a shared layer's matte can be empty when spatially separate
-    // groups reuse one backdrop. Reject those pixels before running Flutter's
-    // iterative superellipse/ellipse solvers for every shape.
-    if (uNumShapes > 1.0) {
-        vec2 outsideBounds = sceneBoundsOutsideSquared(
-            fragCoord,
-            int(uNumShapes)
-        );
-        float emptyThreshold =
-            uContourExtent + 2.0 + outsideBounds.y;
-        if (outsideBounds.x > emptyThreshold * emptyThreshold) {
-            fragColor = vec4(0.0);
-            return;
-        }
+    // groups reuse one backdrop, and a single shape's texture is padded to
+    // its size bucket. Reject those pixels with the matte-space boxes before
+    // running Flutter's iterative superellipse/ellipse solvers.
+    vec2 outsideBounds = sceneBoundsOutsideSquared(
+        fragCoord,
+        int(uNumShapes)
+    );
+    float emptyThreshold = uContourExtent + 2.0 + outsideBounds.y;
+    if (outsideBounds.x > emptyThreshold * emptyThreshold) {
+        fragColor = vec4(0.0);
+        return;
     }
     SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
     float sd = scene.distance;
@@ -72,7 +70,7 @@ void main() {
     // coverage transition is half a physical pixel on either side of the
     // mathematical boundary, rather than a fixed two-pixel fade entirely
     // inside the shape. This keeps the contour position independent of scale.
-    float pixelSize = length(vec2(dFdx(sd), dFdy(sd)));
+    float pixelSize = length(scene.opticalNormal);
     float fade = clamp(uOpticalProps.y, 0.0, 1.0) * max(pixelSize, 1e-4);
     float materialAlpha = 1.0 - smoothstep(-fade, fade, sd);
     // Keep geometry alive only as far as the final pass can draw an attached
@@ -100,8 +98,10 @@ void main() {
     }
 
     float surfaceSd = min(sd, 0.0);
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
+    // Analytic gradient rather than dFdx/dFdy of the distance, which many
+    // GPUs share across a 2x2 quad (see getShapeGradients).
+    float dx = scene.opticalNormal.x;
+    float dy = scene.opticalNormal.y;
 
     // Spread extends the same circular edge profile toward the shape's
     // center. Its reach is shape-relative, so thickness cannot accidentally

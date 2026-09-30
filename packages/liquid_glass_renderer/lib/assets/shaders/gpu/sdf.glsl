@@ -1,6 +1,6 @@
 // Three vec4s per shape: primitive parameters, inverse affine basis, and
 // transformed center/distance/group data. RSE parameters use three vec4s per
-// shape: degrees/spans, circle centers, and semi-axes/radii. This is the
+// shape: degrees/(1 - cos span), circle centers, and semi-axes/radii. This is the
 // lossless symmetric subset of Flutter's Impeller UberSDF payload; the public
 // shape API has one uniform corner radius, so its signed scale is always 1.
 //
@@ -75,7 +75,7 @@ float sdfSquircle(
     float c = semiAxisAndRadii.x - semiAxisAndRadii.y;
     vec2 octant;
     float degree;
-    float span;
+    float cosSpan;
     float axis;
     float circleRadius;
     vec2 circleCenter;
@@ -83,22 +83,24 @@ float sdfSquircle(
         octant = normalized + vec2(0.0, c);
         degree = degreeAndSpans.x;
         axis = semiAxisAndRadii.x;
-        span = degreeAndSpans.z;
+        cosSpan = 1.0 - degreeAndSpans.z;
         circleCenter = circleCenters.xy;
         circleRadius = semiAxisAndRadii.z;
     } else {
         octant = normalized.yx - vec2(0.0, c);
         degree = degreeAndSpans.y;
         axis = semiAxisAndRadii.y;
-        span = degreeAndSpans.w;
+        cosSpan = 1.0 - degreeAndSpans.w;
         circleCenter = circleCenters.zw;
         circleRadius = semiAxisAndRadii.w;
     }
+    // Inside the circular cap's angular span around the 45-degree diagonal.
+    // The span arrives as 1 - cos(span), so this is Flutter's atan2 test
+    // without the trigonometry, and a zero payload still means no cap.
     vec2 relative = octant - circleCenter;
-    float deltaTheta = atan(relative.y, relative.x) - 0.78539816;
-    deltaTheta = mod(deltaTheta + 3.14159265, 6.28318531) - 3.14159265;
-    if (abs(deltaTheta) < abs(span)) {
-        return length(relative) - circleRadius;
+    float relativeLength = length(relative);
+    if (dot(relative, vec2(0.70710678)) > relativeLength * cosSpan) {
+        return relativeLength - circleRadius;
     }
     if (degree < 2.0) {
         return max(abs(octant).x - axis, abs(octant).y - axis);
@@ -159,36 +161,66 @@ struct SceneSample {
     float distance;
     float halfMinor;
     float curvatureFactor;
-    // Outward unit normal of the primitive, or the smooth-union blend of
-    // the members' normals for a group.
+    // Gradients of the distance (see getShapeGradients), blended like the
+    // distance itself for a group. `normal` has the true corners and sets the
+    // blend angle; `opticalNormal` has smoothed corners and drives
+    // refraction, lighting and antialiasing.
     vec2 normal;
+    vec2 opticalNormal;
 };
 
-// Outward normal of a primitive in scene space. Rounded rectangles and
-// continuous corners use the rounded-rectangle gradient of the same radius;
-// ellipses use the gradient of their implicit equation. Only the angle
-// between two shapes' normals is used, so this approximation is enough.
-vec2 getShapeNormal(vec4 primitive, vec4 inverseBasis, vec2 localPoint) {
+// Apple's glass turns its optical normal before a corner starts, as if the
+// corner radius were larger; normals from a 1.5x radius match iOS 27 card
+// corners (see the Refraction notes of PR #174). Capsules are unchanged.
+const float kOpticalCornerRadiusScale = 1.5;
+
+// Scene-space gradients of a primitive's distance: xy with its true corners
+// (the blend angle), zw with corners from a radius scaled by
+// kOpticalCornerRadiusScale (refraction and lighting). Both carry the
+// distance's gradient magnitude, which the geometry pass also uses for
+// antialiasing.
+//
+// They are analytic, so they are exact per pixel: derivatives of the distance
+// are shared by 2x2 quads on many GPUs, which leaves steps on tight curves,
+// and fine derivatives do not compile for GLES 3.0. Rounded rectangles and
+// continuous corners use the rounded-rectangle gradient; ellipses use the
+// gradient of their implicit equation, which is exact on the outline.
+vec4 getShapeGradients(
+    vec4 primitive,
+    vec4 inverseBasis,
+    float distanceScale,
+    vec2 localPoint,
+    bool withExact
+) {
     vec2 halfSize = primitive.yz * 0.5;
-    vec2 localNormal;
+    vec2 exact;
+    vec2 optical;
     if (primitive.x == 2.0) {
-        localNormal = localPoint / max(halfSize * halfSize, 1e-4);
+        exact = normalize(localPoint / max(halfSize * halfSize, 1e-4));
+        optical = exact;
     } else {
-        float radius = min(primitive.w, min(halfSize.x, halfSize.y));
-        vec2 q = abs(localPoint) - halfSize + radius;
-        vec2 corner = max(q, 0.0);
-        vec2 side = q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-        localNormal = sign(localPoint) *
-            (corner.x > 0.0 && corner.y > 0.0 ? corner : side);
+        vec2 side = vec2(
+            localPoint.x < 0.0 ? -1.0 : 1.0,
+            localPoint.y < 0.0 ? -1.0 : 1.0
+        );
+        vec2 inset = abs(localPoint) - halfSize;
+        float halfMinor = min(halfSize.x, halfSize.y);
+        vec2 q = inset + min(primitive.w, halfMinor);
+        vec2 axis = q.x > q.y ? vec2(side.x, 0.0) : vec2(0.0, side.y);
+        exact = withExact && q.x > 0.0 && q.y > 0.0
+            ? side * normalize(q)
+            : axis;
+        q = inset + min(primitive.w * kOpticalCornerRadiusScale, halfMinor);
+        axis = q.x > q.y ? vec2(side.x, 0.0) : vec2(0.0, side.y);
+        optical = q.x > 0.0 && q.y > 0.0 ? side * normalize(q) : axis;
     }
-    // Distances transform with the inverse basis, so normals use its
+    // Distances transform with the inverse basis, so gradients use its
     // transpose.
-    vec2 normal = vec2(
-        inverseBasis.x * localNormal.x + inverseBasis.z * localNormal.y,
-        inverseBasis.y * localNormal.x + inverseBasis.w * localNormal.y
-    );
-    float normalLength = length(normal);
-    return normalLength > 1e-6 ? normal / normalLength : vec2(0.0);
+    mat2 toScene = mat2(
+        inverseBasis.x, inverseBasis.y,
+        inverseBasis.z, inverseBasis.w
+    ) * distanceScale;
+    return vec4(toScene * exact, toScene * optical);
 }
 
 // Smooth-union radius for two surfaces with normals na and nb. It scales with
@@ -200,7 +232,15 @@ vec2 getShapeNormal(vec4 primitive, vec4 inverseBasis, vec2 localPoint) {
 // example/tool/apple_match follow this within half a point, including the
 // sub-point rise it leaves where two rounded corners meet.
 float angularBlendRadius(float k, vec2 na, vec2 nb) {
-    return k * 0.5 * length(na - nb);
+    // Clamped because stretched shapes have gradients longer than 1; the
+    // empty-pixel budget in sceneBoundsOutsideSquared assumes k at most.
+    return k * min(0.5 * length(na - nb), 1.0);
+}
+
+// Weight of the first operand in a polynomial smooth minimum of radius k. It
+// is also that operand's share of the result's gradient.
+float smoothMinWeight(float a, float b, float k) {
+    return clamp(0.5 + (b - a) / (2.0 * max(k, 1e-4)), 0.0, 1.0);
 }
 
 float getShapeCurvatureFactor(
@@ -304,7 +344,8 @@ vec2 sceneBoundsOutsideSquared(vec2 p, int numShapes) {
     return vec2(lowerBoundSquared, smoothingBudget);
 }
 
-SceneSample getShapeSampleFromArray(int index, vec2 p) {
+// A single shape is never blended, so it skips the exact-corner gradient.
+SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
     int baseIndex = index * 3;
     vec4 primitive = uShapeData[baseIndex];
     vec4 inverseBasis = uShapeData[baseIndex + 1];
@@ -330,14 +371,18 @@ SceneSample getShapeSampleFromArray(int index, vec2 p) {
     // unions interpolate this value below.
     resultSample.curvatureFactor = primitive.x == 2.0 ? 1.0 : 0.0;
     vec2 delta = p - placement.xy;
-    resultSample.normal = getShapeNormal(
+    vec4 gradients = getShapeGradients(
         primitive,
         inverseBasis,
+        placement.z,
         vec2(
             inverseBasis.x * delta.x + inverseBasis.y * delta.y,
             inverseBasis.z * delta.x + inverseBasis.w * delta.y
-        )
+        ),
+        blended
     );
+    resultSample.normal = gradients.xy;
+    resultSample.opticalNormal = gradients.zw;
     return resultSample;
 }
 
@@ -351,7 +396,7 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
         e * e * 0.25 / max(blend, 1e-4);
     // Follow the same bounded smooth-min blend used for the distance field so
     // the shape-relative profile remains continuous at a smooth group seam.
-    float weightA = clamp(0.5 + (b.distance - a.distance) / (2.0 * k), 0.0, 1.0);
+    float weightA = smoothMinWeight(a.distance, b.distance, k);
     SceneSample result;
     result.distance = distance;
     result.halfMinor = mix(b.halfMinor, a.halfMinor, weightA);
@@ -360,7 +405,16 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
         a.curvatureFactor,
         weightA
     );
-    result.normal = mix(b.normal, a.normal, weightA);
+    // The distance's gradient splits by the smooth minimum's own weight. Not
+    // renormalized, so it shortens at a bridge's saddle like the distance
+    // field's gradient does.
+    float gradientWeightA = smoothMinWeight(a.distance, b.distance, blend);
+    result.normal = mix(b.normal, a.normal, gradientWeightA);
+    result.opticalNormal = mix(
+        b.opticalNormal,
+        a.opticalNormal,
+        gradientWeightA
+    );
     return result;
 }
 
@@ -370,11 +424,12 @@ SceneSample sceneSample(vec2 p, int numShapes) {
     empty.halfMinor = 0.0;
     empty.curvatureFactor = 0.0;
     empty.normal = vec2(0.0);
+    empty.opticalNormal = vec2(0.0);
     if (numShapes <= 0) {
         return empty;
     }
     if (numShapes == 1) {
-        return getShapeSampleFromArray(0, p);
+        return getShapeSampleFromArray(0, p, false);
     }
     
     SceneSample result = empty;
@@ -399,7 +454,7 @@ SceneSample sceneSample(vec2 p, int numShapes) {
         ) {
             continue;
         }
-        SceneSample shapeValue = getShapeSampleFromArray(i, p);
+        SceneSample shapeValue = getShapeSampleFromArray(i, p, true);
         if (startsGroup) {
             result = result.distance < groupResult.distance ? result : groupResult;
             groupResult = shapeValue;
