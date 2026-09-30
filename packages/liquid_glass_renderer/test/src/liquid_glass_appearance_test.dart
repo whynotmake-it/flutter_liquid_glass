@@ -104,6 +104,33 @@ void main() {
     );
   });
 
+  test('the Liquid Glass slider follows the measured wash opacity', () {
+    const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
+    const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
+    // Face transmittance of the toolbar at each slider checkpoint.
+    const lightMeasured = {0: .592, 25: .529, 50: .470, 75: .380, 100: .290};
+    const darkMeasured = {0: .486, 50: .411, 100: .215};
+    for (final MapEntry(key: position, value: transmittance)
+        in lightMeasured.entries) {
+      expect(
+        light.faceTransfer(94, tintAmount: position / 100)!.transmittance,
+        closeTo(transmittance, .009),
+        reason: 'light $position%',
+      );
+    }
+    for (final MapEntry(key: position, value: transmittance)
+        in darkMeasured.entries) {
+      expect(
+        dark.faceTransfer(94, tintAmount: position / 100)!.transmittance,
+        closeTo(transmittance, .006),
+        reason: 'dark $position%',
+      );
+    }
+    expect(light.contourScale(94, 1), 1);
+    expect(dark.contourScale(94, 0), closeTo(1, 1e-9));
+    expect(dark.contourScale(94, 1), greaterThan(1.2));
+  });
+
   test('clear glass is appearance- and size-independent', () {
     const clear = LiquidGlassColorModel.ios27Clear();
     final small = clear.faceTransfer(40)!;

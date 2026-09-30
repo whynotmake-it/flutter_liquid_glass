@@ -149,7 +149,10 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
-  final faceTransfer = appearance.colorModel.faceTransfer(shortSide);
+  final faceTransfer = appearance.colorModel.faceTransfer(
+    shortSide,
+    tintAmount: settings.effectiveTintAmount,
+  );
   final ColorFilter? colorTransfer;
   if (faceTransfer != null) {
     colorTransfer = ColorFilter.matrix(

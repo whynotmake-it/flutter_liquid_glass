@@ -53,7 +53,12 @@ sealed class LiquidGlassColorModel with Equatable {
   /// final shader.
   @internal
   ({Color emission, double transmittance, double lift, double chromaGain})?
-  faceTransfer(double shortSide);
+  faceTransfer(double shortSide, {double tintAmount = 0});
+
+  /// Factor applied to the border strength at the Liquid Glass slider
+  /// position [tintAmount]. Mirrors the dark branch of the final shader.
+  @internal
+  double contourScale(double shortSide, double tintAmount) => 1;
 
   /// Luminance of the neutral glint target FakeGlass composites, which
   /// cannot scale with the face it does not sample.
@@ -90,7 +95,7 @@ final class DirectLiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})?
-  faceTransfer(double shortSide) => null;
+  faceTransfer(double shortSide, {double tintAmount = 0}) => null;
 
   @override
   Color tintTone(Color tint, double luminance) => tint;
@@ -118,24 +123,25 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})
-  faceTransfer(double shortSide) {
+  faceTransfer(double shortSide, {double tintAmount = 0}) {
+    final amount = tintAmount.clamp(0.0, 1.0);
     if (brightness == Brightness.light) {
+      // The Liquid Glass slider makes the near-white wash more opaque.
+      final alpha = 0.407 + (0.709 - 0.407) * math.pow(amount, 1.22);
       return (
-        emission: const Color.from(
+        emission: Color.from(
           alpha: 1,
-          red: 0.407 * 253 / 255,
-          green: 0.407 * 252 / 255,
-          blue: 0.407 * 253 / 255,
+          red: alpha * 253 / 255,
+          green: alpha * 252 / 255,
+          blue: alpha * 253 / 255,
         ),
-        transmittance: 0.593,
+        transmittance: 1 - alpha,
         lift: 0.13,
         chromaGain: 1.17,
       );
     }
-    // Dark glass keeps its emission but becomes denser with size: controls up
-    // to 75 pt transmit like light glass, surfaces from 105 pt transmit 0.447.
-    final t = ((shortSide - 75) / 30).clamp(0.0, 1.0);
-    final density = t * t * (3 - 2 * t);
+    // Dark glass keeps its emission but becomes denser with size and with
+    // the slider.
     return (
       emission: const Color.from(
         alpha: 1,
@@ -143,10 +149,28 @@ final class Ios27LiquidGlassColorModel extends LiquidGlassColorModel {
         green: 32 / 255,
         blue: 32 / 255,
       ),
-      transmittance: 0.592 + (0.447 - 0.592) * density,
+      transmittance:
+          _darkSizeTransmittance(shortSide) *
+          (1 - 0.558 * math.pow(amount, 1.85)),
       lift: 1.0,
       chromaGain: 1.03,
     );
+  }
+
+  @override
+  double contourScale(double shortSide, double tintAmount) {
+    if (brightness == Brightness.light) return 1;
+    final added =
+        (1 - faceTransfer(shortSide, tintAmount: tintAmount).transmittance) -
+        (1 - _darkSizeTransmittance(shortSide));
+    return 1 + 0.95 * added;
+  }
+
+  /// Controls up to 75 pt transmit like light glass; surfaces from 105 pt
+  /// transmit 0.447.
+  static double _darkSizeTransmittance(double shortSide) {
+    final t = ((shortSide - 75) / 30).clamp(0.0, 1.0);
+    return 0.592 + (0.447 - 0.592) * t * t * (3 - 2 * t);
   }
 
   @override
@@ -207,7 +231,7 @@ final class Ios27ClearLiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})
-  faceTransfer(double shortSide) => (
+  faceTransfer(double shortSide, {double tintAmount = 0}) => (
     emission: const Color.from(
       alpha: 1,
       red: 0.126,

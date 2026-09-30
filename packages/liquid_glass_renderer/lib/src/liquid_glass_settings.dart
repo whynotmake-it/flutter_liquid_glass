@@ -40,6 +40,7 @@ class LiquidGlassSettings with Equatable {
     this.bevelShadowDirectionality = 0.0,
     this.bevelShadowSizeResponse = 0.0,
     this.exteriorShadowSizeResponse = 0.0,
+    this.tintAmount = 0.0,
   });
 
   /// Restores a material vector produced by [toJson].
@@ -69,6 +70,7 @@ class LiquidGlassSettings with Equatable {
       bevelShadowDirectionality: number('bevelShadowDirectionality', 0),
       bevelShadowSizeResponse: number('bevelShadowSizeResponse', 0),
       exteriorShadowSizeResponse: number('exteriorShadowSizeResponse', 0),
+      tintAmount: number('tintAmount', 0),
     );
   }
 
@@ -85,6 +87,7 @@ class LiquidGlassSettings with Equatable {
   /// shadow on solid backdrops.
   const LiquidGlassSettings.ios27ToolbarLight({
     this.frost = 7.0,
+    this.tintAmount = 0.0,
   }) : thickness = 12.0,
        edgeRefraction = 27.42,
        refractionSpread = 0.0,
@@ -115,6 +118,7 @@ class LiquidGlassSettings with Equatable {
   /// where the normal faces the light axis.
   const LiquidGlassSettings.ios27ToolbarDark({
     this.frost = 5.0,
+    this.tintAmount = 0.0,
   }) : thickness = 12.0,
        edgeRefraction = 27.42,
        refractionSpread = 0.0,
@@ -145,6 +149,7 @@ class LiquidGlassSettings with Equatable {
   /// [LiquidGlassAppearance.ios27Clear].
   const LiquidGlassSettings.ios27Clear({
     this.frost = 0.0,
+    this.tintAmount = 0.0,
   }) : thickness = 12.0,
        edgeRefraction = 27.42,
        refractionSpread = 0.0,
@@ -171,12 +176,15 @@ class LiquidGlassSettings with Equatable {
   factory LiquidGlassSettings.ios27Toolbar({
     required Brightness brightness,
     double? frost,
+    double tintAmount = 0,
   }) => brightness == Brightness.dark
       ? LiquidGlassSettings.ios27ToolbarDark(
           frost: frost ?? 5.0,
+          tintAmount: tintAmount,
         )
       : LiquidGlassSettings.ios27ToolbarLight(
           frost: frost ?? 7.0,
+          tintAmount: tintAmount,
         );
 
   /// Creates settings from Figma-style percentage controls.
@@ -328,6 +336,15 @@ class LiquidGlassSettings with Equatable {
   /// its energy and blur above the fitted 94-pixel control baseline.
   final double exteriorShadowSizeResponse;
 
+  /// Position of the iOS 27 Liquid Glass slider in Settings, from `0`
+  /// (Clear) to `1` (Tinted).
+  ///
+  /// Apps set this themselves; the renderer does not read the system value.
+  /// The slider makes the iOS 27 neutral wash more opaque, strengthens the
+  /// dark border and diffuses the backdrop. The glint is unchanged. It is one
+  /// uniform per layer and adds no per-pixel work.
+  final double tintAmount;
+
   /// Effective optical thickness.
   double get effectiveThickness => thickness;
 
@@ -340,8 +357,22 @@ class LiquidGlassSettings with Equatable {
   /// Effective backdrop scale constrained to the supported range.
   double get effectiveBackdropScale => backdropScale.clamp(.25, 4.0);
 
+  /// Effective slider position, clamped to `0...1`.
+  double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
+
   /// Effective backdrop blur sigma.
-  double get effectiveFrost => frost;
+  ///
+  /// Apple fades backdrop detail almost linearly with [tintAmount], by mixing
+  /// toward a fully diffused face. A single Gaussian cannot mix, so the
+  /// slider adds the blur that attenuates detail with a 26 pt period by the
+  /// same measured fraction.
+  double get effectiveFrost {
+    final amount = effectiveTintAmount;
+    if (amount <= 0) return frost;
+    final detail = 1 - 0.965 * amount;
+    const referenceVariance = 26.0 * 26.0 / (2 * math.pi * math.pi);
+    return math.sqrt(frost * frost - referenceVariance * math.log(detail));
+  }
 
   /// Effective chromatic aberration.
   double get effectiveChromaticAberration => chromaticAberration;
@@ -433,6 +464,7 @@ class LiquidGlassSettings with Equatable {
     double? bevelShadowDirectionality,
     double? bevelShadowSizeResponse,
     double? exteriorShadowSizeResponse,
+    double? tintAmount,
   }) => LiquidGlassSettings(
     thickness: thickness ?? this.thickness,
     edgeRefraction: edgeRefraction ?? this.edgeRefraction,
@@ -460,6 +492,7 @@ class LiquidGlassSettings with Equatable {
         bevelShadowSizeResponse ?? this.bevelShadowSizeResponse,
     exteriorShadowSizeResponse:
         exteriorShadowSizeResponse ?? this.exteriorShadowSizeResponse,
+    tintAmount: tintAmount ?? this.tintAmount,
   );
 
   /// Serializes the public material vector for example presets and tooling.
@@ -486,6 +519,7 @@ class LiquidGlassSettings with Equatable {
     'bevelShadowDirectionality': bevelShadowDirectionality,
     'bevelShadowSizeResponse': bevelShadowSizeResponse,
     'exteriorShadowSizeResponse': exteriorShadowSizeResponse,
+    'tintAmount': tintAmount,
   };
 
   @override
@@ -512,5 +546,6 @@ class LiquidGlassSettings with Equatable {
     bevelShadowDirectionality,
     bevelShadowSizeResponse,
     exteriorShadowSizeResponse,
+    tintAmount,
   ];
 }

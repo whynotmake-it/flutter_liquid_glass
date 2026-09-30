@@ -28,7 +28,7 @@ uniform vec4 uContourColor;
 uniform vec4 uLightingShapeConfig;
 uniform vec3 uContourConfig;
 uniform vec4 uProfileConfig;
-uniform vec2 uMaterialConfig;
+uniform vec3 uMaterialConfig;
 uniform vec3 uBevelShadowConfig;
 uniform vec4 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
@@ -51,6 +51,8 @@ vec2 uMaterialCenter = uProfileConfig.yz;
 float uSpecularWrap = uProfileConfig.w;
 float uTransmissionGamma = uMaterialConfig.x;
 float uVibrancy = uMaterialConfig.y;
+// iOS 27 Liquid Glass slider: 0 = Clear, 1 = Tinted.
+float uTintAmount = clamp(uMaterialConfig.z, 0.0, 1.0);
 float uBevelShadowStrength = uBevelShadowConfig.x;
 float uBevelShadowDepth = uBevelShadowConfig.y;
 float uBevelShadowOffset = uBevelShadowConfig.z;
@@ -66,6 +68,8 @@ float uHighlightOppositeStrength = uLightingShapeConfig.w;
 // visible dispersion. The threshold is a conservative quarter-pixel total
 // red-to-blue spread (an eighth pixel on either side of green).
 const float kChromaticAberrationSubpixelThreshold = 0.25;
+// Border strength; the dark iOS 27 face raises it with the slider.
+float gContourAlpha = uContourColor.a;
 // iOS 27 glint recolor, measured on the pinned solid-palette probes in both
 // appearances: the glint mixes the lit face toward a bright target whose
 // luminance sits above SDR white and whose chroma is the face chroma
@@ -119,27 +123,32 @@ vec4 shapeLookup(
 // size. Dark glass keeps its 32/255 emission but becomes denser with size:
 // controls up to 75 pt transmit like light glass and surfaces from 105 pt
 // transmit 0.447. Clear glass is appearance-independent.
-vec4 ios27NeutralTint(float darkWeight, float shortSide, bool clearGlass) {
+vec4 ios27NeutralTint(
+    float darkWeight,
+    float shortSide,
+    bool clearGlass,
+    float tintAmount
+) {
     if (clearGlass) {
         return vec4(vec3(0.126 / 0.046), 0.046);
     }
+    // The Liquid Glass slider makes the wash more opaque. Light glass keeps
+    // its near-white color; dark glass keeps its 32/255 emission, so its wash
+    // darkens as it becomes opaque.
+    float lightAlpha = mix(0.407, 0.709, pow(tintAmount, 1.22));
     float darkTransmittance = mix(
         0.592,
         0.447,
         smoothstep(75.0, 105.0, shortSide)
-    );
+    ) * (1.0 - 0.558 * pow(tintAmount, 1.85));
     vec4 dark = vec4(
         vec3((32.0 / 255.0) / (1.0 - darkTransmittance)),
         1.0 - darkTransmittance
     );
-    return mix(vec4(vec3(253.0, 252.0, 253.0) / 255.0, 0.407), dark, darkWeight);
+    vec4 light = vec4(vec3(253.0, 252.0, 253.0) / 255.0, lightAlpha);
+    return mix(light, dark, darkWeight);
 }
 
-// Apple's face transfer separates luminance from chroma. Transmitted
-// luminance is partially screened with itself, Y + lift * Y * (1 - Y), and
-// backdrop chroma passes through with a near-unity gain instead of being
-// diluted by the neutral wash. Light glass is almost linear; dark glass is a
-// full self-screen that lifts shadows and compresses highlights.
 vec2 ios27FaceTransfer(float darkWeight, bool clearGlass) {
     if (clearGlass) {
         return vec2(0.0, 1.057);
@@ -242,7 +251,7 @@ vec3 applySpecularHighlights(
 ) {
     if (
         uLightIntensity < 0.01 &&
-        uContourColor.a < 0.01 &&
+        gContourAlpha < 0.01 &&
         uBevelShadowStrength < 0.001
     ) {
         return baseColor;
@@ -370,7 +379,7 @@ vec3 applySpecularHighlights(
     // The border absorbs the transmitted backdrop only where the material
     // still overlaps it; its exterior part is composited in main().
     float edgeAbsorption = clamp(
-        outlineCoverage * uContourColor.a * contourDirection(normalXY),
+        outlineCoverage * gContourAlpha * contourDirection(normalXY),
         0.0,
         1.0
     );
@@ -553,7 +562,7 @@ void main() {
     float materialAlpha = clamp(signedEdgeDistance + 0.5, 0.0, 1.0);
     if (
         materialAlpha < 0.01 &&
-        contourCoverage(signedEdgeDistance) * uContourColor.a < 0.01
+        contourCoverage(signedEdgeDistance) * gContourAlpha < 0.01
     ) {
         fragColor = vec4(0.0);
         return;
@@ -665,8 +674,18 @@ void main() {
         vec4 neutralTint = ios27NeutralTint(
             darkWeight,
             uAppearanceConfig.w,
-            clearGlass
+            clearGlass,
+            uTintAmount
         );
+        if (!clearGlass && darkWeight > 0.0) {
+            // The dark border strengthens with the opacity the slider adds.
+            float addedOpacity = neutralTint.a - (1.0 - mix(
+                0.592,
+                0.447,
+                smoothstep(75.0, 105.0, uAppearanceConfig.w)
+            ));
+            gContourAlpha *= 1.0 + 0.95 * addedOpacity * darkWeight;
+        }
         vec2 faceTransfer = ios27FaceTransfer(darkWeight, clearGlass);
         if (clearGlass) {
             gGlintLuminance = 2.34;
@@ -732,7 +751,7 @@ void main() {
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
         contourCoverage(signedEdgeDistance) *
-        uContourColor.a *
+        gContourAlpha *
         contourDirection(surfaceNormal) *
         (1.0 - materialAlpha) *
         appearanceVisibility;
