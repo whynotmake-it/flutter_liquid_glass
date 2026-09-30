@@ -85,7 +85,8 @@ void main() {
       allOf(
         startsWith('const LiquidGlassSettings(\n'),
         contains('  refractionHeight: 8.0,\n'),
-        contains('  refractionAmount: 28.0,\n'),
+        contains('  refractionAmount: 34.5,\n'),
+        contains('  dispersion: -0.06,\n'),
         isNot(contains('smoothRefraction')),
       ),
     );
