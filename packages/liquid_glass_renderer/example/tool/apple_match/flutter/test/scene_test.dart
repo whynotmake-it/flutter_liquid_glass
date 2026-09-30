@@ -6,6 +6,7 @@ import 'package:apple_match_flutter/scene_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 
 void main() {
   test('loads the shared deterministic scene', () {
@@ -62,7 +63,9 @@ void main() {
     );
   });
 
-  testWidgets('loupe scenes magnify before the glass layer', (tester) async {
+  testWidgets('loupe scenes use the full-resolution liquid glass loupe', (
+    tester,
+  ) async {
     final file = File('../scenes/loupe.json');
     final scene = MatchScene.fromBase64(
       base64Encode(utf8.encode(file.readAsStringSync())),
@@ -74,7 +77,8 @@ void main() {
     );
 
     expect(scene.profile, 'loupe');
-    expect(find.byType(RawMagnifier), findsOneWidget);
+    expect(find.byType(LiquidGlassLoupe), findsOneWidget);
+    expect(find.byType(LiquidGlassLoupeSource), findsOneWidget);
   });
 
   testWidgets('tab holdout includes deterministic foreground content', (
@@ -97,24 +101,26 @@ void main() {
 
   test('maps core optical settings', () {
     const values = <String, Object?>{
-      'blur': 9.0,
-      'thickness': 12.0,
-      'lightIntensity': 0.4,
-      'edgeAlpha': 0.2,
-      'edgeWidth': 1.0,
-      'contourTransmissionRatio': 0.75,
+      'frost': 9.0,
+      'refractionHeight': 12.0,
+      'refractionAmount': 54.5,
+      'backdropShrink': 0.1,
+      'dispersion': -0.06,
+      'highlight': 0.4,
+      'contourStrength': 0.2,
+      'contourWidth': 1.0,
+      'contourTransmittance': 0.75,
       'contourOffset': 0.5,
       'curvatureLighting': 0.4,
-      'innerShadowStrength': 0.025,
-      'innerShadowDepth': 12.0,
+      'bevelShadowStrength': 0.025,
+      'bevelShadowDepth': 12.0,
       'exteriorShadowSizeResponse': 0.8,
-      'refractiveIndex': 1.15,
       'saturation': 1.2,
     };
     final settings = matchGlassSettings(values);
     final appearance = matchGlassAppearance(values);
     expect(settings.frost, 9);
-    expect(settings.thickness, 12);
+    expect(settings.refractionHeight, 12);
     expect(settings.highlight, 0.4);
     expect(settings.contourStrength, 0.2);
     expect(settings.contourWidth, 1.0);
@@ -124,7 +130,9 @@ void main() {
     expect(settings.bevelShadowStrength, 0.025);
     expect(settings.bevelShadowDepth, 12.0);
     expect(settings.exteriorShadowSizeResponse, 0.8);
-    expect(settings.edgeRefraction, closeTo(54.5, 0.1));
+    expect(settings.refractionAmount, 54.5);
+    expect(settings.backdropShrink, 0.1);
+    expect(settings.dispersion, -0.06);
     expect(appearance.saturation, 1.2);
   });
 }

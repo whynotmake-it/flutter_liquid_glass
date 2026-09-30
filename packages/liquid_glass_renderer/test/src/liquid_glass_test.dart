@@ -410,20 +410,21 @@ void main() {
 
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
-        'should render a rounded superellipse with different thickness',
+        'should render a rounded superellipse with different refraction '
+        'heights',
         skip: skipGoldenTests,
         fileName: 'rounded_superellipse_thicknesses',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
           scenarioConstraints: testScenarioConstraints,
           children: [
-            for (final thickness in [0.0, 5, 10, 15, 20, 40, 100])
+            for (final height in [0.0, 5, 10, 15, 20, 40, 100])
               GoldenTestScenario(
-                name: 'thickness ${thickness.toStringAsFixed(0)}px',
+                name: 'refraction height ${height.toStringAsFixed(0)}px',
                 child: buildWithGridPaper(
                   LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      thickness: thickness.toDouble(),
+                      refractionHeight: height.toDouble(),
                     ),
                     shape: const LiquidRoundedSuperellipse(
                       borderRadius: 100,
@@ -454,7 +455,7 @@ void main() {
                   child: buildWithGridPaper(
                     LiquidGlass.withOwnLayer(
                       settings: settingsWithoutLighting.copyWith(
-                        thickness: 2,
+                        refractionHeight: 2,
                       ),
                       appearance: LiquidGlassAppearance(
                         tint: Colors.blue.withValues(alpha: 0.5),
@@ -482,7 +483,7 @@ void main() {
                   child: buildWithGridPaper(
                     LiquidGlassLayer(
                       settings: settingsWithoutLighting.copyWith(
-                        thickness: 2,
+                        refractionHeight: 2,
                       ),
                       defaultAppearance: LiquidGlassAppearance(
                         tint: Colors.blue.withValues(alpha: 0.5),
@@ -810,7 +811,7 @@ void main() {
               child: buildWithGridPaper(
                 LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
-                    thickness: 18,
+                    refractionHeight: 18,
                   ),
                   defaultAppearance: LiquidGlassAppearance(
                     tint: Colors.cyan.withValues(alpha: .25),
@@ -879,7 +880,7 @@ void main() {
                   scale: 1.45,
                   child: LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      thickness: 18,
+                      refractionHeight: 18,
                     ),
                     appearance: LiquidGlassAppearance(
                       tint: Colors.cyan.withValues(alpha: .25),
@@ -1103,7 +1104,7 @@ void main() {
                 valueListenable: offset,
                 builder: (_, value, __) => LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
-                    thickness: 18,
+                    refractionHeight: 18,
                   ),
                   defaultAppearance: LiquidGlassAppearance(
                     tint: Colors.cyan.withValues(alpha: .25),
@@ -1152,7 +1153,9 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               home: LiquidGlassLayer(
-                settings: settingsWithoutLighting.copyWith(thickness: 18),
+                settings: settingsWithoutLighting.copyWith(
+                  refractionHeight: 18,
+                ),
                 child: Stack(
                   children: [
                     ValueListenableBuilder<Offset>(
@@ -1199,7 +1202,7 @@ void main() {
         'reuses uniform material geometry until optical geometry changes',
         (tester) async {
           final settings = ValueNotifier(
-            settingsWithoutLighting.copyWith(thickness: 18),
+            settingsWithoutLighting.copyWith(refractionHeight: 18),
           );
           final appearance = ValueNotifier(const LiquidGlassAppearance());
           addTearDown(settings.dispose);
@@ -1231,7 +1234,7 @@ void main() {
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount);
 
-          settings.value = settings.value.copyWith(backdropScale: .8);
+          settings.value = settings.value.copyWith(backdropShrink: .2);
           await tester.pump();
           expect(
             renderer.debugRenderCount,
@@ -1239,7 +1242,7 @@ void main() {
             reason: 'backdrop scaling belongs to the final material pass',
           );
 
-          settings.value = settings.value.copyWith(thickness: 24);
+          settings.value = settings.value.copyWith(refractionHeight: 24);
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount + 1);
         },
@@ -1255,7 +1258,9 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               home: LiquidGlassLayer(
-                settings: settingsWithoutLighting.copyWith(thickness: 18),
+                settings: settingsWithoutLighting.copyWith(
+                  refractionHeight: 18,
+                ),
                 child: LiquidGlassBlendGroup(
                   child: Row(
                     children: [
@@ -1468,7 +1473,7 @@ Widget _transparentTintBlendScene() {
 
 Widget _transformGlass() => LiquidGlass.withOwnLayer(
   settings: settingsWithoutLighting.copyWith(
-    thickness: 18,
+    refractionHeight: 18,
   ),
   appearance: LiquidGlassAppearance(
     tint: Colors.cyan.withValues(alpha: .25),
@@ -1496,9 +1501,9 @@ Widget _dprOpticsRegressionScene() => Directionality(
     child: Center(
       child: LiquidGlass.withOwnLayer(
         settings: settingsWithoutLighting.copyWith(
-          thickness: 24,
-          edgeRefraction: 64,
-          chromaticAberration: .5,
+          refractionHeight: 24,
+          refractionAmount: 64,
+          dispersion: .5,
         ),
         appearance: const LiquidGlassAppearance(),
         shape: const LiquidRoundedSuperellipse(borderRadius: 80),
@@ -1540,7 +1545,7 @@ Widget _coordinateRegressionScene() => Stack(
       child: LiquidGlass.withOwnLayer(
         settings: settingsWithoutLighting.copyWith(
           frost: 5,
-          thickness: 60,
+          refractionHeight: 60,
         ),
         appearance: LiquidGlassAppearance(
           tint: Colors.white.withValues(alpha: .08),

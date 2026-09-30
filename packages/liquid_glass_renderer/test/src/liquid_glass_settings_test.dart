@@ -7,9 +7,11 @@ void main() {
     final light = LiquidGlassSettings.ios27ToolbarLight();
     final dark = LiquidGlassSettings.ios27ToolbarDark();
 
-    expect(light.thickness, 12);
+    expect(light.refractionHeight, 20);
     expect(light.frost, closeTo(3.7, 1e-9));
-    expect(light.edgeRefraction, closeTo(27.42, .01));
+    expect(light.refractionAmount, 60);
+    expect(light.refractionFitsShape, isTrue);
+    expect(light.dispersion, 0);
     expect(light.highlight, 1);
     expect(light.highlightWidth, 1.2);
     expect(light.highlightOppositeStrength, 1);
@@ -21,9 +23,9 @@ void main() {
     expect(light.bevelShadowOffset, 6);
     expect(light.bevelShadowDirectionality, .5);
     expect(light.exteriorShadowSizeResponse, 1);
-    expect(dark.thickness, 12);
+    expect(dark.refractionHeight, 20);
     expect(dark.frost, light.frost);
-    expect(dark.edgeRefraction, closeTo(27.42, .01));
+    expect(dark.refractionAmount, 60);
     expect(dark.highlight, light.highlight);
     expect(dark.highlightWidth, light.highlightWidth);
     expect(dark.contourStrength, .88);
@@ -39,7 +41,11 @@ void main() {
     final clear = LiquidGlassSettings.ios27Clear();
     final toolbar = LiquidGlassSettings.ios27ToolbarLight();
 
+    expect(clear.refractionHeight, 20);
+    expect(clear.refractionAmount, 60);
+    expect(clear.refractionFitsShape, isFalse);
     expect(clear.frost, closeTo(.35, 1e-9));
+    expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
     // Clear glass's slider blur: 0.35/0.67/1.28/4.6/16.4 pt.
     for (final (position, sigma) in [
       (0.0, .35),
@@ -123,12 +129,11 @@ void main() {
 
   test('effective values preserve the configured structural material', () {
     const settings = LiquidGlassSettings(
-      thickness: 40,
-      edgeRefraction: 80,
-      refractionSpread: .8,
-      backdropScale: .75,
+      refractionHeight: 40,
+      refractionAmount: 80,
+      backdropShrink: .25,
       frost: 12,
-      chromaticAberration: 2,
+      dispersion: 2,
       highlight: .6,
       highlightWidth: 2.5,
       highlightWrap: .3,
@@ -143,12 +148,13 @@ void main() {
       bevelShadowSizeResponse: .7,
       exteriorShadowSizeResponse: .6,
     );
-    expect(settings.effectiveThickness, 40);
-    expect(settings.effectiveEdgeRefraction, 80);
-    expect(settings.effectiveRefractionSpread, .8);
-    expect(settings.effectiveBackdropScale, .75);
+    expect(settings.effectiveRefractionHeight, 40);
+    expect(settings.effectiveRefractionAmount, 80);
+    expect(settings.effectiveBackdropShrink, .25);
+    expect(settings.effectiveDisplacementScale, 80);
+    expect(settings.effectiveEdgeDistanceRange, 40);
     expect(settings.effectiveFrost, 12);
-    expect(settings.effectiveChromaticAberration, 2);
+    expect(settings.effectiveDispersion, 2);
     expect(settings.effectiveHighlight, .6);
     expect(settings.effectiveHighlightWidth, 2.5);
     expect(settings.effectiveContourStrength, .3);
@@ -160,12 +166,13 @@ void main() {
 
   test('copyWith and JSON preserve the structural vector', () {
     final original = const LiquidGlassSettings().copyWith(
-      thickness: 31,
-      edgeRefraction: 42,
-      refractionSpread: .5,
-      backdropScale: .8,
+      refractionHeight: 31,
+      refractionAmount: 42,
+      refractionFitsShape: false,
+      smoothRefraction: false,
+      backdropShrink: .2,
       frost: 7,
-      chromaticAberration: .2,
+      dispersion: .2,
       highlight: .4,
       highlightWidth: 3,
       highlightWrap: .2,
@@ -182,5 +189,26 @@ void main() {
       exteriorShadowSizeResponse: .55,
     );
     expect(LiquidGlassSettings.fromJson(original.toJson()), original);
+  });
+
+  test('backdrop shrink never enlarges the backdrop', () {
+    expect(
+      const LiquidGlassSettings(backdropShrink: -1).effectiveBackdropShrink,
+      0,
+    );
+    expect(
+      const LiquidGlassSettings(backdropShrink: 2).effectiveBackdropShrink,
+      .75,
+    );
+  });
+
+  test('refraction and lighting depth stay independent', () {
+    const flat = LiquidGlassSettings(refractionHeight: 0, refractionAmount: 0);
+    expect(flat.effectiveDisplacementScale, greaterThan(0));
+    expect(flat.effectiveEdgeDistanceRange, 12);
+    expect(
+      const LiquidGlassSettings(refractionHeight: -4).effectiveRefractionHeight,
+      0,
+    );
   });
 }

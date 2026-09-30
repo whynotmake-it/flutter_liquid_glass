@@ -35,8 +35,8 @@ void main() {
           cx, cy, 1, -1, //
         ],
         numShapes: 1,
-        opticalIndex: 1.2,
-        thickness: 20,
+        refractionHeight: 20,
+        refractionAmount: 60,
         offsetX: 0,
         offsetY: 0,
       );
@@ -53,8 +53,14 @@ void main() {
           if (bytes.getUint8(i + 2) < 128 || r < 3 || r > radius - 0.5) {
             continue;
           }
-          final nx = (bytes.getUint8(i) - 127) / 127;
-          final ny = (bytes.getUint8(i + 1) - 127) / 127;
+          // Diamond-angle normal code, as decodeSurfaceNormal in
+          // displacement_encoding.glsl.
+          final diamond =
+              (bytes.getUint8(i) * 16 + (bytes.getUint8(i + 1) >> 4)) / 1024;
+          final nx = diamond < 2 ? 1 - diamond : diamond - 3;
+          final ny = diamond < 1
+              ? diamond
+              : (diamond < 3 ? 2 - diamond : diamond - 4);
           final cosine =
               (nx * dx + ny * dy) / (math.sqrt(nx * nx + ny * ny) * r);
           worst = math.max(worst, math.acos(cosine.clamp(-1.0, 1.0)));

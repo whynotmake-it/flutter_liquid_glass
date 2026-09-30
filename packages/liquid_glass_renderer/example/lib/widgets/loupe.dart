@@ -1,20 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 import 'package:motor/motor.dart';
 
 /// Apple's loupe is a clear lens: its backdrop is enlarged, but it does not
-/// inherit the toolbar's milky tint or frost. Keep the edge optics and contour
-/// from the matched toolbar while neutralizing transmission.
-const loupeGlassSettings = LiquidGlassSettings(
-  thickness: 12,
-  edgeRefraction: 27.42,
-  frost: 0,
-  chromaticAberration: 0.005,
-  // Keep only the default glint and a hairline rim. The lens body must remain
-  // the magnified backdrop, not a translucent white fill.
-  contourStrength: 0.08,
-  contourWidth: 0.75,
-);
+/// inherit the toolbar's milky tint or frost.
+const loupeGlassSettings = LiquidGlassLoupe.defaultSettings;
 
 const loupeGlassAppearance = LiquidGlassAppearance();
 
@@ -30,7 +21,7 @@ class ExampleLoupe extends StatelessWidget {
     required this.settings,
     super.key,
     this.size = const Size(116, 86),
-    this.magnificationScale = 1.55,
+    this.magnificationScale = 1.25,
     this.alignment = Alignment.center,
     this.focalPointOffset = Offset.zero,
   });
@@ -105,10 +96,11 @@ class _DraggableLoupeState extends State<DraggableLoupe> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bounds = Offset(
-          (constraints.maxWidth - widget.size.width)
-              .clamp(0, double.infinity),
-          (constraints.maxHeight - widget.size.height)
-              .clamp(0, double.infinity),
+          (constraints.maxWidth - widget.size.width).clamp(0, double.infinity),
+          (constraints.maxHeight - widget.size.height).clamp(
+            0,
+            double.infinity,
+          ),
         );
         _clampPosition(bounds);
         return MouseRegion(

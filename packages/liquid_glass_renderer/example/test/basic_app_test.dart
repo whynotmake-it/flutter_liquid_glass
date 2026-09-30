@@ -89,6 +89,6 @@ void main() {
 
     final toolbar = File('assets/presets/ios27-toolbar-light.yaml')
         .readAsStringSync();
-    expect(toolbar, contains('backdropScale:'));
+    expect(toolbar, contains('backdropShrink:'));
   });
 }

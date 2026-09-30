@@ -39,7 +39,7 @@ void main() {
               );
               Widget layer(Widget child) => LiquidGlassLayer(
                 fake: fake,
-                settings: const LiquidGlassSettings(thickness: 12, frost: 0),
+                settings: const LiquidGlassSettings(frost: 0),
                 defaultAppearance: const LiquidGlassAppearance(
                   tint: Color(0xC00040FF),
                 ),

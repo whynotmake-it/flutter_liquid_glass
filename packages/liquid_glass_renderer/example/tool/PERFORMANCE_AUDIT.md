@@ -481,13 +481,13 @@ only on the visual symptom.
    final backdrop/refraction pass may dominate. Measure dynamic oval, rounded
    rectangle, and superellipse cases separately before adding shader variants.
 
-The next looks-first probe is the shared `chromaticAberration` axis:
+The next looks-first probe is the shared `dispersion` axis:
 
 ```bash
 cd packages/liquid_glass_renderer/example/tool/apple_match
 IOS_27_UDID="$IOS_27_UDID" PYTHONPATH=compare compare/.venv/bin/python material_attribution_scan.py \
-  --axis chromaticAberration --repetitions 1 \
-  --out out/material-attribution-chromaticAberration
+  --axis dispersion --repetitions 1 \
+  --out out/material-attribution-dispersion
 ```
 
 It compares the current `.005` default with zero (the one-backdrop-sample
@@ -640,11 +640,11 @@ geometry or settings are dirty, so no SDF bottleneck claim is justified
 without a targeted geometry-pass A/B measurement.
 
 The final shader's chromatic path now uses one backdrop read whenever the
-maximum encoded displacement multiplied by `abs(chromaticAberration)` is below
+maximum encoded displacement multiplied by `abs(dispersion)` is below
 0.25 source pixels. This is a coherent uniform branch that removes two texture
 reads for the fitted values while preserving the three-sample path for larger
 refraction surfaces. The pinned three-scene scan (`out/material-attribution-
-chromaticAberration-cutoff/summary.json`) found byte-identical A captures for
+dispersion-cutoff/summary.json`) found byte-identical A captures for
 0 through `.01`; values above that boundary changed at most a few pixels and
 did not improve the score. This is a looks-safe optimization candidate, not a
 completed before/after performance gate.

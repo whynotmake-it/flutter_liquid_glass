@@ -153,18 +153,17 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     final geometryInputsChanged =
-        _settings?.effectiveThickness != value.effectiveThickness ||
-        _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
-        _settings?.effectiveRefractionSpread !=
-            value.effectiveRefractionSpread ||
+        _settings?.effectiveRefractionHeight !=
+            value.effectiveRefractionHeight ||
+        _settings?.effectiveRefractionAmount !=
+            value.effectiveRefractionAmount ||
+        _settings?.effectiveRefractionFitsShape !=
+            value.effectiveRefractionFitsShape ||
         _settings?.effectiveContourWidth != value.effectiveContourWidth ||
         _settings?.effectiveContourOffset != value.effectiveContourOffset;
-    final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
-    final isIdle = value.effectiveThickness <= 0;
     _settings = value;
     _updateShaderSettings();
     if (geometryInputsChanged) needsGeometryUpdate = true;
-    if (wasIdle != isIdle) markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -204,8 +203,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   @override
-  bool get alwaysNeedsCompositing =>
-      _geometryImage != null && settings.effectiveThickness > 0;
+  bool get alwaysNeedsCompositing => _geometryImage != null;
 
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
@@ -298,10 +296,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setColor(appearance.tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
-          settings.effectiveChromaticAberration,
-          settings.effectiveThickness * devicePixelRatio,
+          settings.effectiveDispersion,
+          settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.effectiveHighlight,
-          settings.effectiveBackdropScale,
+          1 - settings.effectiveBackdropShrink,
           appearance.saturation,
         ])
         ..setOffset(
@@ -350,16 +348,31 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           _materialShortSide,
         ]);
     });
-    // Float index 53, after the 47-float common block and the 6-float
-    // filter->matte mapping: frosted glass cross-fades its blur away, while
-    // unfrosted glass stays alpha-1 and cross-fades its material in the
+    // Float indices 53 and 54, after the 47-float common block and the
+    // 6-float filter->matte mapping: frosted glass cross-fades its blur away,
+    // while unfrosted glass stays alpha-1 and cross-fades its material in the
     // shader, so both match the backdrop exactly at visibility 0.
-    shader.setFloat(53, _blurFades ? 1 : 0);
+    shader
+      ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
+      ..setFloat(54, softensInShader ? 1 : 0);
   }
 
-  /// Whether the composed filter blurs the backdrop, with the same frost as
-  /// the layer's blur.
-  bool get _blurFades => settings.effectiveFrost > 0;
+  /// Largest frost, in device pixels, folded into the final pass instead of
+  /// a separate blur pass. Enabling the blur pass costs about four command
+  /// buffers per frame on Metal regardless of its radius.
+  static const double shaderSofteningMaxDeviceSigma = 1.25;
+
+  /// Whether the frost is small enough for the final pass's softening kernel.
+  bool get softensInShader {
+    final frost = _frostSigma;
+    return frost > 0 &&
+        frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
+  }
+
+  /// Sigma of the separate backdrop blur pass; `0` when there is none.
+  double get blurPassSigma => softensInShader ? 0 : _frostSigma;
+
+  double get _frostSigma => settings.effectiveFrost;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -444,8 +457,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ) {
     if ((_geometryImage == null && !_drawableEmpty) ||
         _idleComposition ||
-        debugPaintLiquidGlassGeometry ||
-        settings.effectiveThickness <= 0) {
+        debugPaintLiquidGlassGeometry) {
       return false;
     }
     final candidate = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
@@ -511,6 +523,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ],
   ];
 
+  /// Bounds of the clips between this object and its shapes that are
+  /// re-applied around the glass filter, in local coordinates, or `null`.
+  @protected
+  Rect? get retainedClipBounds =>
+      _idleComposition ? null : _ancestorClips.ownerBounds;
+
   @protected
   void syncAncestorClips() =>
       (_idleComposition ? _idleAncestorClips : _ancestorClips).sync();
@@ -573,7 +591,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         (shape) => shape.appearance.visibility > 0,
       ),
     );
-    if (settings.effectiveThickness <= 0 || !hasVisibleShape) {
+    if (!hasVisibleShape) {
       _idleComposition = true;
       // Foreground can change while a cached matte is dormant. Poll against
       // its last paint without overwriting that matte's encoded coordinates.
@@ -768,6 +786,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
+      // Sampler 0 is the image-filter input. The engine replaces its texture
+      // with the backdrop but keeps the sampling set here, so any bound image
+      // selects bilinear or nearest backdrop sampling at no cost.
+      ..setImageSampler(
+        0,
+        geometryImage,
+        filterQuality: settings.effectiveSmoothRefraction
+            ? FilterQuality.low
+            : FilterQuality.none,
+      )
+      // Nearest: the matte packs 12-bit normal angle and displacement codes
+      // across byte boundaries, which filtering between texels would mix.
       ..setImageSampler(1, geometryImage);
     if (_materialImage case final materialImage?) {
       if (_usesTintOnlyAppearance) {
@@ -835,20 +865,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// How far outside the material the composed filter reads the backdrop:
   /// the blur kernel (3 sigma), the peak edge displacement including its
-  /// chromatic split, and, below unit backdrop scale, the extra content
-  /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
-  /// the filter samples its own edge.
+  /// dispersion, and, with [LiquidGlassSettings.backdropShrink], the extra
+  /// content revealed on the face. A `LiquidGlassCapture` must contain this
+  /// reach or the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
-    final blur = settings.effectiveFrost > 0
-        ? settings.effectiveFrost * 3 + 1 / devicePixelRatio
-        : 0.0;
+    final blur = blurPassSigma > 0
+        ? blurPassSigma * 3 + 1 / devicePixelRatio
+        : (softensInShader ? 1 / devicePixelRatio : 0.0);
     final displacement =
         settings.effectiveDisplacementScale *
-        (1 + settings.effectiveChromaticAberration.abs() * 0.5);
-    final scale = settings.effectiveBackdropScale;
-    final revealed = scale < 1
-        ? (1 / scale - 1) * max(material.width, material.height) / 2
-        : 0.0;
+        (1 + settings.effectiveDispersion.abs() * 0.5);
+    final scale = 1 - settings.effectiveBackdropShrink;
+    final revealed = (1 / scale - 1) * max(material.width, material.height) / 2;
     return blur + displacement + revealed;
   }
 
@@ -1155,13 +1183,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   );
 
   (double, double, double, double, double, double)? _coordinateMapping;
+  Rect? _backdropBounds;
+
+  /// Layer-local rect the native filter captures backdrop for, or `null`
+  /// when it is unbounded. Refraction mirrors samples that would leave it:
+  /// outside the clip the filter input is transparent.
+  @protected
+  Rect? get backdropSampleBounds => null;
+
+  /// The [backdropSampleBounds] last written to the shader.
+  @visibleForTesting
+  Rect? get debugBackdropSampleBounds => _backdropBounds;
 
   @protected
   bool syncCoordinateMapping() {
     final mapping = _currentCoordinateMapping();
-    final changed = mapping != _coordinateMapping;
+    final backdropBounds = backdropSampleBounds;
+    final changed =
+        mapping != _coordinateMapping || backdropBounds != _backdropBounds;
     _coordinateMapping = mapping;
-    _writeCoordinateMapping(renderShader, mapping);
+    _backdropBounds = backdropBounds;
+    _writeCoordinateMapping(renderShader, mapping, backdropBounds);
     return changed;
   }
 
@@ -1183,6 +1225,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   void _writeCoordinateMapping(
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
+    Rect? backdropBounds,
   ) {
     shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
@@ -1192,6 +1235,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         mapping.$4,
         mapping.$5,
         mapping.$6,
+      ]);
+    });
+    // Float index 55, after the frost flags.
+    final matteBounds = backdropBounds == null
+        ? Rect.largest
+        : MatrixUtils.transformRect(matteTransform, backdropBounds);
+    shader.setFloatUniforms(initialIndex: 55, (value) {
+      value.setFloats([
+        matteBounds.left * devicePixelRatio,
+        matteBounds.top * devicePixelRatio,
+        matteBounds.right * devicePixelRatio,
+        matteBounds.bottom * devicePixelRatio,
       ]);
     });
   }
@@ -1224,7 +1279,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// shader may only be reused across paints while this snapshot compares
   /// equal.
   @protected
-  Object get shaderInputSnapshot => (_shaderInputSnapshot, _coordinateMapping);
+  Object get shaderInputSnapshot =>
+      (_shaderInputSnapshot, _coordinateMapping, _backdropBounds);
   late Object _shaderInputSnapshot;
 
   void _debugPaintGeometry(PaintingContext context, Offset offset) {
@@ -1504,11 +1560,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         rseData: _rseData,
         boundsData: _boundsData,
         numShapes: numShapes,
-        opticalIndex: settings.effectiveOpticalIndex,
-        refractionSpread: settings.effectiveRefractionSpread,
-        displacementScale:
-            settings.effectiveDisplacementScale * devicePixelRatio,
-        thickness: settings.effectiveThickness * devicePixelRatio,
+        refractionHeight: settings.effectiveRefractionHeight * devicePixelRatio,
+        refractionAmount: settings.effectiveRefractionAmount * devicePixelRatio,
+        edgeDistanceRange:
+            settings.effectiveEdgeDistanceRange * devicePixelRatio,
+        refractionFitsShape: settings.effectiveRefractionFitsShape,
         contourExtent: aaPadding * devicePixelRatio,
         writeMaterials: usesShapeAppearances,
         writeTintOnly: usesTintOnlyAppearance,

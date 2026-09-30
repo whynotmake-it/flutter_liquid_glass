@@ -109,7 +109,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -126,7 +125,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
@@ -143,7 +141,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -174,7 +171,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -240,7 +236,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -367,8 +362,7 @@ Widget _offsetComparisonSurface({
   child: LiquidGlassLayer(
     fake: fake,
     settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
-      edgeRefraction: 0,
-      chromaticAberration: 0,
+      refractionAmount: 0,
       contourOffset: offset,
     ),
     child: const LiquidGlass(

@@ -93,8 +93,8 @@ void main() {
           shape.left, shape.top, shape.right, shape.bottom, //
         ],
       ],
-      opticalIndex: 1.2,
-      thickness: 10,
+      refractionHeight: 10,
+      refractionAmount: 30,
       offsetX: 0,
       offsetY: 0,
     );

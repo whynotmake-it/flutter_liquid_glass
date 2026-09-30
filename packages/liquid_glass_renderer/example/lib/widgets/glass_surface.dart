@@ -74,8 +74,8 @@ class GlassSurface extends HookWidget {
 /// Clear-lens material for elements that sit on top of other glass: no frost,
 /// no tint, only edge optics. Based on the fitted loupe probe settings.
 const clearLensSettings = LiquidGlassSettings(
-  thickness: 8,
-  edgeRefraction: 16,
+  refractionHeight: 8,
+  refractionAmount: 16,
   frost: 0,
   contourStrength: 0.2,
   contourWidth: 1,

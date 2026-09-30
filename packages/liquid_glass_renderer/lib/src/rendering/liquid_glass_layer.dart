@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/filter_pass_transform.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
@@ -13,6 +14,7 @@ import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
@@ -563,12 +565,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final motion = pollCompositorTranslation();
     if (motion.translation case final translation?) {
       setCompositorTranslation(translation);
-      final bounds = _filterMaterialBounds;
-      if (bounds != null && _clipRectLayerHandle.layer != null) {
-        final clip = bounds
-            .shift(translation)
-            .expandToPixelBuckets(devicePixelRatio)
-            .shift(-translation);
+      final clip = _filterClip;
+      if (clip != null && _clipRectLayerHandle.layer != null) {
         _clipRectLayerHandle.layer!.clipRect = clip.shift(_filterPaintOffset);
       }
       if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
@@ -600,6 +598,42 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (motion.needsRepaint) markNeedsPaint();
   }
 
+  // The native filter clip, kept on stable pixel buckets in the translated
+  // frame so retained compositor motion does not resize its render target.
+  Rect? get _filterClip {
+    final bounds = _filterMaterialBounds;
+    if (bounds == null) return null;
+    final translation = compositorTranslation;
+    return bounds
+        .shift(translation)
+        .expandToPixelBuckets(devicePixelRatio)
+        .shift(-translation);
+  }
+
+  // Unblurred, the filter input is the backdrop inside the filter's own clip.
+  // With a blur pass, Impeller re-rasterizes the blurred input into the
+  // filter's coverage, which every clip around the filter narrows: the
+  // retained clips between this layer and its shapes, and the clips above
+  // this layer up to its pass. The texture is transparent outside it.
+  @override
+  Rect? get backdropSampleBounds {
+    final clip = _filterClip;
+    if (clip == null || blurPassSigma <= 0) return clip;
+    final translation = compositorTranslation;
+    var captured = clip.shift(translation);
+    final ancestorClips = [
+      retainedClipBounds,
+      localPaintClipAbove(
+        this,
+        stopAt: (ancestor) => ancestor is RenderLiquidGlassCapture,
+      ),
+    ];
+    for (final ancestorClip in ancestorClips) {
+      if (ancestorClip != null) captured = captured.intersect(ancestorClip);
+    }
+    return captured.shift(-translation);
+  }
+
   ImageFilter? _cachedFilter;
   Object? _cachedFilterSnapshot;
 
@@ -609,7 +643,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       return _cachedFilter!;
     }
     final shader = ImageFilter.shader(renderShader);
-    final frostSigma = settings.effectiveFrost;
+    final frostSigma = blurPassSigma;
     final filter = frostSigma > 0
         ? ImageFilter.compose(
             inner: ImageFilter.blur(
@@ -639,6 +673,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _cachedFilter = null;
       _cachedFilterSnapshot = null;
     } else {
+      syncCoordinateMapping();
       final shader = (_shaderHandle.layer ??= BackdropFilterLayer())
         ..filter = _updateShaderFilter()
         ..backdropKey = backdropKey;

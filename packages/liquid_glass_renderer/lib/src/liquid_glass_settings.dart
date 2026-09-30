@@ -18,12 +18,13 @@ class LiquidGlassSettings with Equatable {
   /// Distances are logical pixels. Strength, wrap, directionality, and size
   /// response values conventionally use the `0` to `1` range.
   const LiquidGlassSettings({
-    this.thickness = 20.0,
-    this.edgeRefraction = 106.13,
-    this.refractionSpread = 0.0,
-    this.backdropScale = 1.0,
+    this.refractionHeight = 20.0,
+    this.refractionAmount = 60.0,
+    this.refractionFitsShape = true,
+    this.smoothRefraction = true,
+    this.backdropShrink = 0.0,
     this.frost = 5.0,
-    this.chromaticAberration = 0.01,
+    this.dispersion = 0.0,
     this.highlight = 1.0,
     this.highlightWidth = 1.2,
     this.highlightWrap = 0.5,
@@ -48,12 +49,13 @@ class LiquidGlassSettings with Equatable {
     double number(String key, double fallback) =>
         (json[key] as num?)?.toDouble() ?? fallback;
     return LiquidGlassSettings(
-      thickness: number('thickness', 20),
-      edgeRefraction: number('edgeRefraction', 106.13),
-      refractionSpread: number('refractionSpread', 0),
-      backdropScale: number('backdropScale', 1),
+      refractionHeight: number('refractionHeight', 20),
+      refractionAmount: number('refractionAmount', 60),
+      refractionFitsShape: json['refractionFitsShape'] as bool? ?? true,
+      smoothRefraction: json['smoothRefraction'] as bool? ?? true,
+      backdropShrink: number('backdropShrink', 0),
       frost: number('frost', 5),
-      chromaticAberration: number('chromaticAberration', .01),
+      dispersion: number('dispersion', 0),
       highlight: number('highlight', 1),
       highlightWidth: number('highlightWidth', 1.2),
       highlightWrap: number('highlightWrap', .5),
@@ -100,11 +102,12 @@ class LiquidGlassSettings with Equatable {
   const LiquidGlassSettings._ios27ToolbarLight({
     required this.frost,
     required this.tintAmount,
-  }) : thickness = 12.0,
-       edgeRefraction = 27.42,
-       refractionSpread = 0.0,
-       backdropScale = 1.0,
-       chromaticAberration = 0.005,
+  }) : refractionHeight = 20.0,
+       refractionAmount = 60.0,
+       refractionFitsShape = true,
+       smoothRefraction = true,
+       backdropShrink = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -141,11 +144,12 @@ class LiquidGlassSettings with Equatable {
   const LiquidGlassSettings._ios27ToolbarDark({
     required this.frost,
     required this.tintAmount,
-  }) : thickness = 12.0,
-       edgeRefraction = 27.42,
-       refractionSpread = 0.0,
-       backdropScale = 1.0,
-       chromaticAberration = 0.005,
+  }) : refractionHeight = 20.0,
+       refractionAmount = 60.0,
+       refractionFitsShape = true,
+       smoothRefraction = true,
+       backdropShrink = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -171,6 +175,12 @@ class LiquidGlassSettings with Equatable {
   /// slider only blurs clear glass, so [frost] defaults to
   /// [ios27ClearFrost] for [tintAmount]. Pair it with
   /// [LiquidGlassAppearance.ios27Clear].
+  ///
+  /// The lens is the full 20 pt / 60 pt bevel on every shape. At slider 0
+  /// the blur is 0.35 pt, which up to about 3.5x device pixel ratio stays
+  /// within the renderer's 1.25 device-pixel in-pass kernel and so costs no
+  /// blur pass. Pass [frost] to override, for example `frost: 0` for
+  /// unsoftened glass.
   factory LiquidGlassSettings.ios27Clear({
     double tintAmount = 0,
     double? frost,
@@ -182,11 +192,12 @@ class LiquidGlassSettings with Equatable {
   const LiquidGlassSettings._ios27Clear({
     required this.frost,
     required this.tintAmount,
-  }) : thickness = 12.0,
-       edgeRefraction = 27.42,
-       refractionSpread = 0.0,
-       backdropScale = 1.0,
-       chromaticAberration = 0.005,
+  }) : refractionHeight = 20.0,
+       refractionAmount = 60.0,
+       refractionFitsShape = false,
+       smoothRefraction = true,
+       backdropShrink = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -222,17 +233,18 @@ class LiquidGlassSettings with Equatable {
   /// Creates settings from Figma-style percentage controls.
   ///
   /// [refraction] and [dispersion] use a `0` to `100` scale. [depth] and
-  /// [frost] remain logical-pixel values.
+  /// [frost] remain logical-pixel values. [depth] is the bevel
+  /// ([refractionHeight]); `100` [refraction] pulls content from four bevel
+  /// widths inside the silhouette.
   LiquidGlassSettings.figma({
     required double refraction,
     required double depth,
     required double dispersion,
     required double frost,
   }) : this(
-         edgeRefraction: (refraction / 100) * 106.13,
-         thickness: depth,
-         refractionSpread: 0,
-         chromaticAberration: 4 * (dispersion / 100),
+         refractionHeight: depth,
+         refractionAmount: (refraction / 100) * 4 * depth,
+         dispersion: 4 * (dispersion / 100),
          frost: frost,
        );
 
@@ -274,34 +286,78 @@ class LiquidGlassSettings with Equatable {
     return LiquidGlassRenderScope.of(context).settings;
   }
 
-  /// Optical profile depth in logical pixels.
-  final double thickness;
-
-  /// Peak edge displacement in logical pixels at the optical rim. The
-  /// renderer solves the internal optical index from this value.
-  final double edgeRefraction;
-
-  /// Face reach of the SDF optical profile. `0` keeps the optical slope at the
-  /// physical edge thickness; `1` carries the eased slope across the full
-  /// face. This is a profile/refractive-field control, not a backdrop zoom.
-  final double refractionSpread;
-
-  /// Display scale of the backdrop on the deep face of the material.
+  /// Width of the refracting bevel in logical pixels, measured inward from
+  /// the silhouette.
   ///
-  /// `1` preserves the backdrop. Values below `1` reveal more content while
-  /// values above `1` magnify. The renderer fades this mapping to identity at
-  /// the SDF contour so edge refraction remains continuous. Large
-  /// magnification should instead paint a higher-resolution backdrop with
-  /// Flutter's [RawMagnifier] before applying glass.
-  final double backdropScale;
+  /// Glass is modeled as a flat face with a rounded bevel of this width.
+  /// Only the bevel refracts; the face beyond it shows the backdrop
+  /// undisplaced. Apple calls this the refraction height; iOS 27 glass
+  /// measures `20`, the text loupe `8`. See [refractionFitsShape] for how
+  /// small shapes limit it.
+  final double refractionHeight;
+
+  /// How far inside the silhouette, in logical pixels, the outermost pixel
+  /// of the glass samples the backdrop.
+  ///
+  /// The displacement falls off across the bevel as a quarter circle,
+  /// `refractionAmount * (1 - sqrt(1 - x * x))` with `x` going from `1` at
+  /// the silhouette to `0` at [refractionHeight], so the bevel joins the
+  /// face without a crease. The ratio to [refractionHeight] sets how
+  /// rod-like the rim reads: above `1`, content near the rim is mirrored.
+  /// iOS 27 glass measures `60`, the text loupe `28`. `0` disables
+  /// refraction.
+  final double refractionAmount;
+
+  /// Whether small shapes shrink the lens to fit.
+  ///
+  /// When `true`, as on iOS 27 regular glass, buttons and toolbars, the
+  /// bevel is at most a quarter of the shape's short side and the rim
+  /// samples no deeper than the shape's center line. A 63 pt tall button
+  /// therefore refracts with a height of about `16` and an amount of about
+  /// `32`, while large surfaces keep the configured values.
+  ///
+  /// When `false`, as on iOS 27 `.clear` glass, the configured lens is kept
+  /// until the bevel would pass the center line; below that the whole lens
+  /// scales down with the shape.
+  final bool refractionFitsShape;
+
+  /// Whether the backdrop is sampled bilinearly instead of from the nearest
+  /// pixel. On by default.
+  ///
+  /// Refraction samples the backdrop at fractional positions. With nearest
+  /// sampling, refracted lines snap to whole device pixels and read as
+  /// jagged; bilinear sampling moves them smoothly, as on Apple's glass.
+  /// Undisplaced glass still reproduces the backdrop exactly. It uses the
+  /// same single texture fetch and no extra pass, and measured within noise
+  /// on Metal. Set it to `false` for the previous nearest sampling.
+  final bool smoothRefraction;
+
+  /// How much the backdrop seen through the face is shrunk, about the center
+  /// of the layer's glass: `0` keeps its size, `0.08` shows it at 92%.
+  ///
+  /// Clamped to `0` to `0.75`, so the glass can reveal more of its
+  /// surroundings but never enlarges (and pixelates) the captured backdrop.
+  /// Magnifiers should re-render their content at full resolution instead
+  /// (the example app's loupe does). The bevel's [refractionAmount] is applied
+  /// on top.
+  ///
+  /// All glass in one layer shares the center, so give a shrinking shape its
+  /// own layer when it should shrink about itself.
+  final double backdropShrink;
 
   /// Backdrop blur sigma in logical pixels.
   ///
   /// The value is absolute and does not change with the material's size.
   final double frost;
 
-  /// Wavelength separation for the edge displacement.
-  final double chromaticAberration;
+  /// Separation of the color channels in the refracted edge.
+  ///
+  /// Red is displaced by `1 + dispersion / 2` and blue by
+  /// `1 - dispersion / 2` times the edge displacement. Negative values bend
+  /// blue more, as real glass does; the iOS 27 loupe measures about `-0.07`
+  /// and other iOS 27 glass `0`. At `0` the glass reads the backdrop once
+  /// per pixel instead of three times.
+  final double dispersion;
 
   /// Strength of the glint along the light axis.
   ///
@@ -420,17 +476,20 @@ class LiquidGlassSettings with Equatable {
   /// one uniform per layer and adds no per-pixel work.
   final double tintAmount;
 
-  /// Effective optical thickness.
-  double get effectiveThickness => thickness;
+  /// Effective bevel width; never negative.
+  double get effectiveRefractionHeight => math.max(0, refractionHeight);
 
-  /// Effective peak edge displacement.
-  double get effectiveEdgeRefraction => edgeRefraction;
+  /// Effective edge displacement; never negative.
+  double get effectiveRefractionAmount => math.max(0, refractionAmount);
 
-  /// Effective optical face reach.
-  double get effectiveRefractionSpread => refractionSpread;
+  /// Effective shape-fitting mode of the lens.
+  bool get effectiveRefractionFitsShape => refractionFitsShape;
 
-  /// Effective backdrop scale constrained to the supported range.
-  double get effectiveBackdropScale => backdropScale.clamp(.25, 4.0);
+  /// Effective backdrop sampling mode.
+  bool get effectiveSmoothRefraction => smoothRefraction;
+
+  /// [backdropShrink] constrained to the supported range.
+  double get effectiveBackdropShrink => backdropShrink.clamp(0.0, 0.75);
 
   /// Effective slider position, clamped to `0...1`.
   double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
@@ -439,7 +498,7 @@ class LiquidGlassSettings with Equatable {
   double get effectiveFrost => math.max(0, frost);
 
   /// Effective chromatic aberration.
-  double get effectiveChromaticAberration => chromaticAberration;
+  double get effectiveDispersion => dispersion;
 
   /// Effective highlight strength.
   double get effectiveHighlight => highlight;
@@ -489,29 +548,28 @@ class LiquidGlassSettings with Equatable {
   /// Effective exterior-shadow size response.
   double get effectiveExteriorShadowSizeResponse => exteriorShadowSizeResponse;
 
-  /// Internal optical index derived from the public peak displacement. The
-  /// public value remains observable and comparable across sizes.
-  double get effectiveOpticalIndex {
-    final depth = effectiveThickness;
-    if (depth <= 0 || effectiveEdgeRefraction <= 0) return 1;
-    final ratio = effectiveEdgeRefraction / (8.0 * depth);
-    return math.sqrt(1.0 + ratio * ratio);
-  }
-
-  /// Shared displacement codec scale for the geometry and final passes. The
-  /// public edge value is the analytic peak of the profile; using it directly
-  /// avoids wasting RGBA8 codes on unreachable displacement range.
+  /// Shared displacement codec scale for the geometry and final passes.
+  /// [refractionAmount] is the exact peak of the profile, so the RGBA8 code
+  /// range is spent only on reachable displacement.
   double get effectiveDisplacementScale =>
-      math.max(1e-3, 1.05 * effectiveEdgeRefraction);
+      math.max(1e-3, effectiveRefractionAmount);
+
+  /// Lighting depth of the rim in logical pixels.
+  ///
+  /// The geometry matte encodes signed edge distance up to four times this
+  /// depth, so rim lighting keeps its precision even when [refractionHeight]
+  /// is small or refraction is disabled.
+  double get effectiveEdgeDistanceRange => math.max(12, refractionHeight);
 
   /// Returns a copy with the supplied material controls replaced.
   LiquidGlassSettings copyWith({
-    double? thickness,
-    double? edgeRefraction,
-    double? refractionSpread,
-    double? backdropScale,
+    double? refractionHeight,
+    double? refractionAmount,
+    bool? refractionFitsShape,
+    bool? smoothRefraction,
+    double? backdropShrink,
     double? frost,
-    double? chromaticAberration,
+    double? dispersion,
     double? highlight,
     double? highlightWidth,
     double? highlightWrap,
@@ -530,12 +588,13 @@ class LiquidGlassSettings with Equatable {
     double? exteriorShadowSizeResponse,
     double? tintAmount,
   }) => LiquidGlassSettings(
-    thickness: thickness ?? this.thickness,
-    edgeRefraction: edgeRefraction ?? this.edgeRefraction,
-    refractionSpread: refractionSpread ?? this.refractionSpread,
-    backdropScale: backdropScale ?? this.backdropScale,
+    refractionHeight: refractionHeight ?? this.refractionHeight,
+    refractionAmount: refractionAmount ?? this.refractionAmount,
+    refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
+    smoothRefraction: smoothRefraction ?? this.smoothRefraction,
+    backdropShrink: backdropShrink ?? this.backdropShrink,
     frost: frost ?? this.frost,
-    chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+    dispersion: dispersion ?? this.dispersion,
     highlight: highlight ?? this.highlight,
     highlightWidth: highlightWidth ?? this.highlightWidth,
     highlightWrap: highlightWrap ?? this.highlightWrap,
@@ -561,12 +620,13 @@ class LiquidGlassSettings with Equatable {
 
   /// Serializes the public material vector for example presets and tooling.
   Map<String, Object> toJson() => {
-    'thickness': thickness,
-    'edgeRefraction': edgeRefraction,
-    'refractionSpread': refractionSpread,
-    'backdropScale': backdropScale,
+    'refractionHeight': refractionHeight,
+    'refractionAmount': refractionAmount,
+    'refractionFitsShape': refractionFitsShape,
+    'smoothRefraction': smoothRefraction,
+    'backdropShrink': backdropShrink,
     'frost': frost,
-    'chromaticAberration': chromaticAberration,
+    'dispersion': dispersion,
     'highlight': highlight,
     'highlightWidth': highlightWidth,
     'highlightWrap': highlightWrap,
@@ -588,12 +648,13 @@ class LiquidGlassSettings with Equatable {
 
   @override
   List<Object?> get props => [
-    thickness,
-    edgeRefraction,
-    refractionSpread,
-    backdropScale,
+    refractionHeight,
+    refractionAmount,
+    refractionFitsShape,
+    smoothRefraction,
+    backdropShrink,
     frost,
-    chromaticAberration,
+    dispersion,
     highlight,
     highlightWidth,
     highlightWrap,

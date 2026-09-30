@@ -38,9 +38,19 @@ uniform vec2 uFilterToMatteOffset;
 // material to the refracted backdrop instead, so visibility 0 is an exact
 // identity of the backdrop.
 uniform float uBlurFade;
+// 1.0 folds sub-pixel frost into this pass: the refracted texel plus its two
+// diagonal neighbours, weighted 1/2, 1/4, 1/4 (sigma ~0.7 device px), instead
+// of a blur pass. Whole-texel offsets, because the filter input is sampled
+// nearest.
+uniform float uSoften;
+// Matte-space rect (LTRB, device px) the filter captured backdrop for.
+// Outside it the filter input is transparent or clamped, so displaced samples
+// are mirrored back in at its edge.
+uniform vec4 uBackdropBounds;
 
 float uDisplacementScale = uOpticalProps.x;
-float uChromaticAberration = uOpticalProps.y;
+float uDispersion = uOpticalProps.y;
+// Rim lighting depth; the matte encodes edge distance up to 4x this.
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
 float uBackdropScale = uLightConfig.y;
@@ -69,7 +79,7 @@ float uHighlightOppositeStrength = uLightingShapeConfig.w;
 // rather than by CA alone, so a large-refraction surface does not silently lose
 // visible dispersion. The threshold is a conservative quarter-pixel total
 // red-to-blue spread (an eighth pixel on either side of green).
-const float kChromaticAberrationSubpixelThreshold = 0.25;
+const float kDispersionSubpixelThreshold = 0.25;
 // Border strength; the dark iOS 27 face raises it with the slider.
 float gContourAlpha = uContourColor.a;
 // iOS 27 glint recolor, measured on the pinned solid-palette probes in both
@@ -308,6 +318,29 @@ vec2 filterDeltaFromMatteDelta(vec2 matteDelta, vec4 basis) {
         basis.w * matteDelta.x - basis.y * matteDelta.y,
         -basis.z * matteDelta.x + basis.x * matteDelta.y
     ) / determinant;
+}
+
+vec2 mirrorIntoBackdrop(vec2 sourceOffset, vec2 matteCoord) {
+    vec2 sampleMatte = matteCoord + vec2(
+        dot(uFilterToMatteBasis.xy, sourceOffset),
+        dot(uFilterToMatteBasis.zw, sourceOffset)
+    );
+    // Keep bilinear footprints, and the softening taps one texel out, off
+    // the uncaptured side of the edge.
+    float margin = 0.5 + uSoften;
+    vec2 lo = uBackdropBounds.xy + margin;
+    vec2 hi = uBackdropBounds.zw - margin;
+    if (all(greaterThanEqual(sampleMatte, lo)) &&
+        all(lessThanEqual(sampleMatte, hi))) {
+        return sourceOffset;
+    }
+    vec2 extent = max(hi - lo, vec2(0.0));
+    vec2 mirrored = lo + extent - abs(extent - abs(sampleMatte - lo));
+    mirrored = clamp(mirrored, lo, max(hi, lo));
+    return sourceOffset + filterDeltaFromMatteDelta(
+        mirrored - sampleMatte,
+        uFilterToMatteBasis
+    );
 }
 
 vec3 applySpecularHighlights(
@@ -631,7 +664,7 @@ void main() {
     float maxDisplacement = max(uDisplacementScale, 0.001);
     float signedEdgeDistance = decodeSignedEdgeDistance(
         geometryData,
-        max(uThickness, 1.0),
+        4.0 * max(uThickness, 1.0),
         contourExtent()
     );
     // Box-filtered coverage of one physical pixel, as Core Animation
@@ -653,35 +686,18 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // Treat face scaling and edge refraction as one source-coordinate
-        // mapping. The scale is exactly identity at the mathematical contour,
-        // then approaches the requested face scale continuously without a
-        // clipped cutoff. Complementing the actual displacement field lets
-        // edge refraction own the optical wall for every SDF/blended shape.
-        float inwardDistance = max(signedEdgeDistance, 0.0);
-        float transitionDepth = max(uThickness * 0.25, 1.0);
-        float inwardDistanceSquared = inwardDistance * inwardDistance;
-        float transitionDepthSquared = transitionDepth * transitionDepth;
-        float distanceWeight =
-            inwardDistanceSquared /
-            (inwardDistanceSquared + transitionDepthSquared);
-        float displacementRatio = clamp(
-            length(displacement) / maxDisplacement,
-            0.0,
-            1.0
-        );
-        float refractionComplement =
-            1.0 - smoothstep(0.0, 1.0, displacementRatio);
-        float scaleWeight = distanceWeight * refractionComplement;
+        // backdropShrink is one lens over the whole face, about the material
+        // center of the layer, uniform up to the silhouette. The bevel
+        // displacement adds on top of it. It never enlarges: magnifiers
+        // re-render their content instead (see the example's loupe).
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis
         );
-        float backdropScale = clamp(uBackdropScale, 0.25, 4.0);
+        float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
             filterDeltaFromCenter *
-            (1.0 / backdropScale - 1.0) *
-            scaleWeight *
+            (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
     vec4 refractColor;
@@ -689,29 +705,72 @@ void main() {
     // subpixel. The uniform predicate stays coherent across the layer and the
     // displacement bound keeps this optimization valid for either CA sign.
     if (
-        abs(uChromaticAberration) * maxDisplacement <=
-        kChromaticAberrationSubpixelThreshold
+        abs(uDispersion) * maxDisplacement <=
+        kDispersionSubpixelThreshold
     ) {
-        vec2 refractedUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + displacement) * invUSize,
-            invUSize
-        );
-        refractColor = texture(uBackgroundTexture, refractedUV);
+        vec2 sourceOffset = backdropScaleOffset + displacement;
+        vec2 refractedUV;
+        if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
+            // Undisplaced glass fetches its own texel, bypassing the sampler,
+            // so it reproduces the backdrop exactly even when the sampler is
+            // bilinear (whose fixed-point sub-texel weights are never exactly
+            // zero at texel centres).
+            refractedUV = (floor(fragCoord) + 0.5) * invUSize;
+            #ifdef IMPELLER_TARGET_OPENGLES
+            // The GLES runtime stages also emit GLSL ES 1.00, which has no
+            // texelFetch. The texel centre is exact under nearest sampling;
+            // bilinear can differ by a few LSB at hard edges.
+            refractColor = texture(uBackgroundTexture, refractedUV);
+            #else
+            refractColor = texelFetch(
+                uBackgroundTexture,
+                ivec2(floor(fragCoord)),
+                0
+            );
+            #endif
+        } else {
+            refractedUV = screenUV +
+                mirrorIntoBackdrop(sourceOffset, matteCoord) * invUSize;
+            refractColor = texture(
+                uBackgroundTexture,
+                mirrorBackgroundUV(refractedUV, invUSize)
+            );
+        }
+        if (uSoften > 0.5) {
+            // The offset scales with visibility, so hidden glass collapses
+            // the kernel onto the unfiltered backdrop.
+            vec2 softenTap = vec2(appearanceVisibility) * invUSize;
+            vec2 tapA = mirrorBackgroundUV(refractedUV + softenTap, invUSize);
+            vec2 tapB = mirrorBackgroundUV(refractedUV - softenTap, invUSize);
+            refractColor = 0.5 * refractColor + 0.25 * (
+                texture(uBackgroundTexture, tapA) +
+                texture(uBackgroundTexture, tapB)
+            );
+        }
     } else {
-        float dispersionStrength = uChromaticAberration * 0.5;
+        float dispersionStrength = uDispersion * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
         
         vec2 redUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + redOffset) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + redOffset,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         vec2 greenUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + displacement) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + displacement,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         vec2 blueUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + blueOffset) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + blueOffset,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         

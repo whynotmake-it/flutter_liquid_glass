@@ -25,14 +25,14 @@ const _defaultRepetition = int.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_REPETITION',
   defaultValue: 1,
 );
-final _benchmarkBackdropScale =
+final _benchmarkBackdropShrink =
     double.tryParse(
       const String.fromEnvironment(
-        'LIQUID_GLASS_BENCHMARK_BACKDROP_SCALE',
-        defaultValue: '1',
+        'LIQUID_GLASS_BENCHMARK_BACKDROP_SHRINK',
+        defaultValue: '0',
       ),
     ) ??
-    1;
+    0;
 final _groupShadowAlpha =
     double.tryParse(
       const String.fromEnvironment(
@@ -422,6 +422,12 @@ enum BenchmarkScenario {
   realSaturationOnly,
   realBlurSaturation,
   realToolbarMaterial,
+  realClearMaterial,
+  realClearUnfrosted,
+  realClearSmooth,
+  realToolbarSmooth,
+  realClearNearest,
+  realToolbarNearest,
   fakeLightingOnly,
   fakeBlurOnly,
   fakeHighBlurOnly,
@@ -624,12 +630,12 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
 
   Widget _buildScenario(double t) {
     final settings = LiquidGlassSettings(
-      thickness: 30,
+      refractionHeight: 30,
       frost: 15,
-      backdropScale: _benchmarkBackdropScale,
+      backdropShrink: _benchmarkBackdropShrink,
     );
     const litSettings = LiquidGlassSettings(
-      thickness: 30,
+      refractionHeight: 30,
       frost: 15,
       contourStrength: .22,
       contourWidth: 1.5,
@@ -705,6 +711,44 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
       ),
       BenchmarkScenario.realToolbarMaterial => _realLayer(
         LiquidGlassSettings.ios27ToolbarLight(),
+        t,
+        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+      ),
+      BenchmarkScenario.realClearMaterial => _realLayer(
+        LiquidGlassSettings.ios27Clear(),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realClearUnfrosted => _realLayer(
+        LiquidGlassSettings.ios27Clear(frost: 0),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realClearSmooth => _realLayer(
+        LiquidGlassSettings.ios27Clear(
+          frost: 0,
+        ).copyWith(smoothRefraction: true),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realToolbarSmooth => _realLayer(
+        LiquidGlassSettings.ios27ToolbarLight().copyWith(
+          smoothRefraction: true,
+        ),
+        t,
+        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+      ),
+      BenchmarkScenario.realClearNearest => _realLayer(
+        LiquidGlassSettings.ios27Clear(
+          frost: 0,
+        ).copyWith(smoothRefraction: false),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realToolbarNearest => _realLayer(
+        LiquidGlassSettings.ios27ToolbarLight().copyWith(
+          smoothRefraction: false,
+        ),
         t,
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
@@ -1920,10 +1964,10 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                     ? const LiquidGlassLayer(
                         settings: LiquidGlassSettings(
                           frost: 0,
-                          edgeRefraction: 40,
-                          backdropScale: .92,
-                          refractionSpread: .5,
-                          chromaticAberration: .1,
+                          refractionHeight: 24,
+                          refractionAmount: 40,
+                          backdropShrink: .08,
+                          dispersion: .1,
                           highlight: .4,
                           contourStrength: .1,
                           contourWidth: 1,

@@ -69,7 +69,7 @@ void paintFakeGlassSurface(
     LiquidRoundedSuperellipse(:final borderRadius) => borderRadius,
   };
   final configuredHighlightWidth = fakeGlassHighlightBandWidth(settings);
-  final opticalThickness = math.max(settings.effectiveThickness, 1).toDouble();
+  final opticalThickness = settings.effectiveEdgeDistanceRange;
   shader.setFloatUniforms((uniforms) {
     uniforms
       ..setSize(size)

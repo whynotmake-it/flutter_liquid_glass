@@ -101,8 +101,8 @@ void main() {
         height: 16,
         shapeData: unusedShape,
         numShapes: 1,
-        opticalIndex: 1.2,
-        thickness: 4,
+        refractionAmount: 24,
+        refractionHeight: 4,
         offsetX: 0,
         offsetY: 0,
       );
@@ -152,8 +152,8 @@ void main() {
               32, 32, 1, -1, // Center, distance scale, new group marker.
             ],
             numShapes: 1,
-            opticalIndex: 1.2,
-            thickness: 10,
+            refractionAmount: 24,
+            refractionHeight: 10,
             offsetX: 0,
             offsetY: 0,
           );
@@ -203,8 +203,8 @@ void main() {
           32, 48, 1, -1,
         ],
         numShapes: 2,
-        opticalIndex: 1.2,
-        thickness: 10,
+        refractionAmount: 24,
+        refractionHeight: 10,
         offsetX: 0,
         offsetY: 0,
       );
@@ -266,8 +266,8 @@ void main() {
           height: 16,
           shapeData: shape,
           numShapes: 1,
-          opticalIndex: 1.2,
-          thickness: 4,
+          refractionAmount: 24,
+          refractionHeight: 4,
           offsetX: i.isEven ? 0 : 1,
           offsetY: 0,
         );

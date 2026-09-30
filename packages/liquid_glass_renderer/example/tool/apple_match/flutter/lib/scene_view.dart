@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'dart:math' as math;
-
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 
 import 'scene.dart';
 
@@ -15,34 +14,16 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       (settings[key] as num?)?.toDouble() ?? fallback;
   const defaults = LiquidGlassSettings();
   return LiquidGlassSettings(
-    thickness: number('thickness', defaults.thickness),
-    edgeRefraction: number(
-      'edgeRefraction',
-      8.0 *
-          number('thickness', defaults.thickness) *
-          math.sqrt(
-            math.max(
-              0.0,
-              math
-                      .pow(
-                        number(
-                          'refractiveIndex',
-                          defaults.effectiveOpticalIndex,
-                        ),
-                        2,
-                      )
-                      .toDouble() -
-                  1.0,
-            ),
-          ),
-    ),
-    refractionSpread: number('refractionSpread', defaults.refractionSpread),
-    backdropScale: number('backdropScale', defaults.backdropScale),
-    frost: number('frost', number('blur', defaults.frost)),
-    highlight: number(
-      'highlight',
-      number('lightIntensity', defaults.highlight),
-    ),
+    refractionHeight: number('refractionHeight', defaults.refractionHeight),
+    refractionAmount: number('refractionAmount', defaults.refractionAmount),
+    backdropShrink: number('backdropShrink', defaults.backdropShrink),
+    refractionFitsShape:
+        settings['refractionFitsShape'] as bool? ??
+        defaults.refractionFitsShape,
+    smoothRefraction:
+        settings['smoothRefraction'] as bool? ?? defaults.smoothRefraction,
+    frost: number('frost', defaults.frost),
+    highlight: number('highlight', defaults.highlight),
     highlightWidth: number('highlightWidth', defaults.highlightWidth),
     highlightWrap: number('highlightWrap', defaults.highlightWrap),
     highlightOppositeStrength: number(
@@ -50,18 +31,12 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       defaults.highlightOppositeStrength,
     ),
     curvatureLighting: number('curvatureLighting', defaults.curvatureLighting),
-    contourStrength: number(
-      'contourStrength',
-      number('edgeAlpha', defaults.contourStrength),
-    ),
-    contourWidth: number(
-      'contourWidth',
-      number('edgeWidth', defaults.contourWidth),
-    ),
+    contourStrength: number('contourStrength', defaults.contourStrength),
+    contourWidth: number('contourWidth', defaults.contourWidth),
     contourOffset: number('contourOffset', defaults.contourOffset),
     contourTransmittance: number(
       'contourTransmittance',
-      number('contourTransmissionRatio', defaults.contourTransmittance),
+      defaults.contourTransmittance,
     ),
     contourDirectionality: number(
       'contourDirectionality',
@@ -69,16 +44,10 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     ),
     bevelShadowStrength: number(
       'bevelShadowStrength',
-      number('innerShadowStrength', defaults.bevelShadowStrength),
+      defaults.bevelShadowStrength,
     ),
-    bevelShadowDepth: number(
-      'bevelShadowDepth',
-      number('innerShadowDepth', defaults.bevelShadowDepth),
-    ),
-    bevelShadowOffset: number(
-      'bevelShadowOffset',
-      number('innerShadowOffset', defaults.bevelShadowOffset),
-    ),
+    bevelShadowDepth: number('bevelShadowDepth', defaults.bevelShadowDepth),
+    bevelShadowOffset: number('bevelShadowOffset', defaults.bevelShadowOffset),
     bevelShadowDirectionality: number(
       'bevelShadowDirectionality',
       defaults.bevelShadowDirectionality,
@@ -91,10 +60,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'exteriorShadowSizeResponse',
       defaults.exteriorShadowSizeResponse,
     ),
-    chromaticAberration: number(
-      'chromaticAberration',
-      defaults.chromaticAberration,
-    ),
+    dispersion: number('dispersion', defaults.dispersion),
     tintAmount: number('tintAmount', defaults.tintAmount),
   );
 }
@@ -112,7 +78,7 @@ LiquidGlassAppearance matchGlassAppearance(Map<String, Object?> settings) {
   const defaults = LiquidGlassAppearance();
   final tint = settings['tint'] is num
       ? Color((settings['tint']! as num).toInt())
-      : color('tint', color('glass', defaults.tint));
+      : color('tint', defaults.tint);
   final colorModel = settings.containsKey('colorModel')
       ? LiquidGlassColorModel.fromJson(settings['colorModel'])
       : defaults.colorModel;
@@ -198,12 +164,18 @@ class MatchSceneView extends StatelessWidget {
       height: shapeHeight,
     );
     final cornerRadius = _number('cornerRadius', scene.cornerRadius);
+    final loupeLink = LiquidGlassLoupeLink();
     return SizedBox(
       width: scene.width,
       height: scene.height,
       child: Stack(
         children: [
-          Positioned.fill(child: ProbeBackground(spec: background)),
+          Positioned.fill(
+            child: LiquidGlassLoupeSource(
+              link: loupeLink,
+              child: ProbeBackground(spec: background),
+            ),
+          ),
           // The reference capture retains the iPhone 17 Pro Dynamic Island
           // even though the harness hides system overlays. Reproduce that
           // device chrome deterministically so full-frame RGBW registration
@@ -224,6 +196,7 @@ class MatchSceneView extends StatelessWidget {
             ),
           if (scene.profile == 'loupe')
             _MatchLoupe(
+              link: loupeLink,
               rect: shapeRect,
               cornerRadius: cornerRadius,
               settings: matchGlassSettings(settings),
@@ -441,12 +414,11 @@ class _TabGlyphPainter extends CustomPainter {
       oldDelegate.glyph != glyph || oldDelegate.color != color;
 }
 
-/// Composes the iOS loupe as Flutter does: magnify the painted backdrop first,
-/// then apply the ordinary liquid-glass pass to that higher-resolution source.
-/// This keeps intentional loupe enlargement out of the renderer shader and
-/// avoids magnifying already filtered pixels.
+/// The iOS loupe through the package's [LiquidGlassLoupe]: the probe is
+/// re-rendered at 1.25x under the lens, then refracted and lit by the glass.
 class _MatchLoupe extends StatelessWidget {
   const _MatchLoupe({
+    required this.link,
     required this.rect,
     required this.cornerRadius,
     required this.settings,
@@ -454,6 +426,7 @@ class _MatchLoupe extends StatelessWidget {
     required this.shadows,
   });
 
+  final LiquidGlassLoupeLink link;
   final Rect rect;
   final double cornerRadius;
   final LiquidGlassSettings settings;
@@ -462,35 +435,21 @@ class _MatchLoupe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = rect.size;
-    final borderRadius = BorderRadius.circular(cornerRadius);
     return Positioned.fromRect(
       rect: rect,
-      child: SizedBox.fromSize(
-        size: size,
-        child: Stack(
-          children: [
-            RawMagnifier(
-              size: size,
-              magnificationScale: 1.55,
-              focalPointOffset: const Offset(0, 75.15),
-              decoration: MagnifierDecoration(
-                shape: RoundedRectangleBorder(borderRadius: borderRadius),
-              ),
-            ),
-            LiquidGlass.withOwnLayer(
-              // The system text-selection loupe is a clear lens. Its
-              // magnification belongs to RawMagnifier above; never let a
-              // candidate's ordinary material vector turn this holdout into
-              // a frosted, opaque pill or a full-face shader zoom.
-              settings: settings.copyWith(refractionSpread: 0, frost: 0),
-              appearance: const LiquidGlassAppearance(),
-              shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
-              shadows: shadows,
-              child: const SizedBox.expand(),
-            ),
-          ],
-        ),
+      child: LiquidGlassLoupe(
+        link: link,
+        size: rect.size,
+        shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
+        // Fitted to the iOS 27 loupe capture: interior rms 0.009 on both
+        // grid probes.
+        focalPointOffset: const Offset(0, 75),
+        // The system text-selection loupe is a clear lens. Never let a
+        // candidate's ordinary material vector turn this holdout into a
+        // frosted, opaque pill or a full-face shader zoom.
+        settings: settings.copyWith(backdropShrink: 0, frost: 0),
+        appearance: const LiquidGlassAppearance(),
+        shadows: shadows,
       ),
     );
   }
