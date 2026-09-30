@@ -226,17 +226,29 @@ float contourExtent() {
 }
 
 // The dark border starts at the silhouette (shifted outward by
-// contourOffset) and fades linearly outward over contourWidth. Inward it
-// ends within a sub-pixel feather, so the glass face keeps its own
-// transmittance right up to the glint.
-float contourCoverage(float signedEdgeDistance) {
+// contourOffset) and fades linearly outward over contourWidth. It is often
+// narrower than a pixel, so it is box-filtered over the same one-pixel
+// footprint as the silhouette instead of being point-sampled, which would
+// alias into a dotted line along curves. This is the ramp's integral from
+// the silhouette to outward distance t.
+float contourIntegral(float t) {
+    float u = clamp(t - uContourOffset, 0.0, uEdgeWidth);
+    return u - u * u / (2.0 * uEdgeWidth);
+}
+
+// Border coverage of the pixel, split at the silhouette: x lies outside the
+// material and is composited over the backdrop, y lies inside it.
+vec2 contourCoverage(float signedEdgeDistance) {
     if (uEdgeWidth <= 0.0) {
-        return 0.0;
+        return vec2(0.0);
     }
-    float outward = -signedEdgeDistance - uContourOffset;
-    return outward >= 0.0
-        ? clamp(1.0 - outward / uEdgeWidth, 0.0, 1.0)
-        : clamp(1.0 + outward * 2.0, 0.0, 1.0);
+    float outward = -signedEdgeDistance;
+    float lower = outward - 0.5;
+    float upper = outward + 0.5;
+    return vec2(
+        contourIntegral(max(upper, 0.0)) - contourIntegral(max(lower, 0.0)),
+        contourIntegral(min(upper, 0.0)) - contourIntegral(min(lower, 0.0))
+    );
 }
 
 // The fraction of the normal perpendicular to the light axis. The glint
@@ -295,7 +307,9 @@ vec3 applySpecularHighlights(
         uHighlightWidth > 0.0 ? uHighlightWidth : uEdgeWidth,
         0.001
     );
-    float outlineCoverage = contourCoverage(signedEdgeDistance);
+    // In-material share of the border, relative to the material's coverage.
+    float outlineCoverage = contourCoverage(signedEdgeDistance).y /
+        max(clamp(signedEdgeDistance + 0.5, 0.0, 1.0), 0.001);
     // The glint is a thin line anchored at the silhouette with a faint
     // inward bleed. Both are linear ramps in logical distance, so the line
     // stays crisp at every size and scale factor.
@@ -595,7 +609,7 @@ void main() {
     float materialAlpha = clamp(signedEdgeDistance + 0.5, 0.0, 1.0);
     if (
         materialAlpha < 0.01 &&
-        contourCoverage(signedEdgeDistance) * gContourAlpha < 0.01
+        contourCoverage(signedEdgeDistance).x * gContourAlpha < 0.01
     ) {
         fragColor = vec4(0.0);
         return;
@@ -792,10 +806,9 @@ void main() {
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
-        contourCoverage(signedEdgeDistance) *
+        contourCoverage(signedEdgeDistance).x *
         gContourAlpha *
         contourDirection(surfaceNormal) *
-        (1.0 - materialAlpha) *
         appearanceVisibility;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
