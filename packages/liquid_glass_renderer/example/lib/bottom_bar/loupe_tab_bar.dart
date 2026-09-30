@@ -109,15 +109,23 @@ class LoupeTabBar extends StatefulWidget {
 
 class _LoupeTabBarState extends State<LoupeTabBar>
     with TickerProviderStateMixin {
-  /// Inset of the tab row from the capsule's top and bottom. The slots span
-  /// the whole width, as on iOS 27.
-  static const _inset = 2.0;
+  /// Inset of the tab row from the capsule, as on iOS 27: 9 pt from the
+  /// ends to the first and last slot, and 4 pt from the top and bottom,
+  /// which leaves the 54 pt platter about 4.5 pt of glass on every side.
+  static const _padding = EdgeInsets.symmetric(horizontal: 9, vertical: 4);
 
-  /// Darker than the glass in both appearances, as on iOS 27.
-  static const _platterColor = CupertinoDynamicColor.withBrightness(
-    color: Color(0x14000000),
-    darkColor: Color(0x40000000),
-  );
+  /// The resting platter over light glass: 231 over white glass, as on
+  /// iOS 27.
+  static const _lightPlatter = [(Color(0x14000000), BlendMode.srcOver)];
+
+  /// The resting platter over dark glass, which iOS 27 darkens more the
+  /// darker the glass is: 185 → 143 over white content and 32 → 10 over
+  /// black. Multiplying by 0.87 and then taking the difference to 0.07
+  /// reproduces both.
+  static const _darkPlatter = [
+    (Color(0xFFDEDEDE), BlendMode.multiply),
+    (Color(0xFF121212), BlendMode.difference),
+  ];
 
   /// Pulling past either end stretches the bar sideways by at most
   /// `1 / _stretchResistance` points, 10–12 pt for a long pull as on iOS 27.
@@ -152,7 +160,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     jelly: _jelly,
     tabCount: widget.tabs.length,
     backdropShrink: widget.loupeSettings.backdropShrink,
-  );
+  )..sidePadding = _padding.left;
   late final _barTransform = Listenable.merge([_press, _stretch]);
   final _showLoupe = ValueNotifier(false);
   final _loupeVisibility = ValueNotifier<double>(0);
@@ -173,7 +181,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   int? _pendingDragFrame;
 
   int get _lastTab => widget.tabs.length - 1;
-  double get _slot => _size.width / widget.tabs.length;
+  double get _slot => (_size.width - _padding.horizontal) / widget.tabs.length;
 
   /// How far the indicator may still be from its tab when the loupe settles
   /// back into the platter: 0.3 in the original bar's alignment units.
@@ -241,7 +249,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     final scale = _swell;
     final center = _size.width / 2;
     final x = center + (local.dx - center) / scale;
-    return x / _slot - .5;
+    return (x - _padding.left) / _slot - .5;
   }
 
   int _tabAt(Offset local) => _positionAt(local).round().clamp(0, _lastTab);
@@ -397,7 +405,9 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     final tint = widget.tint ?? CupertinoTheme.of(context).primaryColor;
     final tintBrightness =
         widget.tintBrightness ?? CupertinoTheme.brightnessOf(context);
-    final platter = _platterColor.resolveFrom(context);
+    final platter = CupertinoTheme.brightnessOf(context) == Brightness.dark
+        ? _darkPlatter
+        : _lightPlatter;
     return MotionBuilder(
       motion: const CupertinoMotion.smooth(),
       converter: const ColorRgbMotionConverter(),
@@ -413,7 +423,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
             child: SizedBox.fromSize(
               size: _size,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: _inset),
+                padding: _padding,
                 child: RepaintBoundary(
                   child: _buildRows(
                     label: label,
@@ -460,12 +470,12 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     required Color label,
     required Color tint,
     required Brightness tintBrightness,
-    required Color platter,
+    required List<(Color, BlendMode)> platter,
   }) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        CustomPaint(painter: TabPlatterPainter(_selection, color: platter)),
+        CustomPaint(painter: TabPlatterPainter(_selection, layers: platter)),
         ClipPath(
           clipper: TabSelectionClipper(_selection, inverse: true),
           child: _buildRow(label, semantics: true),
@@ -529,7 +539,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
           builder: (context, show, loupe) =>
               show ? loupe! : const SizedBox.shrink(),
           child: CustomSingleChildLayout(
-            delegate: LoupeLayoutDelegate(_selection, inset: _inset),
+            delegate: LoupeLayoutDelegate(_selection, padding: _padding),
             child: ListenableTransform(
               listenable: _jelly,
               transform: (size) {
@@ -650,7 +660,7 @@ class _TabItem extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         layered(
           (foreground) => Text(
             tab.label,

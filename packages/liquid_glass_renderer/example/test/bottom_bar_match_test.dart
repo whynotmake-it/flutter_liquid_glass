@@ -11,6 +11,7 @@ import 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
+import 'package:liquid_glass_renderer_example/playground/stage.dart';
 
 /// Directory the captures are written to. The test only runs when it is set:
 ///
@@ -139,9 +140,16 @@ void main() {
     }
   }
 
-  for (final brightness in Brightness.values) {
+  // The playground over its grid backdrop, and the stage alone over black
+  // like Apple's dark-appearance capture.
+  for (final (brightness, black) in [
+    (Brightness.light, false),
+    (Brightness.dark, false),
+    (Brightness.dark, true),
+  ]) {
+    final prefix = '${brightness.name}${black ? '-black' : ''}';
     testWidgets(
-      'captures the controls scene at iPhone 17 Pro size (${brightness.name})',
+      'captures the controls scene at iPhone 17 Pro size ($prefix)',
       (tester) async {
         tester.view
           ..physicalSize = _screen * _scale
@@ -159,7 +167,15 @@ void main() {
             child: CupertinoApp(
               debugShowCheckedModeBanner: false,
               theme: CupertinoThemeData(brightness: brightness),
-              home: Playground(state: state),
+              home: black
+                  ? CupertinoPageScaffold(
+                      backgroundColor: const Color(0xFF000000),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Stage(state: state, onSettings: () {}),
+                      ),
+                    )
+                  : Playground(state: state),
             ),
           ),
         );
@@ -178,7 +194,7 @@ void main() {
           final image = await boundary.toImage(pixelRatio: _scale);
           await tester.runAsync(() async {
             final png = await image.toByteData(format: ui.ImageByteFormat.png);
-            final file = File('$_out/${brightness.name}-$name.png');
+            final file = File('$_out/$prefix-$name.png');
             await file.parent.create(recursive: true);
             await file.writeAsBytes(png!.buffer.asUint8List());
           });

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:motor/motor.dart';
 
@@ -36,38 +37,41 @@ class TabSelection {
 
   late final Listenable listenable = Listenable.merge([position, press, jelly]);
 
-  /// Width of the resting platter in slots: 81.7 pt over the 72.3 pt slots
-  /// of the iOS 27 tab bar.
-  static const platterWidth = 1.13;
+  /// How far the resting platter reaches past its slot on each side: the
+  /// iOS 27 platter is 77 pt wide over 68.7 pt slots.
+  static const platterOutset = 4.15;
 
-  /// Width of the loupe in slots: 97 pt over 72.3 pt slots.
-  static const loupeWidth = 1.34;
+  /// How far the loupe reaches past the platter on each side: a 97 × 73 pt
+  /// loupe over the 77 × 54 pt platter of iOS 27.
+  static const loupeOutset = Size(10, 9.5);
 
-  /// How far the loupe reaches past the tab row at the top and bottom: the
-  /// 73 pt tall loupe of iOS 27 over its 58 pt row.
-  static const loupeOverhang = 7.5;
+  /// Room between the tab row and the bar's ends, which the loupe may use
+  /// but never cross.
+  double sidePadding = 0;
 
   double get _pressAmount => math.max(press.value, 0);
 
   /// The indicator within a tab row of [size], before squash and stretch.
   ///
-  /// It is centered on its tab but, like Apple's, never leaves the row
-  /// sideways, so at the end tabs it sits flush with the bar's ends.
+  /// The platter is centered on its tab, inside the bar's padding. The loupe
+  /// is centered on it too but, like Apple's, never crosses the bar's ends,
+  /// so at the end tabs it sits flush with them.
   Rect restingRect(Size size, {double? pressAmount}) {
     final amount = pressAmount ?? _pressAmount;
     final slot = size.width / tabCount;
+    final grow = loupeOutset * 2 * amount;
     final width = math.min(
-      slot * (platterWidth + (loupeWidth - platterWidth) * amount),
-      size.width,
+      slot + 2 * platterOutset + grow.width,
+      size.width + 2 * sidePadding,
     );
     final center = ((position.value + .5) * slot).clamp(
-      width / 2,
-      size.width - width / 2,
+      width / 2 - sidePadding,
+      size.width + sidePadding - width / 2,
     );
     return Rect.fromCenter(
       center: Offset(center, size.height / 2),
       width: width,
-      height: size.height + 2 * loupeOverhang * amount,
+      height: size.height + grow.height,
     );
   }
 
@@ -151,42 +155,49 @@ class TabSelectionClipper extends CustomClipper<Path> {
 
 /// The resting selection platter. It fades out as the loupe takes over.
 class TabPlatterPainter extends CustomPainter {
-  TabPlatterPainter(this.selection, {required this.color})
+  TabPlatterPainter(this.selection, {required this.layers})
     : super(repaint: selection.listenable);
 
   final TabSelection selection;
-  final Color color;
+
+  /// Colors painted over the glass one after the other, each with its blend
+  /// mode.
+  final List<(Color, BlendMode)> layers;
 
   @override
   void paint(Canvas canvas, Size size) {
     final opacity = (1 - selection.press.value).clamp(0.0, 1.0);
     if (opacity == 0) return;
-    canvas.drawRRect(
-      selection.rrect(size),
-      Paint()..color = color.withValues(alpha: color.a * opacity),
-    );
+    final rrect = selection.rrect(size);
+    for (final (color, blendMode) in layers) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = color.withValues(alpha: color.a * opacity)
+          ..blendMode = blendMode,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(TabPlatterPainter oldDelegate) =>
-      oldDelegate.selection != selection || oldDelegate.color != color;
+      oldDelegate.selection != selection ||
+      !listEquals(oldDelegate.layers, layers);
 }
 
-/// Places the loupe over the indicator of a tab row inset by [inset] at the
-/// top and bottom.
+/// Places the loupe over the indicator of a tab row inset by [padding].
 ///
 /// Relayouts on every move without rebuilding; the child's constraints only
 /// change while the loupe grows or shrinks.
 class LoupeLayoutDelegate extends SingleChildLayoutDelegate {
-  LoupeLayoutDelegate(this.selection, {required this.inset})
+  LoupeLayoutDelegate(this.selection, {required this.padding})
     : super(relayout: selection.listenable);
 
   final TabSelection selection;
-  final double inset;
+  final EdgeInsets padding;
 
-  Rect _rect(Size size) => selection
-      .restingRect(Size(size.width, size.height - 2 * inset))
-      .shift(Offset(0, inset));
+  Rect _rect(Size size) =>
+      selection.restingRect(padding.deflateSize(size)).shift(padding.topLeft);
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
@@ -197,5 +208,5 @@ class LoupeLayoutDelegate extends SingleChildLayoutDelegate {
 
   @override
   bool shouldRelayout(LoupeLayoutDelegate oldDelegate) =>
-      oldDelegate.selection != selection || oldDelegate.inset != inset;
+      oldDelegate.selection != selection || oldDelegate.padding != padding;
 }
