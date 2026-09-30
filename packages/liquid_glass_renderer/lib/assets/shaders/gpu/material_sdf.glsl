@@ -86,6 +86,13 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
 
     MaterialSceneSample result = empty;
     MaterialSceneSample groupResult = empty;
+    // The final pass filters weights across neighboring texels but takes
+    // contributor IDs from one of them. A shape must therefore already be the
+    // secondary of the texels next to where its weight starts, or a texel
+    // still naming another secondary picks up part of the filtered weight.
+    // Over a texel diagonal the distance difference changes by up to twice
+    // that diagonal, so cull with that much extra reach.
+    float filterReach = 2.0 * 1.4142 * uMaterialRasterScale;
     int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (i >= shapeCount) break;
@@ -95,7 +102,7 @@ MaterialSceneSample materialSceneSample(vec2 p, int numShapes) {
         if (
             !startsGroup &&
             getShapeBoundsDistanceFromArray(i, p) >=
-                groupResult.distance + groupBlend
+                groupResult.distance + groupBlend + filterReach
         ) {
             continue;
         }

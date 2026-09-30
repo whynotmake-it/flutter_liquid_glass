@@ -87,11 +87,16 @@ void main() {
         alpha
     );
     #else
+    // b is the nearest shape's weight. a is the same weight expressed for the
+    // lower-indexed shape of the pair: where the nearest shape swaps, both
+    // texels store the same pair in opposite order, and only a interpolates
+    // through the midpoint.
+    float primaryWeight = materialPrimaryWeight(scene);
     fragColor = vec4(
         (scene.primary + 0.5) / float(MAX_SHAPES),
         (scene.secondary + 0.5) / float(MAX_SHAPES),
-        materialPrimaryWeight(scene),
-        1.0
+        primaryWeight,
+        scene.primary <= scene.secondary ? primaryWeight : 1.0 - primaryWeight
     );
     #endif
 }
