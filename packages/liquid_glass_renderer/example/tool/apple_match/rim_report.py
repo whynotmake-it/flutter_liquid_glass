@@ -34,6 +34,7 @@ from apple_match.metrics import read_rgb  # noqa: E402
 
 ZOOM = 5
 DETAIL = (36, 24)  # physical pixels before zoom
+COMPACT_DETAIL = (30, 16)
 
 
 def _font(size: int) -> ImageFont.ImageFont:
@@ -69,8 +70,12 @@ def _detail_points(mask: np.ndarray) -> dict[str, tuple[int, int]]:
     }
 
 
-def _crop(image: Image.Image, center: tuple[int, int]) -> Image.Image:
-    w, h = DETAIL
+def _crop(
+    image: Image.Image,
+    center: tuple[int, int],
+    detail: tuple[int, int] = DETAIL,
+) -> Image.Image:
+    w, h = detail
     x, y = center
     box = (x - w // 2, y - h // 2, x + w // 2, y + h // 2)
     return image.crop(box).resize((w * ZOOM, h * ZOOM), Image.NEAREST)
@@ -139,6 +144,57 @@ def compose(
     canvas.save(output)
 
 
+def compose_compact(
+    reference: Path,
+    candidates: list[tuple[str, Path]],
+    title: str,
+    subtitle: str,
+    output: Path,
+    probes: tuple[str, ...] = ("C", "D"),
+) -> None:
+    """Small review JPEG: thumbnails plus 5x crops, one column per source."""
+    mask = rim.silhouette_mask(read_rgb(reference / "C.png"), read_rgb(reference / "D.png"))
+    ys, xs = np.where(mask)
+    margin = 20
+    box = (int(xs.min()) - margin, int(ys.min()) - margin, int(xs.max()) + margin, int(ys.max()) + margin)
+    points = _detail_points(mask)
+    columns = [("APPLE", reference), *candidates]
+    cell_w, cell_h = COMPACT_DETAIL[0] * ZOOM, COMPACT_DETAIL[1] * ZOOM
+    gap = 6
+    label_w = 92
+    header = 58
+    thumb_h = int((box[3] - box[1]) * cell_w / (box[2] - box[0]))
+    rows = [("thumb", probe, None) for probe in probes] + [
+        ("crop", probe, name) for probe in probes for name in points
+    ]
+    height = header + 22 + sum((thumb_h if kind == "thumb" else cell_h) + gap for kind, _, _ in rows)
+    width = label_w + len(columns) * (cell_w + gap)
+    canvas = Image.new("RGB", (width, height), (28, 30, 34))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((gap, 4), title, font=_font(16), fill="white")
+    draw.text((gap, 26), subtitle, font=_font(11), fill=(206, 211, 219))
+    for ci, (label, _) in enumerate(columns):
+        draw.text((label_w + ci * (cell_w + gap), header), label, font=_font(13),
+                  fill=(255, 214, 102) if ci == 0 else "white")
+    names = {"C": "black", "D": "white", "A": "RGBW"}
+    top = header + 22
+    for kind, probe, name in rows:
+        h = thumb_h if kind == "thumb" else cell_h
+        draw.text((gap, top + 4), f"{names.get(probe, probe)}", font=_font(11), fill="white")
+        draw.text((gap, top + 18), "full" if kind == "thumb" else f"5x {name}", font=_font(10), fill=(255, 64, 160))
+        for ci, (_, directory) in enumerate(columns):
+            image = _load(directory, probe)
+            tile = (
+                image.crop(box).resize((cell_w, thumb_h), Image.LANCZOS)
+                if kind == "thumb"
+                else _crop(image, points[name], COMPACT_DETAIL)
+            )
+            canvas.paste(tile, (label_w + ci * (cell_w + gap), top))
+        top += h + gap
+    output.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output, quality=82, optimize=True)
+
+
 def compose_palette(
     reference: Path,
     candidates: list[tuple[str, Path]],
@@ -146,6 +202,8 @@ def compose_palette(
     title: str,
     subtitle: str,
     output: Path,
+    face_half_width: int = 60,
+    detail: tuple[int, int] = DETAIL,
 ) -> None:
     """One row per solid probe: face crop plus a 5x glint crop per column."""
     mask = rim.silhouette_mask(read_rgb(reference / "K.png"), read_rgb(reference / "W.png"))
@@ -153,11 +211,11 @@ def compose_palette(
     y0 = int(ys.min())
     cx = (int(xs.min()) + int(xs.max())) // 2
     glint_center = (cx, y0)
-    face_box = (cx - 60, y0 - 12, cx + 60, y0 + 48)
+    face_box = (cx - face_half_width, y0 - 12, cx + face_half_width, y0 + 48)
     columns = [("APPLE", reference), *candidates]
-    cell_w = DETAIL[0] * ZOOM
+    cell_w = detail[0] * ZOOM
     face_w = face_box[2] - face_box[0]
-    row_h = DETAIL[1] * ZOOM
+    row_h = detail[1] * ZOOM
     gap = 10
     header = 96
     col_w = face_w + cell_w + gap
@@ -180,9 +238,12 @@ def compose_palette(
             left = 60 + ci * (col_w + gap)
             face = image.crop(face_box).resize((face_w, row_h), Image.NEAREST)
             canvas.paste(face, (left, top))
-            canvas.paste(_crop(image, glint_center), (left + face_w + gap, top))
+            canvas.paste(
+                _crop(image, glint_center, detail),
+                (left + face_w + gap, top),
+            )
     output.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(output)
+    canvas.save(output, quality=82, optimize=True)
 
 
 def score(reference: Path, candidate: Path) -> dict[str, float]:
@@ -200,6 +261,11 @@ def main() -> None:
     parser.add_argument("--note", default="", help="extra provenance line under the subtitle")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--probe", action="append", help="probes to show (default C D A)")
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="small review image (JPEG when --output ends in .jpg)",
+    )
     parser.add_argument(
         "--palette",
         nargs="+",
@@ -226,7 +292,16 @@ def main() -> None:
         )
         if args.note:
             subtitle = f"{subtitle}\n{args.note}"
-        compose_palette(args.reference, candidates, args.palette, args.title, subtitle, args.output)
+        compose_palette(
+            args.reference,
+            candidates,
+            args.palette,
+            args.title,
+            subtitle,
+            args.output,
+            face_half_width=30 if args.compact else 60,
+            detail=COMPACT_DETAIL if args.compact else DETAIL,
+        )
         args.output.with_suffix(".json").write_text(json.dumps(scores, indent=2) + "\n")
         print(json.dumps({k: {m: v for m, v in s.items() if m != "probes"} for k, s in scores.items()}, indent=2))
         return
@@ -240,6 +315,18 @@ def main() -> None:
         )
     if args.note:
         subtitle = f"{subtitle}\n{args.note}"
+    if args.compact:
+        compose_compact(
+            args.reference,
+            candidates,
+            args.title,
+            subtitle,
+            args.output,
+            tuple(args.probe) if args.probe else ("C", "D"),
+        )
+        args.output.with_suffix(".json").write_text(json.dumps(scores, indent=2) + "\n")
+        print(json.dumps(scores, indent=2))
+        return
     compose(
         args.reference,
         candidates,
