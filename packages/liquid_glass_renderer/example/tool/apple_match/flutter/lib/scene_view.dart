@@ -95,6 +95,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'chromaticAberration',
       defaults.chromaticAberration,
     ),
+    tintAmount: number('tintAmount', defaults.tintAmount),
   );
 }
 

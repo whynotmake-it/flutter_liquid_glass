@@ -74,7 +74,12 @@ void paintFakeGlassSurface(
         opticalThickness,
         settings.effectiveHighlightWrap,
         settings.effectiveHighlightOppositeStrength * appearanceVisibility,
-        settings.effectiveContourStrength * appearanceVisibility,
+        settings.effectiveContourStrength *
+            appearance.colorModel.contourScale(
+              size.shortestSide,
+              settings.effectiveTintAmount,
+            ) *
+            appearanceVisibility,
         settings.effectiveContourWidth,
         settings.effectiveContourTransmittance,
         settings.effectiveContourOffset,

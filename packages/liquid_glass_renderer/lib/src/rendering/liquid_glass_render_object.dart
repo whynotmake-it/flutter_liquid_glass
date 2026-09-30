@@ -341,6 +341,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setFloats([
           transmissionGamma,
           vibrancy,
+          settings.effectiveTintAmount,
         ])
         ..setFloats([
           settings.effectiveBevelShadowStrength,
@@ -354,10 +355,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           _materialShortSide,
         ]);
     });
-    // Float index 52, after the 46-float common block and the 6-float
+    // Float index 53, after the 47-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
     // unfrosted glass stays alpha-1 and matches the backdrop exactly.
-    shader.setFloat(52, settings.effectiveFrost > 0 ? 1 : 0);
+    shader.setFloat(53, settings.effectiveFrost > 0 ? 1 : 0);
   }
 
   List<double> _appearanceLookupData(
@@ -1183,7 +1184,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
   ) {
-    shader.setFloatUniforms(initialIndex: 46, (value) {
+    shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,

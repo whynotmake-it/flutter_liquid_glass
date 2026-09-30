@@ -42,6 +42,25 @@ void main() {
     expect(clear.bevelShadowStrength, 0);
   });
 
+  test('the Liquid Glass slider round-trips and only adds blur', () {
+    const settings = LiquidGlassSettings(frost: 3, tintAmount: .5);
+    expect(LiquidGlassSettings.fromJson(settings.toJson()), settings);
+    expect(settings.copyWith(tintAmount: 1).tintAmount, 1);
+    expect(const LiquidGlassSettings(frost: 3).effectiveFrost, 3);
+    expect(settings.effectiveFrost, greaterThan(3));
+    expect(
+      const LiquidGlassSettings(frost: 3, tintAmount: 1).effectiveFrost,
+      greaterThan(settings.effectiveFrost),
+    );
+    expect(
+      LiquidGlassSettings.ios27Toolbar(
+        brightness: Brightness.dark,
+        tintAmount: .25,
+      ).tintAmount,
+      .25,
+    );
+  });
+
   test('brightness-aware toolbar factory selects structural presets', () {
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
