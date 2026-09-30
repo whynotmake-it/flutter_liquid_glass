@@ -1,6 +1,6 @@
 // Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 6: smooth unions are bounded by each pair's
-// convex hull, so merged shapes no longer bulge past collinear edges.
+// Geometry encoding revision 7: smooth unions scale their radius with the
+// angle between the shapes' normals, so collinear edges no longer bulge.
 // continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
 // shader depfile does not reliably invalidate changes made only in includes.
 // Changes:

@@ -1,7 +1,7 @@
 // Deliberately low-resolution per-shape appearance map. The full-resolution
 // geometry pass remains authoritative for optics and lighting; this pass only
 // supplies a smooth, approximate tint transition between nearby shapes.
-// Geometry encoding revision 6: shares the hull-bounded smooth union.
+// Geometry encoding revision 7: shares the angle-scaled smooth union.
 
 #define MAX_SHAPES 16
 
