@@ -1,9 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-
-import 'shared.dart';
+import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 
 class _HairlinePainter extends CustomPainter {
   @override
@@ -93,6 +94,7 @@ void main() {
       expect(row.where((value) => value < 32), hasLength(1));
       expect(row.where((value) => value > 32 && value < 224), isEmpty);
     },
-    skip: skipProperGlassTests,
+    // Needs Impeller shader filters (`--enable-impeller`).
+    skip: !ui.ImageFilter.isShaderFilterSupported,
   );
 }
