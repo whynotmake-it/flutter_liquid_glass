@@ -15,6 +15,7 @@ import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart'
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
+import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
@@ -743,31 +744,27 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   }
 
   static const _maxEdgeShapes = 16;
-  static const _edgeFloatsPerShape = 12;
+  static const _edgeFloatsPerShape = 24;
 
   /// Physical pixels between the silhouette and the edge pass's clips. The
   /// coverage ramp spans half a pixel on either side.
   static const _edgeReachPixels = 2.0;
 
-  /// [shape] as the edge pass evaluates it, grown by [outset] logical pixels:
-  /// rounded boxes and ovals like the analytic surface, which draws
-  /// superellipses as rounded boxes.
+  /// [shape] grown by [outset] logical pixels; the edge pass's two pixels of
+  /// slack absorb the difference from an exact offset curve.
   static Path _edgePath(LiquidShape shape, Rect rect, double outset) {
     final grown = rect.inflate(outset);
+    Radius grownRadius(double radius) => Radius.circular(
+      math.max(math.min(radius, rect.shortestSide / 2) + outset, 0),
+    );
     return switch (shape) {
       LiquidOval() => Path()..addOval(grown),
-      LiquidRoundedRectangle(:final borderRadius) ||
+      LiquidRoundedRectangle(:final borderRadius) =>
+        Path()
+          ..addRRect(RRect.fromRectAndRadius(grown, grownRadius(borderRadius))),
       LiquidRoundedSuperellipse(:final borderRadius) =>
-        Path()..addRRect(
-          RRect.fromRectAndRadius(
-            grown,
-            Radius.circular(
-              math.max(
-                math.min(borderRadius, rect.shortestSide / 2) + outset,
-                0,
-              ),
-            ),
-          ),
+        Path()..addRSuperellipse(
+          RSuperellipse.fromRectAndRadius(grown, grownRadius(borderRadius)),
         ),
     };
   }
@@ -798,13 +795,17 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     final (type, radius) = switch (shape) {
       LiquidOval() => (0.0, 0.0),
       LiquidRoundedRectangle(:final borderRadius) => (1.0, borderRadius),
-      LiquidRoundedSuperellipse(:final borderRadius) => (1.0, borderRadius),
+      LiquidRoundedSuperellipse(:final borderRadius) => (2.0, borderRadius),
     };
     return data..addAll([
       a, b, c, d, //
       tx - size.width / 2, ty - size.height / 2,
       size.width / 2, size.height / 2, //
       radius, type, math.sqrt((a * d - b * c).abs()), 0,
+      if (shape is LiquidRoundedSuperellipse)
+        ...roundedSuperellipseParameters(size, radius)
+      else
+        ...List<double>.filled(12, 0),
     ]);
   }
 
@@ -852,7 +853,8 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
         value
           ..setFloats(shapes.sublist(i, i + 10))
           ..setFloat(shapes[i + 10] * pixel)
-          ..setFloat(0);
+          ..setFloat(0)
+          ..setFloats(shapes.sublist(i + 12, i + _edgeFloatsPerShape));
       }
     });
     _edgeFilterMapping = mapping;

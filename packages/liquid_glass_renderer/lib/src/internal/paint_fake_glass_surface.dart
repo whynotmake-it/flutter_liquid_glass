@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
 
 /// Resolves the highlight band width using the same fallback as the real
 /// image-filter shader: an omitted highlight width follows the contour width.
@@ -27,6 +28,8 @@ double fakeGlassSurfaceOutset(LiquidGlassSettings settings) {
       )
       .toDouble();
 }
+
+const _noSuperellipse = <double>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /// Paints one analytic FakeGlass surface with the same logical-pixel setting
 /// contract used by RealGlass.
@@ -93,7 +96,12 @@ void paintFakeGlassSurface(
       ..setOffset(const Offset(0, 1))
       ..setFloat(1 / math.max(devicePixelRatio, 0.01))
       ..setFloat(exteriorOnly ? 1 : 0)
-      ..setFloat(appearance.colorModel.fakeGlintLuminance);
+      ..setFloat(appearance.colorModel.fakeGlintLuminance)
+      ..setFloats(
+        shape is LiquidRoundedSuperellipse
+            ? roundedSuperellipseParameters(size, cornerRadius)
+            : _noSuperellipse,
+      );
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(

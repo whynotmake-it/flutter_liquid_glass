@@ -23,25 +23,15 @@ uniform vec4 uPassToLayerBasis;
 uniform vec2 uPassToLayerOffset;
 uniform float uShapeCount;
 // Per shape: layer-to-shape affine basis; its offset and half size; corner
-// radius, shape type (0 oval, 1 rounded box) and the shape-space length of
-// one physical pixel.
-uniform vec4 uShapes[MAX_SHAPES * 3];
+// radius, shape type (0 oval, 1 rounded rectangle, 2 rounded superellipse)
+// and the shape-space length of one physical pixel; then the three rounded
+// superellipse parameter vectors.
+uniform vec4 uShapes[MAX_SHAPES * 6];
 uniform sampler2D uTexture;
 
 out vec4 fragColor;
 
-float sdRoundedBox(vec2 p, vec2 halfSize, float radius) {
-    radius = clamp(radius, 0.0, min(halfSize.x, halfSize.y));
-    vec2 q = abs(p) - halfSize + vec2(radius);
-    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-}
-
-float sdEllipse(vec2 p, vec2 radius) {
-    radius = max(radius, vec2(0.001));
-    float k0 = length(p / radius);
-    float k1 = length(p / (radius * radius));
-    return k0 * (k0 - 1.0) / max(k1, 0.001);
-}
+#include "fake_glass_shape.glsl"
 
 void main() {
     vec2 fragCoord = FlutterFragCoord().xy;
@@ -52,16 +42,22 @@ void main() {
     float coverage = 0.0;
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (float(i) >= uShapeCount) break;
-        vec4 basis = uShapes[i * 3];
-        vec4 placement = uShapes[i * 3 + 1];
-        vec4 profile = uShapes[i * 3 + 2];
+        vec4 basis = uShapes[i * 6];
+        vec4 placement = uShapes[i * 6 + 1];
+        vec4 profile = uShapes[i * 6 + 2];
         vec2 local = vec2(
             dot(basis.xy, layerPoint),
             dot(basis.zw, layerPoint)
         ) + placement.xy;
-        float distance = profile.y < 0.5
-            ? sdEllipse(local, placement.zw)
-            : sdRoundedBox(local, placement.zw, profile.x);
+        float distance = sdFakeGlassShape(
+            profile.y,
+            local,
+            placement.zw,
+            profile.x,
+            uShapes[i * 6 + 3],
+            uShapes[i * 6 + 4],
+            uShapes[i * 6 + 5]
+        );
         coverage = max(
             coverage,
             clamp(0.5 - distance / profile.z, 0.0, 1.0)
