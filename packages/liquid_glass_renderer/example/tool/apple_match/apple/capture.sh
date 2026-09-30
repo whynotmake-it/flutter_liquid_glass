@@ -67,6 +67,10 @@ xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
   ReduceMotionEnabled -bool "$REDUCE_MOTION_DEFAULT"
 if [[ "$PREVIOUS_REDUCE_MOTION" != "$REDUCE_MOTION" ]]; then
   xcrun simctl shutdown "$IOS_27_UDID"
+  # shutdown can return before the device stops; booting early races it.
+  while ! xcrun simctl list devices | grep "$IOS_27_UDID" | grep -q "(Shutdown)"; do
+    sleep 1
+  done
   xcrun simctl boot "$IOS_27_UDID"
   xcrun simctl bootstatus "$IOS_27_UDID" -b
   sleep 5
