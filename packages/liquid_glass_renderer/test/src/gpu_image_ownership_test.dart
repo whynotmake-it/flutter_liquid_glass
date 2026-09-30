@@ -34,8 +34,9 @@ void runGpuImageOwnershipTests() {
           return renderer.render(
             width: 64,
             height: 64,
+            // A rounded rectangle: continuous corners need their RSE payload.
             shapeData: [
-              1,
+              3,
               20,
               30,
               4,

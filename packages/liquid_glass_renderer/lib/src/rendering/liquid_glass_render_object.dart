@@ -1268,6 +1268,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   final List<double> _shapeData = [];
   final List<double> _rseData = [];
+  final List<double> _boundsData = [];
   static final Matrix4 _identity = Matrix4.identity();
 
   double get _contourOutset {
@@ -1278,6 +1279,38 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           settings.effectiveContourWidth +
           1.0 / devicePixelRatio,
     );
+  }
+
+  /// Half-extents along the matte axes of a shape with local half-size
+  /// [halfSize] mapped by the affine basis ([axisX], [axisY]). The geometry
+  /// shader culls with these boxes instead of mapping every pixel into each
+  /// shape's local space. Ellipses and rounded rectangles are exact;
+  /// continuous corners extend further into the corner than a circular arc of
+  /// the same radius, so they use their box.
+  static Size _matteHalfExtents(
+    RawShapeType type,
+    Size halfSize,
+    double cornerRadius,
+    Offset axisX,
+    Offset axisY,
+  ) {
+    double extent(double x, double y) {
+      switch (type) {
+        case RawShapeType.ellipse:
+          return sqrt(
+            pow(x * halfSize.width, 2) + pow(y * halfSize.height, 2),
+          );
+        case RawShapeType.roundedRectangle:
+          final radius = min(cornerRadius, halfSize.shortestSide);
+          return x.abs() * (halfSize.width - radius) +
+              y.abs() * (halfSize.height - radius) +
+              radius * sqrt(x * x + y * y);
+        case RawShapeType.squircle:
+          return x.abs() * halfSize.width + y.abs() * halfSize.height;
+      }
+    }
+
+    return Size(extent(axisX.dx, axisY.dx), extent(axisX.dy, axisY.dy));
   }
 
   // The encoder's drawable-shape decision. Called only while preparing
@@ -1341,6 +1374,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       // unrelated standalone glass widgets together.
       _shapeData.clear();
       _rseData.clear();
+      _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
       var shortSide = double.infinity;
@@ -1399,13 +1433,29 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           // oversized primitives), which is especially visible for stretched
           // shapes in a blend group.
           final size = shape.renderObject.size;
-          _rseData.addAll(
-            roundedSuperellipseParameters(
-              size,
-              shape.rawCornerRadius,
-              scale: devicePixelRatio,
-            ),
+          final rseParameters = roundedSuperellipseParameters(
+            size,
+            shape.rawCornerRadius,
+            scale: devicePixelRatio,
           );
+          // The geometry shader tests each cap's angular span as
+          // 1 - cos(span); FakeGlass reads the spans themselves.
+          rseParameters[2] = 1.0 - cos(rseParameters[2]);
+          rseParameters[3] = 1.0 - cos(rseParameters[3]);
+          _rseData.addAll(rseParameters);
+          final center = centerInMatte * devicePixelRatio;
+          final halfExtents = _matteHalfExtents(
+            shape.rawShapeType,
+            size * devicePixelRatio / 2,
+            shape.rawCornerRadius * devicePixelRatio,
+            axisX,
+            axisY,
+          );
+          _boundsData
+            ..add(center.dx - halfExtents.width)
+            ..add(center.dy - halfExtents.height)
+            ..add(center.dx + halfExtents.width)
+            ..add(center.dy + halfExtents.height);
           final blendMarker = firstInGroup
               ? -(geometry.blend * devicePixelRatio + 1)
               : geometry.blend * devicePixelRatio;
@@ -1452,6 +1502,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         height: textureHeight,
         shapeData: _shapeData,
         rseData: _rseData,
+        boundsData: _boundsData,
         numShapes: numShapes,
         opticalIndex: settings.effectiveOpticalIndex,
         refractionSpread: settings.effectiveRefractionSpread,
