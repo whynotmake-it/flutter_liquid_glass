@@ -3,14 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 
-enum _Side { apple, ours, both }
+enum _Side { none, apple, ours, both }
 
 /// Apple's system Liquid Glass and this renderer's at the same spot over the
-/// same photographs, to judge the glint by eye on a device.
+/// same backdrops, to judge the glint and refraction by eye on a device.
 ///
 /// Apple's side is a `UIGlassEffect` platform view registered by the iOS
-/// runner. "Apple" and "Ours" flip one capsule in place; "Both" stacks them.
-/// The glint slider only changes this renderer's `highlight`.
+/// runner. "Apple" and "Ours" flip one capsule in place, "Both" stacks them
+/// and "None" shows the bare backdrop. The glint slider only changes this
+/// renderer's `highlight`. The line grid shows how far each glass displaces
+/// its backdrop.
 class GlintAbPage extends StatefulWidget {
   const GlintAbPage({super.key});
 
@@ -50,6 +52,7 @@ class _GlintAbPageState extends State<GlintAbPage> {
             controller: _pages,
             children: [
               for (final color in _solids) ColoredBox(color: color),
+              const CustomPaint(painter: _LineGridPainter()),
               for (final photo in backdropPhotos)
                 Image.asset(photo, fit: BoxFit.cover, gaplessPlayback: true),
             ],
@@ -60,9 +63,9 @@ class _GlintAbPageState extends State<GlintAbPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_side != _Side.ours) _apple(),
+                  if (_side case _Side.apple || _Side.both) _apple(),
                   if (_side == _Side.both) const SizedBox(height: 24),
-                  if (_side != _Side.apple) _ours(brightness),
+                  if (_side case _Side.ours || _Side.both) _ours(brightness),
                 ],
               ),
             ),
@@ -117,6 +120,7 @@ class _GlintAbPageState extends State<GlintAbPage> {
               groupValue: _side,
               onValueChanged: (side) => setState(() => _side = side!),
               children: const {
+                _Side.none: Text('None'),
                 _Side.apple: Text('Apple'),
                 _Side.ours: Text('Ours'),
                 _Side.both: Text('Both'),
@@ -161,4 +165,29 @@ class _GlintAbPageState extends State<GlintAbPage> {
       ),
     );
   }
+}
+
+/// Black 1 pt lines every 8 pt on white, centered on 4 + 8k in both axes.
+class _LineGridPainter extends CustomPainter {
+  const _LineGridPainter();
+
+  static const spacing = 8.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFFFFFFF),
+    );
+    final line = Paint()..color = const Color(0xFF000000);
+    for (var x = spacing / 2; x < size.width; x += spacing) {
+      canvas.drawRect(Rect.fromLTWH(x - 0.5, 0, 1, size.height), line);
+    }
+    for (var y = spacing / 2; y < size.height; y += spacing) {
+      canvas.drawRect(Rect.fromLTWH(0, y - 0.5, size.width, 1), line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineGridPainter oldDelegate) => false;
 }
