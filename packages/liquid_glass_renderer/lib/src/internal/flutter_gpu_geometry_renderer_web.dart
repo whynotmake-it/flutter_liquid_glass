@@ -29,6 +29,11 @@ class FlutterGpuGeometryRenderer {
   static int get debugActiveGeometryTextureCount => 0;
   static int get debugActiveMaterialTextureCount => 0;
 
+  /// Matches the native renderer's reuse horizon; nothing is reused here.
+  static const int reuseAfterFrames = 6;
+  static int debugReusedTextureCount = 0;
+  int get debugRetiredTextureCount => 0;
+
   /// Material map texels per matte pixel; shared constant with the native
   /// renderer so uniform math stays identical.
   static const int materialRasterScale = 8;
