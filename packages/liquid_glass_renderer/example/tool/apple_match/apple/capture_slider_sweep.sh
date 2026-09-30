@@ -11,14 +11,14 @@ set -uo pipefail
 # Optional env:
 #   SLIDERS       space-separated positions in 0...1 (default 0 0.25 0.5 0.75 1)
 #   SCENES        capture.sh scenes (default: the slider-model scene set)
-#   LOUPE_SCENES  capture_loupe.sh scenes (default loupe loupe_dark)
+#   LOUPE_SCENES  capture_loupe.sh scenes (default loupe loupe_dark; empty skips)
 #   SWEEP_LOG     result log (default references/.staging/slider-sweep.log)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to a dedicated iOS 27 simulator UDID}"
 : "${SLIDERS:=0 0.25 0.5 0.75 1}"
 : "${SCENES:=toolbar_capsule toolbar_capsule_dark small_capsule small_capsule_dark large_capsule large_capsule_dark material_card material_card_dark material_circle material_circle_dark material_capsule_clear material_capsule_clear_dark material_card_clear material_card_clear_dark material_solid_palette material_solid_palette_dark material_solid_palette_clear material_solid_palette_clear_dark}"
-: "${LOUPE_SCENES:=loupe loupe_dark}"
+: "${LOUPE_SCENES=loupe loupe_dark}"
 : "${SWEEP_LOG:=$ROOT/references/.staging/slider-sweep.log}"
 export IOS_27_UDID
 mkdir -p "$(dirname "$SWEEP_LOG")"
