@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 
 void main() {
@@ -54,6 +55,33 @@ void main() {
       ),
     );
     expect(tester.takeException(), isAssertionError);
+  });
+
+  testWidgets('the Liquid Glass slider does not reach the loupe', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        Center(
+          child: LiquidGlassLoupe(
+            link: LiquidGlassLoupeLink(),
+            settings: LiquidGlassLoupe.defaultSettings.copyWith(tintAmount: 1),
+            appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+          ),
+        ),
+      ),
+    );
+    final layer = tester.widget<LiquidGlassLayer>(
+      find.descendant(
+        of: find.byType(LiquidGlassLoupe),
+        matching: find.byType(LiquidGlassLayer),
+      ),
+    );
+    expect(
+      layer.settings,
+      LiquidGlassLoupe.defaultSettings,
+      reason: 'the iOS 27 loupe is identical at every slider position',
+    );
   });
 
   test('the default optics are the iOS 27 loupe fit', () {

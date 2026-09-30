@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_appearance.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 /// Material parameters for the liquid-glass compositor.
@@ -90,9 +89,19 @@ class LiquidGlassSettings with Equatable {
   /// cast by the rim along the light (3.6% of the transmitted light, 6 pt
   /// below the top wall, at the rim on the sides, none at the bottom),
   /// fitted on the Reduce Motion off references.
-  const LiquidGlassSettings.ios27ToolbarLight({
-    this.frost = 7.0,
-    this.tintAmount = 0.0,
+  ///
+  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  factory LiquidGlassSettings.ios27ToolbarLight({
+    double tintAmount = 0,
+    double? frost,
+  }) => LiquidGlassSettings._ios27ToolbarLight(
+    frost: frost ?? ios27RegularFrost(tintAmount),
+    tintAmount: tintAmount,
+  );
+
+  const LiquidGlassSettings._ios27ToolbarLight({
+    required this.frost,
+    required this.tintAmount,
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
@@ -122,9 +131,19 @@ class LiquidGlassSettings with Equatable {
   /// surrounding application follows the platform brightness. The glint is
   /// identical to light mode; the border is stronger and vanishes entirely
   /// where the normal faces the light axis.
-  const LiquidGlassSettings.ios27ToolbarDark({
-    this.frost = 5.0,
-    this.tintAmount = 0.0,
+  ///
+  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  factory LiquidGlassSettings.ios27ToolbarDark({
+    double tintAmount = 0,
+    double? frost,
+  }) => LiquidGlassSettings._ios27ToolbarDark(
+    frost: frost ?? ios27RegularFrost(tintAmount),
+    tintAmount: tintAmount,
+  );
+
+  const LiquidGlassSettings._ios27ToolbarDark({
+    required this.frost,
+    required this.tintAmount,
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
@@ -203,11 +222,11 @@ class LiquidGlassSettings with Equatable {
     double tintAmount = 0,
   }) => brightness == Brightness.dark
       ? LiquidGlassSettings.ios27ToolbarDark(
-          frost: frost ?? 5.0,
+          frost: frost,
           tintAmount: tintAmount,
         )
       : LiquidGlassSettings.ios27ToolbarLight(
-          frost: frost ?? 7.0,
+          frost: frost,
           tintAmount: tintAmount,
         );
 
@@ -228,6 +247,23 @@ class LiquidGlassSettings with Equatable {
          dispersion: 4 * (dispersion / 100),
          frost: frost,
        );
+
+  /// Backdrop blur of iOS 27 regular glass (`.regular`, and the `.glass`
+  /// buttons and toolbars built from it), in logical pixels, for the Settings
+  /// Liquid Glass slider position [tintAmount] (`0` Clear, `1` Tinted).
+  ///
+  /// Apple keeps part of the backdrop with about 1.5 pt of blur and mixes the
+  /// rest toward a fully diffused face; the slider only moves that mix. A
+  /// single blur cannot mix, so this is the blur whose rendered detail best
+  /// matches Apple's at toolbar size, light and dark: 3.7, 6.1 and 16.6 pt at
+  /// 0, 0.5 and 1, growing at one rate up to the Settings middle tick and at
+  /// twice that rate beyond it. Apple diffuses larger glass more and smaller
+  /// glass less.
+  static double ios27RegularFrost(double tintAmount) {
+    final amount = tintAmount.clamp(0.0, 1.0);
+    return 3.7 *
+        math.exp(math.min(amount, 0.5) + 2 * math.max(amount - 0.5, 0.0));
+  }
 
   /// Backdrop blur of iOS 27 `.clear` glass, in logical pixels, for the
   /// Settings Liquid Glass slider position [tintAmount] (`0` Clear, `1`
@@ -433,9 +469,11 @@ class LiquidGlassSettings with Equatable {
   /// (Clear) to `1` (Tinted).
   ///
   /// Apps set this themselves; the renderer does not read the system value.
-  /// The slider makes the iOS 27 neutral wash more opaque, strengthens the
-  /// dark border and diffuses the backdrop. The glint is unchanged. It is one
-  /// uniform per layer and adds no per-pixel work.
+  /// The slider makes the iOS 27 neutral wash more opaque and strengthens the
+  /// dark border; the glint is unchanged, and the direct color model ignores
+  /// it. It does not change [frost]: the iOS 27 presets derive their blur
+  /// from the same position ([ios27RegularFrost], [ios27ClearFrost]). It is
+  /// one uniform per layer and adds no per-pixel work.
   final double tintAmount;
 
   /// Effective bevel width; never negative.
@@ -456,23 +494,8 @@ class LiquidGlassSettings with Equatable {
   /// Effective slider position, clamped to `0...1`.
   double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
 
-  /// Effective backdrop blur sigma for regular glass.
-  double get effectiveFrost => frostFor(const LiquidGlassColorModel.direct());
-
-  /// Backdrop blur sigma for glass using [colorModel].
-  ///
-  /// Apple fades backdrop detail with [tintAmount] by mixing toward a fully
-  /// diffused face. A single Gaussian cannot mix, so the slider adds the
-  /// blur that attenuates detail with a 23 pt period by the same fraction,
-  /// calibrated against Apple's toolbar captures. Clear glass carries its
-  /// slider blur in [frost] instead (see [ios27ClearFrost]).
-  double frostFor(LiquidGlassColorModel colorModel) {
-    final amount = effectiveTintAmount;
-    if (amount <= 0) return frost;
-    final detail = colorModel.sliderDetail(amount);
-    const referenceVariance = 23.0 * 23.0 / (2 * math.pi * math.pi);
-    return math.sqrt(frost * frost - referenceVariance * math.log(detail));
-  }
+  /// Effective backdrop blur sigma; never negative.
+  double get effectiveFrost => math.max(0, frost);
 
   /// Effective chromatic aberration.
   double get effectiveDispersion => dispersion;

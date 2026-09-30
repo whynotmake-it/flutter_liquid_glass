@@ -21,11 +21,11 @@ void main() {
       );
       expect(
         light.settings,
-        withTestFrost(const LiquidGlassSettings.ios27ToolbarLight()),
+        withTestFrost(LiquidGlassSettings.ios27ToolbarLight()),
       );
       expect(
         light.withBrightness(Brightness.dark).settings,
-        withTestFrost(const LiquidGlassSettings.ios27ToolbarDark()),
+        withTestFrost(LiquidGlassSettings.ios27ToolbarDark()),
       );
 
       final clear = GlassMaterial.preset(

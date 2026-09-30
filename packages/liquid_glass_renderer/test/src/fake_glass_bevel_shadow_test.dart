@@ -72,7 +72,7 @@ Future<({double top, double bottom})> _innerShadow(
 }
 
 void main() {
-  final base = const LiquidGlassSettings.ios27ToolbarLight(
+  final base = LiquidGlassSettings.ios27ToolbarLight(
     frost: 0,
   ).copyWith(highlight: 0, contourStrength: 0);
 

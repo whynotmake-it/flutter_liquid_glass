@@ -75,12 +75,6 @@ sealed class LiquidGlassColorModel with Equatable {
   @internal
   double contourScale(double shortSide, double tintAmount) => 1;
 
-  /// Fraction of backdrop detail the face keeps at slider position
-  /// [tintAmount]. Apple mixes toward a fully diffused face.
-  @internal
-  double sliderDetail(double tintAmount) =>
-      sliderKeyframes(tintAmount, 1, 0.44, 0.02);
-
   /// Luminance of the neutral glint target FakeGlass composites, which
   /// cannot scale with the face it does not sample.
   @internal
@@ -255,11 +249,6 @@ final class Ios27ClearLiquidGlassColorModel extends LiquidGlassColorModel {
 
   @override
   double get fakeGlintLuminance => 3.26;
-
-  /// Clear glass carries its slider blur in its frost
-  /// (`LiquidGlassSettings.ios27ClearFrost`), so no detail fade is added.
-  @override
-  double sliderDetail(double tintAmount) => 1;
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})
