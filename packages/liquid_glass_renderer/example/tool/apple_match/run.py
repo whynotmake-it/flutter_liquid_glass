@@ -129,8 +129,7 @@ def main():
             "frost": 0.0,
             "highlight": 0.0,
             "contourStrength": 0.0,
-            "refractionAmount": 106.13,
-            "refractionSpread": 0.0,
+            "refractionAmount": 60.0,
             "saturation": 1.0,
             "dispersion": 0.0,
         }

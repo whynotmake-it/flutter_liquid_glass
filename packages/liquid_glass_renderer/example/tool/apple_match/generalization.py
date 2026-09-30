@@ -259,7 +259,6 @@ def main():
         for key in (
             "shapeProfile",
             "refractionAmount",
-            "refractionSpread",
             "frost",
             "tintRed",
             "tintGreen",
