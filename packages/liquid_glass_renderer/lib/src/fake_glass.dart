@@ -356,7 +356,7 @@ class RenderFakeGlass extends RenderProxyBox {
       appearance.visibility > 0 &&
       (appearance.saturation != 1 ||
           appearance.transmissionGamma != 1 ||
-          appearance.colorModel.faceTransfer != null);
+          appearance.colorModel.faceTransfer(0) != null);
 
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
@@ -417,7 +417,11 @@ class RenderFakeGlass extends RenderProxyBox {
       return;
     }
 
-    final backdropFilter = fakeGlassBackdropFilter(settings, appearance)!;
+    final backdropFilter = fakeGlassBackdropFilter(
+      settings,
+      appearance,
+      shortSide: size.shortestSide,
+    )!;
     assert(() {
       debugRegisterBackdropCapture(this, backdropKey);
       return true;

@@ -87,7 +87,8 @@ void paintFakeGlassSurface(
       ])
       ..setOffset(const Offset(0, 1))
       ..setFloat(1 / math.max(devicePixelRatio, 0.01))
-      ..setFloat(exteriorOnly ? 1 : 0);
+      ..setFloat(exteriorOnly ? 1 : 0)
+      ..setFloat(appearance.colorModel.fakeGlintLuminance);
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(

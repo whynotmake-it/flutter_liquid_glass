@@ -50,12 +50,11 @@ void main() {
     );
   });
 
-  test('clear appearance is a 12.5% white wash', () {
-    const clear = LiquidGlassAppearance.ios27ClearLight();
+  test('clear appearance uses the appearance-independent clear model', () {
+    const clear = LiquidGlassAppearance.ios27Clear();
 
-    expect(clear.tint.a, closeTo(.125, 1e-3));
-    expect(clear.tint.r, 1);
-    expect(clear.colorModel, const LiquidGlassColorModel.direct());
+    expect(clear.tint.a, 0);
+    expect(clear.colorModel, const LiquidGlassColorModel.ios27Clear());
     expect(clear.saturation, 1);
     expect(clear.transmissionGamma, 1);
   });
@@ -72,16 +71,50 @@ void main() {
     );
     expect(dark.saturation, 1);
     expect(dark.transmissionGamma, 1);
+    final lightFace = const LiquidGlassColorModel.ios27(
+      brightness: Brightness.light,
+    ).faceTransfer(94)!;
+    expect(lightFace.lift, .13);
+    expect(lightFace.chromaGain, 1.17);
+    expect(lightFace.transmittance, .593);
+    final darkFace = const LiquidGlassColorModel.ios27(
+      brightness: Brightness.dark,
+    ).faceTransfer(94)!;
+    expect(darkFace.lift, 1);
+    expect(darkFace.chromaGain, 1.03);
+    expect(darkFace.emission.r, closeTo(32 / 255, 1e-9));
+  });
+
+  test('dark regular glass becomes denser with its short side', () {
+    const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
+    // Face transmittance of the pinned Reduce Motion off dark captures.
+    const measured = {63: .599, 94: .486, 118: .447, 150: .447};
+    for (final MapEntry(key: shortSide, value: transmittance)
+        in measured.entries) {
+      expect(
+        dark.faceTransfer(shortSide.toDouble())!.transmittance,
+        closeTo(transmittance, .008),
+        reason: '$shortSide pt',
+      );
+    }
+    const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
     expect(
-      const LiquidGlassColorModel.ios27(brightness: Brightness.light)
-          .faceTransfer,
-      (lift: 0.13, chromaGain: 1.17),
+      light.faceTransfer(63)!.transmittance,
+      light.faceTransfer(150)!.transmittance,
     );
-    expect(
-      const LiquidGlassColorModel.ios27(brightness: Brightness.dark)
-          .faceTransfer,
-      (lift: 1.0, chromaGain: 1.03),
-    );
+  });
+
+  test('clear glass is appearance- and size-independent', () {
+    const clear = LiquidGlassColorModel.ios27Clear();
+    final small = clear.faceTransfer(40)!;
+    final large = clear.faceTransfer(400);
+    expect(small, large);
+    expect(small.emission.r, closeTo(.126, 1e-9));
+    expect(small.transmittance, .954);
+    expect(small.lift, 0);
+    expect(small.chromaGain, 1.057);
+    expect(clear.toJson(), 'ios27Clear');
+    expect(LiquidGlassColorModel.fromJson('ios27Clear'), clear);
   });
 
   test('adaptive tint tones match the native solid-palette measurements', () {

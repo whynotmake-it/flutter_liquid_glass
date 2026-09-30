@@ -30,7 +30,7 @@ uniform vec3 uContourConfig;
 uniform vec4 uProfileConfig;
 uniform vec2 uMaterialConfig;
 uniform vec3 uBevelShadowConfig;
-uniform vec3 uAppearanceConfig;
+uniform vec4 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
 // 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
@@ -77,6 +77,12 @@ const float kGlintPeak = 0.14;
 // weight.
 const float kGlintBleed = 0.21;
 const float kGlintBleedReach = 4.0;
+// The glint target is Lh + faceGain * face + vibrancy * face chroma. Regular
+// glass pulls toward a fixed bright target; clear glass instead brightens
+// its own face. Set per color model in main().
+float gGlintLuminance = kGlintLuminance;
+float gGlintFaceGain = 0.0;
+float gGlintVibrancy = kGlintVibrancy;
 // The contour is reconstructed from a sampled SDF. Test a wider coverage
 // transition independently from the encoded exterior range so distance
 // decoding and geometry placement remain bit-for-bit unchanged.
@@ -109,12 +115,24 @@ vec4 shapeLookup(
 }
 #endif
 
-vec4 ios27NeutralTint(float darkWeight) {
-    return mix(
-        vec4(vec3(253.0, 252.0, 253.0) / 255.0, 0.407),
-        vec4(vec3(57.142857 / 255.0), 0.56),
-        darkWeight
+// Neutral wash of the untinted face. Light glass transmits 0.592 at every
+// size. Dark glass keeps its 32/255 emission but becomes denser with size:
+// controls up to 75 pt transmit like light glass and surfaces from 105 pt
+// transmit 0.447. Clear glass is appearance-independent.
+vec4 ios27NeutralTint(float darkWeight, float shortSide, bool clearGlass) {
+    if (clearGlass) {
+        return vec4(vec3(0.126 / 0.046), 0.046);
+    }
+    float darkTransmittance = mix(
+        0.592,
+        0.447,
+        smoothstep(75.0, 105.0, shortSide)
     );
+    vec4 dark = vec4(
+        vec3((32.0 / 255.0) / (1.0 - darkTransmittance)),
+        1.0 - darkTransmittance
+    );
+    return mix(vec4(vec3(253.0, 252.0, 253.0) / 255.0, 0.407), dark, darkWeight);
 }
 
 // Apple's face transfer separates luminance from chroma. Transmitted
@@ -122,7 +140,10 @@ vec4 ios27NeutralTint(float darkWeight) {
 // backdrop chroma passes through with a near-unity gain instead of being
 // diluted by the neutral wash. Light glass is almost linear; dark glass is a
 // full self-screen that lifts shadows and compresses highlights.
-vec2 ios27FaceTransfer(float darkWeight) {
+vec2 ios27FaceTransfer(float darkWeight, bool clearGlass) {
+    if (clearGlass) {
+        return vec2(0.0, 1.057);
+    }
     return mix(vec2(0.13, 1.17), vec2(1.0, 1.03), darkWeight);
 }
 
@@ -362,8 +383,9 @@ vec3 applySpecularHighlights(
     // luminance toward a target above SDR white and amplifies the face's own
     // chroma, so glass over color glints in that color.
     float resultLuminance = dot(result, LUMA_WEIGHTS);
-    vec3 glintTarget = uHighlightColor.rgb * kGlintLuminance +
-        (result - vec3(resultLuminance)) * kGlintVibrancy;
+    vec3 glintTarget = uHighlightColor.rgb * gGlintLuminance +
+        result * gGlintFaceGain +
+        (result - vec3(resultLuminance)) * gGlintVibrancy;
     // Only the lower bound is clamped: amplified chroma must not produce
     // negative (out-of-gamut) channels, while the upper side keeps its
     // headroom above SDR white for extended-range surfaces.
@@ -480,8 +502,8 @@ void main() {
         );
         primaryResponse.xyz *= 4.0;
         secondaryResponse.xyz *= 4.0;
-        float primaryPackedResponse = primaryResponse.w * 5.0;
-        float secondaryPackedResponse = secondaryResponse.w * 5.0;
+        float primaryPackedResponse = primaryResponse.w * 7.0;
+        float secondaryPackedResponse = secondaryResponse.w * 7.0;
         float primaryColorModel = floor(primaryPackedResponse * 0.5);
         float secondaryColorModel = floor(secondaryPackedResponse * 0.5);
         primaryResponse.w = primaryPackedResponse - primaryColorModel * 2.0;
@@ -638,9 +660,19 @@ void main() {
         // material. The untinted material itself treats luminance and
         // chroma separately (see ios27FaceTransfer). Saturation and gamma
         // stay available as relative adjustments where 1 is Apple's face.
-        float darkWeight = clamp(colorModel - 1.0, 0.0, 1.0);
-        vec4 neutralTint = ios27NeutralTint(darkWeight);
-        vec2 faceTransfer = ios27FaceTransfer(darkWeight);
+        bool clearGlass = colorModel > 2.5;
+        float darkWeight = clearGlass ? 0.0 : clamp(colorModel - 1.0, 0.0, 1.0);
+        vec4 neutralTint = ios27NeutralTint(
+            darkWeight,
+            uAppearanceConfig.w,
+            clearGlass
+        );
+        vec2 faceTransfer = ios27FaceTransfer(darkWeight, clearGlass);
+        if (clearGlass) {
+            gGlintLuminance = 2.34;
+            gGlintFaceGain = 3.58;
+            gGlintVibrancy = 0.78;
+        }
         float backdropLuminance = dot(refractColor.rgb, LUMA_WEIGHTS);
         float transmittedLuminance = pow(
             clamp(

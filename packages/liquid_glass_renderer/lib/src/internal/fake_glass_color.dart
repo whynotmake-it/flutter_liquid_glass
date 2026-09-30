@@ -98,23 +98,23 @@ List<double> fakeGlassColorMatrix({
 }
 
 /// The complete untinted iOS 27 face as a 4x5 color matrix:
-/// `neutral + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
+/// `emission + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
 ///
 /// Evaluating the whole face in the filter clamps only the final color, so
 /// amplified chroma is not clipped before the neutral wash attenuates it.
 /// The luminance transfer is replaced by its least-squares line.
 @internal
 List<double> fakeGlassFaceMatrix({
-  required Color neutral,
+  required Color emission,
+  required double transmittance,
   required double lift,
   required double chromaGain,
   double transmissionGamma = 1,
   double opacity = 1,
 }) {
   const luminance = [0.2126, 0.7152, 0.0722];
-  final transmittance = 1 - neutral.a;
   final (slope, offset) = _faceLuminanceLine(lift, transmissionGamma);
-  final neutralColor = [neutral.r, neutral.g, neutral.b];
+  final emissionColor = [emission.r, emission.g, emission.b];
   final result = <double>[];
   for (var row = 0; row < 3; row++) {
     for (var column = 0; column < 3; column++) {
@@ -126,7 +126,7 @@ List<double> fakeGlassFaceMatrix({
     result
       ..add(0)
       // ColorFilter.matrix biases use the 0-255 channel scale.
-      ..add((neutral.a * neutralColor[row] + transmittance * offset) * 255);
+      ..add((emissionColor[row] + transmittance * offset) * 255);
   }
   return result..addAll([0, 0, 0, opacity.clamp(0.0, 1.0), 0]);
 }
@@ -137,8 +137,9 @@ List<double> fakeGlassFaceMatrix({
 @internal
 ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassSettings settings,
-  LiquidGlassAppearance appearance,
-) {
+  LiquidGlassAppearance appearance, {
+  double shortSide = 1e4,
+}) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
   final blur = settings.effectiveFrost != 0
@@ -148,12 +149,13 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
-  final faceTransfer = appearance.colorModel.faceTransfer;
+  final faceTransfer = appearance.colorModel.faceTransfer(shortSide);
   final ColorFilter? colorTransfer;
   if (faceTransfer != null) {
     colorTransfer = ColorFilter.matrix(
       fakeGlassFaceMatrix(
-        neutral: appearance.colorModel.neutralMaterialTint,
+        emission: faceTransfer.emission,
+        transmittance: faceTransfer.transmittance,
         lift: faceTransfer.lift,
         chromaGain: faceTransfer.chromaGain * appearance.saturation,
         transmissionGamma: appearance.transmissionGamma,

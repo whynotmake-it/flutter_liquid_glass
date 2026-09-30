@@ -448,9 +448,10 @@ void main() {
 
   test('iOS 27 face matrix reproduces the native light solid palette', () {
     const model = LiquidGlassColorModel.ios27(brightness: Brightness.light);
-    final transfer = model.faceTransfer!;
+    final transfer = model.faceTransfer(94)!;
     final matrix = fakeGlassFaceMatrix(
-      neutral: model.neutralMaterialTint,
+      emission: transfer.emission,
+      transmittance: transfer.transmittance,
       lift: transfer.lift,
       chromaGain: transfer.chromaGain,
     );
