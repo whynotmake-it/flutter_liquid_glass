@@ -1,20 +1,22 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/internal/filter_pass_transform.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
-import 'package:meta/meta.dart';
 
 enum _FakeGlassPaintStage {
   shadows,
@@ -32,6 +34,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
     required this.backdropKey,
     required this.surfaceShader,
     required super.child,
+    this.backdropEdgeShader,
     super.key,
   });
 
@@ -40,6 +43,10 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
   final LiquidGlassAppearance defaultAppearance;
   final BackdropKey? backdropKey;
   final FragmentShader? surfaceShader;
+
+  /// Anti-aliases the filtered backdrop's silhouette on Impeller; `null`
+  /// where the backend has no shader image filters.
+  final FragmentShader? backdropEdgeShader;
   @override
   RenderObject createRenderObject(BuildContext context) =>
       RenderConsolidatedFakeGlassLayer(
@@ -49,6 +56,7 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
         defaultAppearance: defaultAppearance,
         backdropKey: backdropKey,
         surfaceShader: surfaceShader,
+        backdropEdgeShader: backdropEdgeShader,
       );
 
   @override
@@ -62,7 +70,8 @@ class ConsolidatedFakeGlassLayer extends SingleChildRenderObjectWidget {
       ..settings = settings
       ..defaultAppearance = defaultAppearance
       ..backdropKey = backdropKey
-      ..surfaceShader = surfaceShader;
+      ..surfaceShader = surfaceShader
+      ..backdropEdgeShader = backdropEdgeShader;
   }
 }
 
@@ -78,6 +87,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     required this._defaultAppearance,
     required this._backdropKey,
     required this._surfaceShader,
+    this._backdropEdgeShader,
   });
 
   double _devicePixelRatio;
@@ -135,8 +145,36 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     markNeedsPaint();
   }
 
+  FragmentShader? _backdropEdgeShader;
+  FragmentShader? get backdropEdgeShader => _backdropEdgeShader;
+  set backdropEdgeShader(FragmentShader? value) {
+    if (identical(_backdropEdgeShader, value)) return;
+    _backdropEdgeShader = value;
+    _edgeFilter = null;
+    markNeedsPaint();
+  }
+
   final _backdropLayer = LayerHandle<BackdropFilterLayer>();
   final _clipLayer = LayerHandle<ClipPathLayer>();
+  final _edgeClipLayer = LayerHandle<ClipPathLayer>();
+  final _edgeLayer = LayerHandle<BackdropFilterLayer>();
+
+  /// Shares one snapshot between the filtered pass and the edge pass when
+  /// the layer has no [backdropKey] of its own.
+  final _edgeBackdropKey = BackdropKey();
+
+  /// Fully visible shapes for the edge pass, [_edgeFloatsPerShape] floats
+  /// each, or `null` when it cannot express them and the backdrop is clipped
+  /// to their path instead.
+  List<double>? _edgeShapes;
+
+  /// The filtered pass's clip, just outside the shapes, and the band around
+  /// their silhouette that the edge pass restores; in layer coordinates.
+  Path? _edgeOutsetPath;
+  Path? _edgeInsetPath;
+  Path? _edgeBandPath;
+  ImageFilter? _edgeFilter;
+  List<double>? _edgeFilterMapping;
   final _effectLayer = LayerHandle<OffsetLayer>();
   final _ancestorClips = RetainedGlassClip();
 
@@ -186,6 +224,11 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   @visibleForTesting
   Path? get debugClipPath => _cachedClipPath;
 
+  /// Whether the shared backdrop's silhouette is anti-aliased by the edge
+  /// pass instead of the clip path.
+  @visibleForTesting
+  bool get debugUsesBackdropEdgePass => _edgeLayer.layer != null;
+
   final List<_FakeGlassPaintStage> _debugLastPaintStages = [];
 
   @visibleForTesting
@@ -228,8 +271,10 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     final motion = _pollCompositorTranslation();
     if (motion.translation case final translation?) {
       _setEffectTranslation(translation);
+      _syncBackdropEdge();
       return;
     }
+    _syncBackdropEdge();
     if (!motion.needsRepaint || _repaintAfterCompositingScheduled) return;
     _repaintAfterCompositingScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -305,6 +350,10 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       var rebuiltShortSide = double.infinity;
       final rebuiltPath = Path();
       final rebuiltClasses = <int>[];
+      List<double>? rebuiltEdgeShapes = <double>[];
+      final rebuiltOutset = Path();
+      final rebuiltInset = Path();
+      final edgeReach = _edgeReachPixels / devicePixelRatio;
       for (final (_, geometry, transform) in geometries) {
         for (final shape in geometry.shapes) {
           final visibilityClass = _visibilityClass(shape.appearance);
@@ -333,6 +382,24 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
               Offset.zero,
               matrix4: shapeToLayer.storage,
             );
+            rebuiltEdgeShapes = _appendEdgeShape(
+              rebuiltEdgeShapes,
+              shape.shape,
+              shape.renderObject.size,
+              shapeToLayer,
+            );
+            rebuiltOutset.addPath(
+              _edgePath(shape.shape, shapeBounds, edgeReach),
+              Offset.zero,
+              matrix4: shapeToLayer.storage,
+            );
+            if (shapeBounds.shortestSide > 2 * edgeReach) {
+              rebuiltInset.addPath(
+                _edgePath(shape.shape, shapeBounds, -edgeReach),
+                Offset.zero,
+                matrix4: shapeToLayer.storage,
+              );
+            }
           }
         }
       }
@@ -342,6 +409,11 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       }
       _cachedClipPath = rebuiltPath;
       _cachedClipBounds = rebuiltBounds;
+      _edgeShapes = rebuiltEdgeShapes;
+      _edgeOutsetPath = rebuiltOutset;
+      _edgeInsetPath = rebuiltInset;
+      _edgeBandPath = null;
+      _edgeFilter = null;
       _cachedClipClasses = rebuiltClasses;
       _cachedClipInputs
         ..clear()
@@ -381,26 +453,55 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
               _debugLastPaintStages.add(_FakeGlassPaintStage.backdrop);
               return true;
             }(), 'Record backdrop composition order.');
-            final filter = _cachedFilter ??= _buildBackdropFilter();
+            final edgeFilter = _backdropEdgeFilter();
+            final key = edgeFilter == null
+                ? backdropKey
+                : backdropKey ?? _edgeBackdropKey;
             final backdropLayer =
                 (_backdropLayer.layer ??= BackdropFilterLayer())
-                  ..filter = filter
+                  ..filter = _cachedFilter ??= _buildBackdropFilter()
                   ..blendMode = BlendMode.srcOver
-                  ..backdropKey = backdropKey;
+                  ..backdropKey = key;
             assert(() {
-              debugRegisterBackdropCapture(this, backdropKey);
+              debugRegisterBackdropCapture(this, key);
               return true;
             }(), 'Count independent backdrop captures in debug builds.');
+            final edgeBounds = bounds.inflate(
+              _edgeReachPixels / devicePixelRatio,
+            );
             _clipLayer.layer = effectContext.pushClipPath(
               true,
               effectOffset,
-              bounds,
-              clipPath,
+              edgeFilter == null ? bounds : edgeBounds,
+              edgeFilter == null ? clipPath : _edgeOutsetPath!,
               (clipContext, clipOffset) {
                 clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
               },
               oldLayer: _clipLayer.layer,
             );
+            if (edgeFilter != null) {
+              final edgeLayer = (_edgeLayer.layer ??= BackdropFilterLayer())
+                ..filter = edgeFilter
+                ..blendMode = BlendMode.srcOver
+                ..backdropKey = key;
+              _edgeClipLayer.layer = effectContext.pushClipPath(
+                true,
+                effectOffset,
+                edgeBounds,
+                _edgeBandPath ??= Path.combine(
+                  PathOperation.difference,
+                  _edgeOutsetPath!,
+                  _edgeInsetPath!,
+                ),
+                (clipContext, clipOffset) {
+                  clipContext.pushLayer(edgeLayer, (_, _) {}, clipOffset);
+                },
+                oldLayer: _edgeClipLayer.layer,
+              );
+            } else {
+              _edgeClipLayer.layer = null;
+              _edgeLayer.layer = null;
+            }
             _paintFadingBackdrops(effectContext, effectOffset, geometries);
           } else {
             _releaseGlassLayers();
@@ -627,8 +728,142 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   void _clearClipCache() {
     _cachedClipPath = null;
     _cachedClipBounds = null;
+    _edgeShapes = null;
+    _edgeOutsetPath = null;
+    _edgeInsetPath = null;
+    _edgeBandPath = null;
+    _edgeFilter = null;
     _cachedClipInputs.clear();
     _cachedClipClasses = const [];
+  }
+
+  static const _maxEdgeShapes = 16;
+  static const _edgeFloatsPerShape = 12;
+
+  /// Physical pixels between the silhouette and the edge pass's clips. The
+  /// coverage ramp spans half a pixel on either side.
+  static const _edgeReachPixels = 2.0;
+
+  /// [shape] as the edge pass evaluates it, grown by [outset] logical pixels:
+  /// rounded boxes and ovals like the analytic surface, which draws
+  /// superellipses as rounded boxes.
+  static Path _edgePath(LiquidShape shape, Rect rect, double outset) {
+    final grown = rect.inflate(outset);
+    return switch (shape) {
+      LiquidOval() => Path()..addOval(grown),
+      LiquidRoundedRectangle(:final borderRadius) ||
+      LiquidRoundedSuperellipse(:final borderRadius) =>
+        Path()..addRRect(
+          RRect.fromRectAndRadius(
+            grown,
+            Radius.circular(
+              math.max(
+                math.min(borderRadius, rect.shortestSide / 2) + outset,
+                0,
+              ),
+            ),
+          ),
+        ),
+    };
+  }
+
+  /// Appends [shape] to the edge pass's shape data, or returns `null` when
+  /// the pass cannot express it.
+  static List<double>? _appendEdgeShape(
+    List<double>? data,
+    LiquidShape shape,
+    Size size,
+    Matrix4 shapeToLayer,
+  ) {
+    if (data == null || data.length >= _maxEdgeShapes * _edgeFloatsPerShape) {
+      return null;
+    }
+    final m = shapeToLayer.storage;
+    // Only 2D affine placements; perspective has no single inverse basis.
+    if (m[3] != 0 || m[7] != 0 || m[15] != 1) return null;
+    final determinant = m[0] * m[5] - m[4] * m[1];
+    if (determinant.abs() < 1e-9) return null;
+    // Inverse of the 2D affine part: layer point -> shape-local point.
+    final a = m[5] / determinant;
+    final b = -m[4] / determinant;
+    final c = -m[1] / determinant;
+    final d = m[0] / determinant;
+    final tx = -(a * m[12] + b * m[13]);
+    final ty = -(c * m[12] + d * m[13]);
+    final (type, radius) = switch (shape) {
+      LiquidOval() => (0.0, 0.0),
+      LiquidRoundedRectangle(:final borderRadius) => (1.0, borderRadius),
+      LiquidRoundedSuperellipse(:final borderRadius) => (1.0, borderRadius),
+    };
+    return data..addAll([
+      a, b, c, d, //
+      tx - size.width / 2, ty - size.height / 2,
+      size.width / 2, size.height / 2, //
+      radius, type, math.sqrt((a * d - b * c).abs()), 0,
+    ]);
+  }
+
+  /// Maps the edge pass's fragment coordinates (physical pixels of the
+  /// enclosing render pass) to this layer's logical coordinates: a 2x2 basis,
+  /// an offset, then the layer-space length of one physical pixel. `null`
+  /// when the mapping is not invertible.
+  List<double>? _edgeMapping() {
+    final passToLayer = Matrix4.tryInvert(
+      filterPassTransform(
+        this,
+        seeding: _compositionProbe.seeding,
+        devicePixelRatio: devicePixelRatio,
+        translation: _effectTranslation,
+      ),
+    );
+    if (passToLayer == null) return null;
+    final m = passToLayer.storage;
+    final scale = 1 / devicePixelRatio;
+    final basis = [m[0] * scale, m[4] * scale, m[1] * scale, m[5] * scale];
+    final pixel = math.sqrt((basis[0] * basis[3] - basis[1] * basis[2]).abs());
+    return [...basis, m[12], m[13], pixel];
+  }
+
+  /// The filter that restores the unfiltered backdrop outside the shapes'
+  /// analytic coverage, or `null` when the backdrop is clipped to the shapes'
+  /// path instead (Skia, whose clips are anti-aliased, or shapes the pass
+  /// cannot express).
+  ImageFilter? _backdropEdgeFilter() {
+    final shader = _backdropEdgeShader;
+    final shapes = _edgeShapes;
+    if (shader == null || shapes == null || shapes.isEmpty) return null;
+    final mapping = _edgeMapping();
+    if (mapping == null) return null;
+    if (_edgeFilter != null && listEquals(_edgeFilterMapping, mapping)) {
+      return _edgeFilter;
+    }
+    final pixel = mapping[6];
+    shader.setFloatUniforms(initialIndex: 2, (value) {
+      value
+        ..setFloats(mapping.sublist(0, 6))
+        ..setFloat(shapes.length / _edgeFloatsPerShape);
+      for (var i = 0; i < shapes.length; i += _edgeFloatsPerShape) {
+        value
+          ..setFloats(shapes.sublist(i, i + 10))
+          ..setFloat(shapes[i + 10] * pixel)
+          ..setFloat(0);
+      }
+    });
+    _edgeFilterMapping = mapping;
+    return _edgeFilter = ImageFilter.shader(shader);
+  }
+
+  /// Keeps the edge pass aligned when retained motion moves this layer
+  /// without a repaint.
+  void _syncBackdropEdge() {
+    final layer = _edgeLayer.layer;
+    if (layer == null) return;
+    final filter = _backdropEdgeFilter();
+    if (filter == null) {
+      markNeedsPaint();
+      return;
+    }
+    if (!identical(layer.filter, filter)) layer.filter = filter;
   }
 
   ImageFilter _buildBackdropFilter() {
@@ -790,6 +1025,9 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
   void _releaseGlassLayers() {
     _backdropLayer.layer = null;
     _clipLayer.layer = null;
+    _edgeClipLayer.layer = null;
+    _edgeLayer.layer = null;
+    _edgeFilter = null;
     for (final layers in _fadingShapeLayers.values) {
       layers.dispose();
     }
