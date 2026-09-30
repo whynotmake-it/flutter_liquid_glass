@@ -39,7 +39,6 @@ class FlutterGpuGeometryRenderer {
   static int debugBatchedSubmitCount = 0;
   static int debugDeferredPassCount = 0;
   static int debugPostFrameFlushCount = 0;
-  static bool get debugSharesCommandBuffer => false;
   int get debugRetiredTextureCount => 0;
 
   /// Material map texels per matte pixel; shared constant with the native

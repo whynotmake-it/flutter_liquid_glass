@@ -18,7 +18,8 @@ void main() {
 final _boundaryKey = GlobalKey();
 
 /// Three layers rebuilding every frame; the middle one mixes appearances, so
-/// it records a matte and a material pass.
+/// it records a matte and a material pass. This multi-pass frame crashed
+/// Vulkan and Metal when its passes shared one command buffer.
 Widget _scene(double t, {Key? key}) {
   Widget layer(double width, {bool tinted = false}) => LiquidGlassLayer(
     settings: const LiquidGlassSettings(contourWidth: 1, contourStrength: 0.3),
@@ -92,23 +93,9 @@ Future<List<Uint8List>> _capture(WidgetTester tester) async {
   return result;
 }
 
-/// Also runs on devices from `example/integration_test`, where one command
-/// buffer holds every pass of a frame; [onDevice] asserts that it does.
-void runGeometrySubmitBatchingTests({bool onDevice = false}) {
+/// Also runs on devices from `example/integration_test`.
+void runGeometrySubmitBatchingTests() {
   tearDown(() => FlutterGpuGeometryRenderer.debugSubmitImmediately = false);
-
-  if (onDevice) {
-    test('the device shares one command buffer per frame', () {
-      expect(
-        FlutterGpuGeometryRenderer.debugSharesCommandBuffer,
-        isTrue,
-        reason:
-            'built with LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS=false, or '
-            'running under flutter_tester',
-      );
-      expect(kDebugMode, isTrue, reason: 'the counters need a debug build');
-    });
-  }
 
   testWidgets(
     'passes recorded in a frame are submitted while its scene is built',
@@ -131,10 +118,7 @@ void runGeometrySubmitBatchingTests({bool onDevice = false}) {
             FlutterGpuGeometryRenderer.debugBatchedSubmitCount - submits;
         if (!kDebugMode) continue;
         expect(framePasses, 4, reason: 'three mattes and one material map');
-        expect(
-          frameSubmits,
-          FlutterGpuGeometryRenderer.debugSharesCommandBuffer ? 1 : 4,
-        );
+        expect(frameSubmits, 4, reason: 'one command buffer per pass');
       }
       if (kDebugMode) {
         expect(

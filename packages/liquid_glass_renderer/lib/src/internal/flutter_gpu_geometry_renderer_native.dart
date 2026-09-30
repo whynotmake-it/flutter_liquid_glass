@@ -483,14 +483,14 @@ class FlutterGpuGeometryRenderer {
       _uniformSize,
     ).emplace(_uniformData);
 
-    final geometryCommandBuffer = _commandBufferForPass();
+    final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
     final geometryPass = geometryCommandBuffer.createRenderPass(_renderTarget!)
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
       ..bindVertexBuffer(_vertexBufferView)
       ..draw(4);
-    _submitUnlessDeferred(geometryCommandBuffer);
+    _submitOrDefer(geometryCommandBuffer);
     if (GpuAllocationDiagnostics.enabled) {
       GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
       GpuAllocationDiagnostics.observe('pass', geometryPass);
@@ -500,7 +500,7 @@ class FlutterGpuGeometryRenderer {
       );
     }
     if (writeMaterials) {
-      final materialCommandBuffer = _commandBufferForPass();
+      final materialCommandBuffer = gpu.gpuContext.createCommandBuffer();
       final materialPass =
           materialCommandBuffer.createRenderPass(_materialRenderTarget!)
             ..bindPipeline(
@@ -512,7 +512,7 @@ class FlutterGpuGeometryRenderer {
             ..bindUniform(_uniformSlot, uniformView)
             ..bindVertexBuffer(_vertexBufferView)
             ..draw(4);
-      _submitUnlessDeferred(materialCommandBuffer);
+      _submitOrDefer(materialCommandBuffer);
       if (GpuAllocationDiagnostics.enabled) {
         GpuAllocationDiagnostics.observe('command', materialCommandBuffer);
         GpuAllocationDiagnostics.observe('pass', materialPass);
@@ -526,7 +526,7 @@ class FlutterGpuGeometryRenderer {
   static int _bucketDimension(int value) => (value + 63) & ~63;
 
   /// Whether passes recorded during a frame are submitted together when the
-  /// frame's scene is built instead of one command buffer each.
+  /// frame's scene is built instead of right after each pass is recorded.
   static const bool _batchSubmissions = bool.fromEnvironment(
     'LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS',
     defaultValue: true,
@@ -536,17 +536,24 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   static bool debugSubmitImmediately = false;
 
-  /// `flutter_tester` (Flutter 3.47, Vulkan on SwiftShader) segfaults when one
-  /// Flutter GPU command buffer holds two render passes: 3 of 3 runs, against
-  /// 0 of 3 with one pass per buffer. Metal and the Pixel 10 are verified by
-  /// `example/integration_test/geometry_batch_test.dart` instead. Under the
-  /// test runner each pass keeps its own command buffer, but submission is
-  /// still deferred to the same flush points, so widget tests exercise them.
-  static final bool _onePassPerCommandBuffer = Platform.environment.containsKey(
-    'FLUTTER_TEST',
-  );
-
-  static gpu.CommandBuffer? _frameCommandBuffer;
+  // Every pass gets its own command buffer. Flutter GPU (3.47.1) begins the
+  // backend pass in `createRenderPass` and ends it only in `submit`, so a
+  // second pass on the same command buffer nests inside the first:
+  //
+  // - Vulkan (Pixel 10, PowerVR; also flutter_tester on SwiftShader):
+  //     Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x60
+  //     #00 vulkan.powervr.so (CmdEndRenderPass2+188)
+  //     #04 libflutter.so (InternalFlutterGpu_CommandBuffer_Submit+56)
+  // - Metal (macOS, AGX G16X):
+  //     -[AGXG16XFamilyCommandBuffer renderCommandEncoderWithDescriptor:]:
+  //     failed assertion `A command encoder is already encoding to this
+  //     command buffer'
+  //       impeller::RenderPassMTL::RenderPassMTL
+  //       impeller::CommandBufferMTL::OnCreateRenderPass
+  //       flutter::gpu::RenderPass::Begin
+  //
+  // Share a command buffer across passes only once the engine ends a pass
+  // before the next begins.
   static final List<gpu.CommandBuffer> _pendingCommandBuffers = [];
   static bool _postFrameFlushScheduled = false;
 
@@ -559,14 +566,9 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   static int debugPostFrameFlushCount = 0;
 
-  /// Passes recorded into a deferred command buffer.
+  /// Passes whose submission was deferred to [flushPendingSubmissions].
   @visibleForTesting
   static int debugDeferredPassCount = 0;
-
-  /// Whether passes share one command buffer per frame on this platform.
-  @visibleForTesting
-  static bool get debugSharesCommandBuffer =>
-      _batchSubmissions && !_onePassPerCommandBuffer;
 
   // Only the paint and compositing phases are followed by a scene build that
   // flushes before the scene reaches the raster thread.
@@ -576,56 +578,38 @@ class FlutterGpuGeometryRenderer {
       SchedulerBinding.instance.schedulerPhase ==
           SchedulerPhase.persistentCallbacks;
 
-  static gpu.CommandBuffer _commandBufferForPass() {
-    if (!_deferring) return gpu.gpuContext.createCommandBuffer();
+  static void _submitOrDefer(gpu.CommandBuffer commandBuffer) {
+    if (!_deferring) {
+      commandBuffer.submit();
+      return;
+    }
     assert(() {
       debugDeferredPassCount++;
       return true;
     }(), 'Count deferred geometry passes in debug builds.');
-    if (!_postFrameFlushScheduled) {
-      _postFrameFlushScheduled = true;
-      // Covers passes whose layer was painted but not composited this frame.
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        _postFrameFlushScheduled = false;
-        if (_frameCommandBuffer == null && _pendingCommandBuffers.isEmpty) {
-          return;
-        }
-        assert(() {
-          debugPostFrameFlushCount++;
-          return true;
-        }(), 'Count safety-net flushes in debug builds.');
-        flushPendingSubmissions();
-      });
-    }
-    if (_onePassPerCommandBuffer) {
-      final commandBuffer = gpu.gpuContext.createCommandBuffer();
-      _pendingCommandBuffers.add(commandBuffer);
-      return commandBuffer;
-    }
-    return _frameCommandBuffer ??= gpu.gpuContext.createCommandBuffer();
+    _pendingCommandBuffers.add(commandBuffer);
+    if (_postFrameFlushScheduled) return;
+    _postFrameFlushScheduled = true;
+    // Covers passes whose layer was painted but not composited.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _postFrameFlushScheduled = false;
+      if (_pendingCommandBuffers.isEmpty) return;
+      assert(() {
+        debugPostFrameFlushCount++;
+        return true;
+      }(), 'Count safety-net flushes in debug builds.');
+      flushPendingSubmissions();
+    });
   }
 
-  static void _submitUnlessDeferred(gpu.CommandBuffer commandBuffer) {
-    if (!_deferring) commandBuffer.submit();
-  }
-
-  /// Submits the passes recorded since the last flush.
+  /// Submits the passes recorded since the last flush, in recording order.
   ///
   /// Glass layers call this while the scene is built, which is before the
   /// scene is handed to the raster thread, so every matte a scene samples has
   /// been submitted ahead of it on the GPU queue. A post-frame callback
   /// flushes passes of layers that were painted but not composited.
   static void flushPendingSubmissions() {
-    final frameCommandBuffer = _frameCommandBuffer;
-    if (frameCommandBuffer == null && _pendingCommandBuffers.isEmpty) return;
-    _frameCommandBuffer = null;
-    if (frameCommandBuffer != null) {
-      frameCommandBuffer.submit();
-      assert(() {
-        debugBatchedSubmitCount++;
-        return true;
-      }(), 'Count batched submissions in debug builds.');
-    }
+    if (_pendingCommandBuffers.isEmpty) return;
     for (final commandBuffer in _pendingCommandBuffers) {
       commandBuffer.submit();
       assert(() {
