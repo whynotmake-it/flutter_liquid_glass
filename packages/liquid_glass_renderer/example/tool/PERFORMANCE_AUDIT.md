@@ -4,22 +4,21 @@ This is the prioritized backlog for the native benchmark harness. Every change
 should be compared against the relevant control scenario on the same runner;
 visual output and native `phys_footprint` remain regression gates.
 
-## 2026-09-29 geometry-pass scissor, Flutter GPU object lifetimes (host)
+## 2026-09-29 geometry-pass scissor, Flutter GPU object lifetimes (Pixel 10)
 
 Details: `OPTIMIZATION_LOG_2026-09.md` K–M.
 
-- **Scissored single-shape geometry passes (kept).** The 64-texel bucket
-  padding no longer runs the SDF for lone shapes: −6…−49 % geometry fragments
-  on rebuild frames, byte-identical mattes (test) and goldens. Host
-  SwiftShader: 44 pt button matte 1.47 → 0.91 ms. Device rebuild-frame GPU
-  time still to be measured.
-- **Transient matte memory is GC-bound (measured, lease not shipped).**
-  Flutter GPU textures, command buffers and render passes report only their
-  C++ object size to the GC, and a submitted pass pins its render target.
-  Leasing them with `NativeFinalizer(externalSize:)` cut live native memory
-  after 1200 matte replacements from 572–700 to 215–321 MB on the host, but
-  cost +3.7 ms/frame of GC in the widget-level probe. Needs a device A/B on
-  `resizeAnimated` (peak footprint vs UI GC time). Engine fix preferred.
+- **Scissored single-shape geometry passes (rejected).** The scissor needs a
+  cleared attachment because the final pass samples the bucket padding, and
+  `LoadAction.clear` adds ~1.5 ms of UI-thread `PAINT` per rebuild frame on
+  the Pixel 10 (button stretch 103 → 92 fps). The GPU saving is ~1 % of the
+  frame. Reverted.
+- **GC size-reporting leases for Flutter GPU objects (rejected).** Flutter GPU
+  textures, command buffers and render passes report only their C++ object
+  size to the GC, and a submitted pass pins its render target. Leasing them
+  with `NativeFinalizer(externalSize:)` made the Pixel run ~190 scavenges/s,
+  cost 7–21 % fps and raised peak PSS + GPU by 32–61 %. The fix has to be
+  engine-side (`GetAllocationSize` or `dispose()`).
 - Two render passes in one Flutter GPU command buffer segfault
   `flutter_tester` deterministically; passes stay in separate buffers.
 
