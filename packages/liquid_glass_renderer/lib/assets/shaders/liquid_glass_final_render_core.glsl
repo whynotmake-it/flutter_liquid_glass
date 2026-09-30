@@ -151,6 +151,13 @@ float ios27DarkTransmittance(float shortSide, float tintAmount) {
     );
 }
 
+// Mixes two washes by their emission (premultiplied color) and opacity.
+vec4 mixWash(vec4 a, vec4 b, float t) {
+    float alpha = mix(a.a, b.a, t);
+    vec3 emission = mix(a.rgb * a.a, b.rgb * b.a, t);
+    return vec4(emission / max(alpha, 1e-4), alpha);
+}
+
 // Neutral wash of the untinted face. Light glass keeps its near-white
 // color and becomes more opaque; dark glass keeps its 32/255 emission, so
 // its wash darkens as it becomes opaque. Clear glass has no slider response.
@@ -171,7 +178,7 @@ vec4 ios27NeutralTint(
         1.0 - darkTransmittance
     );
     vec4 light = vec4(vec3(253.0, 252.0, 253.0) / 255.0, lightAlpha);
-    return mix(light, dark, darkWeight);
+    return mixWash(light, dark, darkWeight);
 }
 
 // Luminance lift and chroma gain of the untinted face. The slider
@@ -189,12 +196,15 @@ vec2 ios27FaceTransfer(float darkWeight, bool clearGlass, float tintAmount) {
     return mix(light, dark, darkWeight);
 }
 
+// Light and dark glass select tint tones differently; merged light and dark
+// shapes mix the two by darkWeight.
 vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
     float luminance = clamp(backdropLuminance, 0.0, 1.0);
-    if (darkWeight < 0.5) {
+    vec3 tone = vec3(0.0);
+    if (darkWeight < 1.0) {
         float lightScale = 0.76059211 +
             (1.0 - 0.76059211) * pow(luminance, 0.90667748);
-        return clamp(
+        tone = clamp(
             lightScale * pow(
                 max(tint, vec3(0.0)),
                 vec3(1.0 + 0.07044432 * (1.0 - luminance))
@@ -203,18 +213,33 @@ vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
             1.0
         );
     }
-    float darkFloor = 0.08611765 * pow(
-        min(1.0, luminance / 0.62019473),
-        1.01150514
-    );
-    float darkCeiling = 1.0 - 0.01560784 * pow(
-        min(1.0, luminance / 0.46837318),
-        1.85642966
-    );
-    return clamp(
-        mix(vec3(darkFloor), vec3(darkCeiling), tint),
-        0.0,
-        1.0
+    if (darkWeight > 0.0) {
+        float darkFloor = 0.08611765 * pow(
+            min(1.0, luminance / 0.62019473),
+            1.01150514
+        );
+        float darkCeiling = 1.0 - 0.01560784 * pow(
+            min(1.0, luminance / 0.46837318),
+            1.85642966
+        );
+        tone = mix(
+            tone,
+            clamp(mix(vec3(darkFloor), vec3(darkCeiling), tint), 0.0, 1.0),
+            darkWeight
+        );
+    }
+    return tone;
+}
+
+// Legacy, dark and clear shares of a color model code (0 legacy, 1 iOS 27
+// light, 2 iOS 27 dark, 3 iOS 27 clear). Merged shapes blend these shares
+// rather than the codes, so a light-to-clear merge does not pass through
+// dark.
+vec3 colorModelSharesOf(float code) {
+    return vec3(
+        code < 0.5 ? 1.0 : 0.0,
+        abs(code - 2.0) < 0.5 ? 1.0 : 0.0,
+        code > 2.5 ? 1.0 : 0.0
     );
 }
 
@@ -226,17 +251,29 @@ float contourExtent() {
 }
 
 // The dark border starts at the silhouette (shifted outward by
-// contourOffset) and fades linearly outward over contourWidth. Inward it
-// ends within a sub-pixel feather, so the glass face keeps its own
-// transmittance right up to the glint.
-float contourCoverage(float signedEdgeDistance) {
+// contourOffset) and fades linearly outward over contourWidth. It is often
+// narrower than a pixel, so it is box-filtered over the same one-pixel
+// footprint as the silhouette instead of being point-sampled, which would
+// alias into a dotted line along curves. This is the ramp's integral from
+// the silhouette to outward distance t.
+float contourIntegral(float t) {
+    float u = clamp(t - uContourOffset, 0.0, uEdgeWidth);
+    return u - u * u / (2.0 * uEdgeWidth);
+}
+
+// Border coverage of the pixel, split at the silhouette: x lies outside the
+// material and is composited over the backdrop, y lies inside it.
+vec2 contourCoverage(float signedEdgeDistance) {
     if (uEdgeWidth <= 0.0) {
-        return 0.0;
+        return vec2(0.0);
     }
-    float outward = -signedEdgeDistance - uContourOffset;
-    return outward >= 0.0
-        ? clamp(1.0 - outward / uEdgeWidth, 0.0, 1.0)
-        : clamp(1.0 + outward * 2.0, 0.0, 1.0);
+    float outward = -signedEdgeDistance;
+    float lower = outward - 0.5;
+    float upper = outward + 0.5;
+    return vec2(
+        contourIntegral(max(upper, 0.0)) - contourIntegral(max(lower, 0.0)),
+        contourIntegral(min(upper, 0.0)) - contourIntegral(min(lower, 0.0))
+    );
 }
 
 // The fraction of the normal perpendicular to the light axis. The glint
@@ -295,7 +332,9 @@ vec3 applySpecularHighlights(
         uHighlightWidth > 0.0 ? uHighlightWidth : uEdgeWidth,
         0.001
     );
-    float outlineCoverage = contourCoverage(signedEdgeDistance);
+    // In-material share of the border, relative to the material's coverage.
+    float outlineCoverage = contourCoverage(signedEdgeDistance).y /
+        max(clamp(signedEdgeDistance + 0.5, 0.0, 1.0), 0.001);
     // The glint is a thin line anchored at the silhouette with a faint
     // inward bleed. Both are linear ramps in logical distance, so the line
     // stays crisp at every size and scale factor.
@@ -468,7 +507,7 @@ void main() {
     
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
-    float colorModel = uAppearanceConfig.x;
+    vec3 colorModelShares = colorModelSharesOf(uAppearanceConfig.x);
     #if SHAPE_TINT
     {
         float materialRasterScale = max(uAppearanceConfig.z, 1.0);
@@ -506,11 +545,24 @@ void main() {
         // transition weight. Pair changes are allowed to be approximate: this
         // map is a transient tint gradient, never the geometry matte.
         vec4 contributors = texture(uMaterialTexture, materialNearestUV);
-        float primaryWeight = clamp(
-            texture(uMaterialLinearTexture, materialLinearUV).b,
-            0.0,
-            1.0
-        );
+        vec4 filtered = texture(uMaterialLinearTexture, materialLinearUV);
+        float primaryWeight = clamp(filtered.b, 0.0, 1.0);
+        // Where the nearest shape swaps, the filtered footprint holds one
+        // pair in both orders: the IDs differ but their sum does not. The
+        // nearest-shape weight never reaches 0.5 there, so use the weight
+        // stored for the pair's lower-indexed shape instead.
+        const float kIdTolerance = 0.5 / 255.0;
+        if (
+            abs(filtered.r - contributors.r) > kIdTolerance &&
+            abs(
+                filtered.r + filtered.g - contributors.r - contributors.g
+            ) < kIdTolerance
+        ) {
+            float lowerWeight = clamp(filtered.a, 0.0, 1.0);
+            primaryWeight = contributors.r <= contributors.g
+                ? lowerWeight
+                : 1.0 - lowerWeight;
+        }
         int primary = int(clamp(
             floor(contributors.r * 16.0),
             0.0,
@@ -567,9 +619,9 @@ void main() {
             primaryWeight
         );
         appearanceVisibility = clamp(appearance.w, 0.0, 1.0);
-        colorModel = mix(
-            secondaryColorModel,
-            primaryColorModel,
+        colorModelShares = mix(
+            colorModelSharesOf(secondaryColorModel),
+            colorModelSharesOf(primaryColorModel),
             primaryWeight
         );
         materialTint.a *= appearanceVisibility;
@@ -595,7 +647,7 @@ void main() {
     float materialAlpha = clamp(signedEdgeDistance + 0.5, 0.0, 1.0);
     if (
         materialAlpha < 0.01 &&
-        contourCoverage(signedEdgeDistance) * gContourAlpha < 0.01
+        contourCoverage(signedEdgeDistance).x * gContourAlpha < 0.01
     ) {
         fragColor = vec4(0.0);
         return;
@@ -691,9 +743,10 @@ void main() {
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
     }
     
-    vec3 transmittedColor;
-    vec3 baseColor;
-    if (colorModel < 0.5) {
+    vec3 transmittedColor = vec3(0.0);
+    vec3 baseColor = vec3(0.0);
+    float legacyShare = colorModelShares.x;
+    if (legacyShare > 0.0) {
         transmittedColor = pow(
             max(refractColor.rgb, vec3(0.0)),
             vec3(max(uTransmissionGamma, 0.01))
@@ -709,37 +762,56 @@ void main() {
             0.0,
             1.0
         );
-    } else {
+    }
+    if (legacyShare < 1.0) {
         // Apple's public tint is not a flat source-over wash. Its documented
         // "range of tones" is selected from backdrop brightness, while tint
         // opacity linearly mixes that opaque tonal result with the untinted
         // material. The untinted material itself treats luminance and
         // chroma separately (see ios27FaceTransfer). Saturation and gamma
         // stay available as relative adjustments where 1 is Apple's face.
-        bool clearGlass = colorModel > 2.5;
-        float darkWeight = clearGlass ? 0.0 : clamp(colorModel - 1.0, 0.0, 1.0);
+        float ios27Share = 1.0 - legacyShare;
+        float darkWeight = clamp(colorModelShares.y / ios27Share, 0.0, 1.0);
+        float clearWeight = clamp(colorModelShares.z / ios27Share, 0.0, 1.0);
+        // Share of dark glass within the regular (non-clear) part.
+        float regularDarkWeight = clearWeight < 1.0
+            ? clamp(darkWeight / (1.0 - clearWeight), 0.0, 1.0)
+            : 0.0;
         vec4 neutralTint = ios27NeutralTint(
-            darkWeight,
+            0.0,
             uAppearanceConfig.w,
-            clearGlass,
+            true,
             uTintAmount
         );
-        if (!clearGlass && darkWeight > 0.0) {
+        vec2 faceTransfer = ios27FaceTransfer(0.0, true, uTintAmount);
+        if (clearWeight < 1.0) {
+            neutralTint = mixWash(
+                ios27NeutralTint(
+                    regularDarkWeight,
+                    uAppearanceConfig.w,
+                    false,
+                    uTintAmount
+                ),
+                neutralTint,
+                clearWeight
+            );
+            faceTransfer = mix(
+                ios27FaceTransfer(regularDarkWeight, false, uTintAmount),
+                faceTransfer,
+                clearWeight
+            );
+        }
+        if (colorModelShares.y > 0.0) {
             // The dark border strengthens with the opacity the slider adds.
             float addedOpacity =
                 ios27DarkTransmittance(uAppearanceConfig.w, 0.0) -
                 ios27DarkTransmittance(uAppearanceConfig.w, uTintAmount);
-            gContourAlpha *= 1.0 + 0.95 * addedOpacity * darkWeight;
+            gContourAlpha *= 1.0 + 0.95 * addedOpacity * colorModelShares.y;
         }
-        vec2 faceTransfer = ios27FaceTransfer(
-            darkWeight,
-            clearGlass,
-            uTintAmount
-        );
-        if (clearGlass) {
-            gGlintLuminance = 2.34;
-            gGlintFaceGain = 3.58;
-            gGlintVibrancy = 0.78;
+        if (colorModelShares.z > 0.0) {
+            gGlintLuminance = mix(gGlintLuminance, 2.34, colorModelShares.z);
+            gGlintFaceGain = mix(gGlintFaceGain, 3.58, colorModelShares.z);
+            gGlintVibrancy = mix(gGlintVibrancy, 0.78, colorModelShares.z);
         }
         float backdropLuminance = dot(refractColor.rgb, LUMA_WEIGHTS);
         float transmittedLuminance = pow(
@@ -768,16 +840,21 @@ void main() {
             0.0,
             1.0
         );
-        baseColor = neutralBase;
+        vec3 ios27Base = neutralBase;
         if (materialTint.a >= 0.001) {
             vec3 tintTone = ios27TintTone(
                 materialTint.rgb,
                 backdropLuminance,
                 darkWeight
             );
-            baseColor = mix(neutralBase, tintTone, materialTint.a);
+            ios27Base = mix(neutralBase, tintTone, materialTint.a);
         }
-        transmittedColor = neutralTransmission * (1.0 - materialTint.a);
+        baseColor = mix(ios27Base, baseColor, legacyShare);
+        transmittedColor = mix(
+            neutralTransmission * (1.0 - materialTint.a),
+            transmittedColor,
+            legacyShare
+        );
     }
 
     // Reconstruct the original material silhouette from the signed SDF. The
@@ -799,10 +876,9 @@ void main() {
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
-        contourCoverage(signedEdgeDistance) *
+        contourCoverage(signedEdgeDistance).x *
         gContourAlpha *
         contourDirection(surfaceNormal) *
-        (1.0 - materialAlpha) *
         appearanceVisibility;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
