@@ -7,61 +7,70 @@ import 'package:motor/motor.dart';
 /// from the resting platter into the loupe.
 ///
 /// Everything that follows the indicator (the platter, the tint mask, the
-/// icon scale and the loupe itself) reads these two controllers at paint
-/// time through [listenable], so moving the indicator never rebuilds or
-/// re-lays out a widget.
+/// tint's shrink compensation and the loupe itself) reads these controllers
+/// at paint or layout time through [listenable], so moving the indicator
+/// never rebuilds a widget.
 class TabSelection {
   TabSelection({
     required this.position,
     required this.press,
+    required this.jelly,
     required this.tabCount,
+    required this.backdropShrink,
   });
 
   /// Center of the indicator in tab indices. Fractional while it moves, and
   /// slightly outside `0..tabCount - 1` while overdragged.
   final SingleMotionController position;
 
-  /// `0` for the resting platter, `1` for the loupe.
+  /// `0` for the resting platter, `1` for the loupe. Also the loupe's glass
+  /// visibility.
   final SingleMotionController press;
+
+  /// Smoothed indicator velocity in tabs per second, for squash and stretch.
+  final SingleMotionController jelly;
 
   int tabCount;
 
-  late final Listenable listenable = Listenable.merge([position, press]);
+  /// The loupe's `LiquidGlassSettings.backdropShrink`.
+  double backdropShrink;
 
-  /// How far the loupe reaches past the platter on each side.
-  static const loupeOutset = Size(12, 10);
+  late final Listenable listenable = Listenable.merge([position, press, jelly]);
 
-  /// Scale every icon gains while the bar is held. Icons under the loupe
-  /// get no extra enlargement: the loupe itself shrinks what it covers.
-  static const pressScale = .1;
-
-  /// Horizontal speed, in logical pixels per second, at which the indicator
-  /// stretches the most.
-  static const _jellySpeed = 2400.0;
-  static const _jellyStretch = .18;
+  /// How far the loupe reaches past the platter on every side.
+  static const loupeOutset = 14.0;
 
   double get _pressAmount => math.max(press.value, 0);
 
-  /// The indicator within a tab row of [size], before jelly.
+  /// The indicator within a tab row of [size], before squash and stretch.
   Rect restingRect(Size size, {double? pressAmount}) {
     final slot = size.width / tabCount;
-    final p = pressAmount ?? _pressAmount;
+    final grow = 2 * loupeOutset * (pressAmount ?? _pressAmount);
     return Rect.fromCenter(
       center: Offset((position.value + .5) * slot, size.height / 2),
-      width: slot + 2 * loupeOutset.width * p,
-      height: size.height + 2 * loupeOutset.height * p,
+      width: slot + grow,
+      height: size.height + grow,
     );
   }
 
-  /// The indicator within a tab row of [size], stretched along its motion.
+  /// Squash along the motion and stretch across it, from
+  /// `buildJellyTransform` in the original example bottom bar.
+  ({double x, double y}) get jellyScale {
+    // That bar measured velocity in alignment units, where -1 to 1 spans
+    // the first to the last tab.
+    final alignmentVelocity = jelly.value * 2 / math.max(tabCount - 1, 1);
+    final distortion = (alignmentVelocity.abs() / 10).clamp(0.0, 1.0) * .8;
+    return (x: 1 - distortion * .5, y: 1 + distortion * .3);
+  }
+
+  /// The indicator within a tab row of [size].
   Rect rect(Size size) {
     final rect = restingRect(size);
-    final jelly = _jelly(size);
-    if (jelly == 0) return rect;
+    final (:x, :y) = jellyScale;
     return Rect.fromCenter(
       center: rect.center,
-      width: rect.width * (1 + jelly),
-      height: rect.height * (1 - jelly / 2),
+      width: rect.width * x,
+      height: rect.height * y,
     );
   }
 
@@ -73,16 +82,16 @@ class TabSelection {
     );
   }
 
-  double _jelly(Size size) {
-    if (!position.isAnimating) return 0;
-    final slot = size.width / tabCount;
-    final speed = (position.velocity * slot).abs();
-    final p = _pressAmount.clamp(0.0, 1.0);
-    return (speed / _jellySpeed).clamp(0.0, 1.0) * _jellyStretch * p;
+  /// Scale about the loupe center that the loupe's shrunk backdrop undoes,
+  /// so the tinted icons under it keep the size of the others.
+  ///
+  /// The glass samples the backdrop at `1 + (1 / (1 - shrink) - 1) * v`
+  /// times the distance from its center at visibility `v`.
+  double get tintScale {
+    final shrink = backdropShrink.clamp(0.0, .75);
+    final visibility = press.value.clamp(0.0, 1.0);
+    return 1 + (1 / (1 - shrink) - 1) * visibility;
   }
-
-  /// Scale of each tab's icon and label.
-  double get iconScale => 1 + _pressAmount * pressScale;
 }
 
 /// Clips to the indicator, or with [inverse] to everything outside it.
@@ -97,7 +106,7 @@ class TabSelectionClipper extends CustomClipper<Path> {
   final TabSelection selection;
   final bool inverse;
 
-  /// Room for scaled icons that grow past the row.
+  /// Room for content that the bar's own scale pushes past the row.
   static const _overflow = 24.0;
 
   @override
@@ -141,48 +150,29 @@ class TabPlatterPainter extends CustomPainter {
       oldDelegate.selection != selection || oldDelegate.color != color;
 }
 
-/// Lays tabs out in equal slots and scales each one about its center at
-/// paint time.
-class TabRowDelegate extends FlowDelegate {
-  TabRowDelegate(this.selection) : super(repaint: selection.listenable);
+/// Places the loupe over the indicator of a tab row inset by [padding].
+///
+/// Relayouts on every move without rebuilding; the child's constraints only
+/// change while the loupe grows or shrinks.
+class LoupeLayoutDelegate extends SingleChildLayoutDelegate {
+  LoupeLayoutDelegate(this.selection, {required this.padding})
+    : super(relayout: selection.listenable);
 
   final TabSelection selection;
+  final double padding;
+
+  Rect _rect(Size size) => selection
+      .restingRect(Size(size.width - 2 * padding, size.height - 2 * padding))
+      .shift(Offset(padding, padding));
 
   @override
-  Size getSize(BoxConstraints constraints) => constraints.biggest;
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      BoxConstraints.tight(_rect(constraints.biggest).size);
 
   @override
-  BoxConstraints getConstraintsForChild(int i, BoxConstraints constraints) =>
-      BoxConstraints.tight(
-        Size(constraints.maxWidth / selection.tabCount, constraints.maxHeight),
-      );
+  Offset getPositionForChild(Size size, Size childSize) => _rect(size).topLeft;
 
   @override
-  void paintChildren(FlowPaintingContext context) {
-    final slot = context.size.width / context.childCount;
-    final center = context.size.height / 2;
-    final scale = selection.iconScale;
-    for (var i = 0; i < context.childCount; i++) {
-      final x = slot * i;
-      if (scale == 1) {
-        context.paintChild(i, transform: Matrix4.translationValues(x, 0, 0));
-        continue;
-      }
-      final cx = x + slot / 2;
-      context.paintChild(
-        i,
-        transform: Matrix4.translationValues(cx, center, 0)
-          ..scaleByDouble(scale, scale, 1, 1)
-          ..translateByDouble(-slot / 2, -center, 0, 1),
-      );
-    }
-  }
-
-  @override
-  bool shouldRelayout(TabRowDelegate oldDelegate) =>
-      oldDelegate.selection != selection;
-
-  @override
-  bool shouldRepaint(TabRowDelegate oldDelegate) =>
-      oldDelegate.selection != selection;
+  bool shouldRelayout(LoupeLayoutDelegate oldDelegate) =>
+      oldDelegate.selection != selection || oldDelegate.padding != padding;
 }

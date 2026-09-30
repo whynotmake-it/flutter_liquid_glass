@@ -1,6 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/listenable_transform.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/tab_selection.dart';
 import 'package:motor/motor.dart';
 
@@ -14,17 +16,21 @@ class BottomBarTab {
 
 /// An iOS 27 tab bar: a glass capsule whose selection platter turns into a
 /// clear loupe while the bar is held, follows the finger across the tabs and
-/// snaps to a tab on release.
+/// snaps to a tab on release. The whole bar swells while held.
 ///
 /// Must be inside a [LiquidGlassBlendGroup], which the capsule joins so it
 /// can merge with neighboring bar segments. The loupe renders in its own
 /// small glass layer, mounted only while it is visible, because it has to
-/// refract the capsule and the icons painted beneath it.
+/// refract the capsule and the icons painted beneath it. Its
+/// `backdropShrink` shows the bar smaller inside it; the tinted icons under
+/// it are scaled up by the same amount so they keep their size.
 ///
-/// While the indicator moves, nothing rebuilds or re-lays out: the platter,
-/// the tint mask, the icon scale and the loupe transform read the motion
-/// controllers at paint time. Only the loupe's own transform and fade go
-/// through small builders.
+/// The drag and motion follow the original example bottom bar: pointer
+/// positions from a horizontal drag, an interactive spring while dragging,
+/// a bouncy spring to the chosen tab, and a loupe that stays up until the
+/// indicator has nearly arrived. Nothing rebuilds while the finger moves:
+/// the bar transform, platter, tint mask and loupe placement read the motion
+/// controllers at paint and layout time.
 class LoupeTabBar extends StatefulWidget {
   const LoupeTabBar({
     required this.tabs,
@@ -34,6 +40,7 @@ class LoupeTabBar extends StatefulWidget {
     this.shadows = const [],
     this.fake = false,
     this.height = 62,
+    this.pressScale = .05,
     this.loupeSettings = defaultLoupeSettings,
     super.key,
   }) : assert(tabs.length > 0, 'A tab bar needs at least one tab.');
@@ -55,19 +62,21 @@ class LoupeTabBar extends StatefulWidget {
 
   final double height;
 
+  /// How much the whole bar grows while held.
+  final double pressScale;
+
   /// Settings of the loupe's own glass layer.
   ///
-  /// Apple's loupe appears to shrink what it covers slightly; set
-  /// `backdropShrink` here for that. Never enlarge: the
-  /// icons already scale up while the bar is held.
+  /// Its `backdropShrink` is how much smaller the bar looks inside the loupe.
   final LiquidGlassSettings loupeSettings;
 
-  /// Clear, unfrosted lens with a wide bevel, after the loupe in the original
-  /// example bottom bar (`test/support/bottom_bar.dart`), without its
-  /// magnification.
+  /// A clear, unfrosted lens with a wide bevel, after the loupe in the
+  /// original example bottom bar (`test/support/bottom_bar.dart`), shrinking
+  /// the backdrop enough that the swollen bar's edges show inside it.
   static const defaultLoupeSettings = LiquidGlassSettings(
     refractionHeight: 24,
     refractionAmount: 40,
+    backdropShrink: .25,
     dispersion: .1,
     frost: 0,
     contourStrength: .1,
@@ -94,23 +103,14 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   ];
 
   static const _follow = Motion.interactiveSpring(snapToEnd: true);
-  static const _settle = Motion.snappySpring(
-    duration: Duration(milliseconds: 450),
-    extraBounce: .1,
-    snapToEnd: true,
-  );
-  static const _pressIn = Motion.snappySpring(
+  static const _settle = Motion.bouncySpring(snapToEnd: true);
+  static const _thickness = Motion.snappySpring(
     duration: Duration(milliseconds: 300),
     snapToEnd: true,
   );
-  static const _pressOut = Motion.smoothSpring(
-    duration: Duration(milliseconds: 400),
-    snapToEnd: true,
+  static const _wobble = Motion.bouncySpring(
+    duration: Duration(milliseconds: 600),
   );
-  static const _stretchBack = Motion.bouncySpring(snapToEnd: true);
-
-  /// Movement before a press becomes a drag.
-  static const _dragSlop = 4.0;
 
   /// The loupe's overdrag past the first and last tab approaches this many
   /// tabs.
@@ -121,7 +121,8 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     vsync: this,
     initialValue: widget.selectedIndex.toDouble(),
   );
-  late final _press = SingleMotionController(motion: _pressIn, vsync: this);
+  late final _press = SingleMotionController(motion: _thickness, vsync: this);
+  late final _jelly = SingleMotionController(motion: _wobble, vsync: this);
   late final _stretch = MotionController<Offset>(
     motion: _follow,
     vsync: this,
@@ -131,58 +132,97 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   late final _selection = TabSelection(
     position: _position,
     press: _press,
+    jelly: _jelly,
     tabCount: widget.tabs.length,
+    backdropShrink: widget.loupeSettings.backdropShrink,
   );
+  late final _barTransform = Listenable.merge([_press, _stretch]);
   final _showLoupe = ValueNotifier(false);
+  final _loupeVisibility = ValueNotifier<double>(0);
 
   late int _selected = widget.selectedIndex;
-  double _rowWidth = 0;
+  late int _target = widget.selectedIndex;
+  Size _size = Size.zero;
 
-  int? _pointer;
-  Offset _down = Offset.zero;
+  bool _held = false;
   bool _dragging = false;
-  VelocityTracker? _tracker;
+  double _pressTarget = 0;
+
+  /// The finger's last position in tabs, without rubber banding.
+  double _finger = 0;
 
   int get _lastTab => widget.tabs.length - 1;
-  double get _slot => _rowWidth / widget.tabs.length;
+  double get _slot => (_size.width - 2 * _padding) / widget.tabs.length;
+
+  /// How far the indicator may still be from its tab when the loupe settles
+  /// back into the platter: 0.3 in the original bar's alignment units.
+  double get _arrivalDistance => .15 * math.max(_lastTab, 1);
 
   @override
   void initState() {
     super.initState();
-    _press.addListener(_updateLoupe);
+    _position.addListener(_onPositionTick);
+    _press.addListener(_onPressTick);
   }
 
   @override
   void didUpdateWidget(LoupeTabBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _selection.tabCount = widget.tabs.length;
+    _selection
+      ..tabCount = widget.tabs.length
+      ..backdropShrink = widget.loupeSettings.backdropShrink;
     if (widget.selectedIndex != oldWidget.selectedIndex) {
       _selected = widget.selectedIndex;
-      if (_pointer == null) {
-        _position
-          ..motion = _settle
-          ..animateTo(_selected.toDouble());
-      }
+      if (!_held) _moveTo(_selected);
     }
   }
 
   @override
   void dispose() {
-    _press.removeListener(_updateLoupe);
-    _position.dispose();
-    _press.dispose();
+    _position
+      ..removeListener(_onPositionTick)
+      ..dispose();
+    _press
+      ..removeListener(_onPressTick)
+      ..dispose();
+    _jelly.dispose();
     _stretch.dispose();
     _showLoupe.dispose();
+    _loupeVisibility.dispose();
     super.dispose();
   }
 
-  void _updateLoupe() =>
-      _showLoupe.value = _pointer != null || _press.value > .005;
+  void _onPositionTick() {
+    _jelly.animateTo(_position.velocity);
+    _updatePress();
+  }
 
-  int _tabAt(Offset local) =>
-      ((local.dx - _padding) / _slot).floor().clamp(0, _lastTab);
+  void _onPressTick() {
+    _loupeVisibility.value = _press.value.clamp(0.0, 1.0);
+    _showLoupe.value = _pressTarget == 1 || _press.value > .005;
+  }
 
-  double _positionAt(Offset local) => (local.dx - _padding) / _slot - .5;
+  /// Keeps the loupe up while held and until the indicator has nearly
+  /// reached its tab.
+  void _updatePress() {
+    final show = _held || (_position.value - _target).abs() > _arrivalDistance;
+    final target = show ? 1.0 : 0.0;
+    if (target == _pressTarget) return;
+    _pressTarget = target;
+    _press.animateTo(target);
+    _onPressTick();
+  }
+
+  /// The tab position under [local], undoing the bar's swell about its
+  /// center.
+  double _positionAt(Offset local) {
+    final scale = 1 + widget.pressScale * math.max(_press.value, 0);
+    final center = _size.width / 2;
+    final x = center + (local.dx - center) / scale;
+    return (x - _padding) / _slot - .5;
+  }
+
+  int _tabAt(Offset local) => _positionAt(local).round().clamp(0, _lastTab);
 
   /// Resists overdrag like a scroll view edge: nearly 1:1 at first,
   /// approaching [_overdragLimit].
@@ -191,35 +231,12 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     return overdrag.sign * resisted / (1 + resisted / _overdragLimit);
   }
 
-  void _onDown(PointerDownEvent event) {
-    if (_pointer != null || _rowWidth == 0) return;
-    _pointer = event.pointer;
-    _dragging = false;
-    _down = event.localPosition;
-    _tracker = VelocityTracker.withKind(event.kind)
-      ..addPosition(event.timeStamp, event.localPosition);
-    _updateLoupe();
-    _press
-      ..motion = _pressIn
-      ..animateTo(1);
+  void _track(Offset local, {required Motion motion}) {
+    _finger = _positionAt(local);
+    final clamped = _finger.clamp(0.0, _lastTab.toDouble());
+    final overdrag = _finger - clamped;
     _position
-      ..motion = _settle
-      ..animateTo(_tabAt(event.localPosition).toDouble());
-  }
-
-  void _onMove(PointerMoveEvent event) {
-    if (event.pointer != _pointer) return;
-    final local = event.localPosition;
-    _tracker!.addPosition(event.timeStamp, local);
-    if (!_dragging) {
-      if ((local - _down).distance < _dragSlop) return;
-      _dragging = true;
-    }
-    final raw = _positionAt(local);
-    final clamped = raw.clamp(0.0, _lastTab.toDouble());
-    final overdrag = raw - clamped;
-    _position
-      ..motion = _follow
+      ..motion = motion
       ..animateTo(clamped + _rubberBand(overdrag));
 
     // Pulling past the capsule stretches it toward that side, which is how it
@@ -231,52 +248,93 @@ class _LoupeTabBarState extends State<LoupeTabBar>
       ..animateTo(Offset(overdrag * _slot, overY).withResistance(.08) * .5);
   }
 
-  void _onUp(PointerUpEvent event) {
-    if (event.pointer != _pointer) return;
-    if (!_dragging) {
-      _release(_tabAt(_down));
-      return;
-    }
-    final velocity = _tracker!.getVelocity().pixelsPerSecond.dx / _slot;
-    final projected = _positionAt(event.localPosition) + velocity * .08;
-    _release(projected.round().clamp(0, _lastTab));
+  void _onDown(DragDownDetails details) {
+    if (_size.isEmpty) return;
+    _held = true;
+    _dragging = false;
+    _track(details.localPosition, motion: _settle);
+    _updatePress();
   }
 
-  void _onCancel(PointerCancelEvent event) {
-    if (event.pointer != _pointer) return;
-    _release(
-      _dragging ? _position.value.round().clamp(0, _lastTab) : _selected,
-    );
+  void _onDragUpdate(Offset local) {
+    if (!_held) return;
+    _dragging = true;
+    _track(local, motion: _follow);
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_held) return;
+    final velocity = details.velocity.pixelsPerSecond.dx / _slot;
+    final nearest = _finger.round().clamp(0, _lastTab);
+    var target = nearest;
+    // A flick carries at least one tab further, projected 0.3 s ahead.
+    if (velocity.abs() > .5 * math.max(_lastTab, 1)) {
+      target = (_finger + velocity * .3).round().clamp(0, _lastTab);
+      if (velocity > 0 && target <= nearest && nearest < _lastTab) {
+        target = nearest + 1;
+      } else if (velocity < 0 && target >= nearest && nearest > 0) {
+        target = nearest - 1;
+      }
+    }
+    _release(target);
+  }
+
+  void _onCancel() {
+    if (!_held) return;
+    _release(_dragging ? _finger.round().clamp(0, _lastTab) : _selected);
   }
 
   void _release(int tab) {
-    _pointer = null;
-    _tracker = null;
+    _held = false;
     _dragging = false;
-    _position
-      ..motion = _settle
-      ..animateTo(tab.toDouble());
-    _press
-      ..motion = _pressOut
-      ..animateTo(0);
     _stretch
-      ..motion = _stretchBack
+      ..motion = _settle
       ..animateTo(Offset.zero);
-    _updateLoupe();
+    _moveTo(tab);
     _select(tab);
   }
 
-  void _activate(int tab) {
+  void _moveTo(int tab) {
+    _target = tab;
     _position
       ..motion = _settle
       ..animateTo(tab.toDouble());
-    _select(tab);
+    _updatePress();
   }
 
   void _select(int tab) {
     if (tab == _selected) return;
     setState(() => _selected = tab);
     widget.onSelected?.call(tab);
+  }
+
+  void _activate(int tab) {
+    _moveTo(tab);
+    _select(tab);
+  }
+
+  /// The bar's swell and stretch, both about its center.
+  Matrix4 _barMatrix(Size size) {
+    final swell = 1 + widget.pressScale * math.max(_press.value, 0);
+    final stretch = _stretch.value;
+    final (x, y) = _stretchScale(stretch, size);
+    final center = size.center(Offset.zero) + stretch * 1.5;
+    return Matrix4.translationValues(center.dx, center.dy, 0)
+      ..scaleByDouble(x * swell, y * swell, 1, 1)
+      ..translateByDouble(-size.width / 2, -size.height / 2, 0, 1);
+  }
+
+  /// Volume-preserving stretch for an offset in pixels, as
+  /// [RawLiquidStretch] computes it.
+  static (double, double) _stretchScale(Offset stretch, Size size) {
+    if (stretch == Offset.zero || size.isEmpty) return (1, 1);
+    final rx = stretch.dx.abs() / size.width;
+    final ry = stretch.dy.abs() / size.height;
+    final baseX = 1 + rx;
+    final baseY = 1 + ry;
+    final volume = 1 + math.sqrt(rx * rx + ry * ry) * .5;
+    final correction = math.sqrt(volume / (baseX * baseY));
+    return (baseX * correction, baseY * correction);
   }
 
   @override
@@ -289,16 +347,14 @@ class _LoupeTabBarState extends State<LoupeTabBar>
       value: CupertinoColors.label.resolveFrom(context),
       builder: (context, label, _) => LayoutBuilder(
         builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, widget.height);
-          _rowWidth = size.width - 2 * _padding;
-          final rowSize = Size(_rowWidth, size.height - 2 * _padding);
+          _size = Size(constraints.maxWidth, widget.height);
           final bar = LiquidGlass.grouped(
-            shape: LiquidRoundedSuperellipse(borderRadius: size.height / 2),
+            shape: LiquidRoundedSuperellipse(borderRadius: widget.height / 2),
             clipBehavior: Clip.none,
             appearance: widget.appearance,
             shadows: widget.shadows,
             child: SizedBox.fromSize(
-              size: size,
+              size: _size,
               child: Padding(
                 padding: const EdgeInsets.all(_padding),
                 child: RepaintBoundary(
@@ -307,17 +363,20 @@ class _LoupeTabBarState extends State<LoupeTabBar>
               ),
             ),
           );
-          final loupe = _buildLoupe(rowSize);
-          return Listener(
+          final loupe = _buildLoupe();
+          return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onPointerDown: _onDown,
-            onPointerMove: _onMove,
-            onPointerUp: _onUp,
-            onPointerCancel: _onCancel,
-            child: ListenableBuilder(
-              listenable: _stretch,
-              builder: (context, child) =>
-                  RawLiquidStretch(stretchPixels: _stretch.value, child: child),
+            onTapUp: (details) => _release(_tabAt(details.localPosition)),
+            onHorizontalDragDown: _onDown,
+            onHorizontalDragStart: (details) =>
+                _onDragUpdate(details.localPosition),
+            onHorizontalDragUpdate: (details) =>
+                _onDragUpdate(details.localPosition),
+            onHorizontalDragEnd: _onDragEnd,
+            onHorizontalDragCancel: _onCancel,
+            child: ListenableTransform(
+              listenable: _barTransform,
+              transform: _barMatrix,
               // Fake glass cannot sample what is painted above its own
               // backdrop filter, so a fake loupe sits beneath the capsule.
               child: Stack(
@@ -352,7 +411,14 @@ class _LoupeTabBarState extends State<LoupeTabBar>
           child: ExcludeSemantics(
             child: ClipPath(
               clipper: TabSelectionClipper(_selection),
-              child: _buildRow(tint),
+              child: ListenableTransform(
+                listenable: _selection.listenable,
+                transform: (size) => scaleAbout(
+                  _selection.rect(size).center,
+                  _selection.tintScale,
+                ),
+                child: _buildRow(tint),
+              ),
             ),
           ),
         ),
@@ -361,67 +427,58 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   }
 
   Widget _buildRow(Color color, {bool semantics = false}) {
-    return Flow(
-      delegate: TabRowDelegate(_selection),
+    return Row(
       children: [
         for (final (index, tab) in widget.tabs.indexed)
-          Semantics(
-            container: semantics,
-            button: semantics,
-            selected: semantics && index == _selected,
-            label: semantics ? tab.label : null,
-            onTap: semantics ? () => _activate(index) : null,
-            excludeSemantics: true,
-            child: RepaintBoundary(
-              child: _TabItem(tab: tab, color: color),
+          Expanded(
+            child: Semantics(
+              container: semantics,
+              button: semantics,
+              selected: semantics && index == _selected,
+              label: semantics ? tab.label : null,
+              onTap: semantics ? () => _activate(index) : null,
+              excludeSemantics: true,
+              child: RepaintBoundary(
+                child: _TabItem(tab: tab, color: color),
+              ),
             ),
           ),
       ],
     );
   }
 
-  Widget _buildLoupe(Size rowSize) {
-    final loupeSize = _selection.restingRect(rowSize, pressAmount: 1).size;
-    return Positioned(
-      left: _padding,
-      top: _padding,
-      width: loupeSize.width,
-      height: loupeSize.height,
+  Widget _buildLoupe() {
+    return Positioned.fill(
       child: IgnorePointer(
         child: ValueListenableBuilder(
           valueListenable: _showLoupe,
           builder: (context, show, loupe) =>
               show ? loupe! : const SizedBox.shrink(),
-          child: RepaintBoundary(
-            child: ListenableBuilder(
-              listenable: _selection.listenable,
-              builder: (context, child) {
-                final rect = _selection.rect(rowSize);
-                return Transform(
-                  transform: Matrix4.translationValues(rect.left, rect.top, 0)
-                    ..scaleByDouble(
-                      rect.width / loupeSize.width,
-                      rect.height / loupeSize.height,
-                      1,
-                      1,
-                    ),
-                  child: child,
-                );
+          child: CustomSingleChildLayout(
+            delegate: LoupeLayoutDelegate(_selection, padding: _padding),
+            child: ListenableTransform(
+              listenable: _jelly,
+              transform: (size) {
+                final (:x, :y) = _selection.jellyScale;
+                return scaleAbout(size.center(Offset.zero), x, y);
               },
-              child: ListenableBuilder(
-                listenable: _press,
-                builder: (context, _) => LiquidGlass.withOwnLayer(
-                  key: LoupeTabBar.loupeKey,
-                  settings: widget.loupeSettings,
-                  fake: widget.fake,
-                  appearance: LiquidGlassAppearance(
-                    visibility: _press.value.clamp(0.0, 1.0),
-                  ),
-                  shape: LiquidRoundedSuperellipse(
-                    borderRadius: loupeSize.height / 2,
-                  ),
-                  shadows: _loupeShadows,
-                  child: const SizedBox.expand(),
+              child: RepaintBoundary(
+                child: ValueListenableBuilder(
+                  valueListenable: _loupeVisibility,
+                  builder: (context, visibility, child) =>
+                      LiquidGlass.withOwnLayer(
+                        key: LoupeTabBar.loupeKey,
+                        settings: widget.loupeSettings,
+                        fake: widget.fake,
+                        appearance: LiquidGlassAppearance(
+                          visibility: visibility,
+                        ),
+                        shape: const LiquidRoundedSuperellipse(
+                          borderRadius: 64,
+                        ),
+                        shadows: _loupeShadows,
+                        child: const SizedBox.expand(),
+                      ),
                 ),
               ),
             ),

@@ -82,6 +82,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('moving the finger rebuilds nothing', (tester) async {
+    await pumpBar(tester);
+
+    final gesture = await tester.startGesture(tabCenter(tester, 'Home'));
+    await gesture.moveBy(const Offset(24, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(LoupeTabBar.loupeKey), findsOneWidget);
+
+    var rebuilds = 0;
+    debugOnRebuildDirtyWidget = (element, builtOnce) => rebuilds++;
+    addTearDown(() => debugOnRebuildDirtyWidget = null);
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(12, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    debugOnRebuildDirtyWidget = null;
+    expect(rebuilds, 0);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('the whole bar shares one adaptive brightness estimate', (
     tester,
   ) async {
