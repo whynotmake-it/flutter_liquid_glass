@@ -284,6 +284,11 @@ LIQUID_GLASS_BENCHMARK_MEASURE_SECONDS=20 \
 ./tool/benchmark.sh
 ```
 
+`LIQUID_GLASS_BENCHMARK_DART_DEFINES` passes space-separated `KEY=VALUE`
+pairs as `--dart-define`s to the profile build, in both this script and
+`android_gpu_bench.sh`, so an A/B arm can be built from the same checkout,
+for example `LIQUID_GLASS_REUSE_GEOMETRY_TEXTURES=false`.
+
 Set `LIQUID_GLASS_FLUTTER_BIN` and `LIQUID_GLASS_DART_BIN` to absolute SDK
 paths when the system SDK is not the repository's Flutter 3.47.x SDK. Set
 `LIQUID_GLASS_BENCHMARK_TRACE_TEMPLATE` to override the default Xcode

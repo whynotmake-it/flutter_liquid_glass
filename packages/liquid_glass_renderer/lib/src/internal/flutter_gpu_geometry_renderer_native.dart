@@ -4,21 +4,26 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
-/// Each changed matte owns its texture: previously submitted Flutter scenes
-/// may still sample the old matte with their old coordinate uniforms. Rewriting
-/// that texture would mix frames. The layer reuses the image without calling
-/// [render] when geometry is unchanged (including uniform translation).
+/// Each changed matte gets a texture no in-flight frame reads: previously
+/// submitted Flutter scenes may still sample the old matte with their old
+/// coordinate uniforms, and rewriting it would mix frames. A replaced texture
+/// is rendered into again only after [reuseAfterFrames] frames, which keeps
+/// Impeller's cached render pass and framebuffer and skips the allocation.
+/// The layer reuses the image without calling [render] when geometry is
+/// unchanged (including uniform translation).
 ///
 /// This renderer owns the image handles returned by [gpu.Texture.asImage].
 /// Replacing/disposal releases those handles; recorded scenes hold independent
 /// native references. Direct callers needing a handle across renders can clone
-/// it and must dispose their clone.
+/// it and must dispose their clone; its pixels stay valid for
+/// [reuseAfterFrames] frames after replacement, enough for scene submission.
 @internal
 class FlutterGpuGeometryRenderer {
   FlutterGpuGeometryRenderer({
@@ -66,6 +71,7 @@ class FlutterGpuGeometryRenderer {
     _offsetRseData = resources.offsetRseData;
     _offsetShapeTints = resources.offsetShapeTints;
     _offsetShapeResponses = resources.offsetShapeResponses;
+    _offsetShapeBounds = resources.offsetShapeBounds;
     _vertexBuffer = resources.vertexBuffer;
     _vertexBufferView = resources.vertexBufferView;
     _uniformData = ByteData(_uniformSize);
@@ -273,6 +279,7 @@ class FlutterGpuGeometryRenderer {
   late final int _offsetRseData;
   late final int _offsetShapeTints;
   late final int _offsetShapeResponses;
+  late final int _offsetShapeBounds;
   late final ByteData _uniformData;
   int _writtenShapeFloats = 0;
   int _writtenRseFloats = 0;
@@ -310,6 +317,8 @@ class FlutterGpuGeometryRenderer {
     _offsetShapeTints = _uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     _offsetShapeResponses =
         _uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    _offsetShapeBounds =
+        _uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
   }
 
   void _createVertexBuffer() {
@@ -329,26 +338,29 @@ class FlutterGpuGeometryRenderer {
     );
   }
 
-  /// Renders a new immutable geometry texture and returns it as a [ui.Image].
+  /// Renders a new geometry matte and returns it as a [ui.Image].
   ///
-  /// The returned image is a non-owning wrapper — do NOT dispose it.
-  /// The underlying texture persists across frames.
+  /// The returned image is a non-owning wrapper — do NOT dispose it. Its
+  /// texture is not written again until [reuseAfterFrames] frames after a
+  /// later render replaces it; a clone kept longer than that may show a newer
+  /// matte.
   ({ui.Image image, int width, int height}) render({
     required int width,
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) {
     assert(() {
       debugRenderCount++;
@@ -358,46 +370,47 @@ class FlutterGpuGeometryRenderer {
     final allocatedWidth = _bucketDimension(width);
     final allocatedHeight = _bucketDimension(height);
 
+    _ensureFrameCounter();
+    _lastRenderFrame = _completedFrames;
     if (_texture != null) {
-      // Release our references, not those held by earlier submitted scenes.
-      _renderTarget = null;
+      // Release our handle; earlier submitted scenes hold their own.
       _image?.dispose();
       _image = null;
+      _retire(_retiredMattes, _texture!, _renderTarget!);
+      _renderTarget = null;
       _texture = null;
       assert(() {
         _debugActiveGeometryTextureCount--;
         return true;
       }(), 'Track replaced geometry textures in debug builds.');
     }
-    _texture = gpu.gpuContext.createTexture(
-      gpu.StorageMode.devicePrivate,
+    // The shader writes every pixel of the full-screen quad, so neither a
+    // fresh nor a reused texture needs a clear or a copy of the old matte.
+    final (matte, matteTarget) = _acquire(
+      _retiredMattes,
       allocatedWidth,
       allocatedHeight,
     );
+    _texture = matte;
+    _renderTarget = matteTarget;
     _image = _texture!.asImage();
-    // The shader writes every pixel of the full-screen quad; no clear or
-    // copy of the previous matte is needed.
-    _renderTarget = gpu.RenderTarget.singleColor(
-      gpu.ColorAttachment(
-        texture: _texture!,
-        loadAction: gpu.LoadAction.dontCare,
-      ),
-    );
     assert(() {
       _debugActiveGeometryTextureCount++;
       return true;
     }(), 'Track live geometry textures in debug builds.');
 
-    if (!writeMaterials && _materialTexture != null) {
-      _materialRenderTarget = null;
+    if (_materialTexture != null) {
       _materialImage?.dispose();
       _materialImage = null;
+      _retire(_retiredMaterials, _materialTexture!, _materialRenderTarget!);
+      _materialRenderTarget = null;
       _materialTexture = null;
       assert(() {
         _debugActiveMaterialTextureCount--;
         return true;
-      }(), 'Track released material textures in debug builds.');
-    } else if (writeMaterials) {
+      }(), 'Track replaced material textures in debug builds.');
+    }
+    if (writeMaterials) {
       final materialMapWidth = math.max(
         1,
         (allocatedWidth + materialRasterScale - 1) ~/ materialRasterScale,
@@ -412,51 +425,30 @@ class FlutterGpuGeometryRenderer {
       final materialHeight = writeTintOnly
           ? materialMapHeight
           : materialMapHeight + 2;
-      if (_materialTexture != null) {
-        _materialRenderTarget = null;
-        _materialImage?.dispose();
-        _materialImage = null;
-        _materialTexture = null;
-        assert(() {
-          _debugActiveMaterialTextureCount--;
-          return true;
-        }(), 'Track replaced material textures in debug builds.');
-      }
-      _materialTexture = gpu.gpuContext.createTexture(
-        gpu.StorageMode.devicePrivate,
+      final (material, materialTarget) = _acquire(
+        _retiredMaterials,
         materialWidth,
         materialHeight,
       );
+      _materialTexture = material;
+      _materialRenderTarget = materialTarget;
       _materialImage = _materialTexture!.asImage();
-      _materialRenderTarget = gpu.RenderTarget.singleColor(
-        gpu.ColorAttachment(
-          texture: _materialTexture!,
-          loadAction: gpu.LoadAction.dontCare,
-        ),
-      );
       assert(() {
         _debugActiveMaterialTextureCount++;
         return true;
       }(), 'Track live material textures in debug builds.');
     }
+    _trimRetired(_retiredMattes, allocatedWidth, allocatedHeight);
 
     _packUniformData(
       offsetX: offsetX,
       offsetY: offsetY,
       textureWidth: allocatedWidth.toDouble(),
       textureHeight: allocatedHeight.toDouble(),
-      opticalIndex: opticalIndex,
-      refractionSpread: refractionSpread,
-      displacementScale:
-          displacementScale ??
-          math.max(
-            1e-3,
-            1.05 *
-                8.0 *
-                thickness *
-                math.sqrt(math.max(0.0, opticalIndex * opticalIndex - 1.0)),
-          ),
-      thickness: thickness,
+      refractionHeight: refractionHeight,
+      refractionAmount: refractionAmount,
+      edgeDistanceRange: edgeDistanceRange ?? math.max(12, refractionHeight),
+      refractionFitsShape: refractionFitsShape,
       contourExtent: contourExtent,
       materialScale: writeMaterials ? materialRasterScale.toDouble() : 1.0,
       materialMapWidth: writeMaterials
@@ -482,6 +474,7 @@ class FlutterGpuGeometryRenderer {
       shapeData: shapeData,
       rseData: rseData,
       appearanceData: appearanceData,
+      boundsData: boundsData,
     );
 
     final uniformView = _hostBufferForUniformSize(
@@ -530,15 +523,150 @@ class FlutterGpuGeometryRenderer {
 
   static int _bucketDimension(int value) => (value + 63) & ~63;
 
+  /// Frames after its replacement before a texture may be rendered into
+  /// again.
+  ///
+  /// The last scene that can sample a matte replaced during frame E is
+  /// frame E - 1's. The engine keeps at most two layer trees in flight and
+  /// frees a slot only after rasterizing (`Animator`'s `FramePipeline(2)`),
+  /// so when the UI thread paints frame k, frame k - 2 has been rasterized.
+  /// The Vulkan swapchains (KHR and AHB) wait for the GPU fence of the frame
+  /// two before the one they rasterize, so the GPU has finished frame k - 4.
+  /// Reuse is therefore safe from frame E + 3. Metal tracks the hazard
+  /// itself and GLES submits on the raster thread in order. The extra three
+  /// frames absorb frames rendered outside vsync, such as warm-up frames.
+  static const int reuseAfterFrames = 6;
+
+  /// Harness switch for A/B builds; production always reuses.
+  static const bool _reuseTextures = bool.fromEnvironment(
+    'LIQUID_GLASS_REUSE_GEOMETRY_TEXTURES',
+    defaultValue: true,
+  );
+
+  /// Renderers stop holding retired textures after this many frames
+  /// without a geometry render.
+  static const int _idleFramesBeforeTrim = 30;
+
+  static int _completedFrames = 0;
+  static bool _countingFrames = false;
+  static final Set<FlutterGpuGeometryRenderer> _renderersWithRetired = {};
+
+  /// Counts frames that submit a scene, the unit [reuseAfterFrames] is in.
+  ///
+  /// Renders outside a frame, as in unit tests, do not advance the count,
+  /// so their textures are never reused.
+  static void _ensureFrameCounter() {
+    if (_countingFrames || !_reuseTextures) return;
+    _countingFrames = true;
+    SchedulerBinding.instance.addPersistentFrameCallback((_) {
+      if (!RendererBinding.instance.sendFramesToEngine) return;
+      _completedFrames++;
+      if (_renderersWithRetired.isEmpty) return;
+      for (final renderer in _renderersWithRetired.toList()) {
+        if (_completedFrames - renderer._lastRenderFrame >
+            _idleFramesBeforeTrim) {
+          renderer._releaseRetired();
+        }
+      }
+    });
+  }
+
+  int _lastRenderFrame = 0;
+  final List<_RetiredTarget> _retiredMattes = [];
+  final List<_RetiredTarget> _retiredMaterials = [];
+
+  /// Number of replaced textures this renderer holds for reuse.
+  @visibleForTesting
+  int get debugRetiredTextureCount =>
+      _retiredMattes.length + _retiredMaterials.length;
+
+  /// Renders that wrote into a reused texture instead of allocating one.
+  @visibleForTesting
+  static int debugReusedTextureCount = 0;
+
+  void _retire(
+    List<_RetiredTarget> retired,
+    gpu.Texture texture,
+    gpu.RenderTarget target,
+  ) {
+    if (!_reuseTextures) return;
+    retired.add(_RetiredTarget(texture, target, _completedFrames));
+    _renderersWithRetired.add(this);
+  }
+
+  (gpu.Texture, gpu.RenderTarget) _acquire(
+    List<_RetiredTarget> retired,
+    int width,
+    int height,
+  ) {
+    for (var index = 0; index < retired.length; index++) {
+      final candidate = retired[index];
+      if (_completedFrames - candidate.retiredFrame < reuseAfterFrames) {
+        // Retired in frame order; later entries are younger still.
+        break;
+      }
+      if (candidate.texture.width == width &&
+          candidate.texture.height == height) {
+        retired.removeAt(index);
+        assert(() {
+          debugReusedTextureCount++;
+          return true;
+        }(), 'Count reused geometry textures in debug builds.');
+        return (candidate.texture, candidate.renderTarget);
+      }
+    }
+    final texture = gpu.gpuContext.createTexture(
+      gpu.StorageMode.devicePrivate,
+      width,
+      height,
+    );
+    return (
+      texture,
+      gpu.RenderTarget.singleColor(
+        gpu.ColorAttachment(
+          texture: texture,
+          loadAction: gpu.LoadAction.dontCare,
+        ),
+      ),
+    );
+  }
+
+  /// Keeps enough retired mattes to cycle through [reuseAfterFrames] at the
+  /// current size, and a few of other sizes for mattes that oscillate
+  /// between two buckets.
+  void _trimRetired(List<_RetiredTarget> retired, int width, int height) {
+    retired.removeWhere(
+      (entry) =>
+          (entry.texture.width != width || entry.texture.height != height) &&
+          _completedFrames - entry.retiredFrame > 2 * reuseAfterFrames,
+    );
+    const maxRetired = reuseAfterFrames + 2;
+    if (retired.length > maxRetired) {
+      retired.removeRange(0, retired.length - maxRetired);
+    }
+    if (_retiredMaterials.length > maxRetired) {
+      _retiredMaterials.removeRange(
+        0,
+        _retiredMaterials.length - maxRetired,
+      );
+    }
+  }
+
+  void _releaseRetired() {
+    _retiredMattes.clear();
+    _retiredMaterials.clear();
+    _renderersWithRetired.remove(this);
+  }
+
   void _packUniformData({
     required double offsetX,
     required double offsetY,
     required double textureWidth,
     required double textureHeight,
-    required double opticalIndex,
-    required double refractionSpread,
-    required double displacementScale,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
+    required double edgeDistanceRange,
+    required bool refractionFitsShape,
     required double contourExtent,
     required double materialScale,
     required double materialMapWidth,
@@ -548,6 +676,7 @@ class FlutterGpuGeometryRenderer {
     required List<double> shapeData,
     required List<double> rseData,
     required List<double> appearanceData,
+    required List<double> boundsData,
   }) {
     final floatData = _uniformData.buffer.asFloat32List();
 
@@ -556,17 +685,18 @@ class FlutterGpuGeometryRenderer {
     floatData[uOffsetIndex + 1] = offsetY;
 
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
-    // Reuse the existing vec2 slot for profile spread and codec scale.
-    floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
-    floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
+    // X selects shape-fitted refraction; Y is the bevel's edge displacement,
+    // which is also the codec scale.
+    floatData[textureSizeIndex] = refractionFitsShape ? 1 : 0;
+    floatData[textureSizeIndex + 1] = math.max(1e-3, refractionAmount);
 
     final opticalPropsIndex = _offsetOpticalProps ~/ 4;
-    floatData[opticalPropsIndex] = opticalIndex;
+    floatData[opticalPropsIndex] = math.max(0, refractionHeight);
     // The Y slot is a harness-only centered-AA half-width. It defaults to
     // 0.5, matching Flutter's one-pixel transition; keeping it in the
     // existing reserved slot avoids changing the uniform ABI.
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
-    floatData[opticalPropsIndex + 2] = thickness;
+    floatData[opticalPropsIndex + 2] = math.max(1, edgeDistanceRange);
     floatData[opticalPropsIndex + 3] = numShapes;
 
     final contourPropsIndex = _offsetContourProps ~/ 4;
@@ -610,6 +740,15 @@ class FlutterGpuGeometryRenderer {
         floatData[shapeResponsesStartIndex + i] = appearanceData[16 * 4 + i];
       }
     }
+
+    // Shapes without bounds are never culled.
+    final boundsStartIndex = _offsetShapeBounds ~/ 4;
+    final boundsFloats = math.min(boundsData.length, 16 * 4);
+    for (var i = 0; i < 16 * 4; i++) {
+      floatData[boundsStartIndex + i] = i < boundsFloats
+          ? boundsData[i]
+          : (i % 4 < 2 ? -1e9 : 1e9);
+    }
   }
 
   /// Releases borrowed output handles, keeping reusable rendering resources.
@@ -617,6 +756,7 @@ class FlutterGpuGeometryRenderer {
   /// Callers retaining an output must clone its images before calling this.
   /// Independent clones and submitted native scenes remain valid.
   void releaseOutput() {
+    _releaseRetired();
     _renderTarget = null;
     _image?.dispose();
     _image = null;
@@ -692,6 +832,16 @@ class GpuAllocationDiagnostics {
   }
 }
 
+/// A replaced texture and its render target, stamped with the frame count at
+/// replacement.
+final class _RetiredTarget {
+  _RetiredTarget(this.texture, this.renderTarget, this.retiredFrame);
+
+  final gpu.Texture texture;
+  final gpu.RenderTarget renderTarget;
+  final int retiredFrame;
+}
+
 class _SharedGeometryResources {
   _SharedGeometryResources({
     required gpu.Shader vertexShader,
@@ -725,6 +875,7 @@ class _SharedGeometryResources {
     offsetShapeTints = uniformSlot.getMemberOffsetInBytes('uShapeTints') ?? 0;
     offsetShapeResponses =
         uniformSlot.getMemberOffsetInBytes('uShapeResponses') ?? 0;
+    offsetShapeBounds = uniformSlot.getMemberOffsetInBytes('uShapeBounds') ?? 0;
     final vertices = Float32List.fromList([
       -1.0, -1.0, 0.0, 0.0, //
       1.0, -1.0, 1.0, 0.0, //
@@ -754,6 +905,7 @@ class _SharedGeometryResources {
   late final int offsetRseData;
   late final int offsetShapeTints;
   late final int offsetShapeResponses;
+  late final int offsetShapeBounds;
   late final gpu.DeviceBuffer vertexBuffer;
   late final gpu.BufferView vertexBufferView;
 }

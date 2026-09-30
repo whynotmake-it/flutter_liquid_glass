@@ -29,6 +29,11 @@ class FlutterGpuGeometryRenderer {
   static int get debugActiveGeometryTextureCount => 0;
   static int get debugActiveMaterialTextureCount => 0;
 
+  /// Matches the native renderer's reuse horizon; nothing is reused here.
+  static const int reuseAfterFrames = 6;
+  static int debugReusedTextureCount = 0;
+  int get debugRetiredTextureCount => 0;
+
   /// Material map texels per matte pixel; shared constant with the native
   /// renderer so uniform math stays identical.
   static const int materialRasterScale = 8;
@@ -46,17 +51,18 @@ class FlutterGpuGeometryRenderer {
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}

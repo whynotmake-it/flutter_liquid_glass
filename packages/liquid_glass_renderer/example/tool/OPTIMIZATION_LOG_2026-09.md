@@ -414,3 +414,46 @@ uniform-array reads; (b) the quad's blended fill over the whole 3σ support
 the legacy path's offscreen must be cheaper than assumed on this GPU and the
 analytic draw needs a smaller footprint (ring / 2.5σ support) or a lower
 resolution intermediate.
+
+### N. Reused geometry textures — pending device (2026-09-30)
+
+Target: the UI-thread `PAINT` cost of a geometry rebuild (Pixel 10: ~2.6 ms
+per single-shape rebuild vs 0.07–0.13 Mcycles of GPU; sheet build p95 7.7 ms
+vs ~1.9 ms for liquid_glass_widgets / 0.2). Every rebuild allocated a new
+matte (and material map), and Impeller's Vulkan backend caches the
+`VkRenderPass` and `VkFramebuffer` on the texture (`TextureVK` frame data),
+so each rebuild also created both. Pipelines are already cached by Flutter
+GPU's pipeline library.
+
+Change: `FlutterGpuGeometryRenderer` keeps replaced textures (with their
+render targets) and renders into one again once `reuseAfterFrames` (6)
+frames have passed. Safety: `Animator` pipelines at most two layer trees and
+frees a slot after rasterizing, and the KHR/AHB swapchains keep two frames in
+flight, so a matte replaced during frame E is unreadable from frame E + 3;
+Metal tracks the hazard, GLES submits on the raster thread in order. Frames
+are counted by a persistent frame callback while `sendFramesToEngine`;
+renders outside a frame never reuse. Exact size only, and the full-screen
+quad rewrites every texel, so output is byte-identical (test + all 76
+host goldens). Retention: at most `reuseAfterFrames + 2` textures per
+renderer and list, released after 30 frames without a render.
+
+Host (SwiftShader, 1216×1856 matte, encode + submit on the UI thread):
+244–336 µs → 151–163 µs (texture creation, `asImage`, render-pass setup and
+draw recording all shrink). Widget-level frame on the host: sheet p50
+1.36–1.49 → 1.27–1.34 ms; the button, whose matte is tiny, is unchanged.
+
+Limits: reuse needs the bucketed size to repeat, so a monotonic resize sweep
+(the sheet 45→90 % resize) crosses a 64 px bucket every few frames and
+mostly still allocates. Stretch/press, loupe travel inside a group, and
+blend-group motion keep their bucket and reuse every frame.
+
+Not pursued: batching passes into one command buffer (two render passes in
+one Flutter GPU command buffer segfault `flutter_tester` 3/3; only
+mixed-appearance layers have two passes, and cross-layer batching would need
+submission deferred past paint); moving encode off the UI thread (Flutter GPU
+encodes and submits on the calling thread except on GLES, with no public
+hook to defer to the raster thread).
+
+A/B on device: `LIQUID_GLASS_REUSE_GEOMETRY_TEXTURES=false` restores
+allocation per render in the same build; `LIQUID_GLASS_BENCHMARK_DART_DEFINES`
+passes it through `benchmark.sh` / `android_gpu_bench.sh`.

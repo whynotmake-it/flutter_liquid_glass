@@ -48,6 +48,11 @@ struct Scene: Decodable {
 
     let canvas: CanvasSpec
     let shape: ShapeSpec
+    /// Second shape of a `merge_pair` scene, merged with `shape` inside one
+    /// `GlassEffectContainer`.
+    let mergeShape: ShapeSpec?
+    let containerSpacing: Double?
+    let glassVariant: String?
     let id: String
     let profile: String
     let appearance: String

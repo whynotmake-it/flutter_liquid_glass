@@ -48,7 +48,7 @@ void main() {
 
     testWidgets('generates reusable GPU geometry metadata', (tester) async {
       await tester.pumpWidget(
-        build(const LiquidGlassSettings(thickness: 30), 24),
+        build(const LiquidGlassSettings(refractionHeight: 30), 24),
       );
       await tester.pumpAndSettle();
 
@@ -71,7 +71,7 @@ void main() {
         await tester.pumpWidget(
           CupertinoApp(
             home: LiquidGlassLayer(
-              settings: const LiquidGlassSettings(thickness: 30),
+              settings: const LiquidGlassSettings(refractionHeight: 30),
               child: StatefulBuilder(
                 builder: (context, setState) {
                   update = setState;
@@ -122,7 +122,7 @@ void main() {
         await tester.pumpWidget(
           CupertinoApp(
             home: LiquidGlassLayer(
-              settings: const LiquidGlassSettings(thickness: 30),
+              settings: const LiquidGlassSettings(refractionHeight: 30),
               child: LiquidGlassBlendGroup(
                 key: blendGroupKey,
                 child: Center(
