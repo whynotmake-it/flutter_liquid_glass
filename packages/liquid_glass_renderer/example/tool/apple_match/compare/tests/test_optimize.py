@@ -267,17 +267,16 @@ class OptimizerTests(unittest.TestCase):
                 {
                     "tintAlpha": 0.05,
                     "frost": 0.0,
-                    "refractionHeight": 12.0,
-                    "refractionAmount": edge,
-                    "refractionSpread": spread,
+                    "refractionHeight": height,
+                    "refractionAmount": amount,
                 }
-                for edge in (25.0, 35.0)
-                for spread in (0.75, 1.0)
+                for height in (8.0, 20.0)
+                for amount in (28.0, 60.0)
             ],
-            profile_gate=True,
         )
-        self.assertEqual(axes["mode"], "profile-gate")
-        self.assertEqual(axes["axes"]["refractionSpread"], [0.75, 1.0])
+        self.assertEqual(axes["mode"], "seed-grid")
+        self.assertEqual(axes["axes"]["refractionHeight"], [8.0, 20.0])
+        self.assertEqual(axes["axes"]["refractionAmount"], [28.0, 60.0])
 
     def test_seed_scan_summary_retires_shader_level_s0_for_composition_scan(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -286,7 +285,7 @@ class OptimizerTests(unittest.TestCase):
                 "score": 22.5,
                 "loss": 77.5,
                 "directMae8Bit": 198.0,
-                "settings": {"refractionSpread": 0.0},
+                "settings": {"refractionAmount": 25.0},
             }]
             summary = scan_summary(
                 rows=rows,
@@ -296,7 +295,6 @@ class OptimizerTests(unittest.TestCase):
                         "frost": 0.0,
                         "refractionHeight": 12.0,
                         "refractionAmount": 25.0,
-                        "refractionSpread": 0.0,
                     }
                 ],
                 all_seed_count=4,
@@ -306,7 +304,6 @@ class OptimizerTests(unittest.TestCase):
                 reference_metadata={"udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B"},
                 reference_metadata_path=out / "metadata.json",
                 out=out,
-                profile_gate=False,
                 scene_shape={"width": 116.3, "height": 85.7},
             )
             self.assertEqual(

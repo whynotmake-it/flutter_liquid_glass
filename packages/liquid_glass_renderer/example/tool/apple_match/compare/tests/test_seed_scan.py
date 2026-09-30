@@ -38,22 +38,6 @@ class SeedScanTest(unittest.TestCase):
             for key, value in forced.items():
                 self.assertEqual(seed[key], value)
 
-    def test_loupe_rejects_ineffective_profile_controls(self) -> None:
-        with self.assertRaisesRegex(ValueError, "not effective controls"):
-            seed_scan.build_seed_candidates(
-                scene_id="loupe",
-                scene=self.scene,
-                base=self.base,
-                spread=0.5,
-            )
-        with self.assertRaisesRegex(ValueError, "not effective controls"):
-            seed_scan.build_seed_candidates(
-                scene_id="loupe",
-                scene=self.scene,
-                base=self.base,
-                profile_gate=True,
-            )
-
     def test_generic_seed_grid_remains_available(self) -> None:
         scene = json.loads((ROOT / "scenes/toolbar_capsule.json").read_text())
         seeds, axes, forced = seed_scan.build_seed_candidates(
@@ -65,13 +49,7 @@ class SeedScanTest(unittest.TestCase):
         self.assertEqual(len(seeds), 144)
         self.assertEqual(
             axes,
-            (
-                "tintAlpha",
-                "frost",
-                "refractionHeight",
-                "refractionAmount",
-                "refractionSpread",
-            ),
+            ("tintAlpha", "frost", "refractionHeight", "refractionAmount"),
         )
         self.assertEqual(forced, {})
 
