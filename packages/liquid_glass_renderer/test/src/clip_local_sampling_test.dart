@@ -71,7 +71,7 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('vec3 ios27TintTone('));
-    expect(source, contains('baseColor = mix(neutralBase, tintTone'));
+    expect(source, contains('ios27Base = mix(neutralBase, tintTone'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
       6,
@@ -260,6 +260,30 @@ void main() {
     expect(source, contains('#ifdef IMPELLER_TARGET_OPENGLES'));
   });
 
+  test('displaced samples mirror at the captured backdrop edge', () {
+    final source = File(
+      'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+    ).readAsStringSync();
+    final renderer = File(
+      'lib/src/rendering/liquid_glass_render_object.dart',
+    ).readAsStringSync();
+    final layer = File(
+      'lib/src/rendering/liquid_glass_layer.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('uniform vec4 uBackdropBounds'));
+    // One definition, the displaced sample, and the three dispersion taps.
+    expect(
+      RegExp(r'mirrorIntoBackdrop\s*\(').allMatches(source).length,
+      5,
+    );
+    expect(renderer, contains('initialIndex: 55'));
+    // The bounds are the native filter clip, not the material bounds: the
+    // clip is rounded out to pixel buckets and holds real backdrop.
+    expect(layer, contains('Rect? get backdropSampleBounds'));
+    expect(layer, contains('.expandToPixelBuckets(devicePixelRatio)'));
+  });
+
   test('magnification is one uniform lens about the material center', () {
     final source = File(
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
@@ -328,7 +352,8 @@ void main() {
       'lib/assets/shaders/gpu/geometry_fragment.glsl',
     ).readAsStringSync();
 
-    expect(source, contains('-signedEdgeDistance - uContourOffset'));
+    expect(source, contains('clamp(t - uContourOffset, 0.0, uEdgeWidth)'));
+    expect(source, contains('float outward = -signedEdgeDistance;'));
     expect(source, contains('externalContourAlpha'));
     expect(source, contains('contourDirection(surfaceNormal)'));
     expect(geometrySource, contains('uContourExtent'));

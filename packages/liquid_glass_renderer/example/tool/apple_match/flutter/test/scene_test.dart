@@ -62,7 +62,9 @@ void main() {
     );
   });
 
-  testWidgets('loupe scenes magnify before the glass layer', (tester) async {
+  testWidgets('loupe scenes use the full-resolution liquid glass loupe', (
+    tester,
+  ) async {
     final file = File('../scenes/loupe.json');
     final scene = MatchScene.fromBase64(
       base64Encode(utf8.encode(file.readAsStringSync())),
@@ -74,7 +76,8 @@ void main() {
     );
 
     expect(scene.profile, 'loupe');
-    expect(find.byType(RawMagnifier), findsOneWidget);
+    expect(find.byType(LiquidGlassLoupe), findsOneWidget);
+    expect(find.byType(LiquidGlassLoupeSource), findsOneWidget);
   });
 
   testWidgets('tab holdout includes deterministic foreground content', (

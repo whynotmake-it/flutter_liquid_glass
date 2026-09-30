@@ -23,6 +23,10 @@ class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.smoothRefraction = true,
+    @Deprecated(
+      'Resamples the captured backdrop and zooms about the layer center. '
+      'Use LiquidGlassLoupe for magnifiers.',
+    )
     this.magnification = 1.0,
     this.frost = 5.0,
     this.chromaticAberration = 0.0,
@@ -312,11 +316,20 @@ class LiquidGlassSettings with Equatable {
   final bool smoothRefraction;
 
   /// Magnification of the backdrop seen through the whole face, about the
-  /// center of the glass.
+  /// center of all glass in the layer.
   ///
-  /// `1` preserves the backdrop, values above `1` magnify (the iOS 27 text
-  /// loupe measures `1.25`) and values below `1` reveal more content. The
-  /// bevel's [refractionAmount] is applied on top.
+  /// `1` preserves the backdrop, values above `1` magnify and values below
+  /// `1` reveal more content. The bevel's [refractionAmount] is applied on
+  /// top.
+  ///
+  /// This resamples the backdrop the glass already captured, so magnified
+  /// content pixelates, and a layer with several shapes zooms about their
+  /// common center rather than each shape's. Use `LiquidGlassLoupe` for
+  /// magnifiers: it re-renders the content at full resolution.
+  @Deprecated(
+    'Resamples the captured backdrop and zooms about the layer center. Use '
+    'LiquidGlassLoupe for magnifiers.',
+  )
   final double magnification;
 
   /// Backdrop blur sigma in logical pixels.
