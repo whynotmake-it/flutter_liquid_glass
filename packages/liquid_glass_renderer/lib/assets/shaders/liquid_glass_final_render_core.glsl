@@ -123,6 +123,31 @@ vec4 shapeLookup(
 // size. Dark glass keeps its 32/255 emission but becomes denser with size:
 // controls up to 75 pt transmit like light glass and surfaces from 105 pt
 // transmit 0.447. Clear glass is appearance-independent.
+// The Liquid Glass slider moves every iOS 27 material parameter linearly
+// between three keyframes: Clear (0), the Settings middle tick (0.5) and
+// Tinted (1).
+float sliderKeyframes(float s, float clearValue, float middle, float tinted) {
+    return s <= 0.5
+        ? mix(clearValue, middle, s * 2.0)
+        : mix(middle, tinted, s * 2.0 - 1.0);
+}
+
+// Transmittance of the dark regular face. Controls up to 75 pt keep the
+// light-mode density until the middle tick; surfaces from 105 pt are denser
+// from the start. Both roughly halve by Tinted.
+float ios27DarkTransmittance(float shortSide, float tintAmount) {
+    float large = smoothstep(75.0, 105.0, shortSide);
+    return sliderKeyframes(
+        tintAmount,
+        mix(0.597, 0.447, large),
+        mix(0.596, 0.346, large),
+        mix(0.295, 0.195, large)
+    );
+}
+
+// Neutral wash of the untinted face. Light glass keeps its near-white
+// color and becomes more opaque; dark glass keeps its 32/255 emission, so
+// its wash darkens as it becomes opaque. Clear glass has no slider response.
 vec4 ios27NeutralTint(
     float darkWeight,
     float shortSide,
@@ -132,15 +157,9 @@ vec4 ios27NeutralTint(
     if (clearGlass) {
         return vec4(vec3(0.126 / 0.046), 0.046);
     }
-    // The Liquid Glass slider makes the wash more opaque. Light glass keeps
-    // its near-white color; dark glass keeps its 32/255 emission, so its wash
-    // darkens as it becomes opaque.
-    float lightAlpha = mix(0.407, 0.709, pow(tintAmount, 1.22));
-    float darkTransmittance = mix(
-        0.592,
-        0.447,
-        smoothstep(75.0, 105.0, shortSide)
-    ) * (1.0 - 0.558 * pow(tintAmount, 1.85));
+    float lightAlpha =
+        1.0 - sliderKeyframes(tintAmount, 0.592, 0.468, 0.286);
+    float darkTransmittance = ios27DarkTransmittance(shortSide, tintAmount);
     vec4 dark = vec4(
         vec3((32.0 / 255.0) / (1.0 - darkTransmittance)),
         1.0 - darkTransmittance
@@ -149,11 +168,19 @@ vec4 ios27NeutralTint(
     return mix(light, dark, darkWeight);
 }
 
-vec2 ios27FaceTransfer(float darkWeight, bool clearGlass) {
+// Luminance lift and chroma gain of the untinted face. The slider
+// desaturates both appearances and compresses dark highlights up to the
+// middle tick.
+vec2 ios27FaceTransfer(float darkWeight, bool clearGlass, float tintAmount) {
     if (clearGlass) {
         return vec2(0.0, 1.057);
     }
-    return mix(vec2(0.13, 1.17), vec2(1.0, 1.03), darkWeight);
+    vec2 light = vec2(0.13, sliderKeyframes(tintAmount, 1.17, 0.982, 0.751));
+    vec2 dark = vec2(
+        sliderKeyframes(tintAmount, 1.0, 1.58, 1.13),
+        sliderKeyframes(tintAmount, 1.02, 0.955, 0.572)
+    );
+    return mix(light, dark, darkWeight);
 }
 
 vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
@@ -679,14 +706,16 @@ void main() {
         );
         if (!clearGlass && darkWeight > 0.0) {
             // The dark border strengthens with the opacity the slider adds.
-            float addedOpacity = neutralTint.a - (1.0 - mix(
-                0.592,
-                0.447,
-                smoothstep(75.0, 105.0, uAppearanceConfig.w)
-            ));
+            float addedOpacity =
+                ios27DarkTransmittance(uAppearanceConfig.w, 0.0) -
+                ios27DarkTransmittance(uAppearanceConfig.w, uTintAmount);
             gContourAlpha *= 1.0 + 0.95 * addedOpacity * darkWeight;
         }
-        vec2 faceTransfer = ios27FaceTransfer(darkWeight, clearGlass);
+        vec2 faceTransfer = ios27FaceTransfer(
+            darkWeight,
+            clearGlass,
+            uTintAmount
+        );
         if (clearGlass) {
             gGlintLuminance = 2.34;
             gGlintFaceGain = 3.58;

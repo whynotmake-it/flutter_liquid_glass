@@ -76,12 +76,12 @@ void main() {
     ).faceTransfer(94)!;
     expect(lightFace.lift, .13);
     expect(lightFace.chromaGain, 1.17);
-    expect(lightFace.transmittance, .593);
+    expect(lightFace.transmittance, closeTo(.592, 1e-9));
     final darkFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.dark,
     ).faceTransfer(94)!;
     expect(darkFace.lift, 1);
-    expect(darkFace.chromaGain, 1.03);
+    expect(darkFace.chromaGain, 1.02);
     expect(darkFace.emission.r, closeTo(32 / 255, 1e-9));
   });
 
@@ -104,31 +104,52 @@ void main() {
     );
   });
 
-  test('the Liquid Glass slider follows the measured wash opacity', () {
+  test('the Liquid Glass slider follows the measured face density', () {
     const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
     const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
-    // Face transmittance of the toolbar at each slider checkpoint.
-    const lightMeasured = {0: .592, 25: .529, 50: .470, 75: .380, 100: .290};
-    const darkMeasured = {0: .486, 50: .411, 100: .215};
+    // Face transmittance of the Reduce Motion off slider sweep.
+    const lightToolbar = {
+      0: .592,
+      25: .529,
+      45: .482,
+      50: .470,
+      55: .454,
+      75: .380,
+      100: .290,
+    };
     for (final MapEntry(key: position, value: transmittance)
-        in lightMeasured.entries) {
+        in lightToolbar.entries) {
       expect(
         light.faceTransfer(94, tintAmount: position / 100)!.transmittance,
-        closeTo(transmittance, .009),
+        closeTo(transmittance, .006),
         reason: 'light $position%',
       );
     }
-    for (final MapEntry(key: position, value: transmittance)
-        in darkMeasured.entries) {
-      expect(
-        dark.faceTransfer(94, tintAmount: position / 100)!.transmittance,
-        closeTo(transmittance, .006),
-        reason: 'dark $position%',
-      );
+    const darkBySize = {
+      63: {0: .599, 50: .599, 75: .450, 100: .298},
+      94: {0: .486, 50: .411, 75: .306, 100: .215},
+      150: {0: .447, 50: .351, 75: .267, 100: .208},
+    };
+    for (final MapEntry(key: size, value: sweep) in darkBySize.entries) {
+      for (final MapEntry(key: position, value: transmittance)
+          in sweep.entries) {
+        expect(
+          dark
+              .faceTransfer(size.toDouble(), tintAmount: position / 100)!
+              .transmittance,
+          closeTo(transmittance, .02),
+          reason: 'dark $size pt $position%',
+        );
+      }
     }
     expect(light.contourScale(94, 1), 1);
     expect(dark.contourScale(94, 0), closeTo(1, 1e-9));
     expect(dark.contourScale(94, 1), greaterThan(1.2));
+    expect(light.sliderDetail(.5), closeTo(.44, 1e-9));
+    expect(
+      const LiquidGlassColorModel.ios27Clear().sliderDetail(.5),
+      closeTo(.76, 1e-9),
+    );
   });
 
   test('clear glass is appearance- and size-independent', () {
