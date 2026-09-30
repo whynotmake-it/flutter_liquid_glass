@@ -36,6 +36,11 @@ uniform vec2 uFilterToMatteOffset;
 // 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
 // glass opaque so visibility 0 is an exact identity of the backdrop.
 uniform float uBlurFade;
+// 1.0 folds sub-pixel frost into this pass: the refracted texel plus its two
+// diagonal neighbours, weighted 1/2, 1/4, 1/4 (sigma ~0.7 device px), instead
+// of a blur pass. Whole-texel offsets, because the filter input is sampled
+// nearest.
+uniform float uSoften;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -599,11 +604,23 @@ void main() {
         abs(uChromaticAberration) * maxDisplacement <=
         kChromaticAberrationSubpixelThreshold
     ) {
-        vec2 refractedUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + displacement) * invUSize,
-            invUSize
+        vec2 refractedUV =
+            screenUV + (backdropScaleOffset + displacement) * invUSize;
+        refractColor = texture(
+            uBackgroundTexture,
+            mirrorBackgroundUV(refractedUV, invUSize)
         );
-        refractColor = texture(uBackgroundTexture, refractedUV);
+        if (uSoften > 0.5) {
+            // The offset scales with visibility, so hidden glass collapses
+            // the kernel onto the unfiltered backdrop.
+            vec2 softenTap = vec2(appearanceVisibility) * invUSize;
+            vec2 tapA = mirrorBackgroundUV(refractedUV + softenTap, invUSize);
+            vec2 tapB = mirrorBackgroundUV(refractedUV - softenTap, invUSize);
+            refractColor = 0.5 * refractColor + 0.25 * (
+                texture(uBackgroundTexture, tapA) +
+                texture(uBackgroundTexture, tapB)
+            );
+        }
     } else {
         float dispersionStrength = uChromaticAberration * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);

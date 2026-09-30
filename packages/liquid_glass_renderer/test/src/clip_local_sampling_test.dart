@@ -74,8 +74,10 @@ void main() {
     expect(source, contains('baseColor = mix(neutralBase, tintTone'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
-      4,
-      reason: 'the tint response must reuse the existing refracted sample',
+      5,
+      reason:
+          'the tint response must reuse the existing refracted sample; the '
+          'only additions are the two optional sub-pixel softening taps',
     );
   });
 
