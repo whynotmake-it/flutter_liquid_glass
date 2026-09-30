@@ -422,6 +422,8 @@ enum BenchmarkScenario {
   realSaturationOnly,
   realBlurSaturation,
   realToolbarMaterial,
+  realClearMaterial,
+  realClearUnfrosted,
   fakeLightingOnly,
   fakeBlurOnly,
   fakeHighBlurOnly,
@@ -707,6 +709,16 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         const LiquidGlassSettings.ios27ToolbarLight(),
         t,
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+      ),
+      BenchmarkScenario.realClearMaterial => _realLayer(
+        LiquidGlassSettings.ios27Clear(),
+        t,
+        appearance: const LiquidGlassAppearance(),
+      ),
+      BenchmarkScenario.realClearUnfrosted => _realLayer(
+        LiquidGlassSettings.ios27Clear(frost: 0),
+        t,
+        appearance: const LiquidGlassAppearance(),
       ),
       BenchmarkScenario.fakeLightingOnly => _fakeLayer(
         const LiquidGlassSettings(
