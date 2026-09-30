@@ -573,3 +573,60 @@ hook to defer to the raster thread).
 A/B on device: `LIQUID_GLASS_REUSE_GEOMETRY_TEXTURES=false` restores
 allocation per render in the same build; `LIQUID_GLASS_BENCHMARK_DART_DEFINES`
 passes it through `benchmark.sh` / `android_gpu_bench.sh`.
+
+### O. Batched geometry submission — shared command buffer REJECTED (engine crash), deferral pending device (2026-09-30)
+
+Target: per-submission overhead on rebuild frames with more than one pass
+(mixed appearances, several rebuilding layers).
+
+First version: every pass of a frame recorded into one shared Flutter GPU
+command buffer, submitted from `GeometryTransformTrackingLayer.addToScene`.
+**It crashes on every backend**, not only `flutter_tester`: Flutter GPU
+3.47.1 begins the backend pass when the pass is created
+(`flutter::gpu::RenderPass::Begin` → `CommandBuffer::CreateRenderPass`;
+`RenderPassVK` calls `beginRenderPass` in its constructor, `RenderPassMTL`
+opens its encoder in its constructor) and ends it only in `submit`
+(`CommandBuffer::Submit` → `EncodeCommands` → `endRenderPass` /
+`endEncoding`). A second pass on the same command buffer nests inside the
+first.
+
+- Pixel 10 (PowerVR, Vulkan), `integration_test/geometry_batch_test.dart`
+  debug and the multi-pass profile scene:
+  ```
+  Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x60
+  #00 vulkan.powervr.so (CmdEndRenderPass2+188)
+  #01..#03 libflutter.so
+  #04 libflutter.so (InternalFlutterGpu_CommandBuffer_Submit+56)
+  ```
+- macOS (AGX G16X, Metal), same test and `independent16Motion` in profile:
+  ```
+  -[AGXG16XFamilyCommandBuffer renderCommandEncoderWithDescriptor:]: failed
+  assertion `A command encoder is already encoding to this command buffer'
+    impeller::RenderPassMTL::RenderPassMTL
+    impeller::CommandBufferMTL::OnCreateRenderPass
+    flutter::gpu::RenderPass::Begin (InternalFlutterGpu_RenderPass_Begin)
+  ```
+- `flutter_tester` (Linux, SwiftShader Vulkan): segfault 3/3.
+
+Single-pass scenes survived only because they never put a second pass on a
+buffer. An upstream issue draft (multi-pass command buffers and a
+multi-buffer submit) is in the project notes.
+
+Current version: every pass has its own command buffer on every platform;
+only the *submission* is deferred to the same flush point (scene build, with
+the post-frame safety net). Without a Flutter GPU API that submits several
+command buffers in one queue submission, deferral cannot reduce the number
+of submits or fences; it only moves them from paint to scene build, which
+also delays the GPU's start on the matte. Expected: neutral at best. It is
+kept only if the Pixel A/B shows a gain; otherwise #179 is not worth
+merging. `LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS=false` submits right after
+each pass.
+
+Verification on the host: the flush happens during scene build in every
+frame (the post-frame safety net never fires; removing the `addToScene`
+flush fails the test with 10 safety-net flushes in 10 frames), one command
+buffer per pass, and mattes, material maps and a full-frame capture are
+byte-identical to immediate submission.
+
+Other optimizations rejected only because of the test runner: none found in
+this log or `PERFORMANCE_AUDIT.md`.

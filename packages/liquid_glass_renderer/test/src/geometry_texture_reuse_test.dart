@@ -70,6 +70,12 @@ int get _dropped => FlutterGpuGeometryRenderer.debugDroppedTextureCount;
 int get _reused => FlutterGpuGeometryRenderer.debugReusedTextureCount;
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  runGeometryTextureReuseTests();
+}
+
+/// Also runs on devices from `example/integration_test/geometry_batch_test.dart`.
+void runGeometryTextureReuseTests() {
   setUp(() {
     FlutterGpuGeometryRenderer.debugReusedTextureCount = 0;
   });

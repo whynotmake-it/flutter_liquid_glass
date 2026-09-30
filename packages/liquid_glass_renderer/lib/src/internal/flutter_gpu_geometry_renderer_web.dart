@@ -37,6 +37,13 @@ class FlutterGpuGeometryRenderer {
   static int debugAllocatedTextureCount = 0;
   static int debugDroppedTextureCount = 0;
   static int get debugReleasedTextureCount => 0;
+
+  /// Nothing is ever deferred on the web.
+  static void flushPendingSubmissions() {}
+  static bool debugSubmitImmediately = false;
+  static int debugBatchedSubmitCount = 0;
+  static int debugDeferredPassCount = 0;
+  static int debugPostFrameFlushCount = 0;
   int get debugRetiredTextureCount => 0;
   int get debugMatteTextureCount => 0;
   Object? get debugMatteTexture => null;
