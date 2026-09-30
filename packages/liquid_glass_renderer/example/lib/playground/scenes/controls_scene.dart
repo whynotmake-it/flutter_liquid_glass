@@ -4,6 +4,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/adaptive_controls.dart';
+import 'package:motor/motor.dart';
 
 /// Everyday controls: navigation buttons at the top and a bottom bar. Every
 /// shape samples the one shared backdrop capture.
@@ -46,20 +47,7 @@ class ControlsScene extends StatelessWidget {
               topControlsSide + topControlSize + topControlsSpacing,
               0,
             ),
-            child: AdaptiveGroup(
-              child: Row(
-                children: [
-                  CircleButton(icon: CupertinoIcons.chevron_left),
-                  Spacer(),
-                  _ButtonCapsule(
-                    icons: [
-                      CupertinoIcons.square_arrow_up,
-                      CupertinoIcons.ellipsis,
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            child: AdaptiveGroup(child: _TopControls()),
           ),
           const Spacer(),
           Center(
@@ -90,6 +78,47 @@ const topControlSize = 48.0;
 
 /// Gap between neighboring glass buttons along the top of the stage.
 const topControlsSpacing = 8.0;
+
+/// The back button, a visibility toggle and the share/more capsule. The
+/// toggle springs the capsule's [LiquidGlassVisibility] between 0 and 1, to
+/// show every glass factor fading together.
+class _TopControls extends StatefulWidget {
+  const _TopControls();
+
+  @override
+  State<_TopControls> createState() => _TopControlsState();
+}
+
+class _TopControlsState extends State<_TopControls> {
+  var _visible = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const CircleButton(icon: CupertinoIcons.chevron_left),
+        const SizedBox(width: topControlsSpacing),
+        CircleButton(
+          icon: _visible ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+          semanticLabel: _visible ? 'Hide capsule' : 'Show capsule',
+          onPressed: () => setState(() => _visible = !_visible),
+        ),
+        const Spacer(),
+        SingleMotionBuilder(
+          motion: const CupertinoMotion.smooth(
+            duration: Duration(milliseconds: 600),
+          ),
+          value: _visible ? 1 : 0,
+          builder: (context, visibility, child) =>
+              LiquidGlassVisibility(visibility: visibility, child: child!),
+          child: const _ButtonCapsule(
+            icons: [CupertinoIcons.square_arrow_up, CupertinoIcons.ellipsis],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 /// The mini player, tab bar and search button, adapting to the backdrop as
 /// one group.
