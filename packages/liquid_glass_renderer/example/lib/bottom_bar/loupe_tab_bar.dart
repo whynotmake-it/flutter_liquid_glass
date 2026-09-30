@@ -90,11 +90,11 @@ class LoupeTabBar extends StatefulWidget {
   final LiquidGlassSettings loupeSettings;
 
   /// A clear, unfrosted lens like the iOS 27 tab bar's: it shows the bar
-  /// 1:1 and only bends and splits the colors in a 3–4 pt band along its
-  /// rim.
+  /// 1:1 in its middle and bends and splits the colors along its rim, with
+  /// the bevel of the iOS 27 text loupe.
   static const defaultLoupeSettings = LiquidGlassSettings(
-    refractionHeight: 4,
-    refractionAmount: 12,
+    refractionHeight: 8,
+    refractionAmount: 28,
     dispersion: -.07,
     frost: 0,
     contourStrength: .1,
@@ -137,8 +137,17 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     duration: Duration(milliseconds: 300),
     snapToEnd: true,
   );
-  static const _wobble = Motion.bouncySpring(
-    duration: Duration(milliseconds: 600),
+
+  /// Flattens the loupe as the indicator speeds up.
+  static const _squash = Motion.cupertino(
+    duration: Duration(milliseconds: 150),
+  );
+
+  /// Springs the loupe back once the indicator slows down: quickly, past
+  /// rest to taller than at rest, then a soft jiggle.
+  static const _recover = Motion.cupertino(
+    duration: Duration(milliseconds: 350),
+    bounce: .7,
   );
 
   late final _position = SingleMotionController(
@@ -147,7 +156,8 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     initialValue: widget.selectedIndex.toDouble(),
   );
   late final _press = SingleMotionController(motion: _thickness, vsync: this);
-  late final _jelly = SingleMotionController(motion: _wobble, vsync: this);
+  late final _jelly = SingleMotionController(motion: _recover, vsync: this);
+  double _jellyTarget = 0;
   late final _stretch = MotionController<Offset>(
     motion: _follow,
     vsync: this,
@@ -160,7 +170,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     jelly: _jelly,
     tabCount: widget.tabs.length,
     backdropShrink: widget.loupeSettings.backdropShrink,
-  )..sidePadding = _padding.left;
+  );
   late final _barTransform = Listenable.merge([_press, _stretch]);
   final _showLoupe = ValueNotifier(false);
   final _loupeVisibility = ValueNotifier<double>(0);
@@ -223,7 +233,15 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   }
 
   void _onPositionTick() {
-    _jelly.animateTo(_position.velocity);
+    final speed = _position.velocity.abs() * _slot;
+    final target = speed < 20 ? 0.0 : TabSelection.jellyTarget(speed);
+    // Retargeting restarts the spring, so small changes are left alone and
+    // the recovery can ring out.
+    if ((target - _jellyTarget).abs() > .01 ||
+        (target == 0 && _jellyTarget != 0)) {
+      _jellyTarget = target;
+      _springTo(_jelly, target > _jelly.value ? _squash : _recover, target);
+    }
     _updatePress();
   }
 
@@ -543,7 +561,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
             child: ListenableTransform(
               listenable: _jelly,
               transform: (size) {
-                final (:x, :y) = _selection.jellyScale(_slot);
+                final (:x, :y) = _selection.jellyScale;
                 return scaleAbout(size.center(Offset.zero), x, y);
               },
               child: RepaintBoundary(

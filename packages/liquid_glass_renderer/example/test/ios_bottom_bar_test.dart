@@ -1,8 +1,15 @@
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart';
+
+/// Where the loupe's per-frame size in the fast drag test is written as CSV,
+/// if set.
+const _dynamicsOut = String.fromEnvironment('LOUPE_DYNAMICS_OUT');
 
 const _tabs = [
   BottomBarTab(icon: CupertinoIcons.house_fill, label: 'Home'),
@@ -99,6 +106,63 @@ void main() {
     final slot = tabCenter(tester, 'New').dx - home.dx;
     final loupe = tester.getCenter(find.byKey(LoupeTabBar.loupeKey));
     expect((library.dx - loupe.dx).abs(), lessThan(slot));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a fast drag flattens the loupe, which springs back taller and '
+      'jiggles out', (tester) async {
+    await pumpBar(tester);
+    final home = tabCenter(tester, 'Home');
+    final library = tabCenter(tester, 'Library');
+
+    final gesture = await tester.startGesture(home);
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final rest = tester.getRect(find.byKey(LoupeTabBar.loupeKey)).size;
+
+    // About 1100 pt/s, the fastest of the iOS 27 reference pans.
+    final samples = <(int, Size)>[];
+    const frames = 12;
+    for (var frame = 1; frame <= frames; frame++) {
+      await gesture.moveTo(Offset.lerp(home, library, frame / frames)!);
+      await tester.pump(const Duration(milliseconds: 16));
+      samples.add((
+        frame * 16,
+        tester.getRect(find.byKey(LoupeTabBar.loupeKey)).size,
+      ));
+    }
+    for (var frame = 1; frame <= 90; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      samples.add((
+        (frames + frame) * 16,
+        tester.getRect(find.byKey(LoupeTabBar.loupeKey)).size,
+      ));
+    }
+
+    if (_dynamicsOut.isNotEmpty) {
+      File(_dynamicsOut)
+        ..createSync(recursive: true)
+        ..writeAsStringSync(
+          [
+            'ms,width,height,rest_width,rest_height',
+            for (final (ms, size) in samples)
+              '$ms,${size.width},${size.height},${rest.width},${rest.height}',
+          ].join('\n'),
+        );
+    }
+
+    final heights = [
+      for (final (_, size) in samples) size.height / rest.height,
+    ];
+    final flattest = heights.reduce(math.min);
+    final flattestAt = heights.indexOf(flattest);
+    final tallest = heights.skip(flattestAt).reduce(math.max);
+    expect(flattest, lessThan(.8), reason: 'flattened while moving fast');
+    expect(tallest, greaterThan(1.02), reason: 'springs back past rest');
+    expect(heights.last, closeTo(1, .01), reason: 'settles at rest');
 
     await gesture.up();
     await tester.pumpAndSettle();

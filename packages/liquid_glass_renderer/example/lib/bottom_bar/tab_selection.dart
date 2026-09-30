@@ -27,7 +27,8 @@ class TabSelection {
   /// visibility.
   final SingleMotionController press;
 
-  /// Smoothed indicator velocity in tabs per second, for squash and stretch.
+  /// How far the loupe is flattened: `0` at rest, positive while it is
+  /// squashed by fast motion, negative while it springs back taller.
   final SingleMotionController jelly;
 
   int tabCount;
@@ -45,54 +46,47 @@ class TabSelection {
   /// loupe over the 77 × 54 pt platter of iOS 27.
   static const loupeOutset = Size(10, 9.5);
 
-  /// Room between the tab row and the bar's ends, which the loupe may use
-  /// but never cross.
-  double sidePadding = 0;
-
   double get _pressAmount => math.max(press.value, 0);
 
   /// The indicator within a tab row of [size], before squash and stretch.
   ///
-  /// The platter is centered on its tab, inside the bar's padding. The loupe
-  /// is centered on it too but, like Apple's, never crosses the bar's ends,
-  /// so at the end tabs it sits flush with them.
+  /// Both the platter and the loupe are centered on the indicator, which
+  /// stays between the first and the last tab. The platter fits inside the
+  /// bar's padding; the loupe, like Apple's, reaches past the bar's ends at
+  /// the end tabs.
   Rect restingRect(Size size, {double? pressAmount}) {
     final amount = pressAmount ?? _pressAmount;
     final slot = size.width / tabCount;
     final grow = loupeOutset * 2 * amount;
-    final width = math.min(
-      slot + 2 * platterOutset + grow.width,
-      size.width + 2 * sidePadding,
-    );
-    final center = ((position.value + .5) * slot).clamp(
-      width / 2 - sidePadding,
-      size.width + sidePadding - width / 2,
-    );
     return Rect.fromCenter(
-      center: Offset(center, size.height / 2),
-      width: width,
+      center: Offset((position.value + .5) * slot, size.height / 2),
+      width: slot + 2 * platterOutset + grow.width,
       height: size.height + grow.height,
     );
   }
 
-  /// Indicator speed in points per second at which [jellyScale] is halfway
+  /// Indicator speed in points per second at which [jellyTarget] is halfway
   /// to its strongest.
   static const _jellySpeed = 300.0;
 
-  /// Squash across the motion, fitted to fast drags on iOS 27: at 270, 540
-  /// and 1100 pt/s the loupe keeps about 0.95 of its width and 0.75, 0.67
-  /// and 0.6 of its height, so it reads as stretched along the motion. For
-  /// tabs [slot] points wide.
-  ({double x, double y}) jellyScale(double slot) {
-    final speed = jelly.value.abs() * slot;
-    final amount = speed / (speed + _jellySpeed);
-    return (x: 1 - .1 * amount, y: 1 - .51 * amount);
+  /// How far the loupe flattens at [speed] points per second, fitted to
+  /// fast drags on iOS 27: at 270, 540 and 1100 pt/s it keeps 0.75, 0.67 and
+  /// 0.6 of its height, so it reads as stretched along the motion.
+  static double jellyTarget(double speed) =>
+      .51 * speed / (speed + _jellySpeed);
+
+  /// The loupe's scale for the current [jelly]: flattened by it, or taller
+  /// while it springs back past rest. Either way it narrows a little, as
+  /// Apple's keeps about 0.95 of its width at speed.
+  ({double x, double y}) get jellyScale {
+    final flat = jelly.value;
+    return (x: 1 - .2 * flat.abs(), y: 1 - flat);
   }
 
   /// The indicator within a tab row of [size].
   Rect rect(Size size) {
     final rect = restingRect(size);
-    final (:x, :y) = jellyScale(size.width / tabCount);
+    final (:x, :y) = jellyScale;
     return Rect.fromCenter(
       center: rect.center,
       width: rect.width * x,
