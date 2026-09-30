@@ -60,10 +60,6 @@ void paintFakeGlassSurface(
     LiquidRoundedRectangle(:final borderRadius) => borderRadius,
     LiquidRoundedSuperellipse(:final borderRadius) => borderRadius,
   };
-  final configuredDepth = settings.effectiveBevelShadowDepth;
-  final bevelDepth = configuredDepth > 0
-      ? configuredDepth
-      : math.min(size.shortestSide * 0.12, 12).toDouble();
   final configuredHighlightWidth = fakeGlassHighlightBandWidth(settings);
   final opticalThickness = settings.effectiveEdgeDistanceRange;
   shader.setFloatUniforms((uniforms) {
@@ -88,7 +84,7 @@ void paintFakeGlassSurface(
         settings.effectiveContourOffset,
         settings.effectiveContourDirectionality,
         settings.effectiveBevelShadowStrength * appearanceVisibility,
-        bevelDepth,
+        settings.effectiveBevelShadowDepth,
         settings.effectiveBevelShadowOffset,
         settings.effectiveBevelShadowDirectionality,
         settings.effectiveBevelShadowSizeResponse,
