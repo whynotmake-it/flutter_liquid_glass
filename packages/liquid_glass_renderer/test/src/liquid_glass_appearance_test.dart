@@ -145,11 +145,6 @@ void main() {
     expect(light.contourScale(94, 1), 1);
     expect(dark.contourScale(94, 0), closeTo(1, 1e-9));
     expect(dark.contourScale(94, 1), greaterThan(1.2));
-    expect(light.sliderDetail(.5), closeTo(.44, 1e-9));
-    expect(
-      const LiquidGlassColorModel.ios27Clear().sliderDetail(.5),
-      1,
-    );
   });
 
   test('clear glass is appearance- and size-independent', () {

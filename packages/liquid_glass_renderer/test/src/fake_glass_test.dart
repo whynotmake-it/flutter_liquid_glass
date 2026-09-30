@@ -21,7 +21,7 @@ void main() {
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarLight(),
+          LiquidGlassSettings.ios27ToolbarLight(),
         ),
         1.2,
       );
@@ -361,7 +361,7 @@ Widget _offsetComparisonSurface({
 }) => Center(
   child: LiquidGlassLayer(
     fake: fake,
-    settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
+    settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
       refractionAmount: 0,
       contourOffset: offset,
     ),
