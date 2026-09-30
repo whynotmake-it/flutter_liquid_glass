@@ -29,12 +29,12 @@ void main() {
     expect(dark.exteriorShadowSizeResponse, 0);
   });
 
-  test('iOS 27 clear preset keeps the toolbar glint shape, stronger', () {
-    const clear = LiquidGlassSettings.ios27ClearLight();
+  test('iOS 27 clear preset keeps the toolbar glint shape', () {
+    const clear = LiquidGlassSettings.ios27Clear();
     const toolbar = LiquidGlassSettings.ios27ToolbarLight();
 
     expect(clear.frost, 0);
-    expect(clear.highlight, closeTo(1.73, 1e-9));
+    expect(clear.highlight, 1);
     expect(clear.highlightWidth, toolbar.highlightWidth);
     expect(clear.highlightWrap, toolbar.highlightWrap);
     expect(clear.contourStrength, .36);

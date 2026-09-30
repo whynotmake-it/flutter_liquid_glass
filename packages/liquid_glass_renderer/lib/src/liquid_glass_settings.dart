@@ -137,20 +137,20 @@ class LiquidGlassSettings with Equatable {
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 0.0;
 
-  /// Light-mode settings fitted to iOS 27 `Glass.clear`.
+  /// Settings fitted to iOS 27 `Glass.clear`, identical in light and dark.
   ///
-  /// Clear glass has the same glint line and angular falloff as the toolbar
-  /// with 1.73 times its strength, and a border only where the normal is
-  /// perpendicular to the light axis. Pair it with
-  /// [LiquidGlassAppearance.ios27ClearLight].
-  const LiquidGlassSettings.ios27ClearLight({
+  /// Clear glass has the same glint line and angular falloff as the toolbar;
+  /// its brighter glint comes from its color model. The border exists only
+  /// where the normal is perpendicular to the light axis. Pair it with
+  /// [LiquidGlassAppearance.ios27Clear].
+  const LiquidGlassSettings.ios27Clear({
     this.frost = 0.0,
   }) : thickness = 12.0,
        edgeRefraction = 27.42,
        refractionSpread = 0.0,
        backdropScale = 1.0,
        chromaticAberration = 0.005,
-       highlight = 1.73,
+       highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
        highlightOppositeStrength = 1.0,

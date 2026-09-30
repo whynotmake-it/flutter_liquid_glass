@@ -108,18 +108,14 @@ class LiquidGlassAppearance with Equatable {
           visibility: visibility,
         );
 
-  /// The fitted light iOS 27 `Glass.clear` appearance.
-  ///
-  /// A white wash at 12.5% over the unmodified backdrop: the black and white
-  /// probes pin emission and transmittance exactly. No solid-palette capture
-  /// of clear glass exists yet, so chroma and luminance transfer are left at
-  /// identity.
-  const LiquidGlassAppearance.ios27ClearLight({this.visibility = 1})
-    : tint = const Color.fromRGBO(255, 255, 255, 0.125),
-      saturation = 1,
-      transmissionGamma = 1,
-      vibrancy = 0,
-      colorModel = const LiquidGlassColorModel.direct();
+  /// The fitted iOS 27 `Glass.clear` appearance, identical in light and dark.
+  const LiquidGlassAppearance.ios27Clear({
+    this.tint = const Color(0x00007AFF),
+    this.visibility = 1,
+  }) : saturation = 1,
+       transmissionGamma = 1,
+       vibrancy = 0,
+       colorModel = const LiquidGlassColorModel.ios27Clear();
 
   /// Material tint; alpha controls how strongly it mixes with the backdrop.
   final Color tint;

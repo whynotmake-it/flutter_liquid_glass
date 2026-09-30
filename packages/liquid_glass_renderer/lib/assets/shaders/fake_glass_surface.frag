@@ -30,6 +30,9 @@ uniform float uPixelSize;
 // 1 when drawing only the border ring outside the shape clip. The clip path is
 // the silhouette there; the analytic SDF may approximate it by a pixel.
 uniform float uExteriorOnly;
+// Luminance of the neutral glint target: FakeGlass cannot scale it by the
+// face it cannot see, so clear glass uses its best constant.
+uniform float uGlintLuminance;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -167,11 +170,12 @@ void main() {
       uTint.rgb * tintAlpha * (1.0 - contourAbsorption) *
       (1.0 - bevelShadow);
   float litAlpha = materialAlpha;
-  litPremultiplied = litPremultiplied * (1.0 - glint) + vec3(1.6 * glint);
+  litPremultiplied =
+      litPremultiplied * (1.0 - glint) + vec3(uGlintLuminance * glint);
   litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
   float alpha = litAlpha * materialCoverage + exteriorContourAlpha;
   fragColor = vec4(
-    clamp(litPremultiplied * materialCoverage, 0.0, 1.6),
+    max(litPremultiplied * materialCoverage, vec3(0.0)),
     clamp(alpha, 0.0, 1.0)
   );
 }

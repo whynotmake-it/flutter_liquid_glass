@@ -222,6 +222,13 @@ Independent `LiquidGlass` children may share a layer without blending.
 its transfer function; the remaining fields stay available for custom looks
 and for fitting materials that are not covered by the toolbar presets.
 
+The iOS 27 color models reproduce Apple's measured face. Dark regular glass
+gets denser with size: shapes up to 75 pt on their short side transmit like
+light glass, and shapes from 105 pt settle at Apple's denser dark material.
+Within one layer, the smallest shape decides. `LiquidGlassColorModel.ios27Clear`
+(used by `LiquidGlassSettings.ios27Clear` and
+`LiquidGlassAppearance.ios27Clear`) is identical in light and dark.
+
 Keep `backdropScale` near `1`. Strong magnification enlarges an already
 captured image and loses detail. Build a loupe with Flutter's `RawMagnifier`
 before applying glass, then use glass only for edge optics and lighting.
