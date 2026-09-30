@@ -88,12 +88,12 @@ class LoupeTabBar extends StatefulWidget {
   final LiquidGlassSettings loupeSettings;
 
   /// A clear, unfrosted lens with a wide bevel, after the loupe in the
-  /// original example bottom bar (`test/support/bottom_bar.dart`), shrinking
-  /// the backdrop enough that the swollen bar's edges show inside it.
+  /// original example bottom bar (`test/support/bottom_bar.dart`), showing
+  /// the bar a little smaller inside it.
   static const defaultLoupeSettings = LiquidGlassSettings(
     refractionHeight: 24,
     refractionAmount: 40,
-    backdropShrink: .25,
+    backdropShrink: .19,
     dispersion: .1,
     frost: 0,
     contourStrength: .1,
