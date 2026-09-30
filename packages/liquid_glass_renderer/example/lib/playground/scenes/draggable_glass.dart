@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 /// The soft drop shadow iOS gives floating glass.
@@ -19,6 +20,41 @@ class GlowContent extends StatelessWidget {
       child: GlassGlow(glowColor: const Color(0x29FFFFFF), child: child),
     );
   }
+}
+
+/// Drags [child] from the first pointer contact, winning over the scrolling
+/// backdrop beneath it, like Flutter's `Draggable`.
+class ImmediateDrag extends StatelessWidget {
+  const ImmediateDrag({required this.onUpdate, required this.child, super.key});
+
+  final GestureDragUpdateCallback onUpdate;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: {
+        ImmediateMultiDragGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<
+              ImmediateMultiDragGestureRecognizer
+            >(
+              ImmediateMultiDragGestureRecognizer.new,
+              (recognizer) => recognizer.onStart = (_) => _Drag(onUpdate),
+            ),
+      },
+      child: child,
+    );
+  }
+}
+
+class _Drag extends Drag {
+  _Drag(this._onUpdate);
+
+  final GestureDragUpdateCallback _onUpdate;
+
+  @override
+  void update(DragUpdateDetails details) => _onUpdate(details);
 }
 
 /// A glass shape that can be dragged around the stage.
@@ -118,7 +154,7 @@ class _DraggableGlassState extends State<DraggableGlass> {
           child: child!,
         );
       },
-      child: GestureDetector(onPanUpdate: _drag, child: glass),
+      child: ImmediateDrag(onUpdate: _drag, child: glass),
     );
   }
 }

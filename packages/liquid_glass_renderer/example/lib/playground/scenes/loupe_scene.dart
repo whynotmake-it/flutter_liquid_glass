@@ -82,7 +82,7 @@ class _DraggableLoupe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lens = GestureDetector(onPanUpdate: _drag, child: child);
+    final lens = ImmediateDrag(onUpdate: _drag, child: child);
     final showCaret = loupe.focalPointOffset != Offset.zero;
     final caret = ColoredBox(color: CupertinoTheme.of(context).primaryColor);
     return ValueListenableBuilder(
