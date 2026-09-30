@@ -26,5 +26,40 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    engineBridge.pluginRegistry.registrar(forPlugin: "NativeGlass")?
+      .register(NativeGlassFactory(), withId: "native-glass")
   }
+}
+
+/// System Liquid Glass as a platform view, so the example can show Apple's
+/// glass over the same Flutter content as its own (see `glint_ab_main.dart`).
+final class NativeGlassFactory: NSObject, FlutterPlatformViewFactory {
+  func create(
+    withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?
+  ) -> FlutterPlatformView {
+    let style = (args as? [String: Any])?["style"] as? String
+    return NativeGlassView(frame: frame, clear: style == "clear")
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    FlutterStandardMessageCodec.sharedInstance()
+  }
+}
+
+final class NativeGlassView: NSObject, FlutterPlatformView {
+  private let glass: UIView
+
+  init(frame: CGRect, clear: Bool) {
+    if #available(iOS 26.0, *) {
+      let view = UIVisualEffectView(effect: UIGlassEffect(style: clear ? .clear : .regular))
+      view.cornerConfiguration = .capsule()
+      glass = view
+    } else {
+      glass = UIView(frame: frame)
+    }
+    glass.frame = frame
+    glass.isUserInteractionEnabled = false
+  }
+
+  func view() -> UIView { glass }
 }
