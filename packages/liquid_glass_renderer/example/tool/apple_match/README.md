@@ -549,13 +549,13 @@ The example can be launched with:
 
 ```bash
 cd packages/liquid_glass_renderer/example
-fvm flutter run -d macos -t lib/basic_app.dart
+fvm flutter run -d macos
 ```
 
 The deterministic grid mode used by screenshots/tests is:
 
 ```bash
-fvm flutter run -d macos -t lib/basic_app.dart \
+fvm flutter run -d macos \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=0
 ```
