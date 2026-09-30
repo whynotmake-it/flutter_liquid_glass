@@ -85,16 +85,16 @@
         "artifact": "out/material-attribution-frost/summary.json"
       }]
     },
-    "chromaticAberration": {
+    "dispersion": {
       "status": "rejected",
       "reason": "Values 0 through 0.01 are byte-identical in all three scenes; larger values do not improve score.",
       "evidence": [{
-        "axis": "chromaticAberration",
+        "axis": "dispersion",
         "baseline": 0.005,
         "candidate": 0.0,
         "scenes": ["toolbar_capsule", "small_capsule", "large_capsule"],
         "delta": {"byteIdenticalThrough": 0.01},
-        "artifact": "out/material-attribution-chromaticAberration-cutoff/summary.json"
+        "artifact": "out/material-attribution-dispersion-cutoff/summary.json"
       }]
     },
     "saturation": {

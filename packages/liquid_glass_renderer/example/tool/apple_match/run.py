@@ -132,7 +132,7 @@ def main():
             "edgeRefraction": 106.13,
             "refractionSpread": 0.0,
             "saturation": 1.0,
-            "chromaticAberration": 0.0,
+            "dispersion": 0.0,
         }
     )
     current_capture = None

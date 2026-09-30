@@ -21,7 +21,7 @@
   "edgeRefraction": 27.42,
   "refractionSpread": 0.0,
   "frost": 0.0,
-  "chromaticAberration": 0.005,
+  "dispersion": 0.005,
   "tintRed": 255,
   "tintGreen": 255,
   "tintBlue": 255,

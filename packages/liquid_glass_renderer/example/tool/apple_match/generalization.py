@@ -268,7 +268,7 @@ def main():
             "saturation",
             "transmissionGamma",
             "vibrancy",
-            "chromaticAberration",
+            "dispersion",
             "highlight",
             "contourStrength",
             "contourWidth",

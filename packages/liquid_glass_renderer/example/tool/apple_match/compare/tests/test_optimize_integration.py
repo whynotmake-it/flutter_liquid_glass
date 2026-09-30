@@ -49,7 +49,7 @@ class OnlineLoopSmokeTests(unittest.TestCase):
             "glassAlpha": 0.0,
             "refractiveIndex": 1.0,
             "saturation": 1.0,
-            "chromaticAberration": 0.0,
+            "dispersion": 0.0,
         }
         flutter_bin = os.environ.get(
             "FLUTTER_BIN", str(Path.home() / "fvm/versions/3.47.1/bin/flutter")

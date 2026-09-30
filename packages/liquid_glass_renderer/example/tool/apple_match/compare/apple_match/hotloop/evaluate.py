@@ -74,7 +74,7 @@ SUPPORTED_SETTINGS = frozenset(
         "refractionSpread",
         "backdropScale",
         "saturation",
-        "chromaticAberration",
+        "dispersion",
         "shadowLuminance",
         "shadowAlpha",
         "shadowOffsetX",

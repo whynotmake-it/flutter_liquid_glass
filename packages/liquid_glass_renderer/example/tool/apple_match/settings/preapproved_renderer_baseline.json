@@ -10,7 +10,7 @@
   "innerRefractionHeight": 0.45,
   "innerRefractionAmount": 0.0,
   "refractionCurve": 1.0,
-  "chromaticAberration": 0.0,
+  "dispersion": 0.0,
   "frostRed": 255,
   "frostGreen": 255,
   "frostBlue": 255,

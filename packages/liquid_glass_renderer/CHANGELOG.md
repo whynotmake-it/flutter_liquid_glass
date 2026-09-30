@@ -22,7 +22,7 @@
 - Refit refraction to iOS 27: defaults and toolbar presets use a 20 pt bevel
   with 60 pt edge displacement, and the new `refractionFitsShape` (default
   `true`) limits the lens on small shapes like regular glass does; use
-  `false` for clear glass. `chromaticAberration` now defaults to `0`.
+  `false` for clear glass. `dispersion` now defaults to `0`.
 - Add `LiquidGlassSettings.smoothRefraction`, on by default: bilinear
   instead of nearest backdrop sampling, so refracted lines stop snapping to
   whole pixels. Undisplaced glass still reproduces the backdrop exactly.

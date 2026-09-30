@@ -283,7 +283,7 @@ Final names are evidence-gated, but the current design is:
 - `thickness`
 - `edgeRefraction`
 - `refractionSpread`
-- `chromaticAberration` — retain only if it helps at least two scenes
+- `dispersion` — retain only if it helps at least two scenes
 - `frost` — replaces `blur`
 - `tint` — replaces `glassColor`
 - `saturation`

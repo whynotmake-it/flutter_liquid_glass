@@ -102,10 +102,7 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
       'exteriorShadowSizeResponse',
       defaults.exteriorShadowSizeResponse,
     ),
-    chromaticAberration: number(
-      'chromaticAberration',
-      defaults.chromaticAberration,
-    ),
+    dispersion: number('dispersion', defaults.dispersion),
     tintAmount: number('tintAmount', defaults.tintAmount),
   );
 }

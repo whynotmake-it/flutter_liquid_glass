@@ -41,5 +41,5 @@
   "glassAlpha": 0.53,
   "refractiveIndex": 1.04,
   "saturation": 0.9,
-  "chromaticAberration": 0.005
+  "dispersion": 0.005
 }

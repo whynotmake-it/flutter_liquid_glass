@@ -131,8 +131,8 @@ def write_markdown(records: list[dict], path: Path) -> None:
         image_path = ROOT / "out" / "annotated-comparisons" / "iterations" / image_scan / scene / f"{value}-rep{record['repetition']}.png"
         # The historical non-cutoff CA scan is byte-for-byte duplicated by the
         # retained cutoff scan; point both rows at the single annotated image.
-        if not image_path.exists() and scan == "material-attribution-chromaticAberration":
-            image_scan = "material-attribution-chromaticAberration-cutoff"
+        if not image_path.exists() and scan == "material-attribution-dispersion":
+            image_scan = "material-attribution-dispersion-cutoff"
         image = f"out/annotated-comparisons/iterations/{image_scan}/{scene}/{value}-rep{record['repetition']}.png"
         lines.append(
             f"| {scan} | {scene} | {record['value']:g} | "

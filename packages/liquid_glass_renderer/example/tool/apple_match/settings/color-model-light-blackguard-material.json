@@ -10,7 +10,7 @@
   "saturation": 1.913,
   "transmissionGamma": 0.898,
   "vibrancy": 0.0,
-  "chromaticAberration": 0.005,
+  "dispersion": 0.005,
   "highlight": 0.25,
   "highlightOppositeStrength": 0.5,
   "highlightWidth": 0.75,

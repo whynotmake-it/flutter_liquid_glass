@@ -29,7 +29,7 @@ class LiquidGlassSettings with Equatable {
     )
     this.magnification = 1.0,
     this.frost = 5.0,
-    this.chromaticAberration = 0.0,
+    this.dispersion = 0.0,
     this.highlight = 1.0,
     this.highlightWidth = 1.2,
     this.highlightWrap = 0.5,
@@ -77,7 +77,7 @@ class LiquidGlassSettings with Equatable {
       },
       magnification: legacy('magnification', 'backdropScale', 1),
       frost: number('frost', 5),
-      chromaticAberration: number('chromaticAberration', 0),
+      dispersion: number('dispersion', 0),
       highlight: number('highlight', 1),
       highlightWidth: number('highlightWidth', 1.2),
       highlightWrap: number('highlightWrap', .5),
@@ -117,7 +117,7 @@ class LiquidGlassSettings with Equatable {
        refractionFitsShape = true,
        smoothRefraction = true,
        magnification = 1.0,
-       chromaticAberration = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -149,7 +149,7 @@ class LiquidGlassSettings with Equatable {
        refractionFitsShape = true,
        smoothRefraction = true,
        magnification = 1.0,
-       chromaticAberration = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -197,7 +197,7 @@ class LiquidGlassSettings with Equatable {
        refractionFitsShape = false,
        smoothRefraction = true,
        magnification = 1.0,
-       chromaticAberration = 0.0,
+       dispersion = 0.0,
        highlight = 1.0,
        highlightWidth = 1.2,
        highlightWrap = 0.5,
@@ -244,7 +244,7 @@ class LiquidGlassSettings with Equatable {
   }) : this(
          refractionHeight: depth,
          refractionAmount: (refraction / 100) * 4 * depth,
-         chromaticAberration: 4 * (dispersion / 100),
+         dispersion: 4 * (dispersion / 100),
          frost: frost,
        );
 
@@ -338,7 +338,7 @@ class LiquidGlassSettings with Equatable {
   final double frost;
 
   /// Wavelength separation for the edge displacement.
-  final double chromaticAberration;
+  final double dispersion;
 
   /// Strength of the glint along the light axis.
   ///
@@ -484,7 +484,7 @@ class LiquidGlassSettings with Equatable {
   }
 
   /// Effective chromatic aberration.
-  double get effectiveChromaticAberration => chromaticAberration;
+  double get effectiveDispersion => dispersion;
 
   /// Effective highlight strength.
   double get effectiveHighlight => highlight;
@@ -555,7 +555,7 @@ class LiquidGlassSettings with Equatable {
     bool? smoothRefraction,
     double? magnification,
     double? frost,
-    double? chromaticAberration,
+    double? dispersion,
     double? highlight,
     double? highlightWidth,
     double? highlightWrap,
@@ -580,7 +580,7 @@ class LiquidGlassSettings with Equatable {
     smoothRefraction: smoothRefraction ?? this.smoothRefraction,
     magnification: magnification ?? this.magnification,
     frost: frost ?? this.frost,
-    chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+    dispersion: dispersion ?? this.dispersion,
     highlight: highlight ?? this.highlight,
     highlightWidth: highlightWidth ?? this.highlightWidth,
     highlightWrap: highlightWrap ?? this.highlightWrap,
@@ -612,7 +612,7 @@ class LiquidGlassSettings with Equatable {
     'smoothRefraction': smoothRefraction,
     'magnification': magnification,
     'frost': frost,
-    'chromaticAberration': chromaticAberration,
+    'dispersion': dispersion,
     'highlight': highlight,
     'highlightWidth': highlightWidth,
     'highlightWrap': highlightWrap,
@@ -640,7 +640,7 @@ class LiquidGlassSettings with Equatable {
     smoothRefraction,
     magnification,
     frost,
-    chromaticAberration,
+    dispersion,
     highlight,
     highlightWidth,
     highlightWrap,

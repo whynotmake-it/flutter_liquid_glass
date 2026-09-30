@@ -116,12 +116,12 @@ class PlaygroundPage extends HookWidget {
                       ),
                       _SliderSetting(
                         label: 'Chromatic aberration',
-                        value: settings.chromaticAberration,
+                        value: settings.dispersion,
                         min: 0,
                         max: 1,
                         fractionDigits: 3,
                         onChanged: (value) => setSettings(
-                          settings.copyWith(chromaticAberration: value),
+                          settings.copyWith(dispersion: value),
                         ),
                       ),
                       _SliderSetting(

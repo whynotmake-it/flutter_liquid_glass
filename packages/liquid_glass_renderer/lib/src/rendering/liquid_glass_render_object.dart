@@ -301,7 +301,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setColor(tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
-          settings.effectiveChromaticAberration,
+          settings.effectiveDispersion,
           settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.effectiveHighlight,
           settings.effectiveMagnification,
@@ -880,7 +880,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         : (softensInShader ? 1 / devicePixelRatio : 0.0);
     final displacement =
         settings.effectiveDisplacementScale *
-        (1 + settings.effectiveChromaticAberration.abs() * 0.5);
+        (1 + settings.effectiveDispersion.abs() * 0.5);
     final scale = settings.effectiveMagnification;
     final revealed = scale < 1
         ? (1 / scale - 1) * max(material.width, material.height) / 2

@@ -11,7 +11,7 @@ void main() {
     expect(light.frost, 7);
     expect(light.refractionAmount, 60);
     expect(light.refractionFitsShape, isTrue);
-    expect(light.chromaticAberration, 0);
+    expect(light.dispersion, 0);
     expect(light.highlight, 1);
     expect(light.highlightWidth, 1.2);
     expect(light.highlightOppositeStrength, 1);
@@ -104,7 +104,7 @@ void main() {
       refractionAmount: 80,
       magnification: .75,
       frost: 12,
-      chromaticAberration: 2,
+      dispersion: 2,
       highlight: .6,
       highlightWidth: 2.5,
       highlightWrap: .3,
@@ -125,7 +125,7 @@ void main() {
     expect(settings.effectiveDisplacementScale, 80);
     expect(settings.effectiveEdgeDistanceRange, 40);
     expect(settings.effectiveFrost, 12);
-    expect(settings.effectiveChromaticAberration, 2);
+    expect(settings.effectiveDispersion, 2);
     expect(settings.effectiveHighlight, .6);
     expect(settings.effectiveHighlightWidth, 2.5);
     expect(settings.effectiveContourStrength, .3);
@@ -143,7 +143,7 @@ void main() {
       smoothRefraction: false,
       magnification: .8,
       frost: 7,
-      chromaticAberration: .2,
+      dispersion: .2,
       highlight: .4,
       highlightWidth: 3,
       highlightWrap: .2,

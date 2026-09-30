@@ -206,7 +206,7 @@ Independent `LiquidGlass` children may share a layer without blending.
 `LiquidGlassSettings` groups controls by purpose:
 
 - Optics: `refractionHeight`, `refractionAmount`, `magnification`, and
-  `chromaticAberration`.
+  `dispersion`.
 - Frost: `frost`, expressed as a logical-pixel blur sigma.
 - Highlight: `highlight`, `highlightWidth`, `highlightWrap`,
   `highlightOppositeStrength`, and `curvatureLighting`.
@@ -260,7 +260,7 @@ Values measured on iOS 27 (Reduce Motion off):
 | Clear glass (`LiquidGlassSettings.ios27Clear(tintAmount: slider)`) | `20` | `60` | `refractionFitsShape: false`, `frost: LiquidGlassSettings.ios27ClearFrost(slider)` (0.35 at slider 0, applied in the final pass) |
 | Text loupe | `8` | `28` | `magnification: 1.25` |
 
-iOS 27 shows no chromatic dispersion in refraction, so `chromaticAberration`
+iOS 27 shows no chromatic dispersion in refraction, so `dispersion`
 defaults to `0`. Frost up to 1.25 device pixels (such as clear glass's 0.35 pt on
 a 3x screen) is applied as a three-texel kernel inside the final pass instead
 of a separate blur pass. Strong magnification enlarges an already captured image and

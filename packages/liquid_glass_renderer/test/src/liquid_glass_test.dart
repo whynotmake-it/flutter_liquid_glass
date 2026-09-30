@@ -1503,7 +1503,7 @@ Widget _dprOpticsRegressionScene() => Directionality(
         settings: settingsWithoutLighting.copyWith(
           refractionHeight: 24,
           refractionAmount: 64,
-          chromaticAberration: .5,
+          dispersion: .5,
         ),
         appearance: const LiquidGlassAppearance(),
         shape: const LiquidRoundedSuperellipse(borderRadius: 80),

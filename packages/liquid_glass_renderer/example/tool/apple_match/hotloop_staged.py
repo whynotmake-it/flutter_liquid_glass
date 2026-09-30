@@ -57,7 +57,7 @@ STAGES = {
         "thickness": [8.0, 10.0, 12.0, 14.0, 16.0],
         "edgeRefraction": [18.3, 22.85, 27.42, 32.0, 36.6],
         "refractionSpread": [0.0, 0.25, 0.5, 0.75, 1.0],
-        "chromaticAberration": [0.0, 0.0025, 0.005, 0.0075, 0.01],
+        "dispersion": [0.0, 0.0025, 0.005, 0.0075, 0.01],
     },
     # The loupe's RawMagnifier owns enlargement; only these material controls
     # remain effective on its clear glass shell. Keep this bounded stage
@@ -76,7 +76,7 @@ STAGES = {
             300.0,
             400.0,
         ],
-        "chromaticAberration": [0.0, 0.001, 0.0025, 0.005],
+        "dispersion": [0.0, 0.001, 0.0025, 0.005],
         "highlight": [0.0, 0.1, 0.2, 0.3, 0.5],
         "contourStrength": [0.0, 0.05, 0.1, 0.2, 0.35],
         "contourWidth": [0.5, 1.0, 1.5],

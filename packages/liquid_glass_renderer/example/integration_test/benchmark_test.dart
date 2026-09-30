@@ -1969,7 +1969,7 @@ class _AppLikeSceneState extends State<_AppLikeScene> {
                           refractionAmount: 40,
                           // ignore: deprecated_member_use
                           magnification: .92,
-                          chromaticAberration: .1,
+                          dispersion: .1,
                           highlight: .4,
                           contourStrength: .1,
                           contourWidth: 1,

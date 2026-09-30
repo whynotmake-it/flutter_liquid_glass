@@ -51,7 +51,7 @@ AXES = {
     # authoritative toolbar/capsule default and must remain in the grid.
     # The upper values test whether the current relative-displacement
     # parameterization is simply too weak to be visually observable.
-    "chromaticAberration": (0.0, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1),
+    "dispersion": (0.0, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1),
 }
 
 
