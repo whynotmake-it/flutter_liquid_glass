@@ -457,3 +457,50 @@ hook to defer to the raster thread).
 A/B on device: `LIQUID_GLASS_REUSE_GEOMETRY_TEXTURES=false` restores
 allocation per render in the same build; `LIQUID_GLASS_BENCHMARK_DART_DEFINES`
 passes it through `benchmark.sh` / `android_gpu_bench.sh`.
+
+### O. One command buffer per frame for all geometry passes — pending device (2026-09-30)
+
+Target: per-submission overhead on rebuild frames. Each geometry and
+material pass had its own `gpu.CommandBuffer` and submit (Vulkan: command
+buffer from the pool, descriptor pool, fence, `vkQueueSubmit`). Flutter GPU
+records a render pass's commands at `submit`, so batching does not move the
+recording work; it removes the per-buffer and per-submit overhead. It helps
+frames with more than one pass: mixed appearances (matte + material map) and
+several layers rebuilding in the same frame. A single uniform layer (button
+stretch) has one pass either way.
+
+Change: during the paint and compositing phases (`persistentCallbacks`),
+`FlutterGpuGeometryRenderer` records passes into one shared command buffer.
+`GeometryTransformTrackingLayer.addToScene` submits it. Every scene
+containing real glass is built through that layer (it is
+`alwaysNeedsAddToScene`, so ancestors are never retained around it), and it
+adds itself before the effect that samples the matte and before the scene
+reaches the raster thread, so the matte is on the GPU queue ahead of the
+frame. `toImage`/`toImageSync` of a subtree builds a scene the same way. A
+post-frame callback flushes passes of layers painted but not composited.
+Renders outside a frame (direct renderer use, unit tests) submit
+immediately. `LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS=false` restores one
+submit per pass for A/B builds.
+
+**`flutter_tester` segfault.** Two render passes in one Flutter GPU command
+buffer crash `flutter_tester` (Flutter 3.47.1, Linux, Vulkan on SwiftShader)
+3/3, one pass per buffer 0/3 (probe: `zz_two_pass_probe_test.dart` in the
+renderer-perf probes). The test runner is not the target, so it does not
+veto the change: when `FLUTTER_TEST` is set, each pass gets its own command
+buffer but submission is still deferred to the same flush points, so widget
+tests exercise the scheduling. Devices are verified by
+`example/integration_test/geometry_batch_test.dart`, which runs the batching
+and texture-reuse tests on the device and additionally asserts that one
+command buffer is shared.
+
+Verification on the host (fallback path): the flush happens during scene
+build in every frame (the post-frame safety net never fires; removing the
+`addToScene` flush makes the test fail with 10 safety-net flushes in 10
+frames), and mattes, material maps and a full-frame capture are
+byte-identical to immediate submission. No host timing: the shared-buffer
+path cannot run under `flutter_tester`.
+
+Other optimizations rejected only because of the test runner: none found in
+this log or `PERFORMANCE_AUDIT.md`; earlier `flutter_tester` limitations
+(one backdrop subpass per process, the seed hang) changed how tests are
+structured, not what shipped.
