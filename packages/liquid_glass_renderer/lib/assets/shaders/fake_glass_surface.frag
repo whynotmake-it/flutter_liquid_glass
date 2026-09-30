@@ -33,6 +33,9 @@ uniform float uExteriorOnly;
 // Luminance of the neutral glint target: FakeGlass cannot scale it by the
 // face it cannot see, so clear glass uses its best constant.
 uniform float uGlintLuminance;
+// Premultiplied emission of the face the backdrop filter produced, so the
+// inner shadow can shade only the transmitted part of that face.
+uniform vec3 uFaceEmission;
 // Rounded superellipse parameters (see roundedSuperellipseParameters).
 uniform vec4 uRseDegreeAndSpans;
 uniform vec4 uRseCircleCenters;
@@ -129,15 +132,13 @@ void main() {
     1.875,
     sizeProgress * clamp(uBevelSizeResponse, 0.0, 1.0)
   );
-  float bevelOffset = min(max(uBevelOffset, 0.0), bevelDepth - 0.001);
-  float bevelLeading = bevelOffset > 0.001
-      ? smoothstep(0.0, bevelOffset, inward)
+  // The rim's band is displaced along the light, as in RealGlass.
+  float bevelShift = max(uBevelOffset, 0.0) * facing;
+  float bevelPenumbra = 2.0 * bevelShift;
+  float bevelLeading = bevelPenumbra > 0.001
+      ? smoothstep(0.0, bevelPenumbra, inward)
       : 1.0;
-  float bevelFalloff = 1.0 - smoothstep(
-    bevelOffset,
-    max(bevelDepth, bevelOffset + 0.001),
-    inward
-  );
+  float bevelFalloff = 1.0 - smoothstep(0.0, bevelDepth, inward - bevelShift);
   float wrappedFacing = smoothstep(0.0, 1.0, facing * 0.5 + 0.5);
   float directionalShadow = mix(
     1.0,
@@ -182,9 +183,13 @@ void main() {
   float materialAlpha = 1.0 - (1.0 - tintAlpha) *
       (1.0 - backdropAbsorption);
   float exteriorContourAlpha = clamp(contourBand.x * contourStrength, 0.0, 1.0);
+  // The inner shadow absorbs the filtered face, which includes the face's
+  // own emission; adding that share back leaves only the transmitted light
+  // shaded, as in RealGlass.
   vec3 litPremultiplied =
-      uTint.rgb * tintAlpha * (1.0 - contourAbsorption) *
-      (1.0 - bevelShadow);
+      uTint.rgb * tintAlpha * (1.0 - contourAbsorption) +
+      uFaceEmission * bevelShadow * (1.0 - tintAlpha) *
+          (1.0 - backdropContourAbsorption);
   float litAlpha = materialAlpha;
   litPremultiplied =
       litPremultiplied * (1.0 - glint) + vec3(uGlintLuminance * glint);

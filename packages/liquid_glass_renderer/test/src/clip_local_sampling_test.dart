@@ -107,7 +107,9 @@ void main() {
       expect(source, contains('bevelLeadingEdge'));
       expect(source, contains('bevelFalloff'));
       expect(source, contains('uBevelShadowSizeResponse'));
-      expect(source, contains('sizeEnergy *'));
+      expect(source, contains('uBevelShadowStrength *'));
+      expect(source, contains('inwardDistance - shadowShift'));
+      expect(source, contains('transmittedColor * (1.0 - edgeAbsorption)'));
       expect(
         source,
         contains('uContourOffset + uEdgeWidth + kContourCoverageFeather'),
