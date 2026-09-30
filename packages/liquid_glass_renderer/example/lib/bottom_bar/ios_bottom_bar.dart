@@ -43,7 +43,7 @@ class IosBottomBar extends StatelessWidget {
   static const barHeight = 62.0;
   static const accessoryHeight = 48.0;
   static const spacing = 14.0;
-  static const accessorySpacing = 10.0;
+  static const accessorySpacing = 8.0;
 
   /// Below both gaps even while the tab bar swells under the finger, so
   /// segments only merge once pulled toward each other.

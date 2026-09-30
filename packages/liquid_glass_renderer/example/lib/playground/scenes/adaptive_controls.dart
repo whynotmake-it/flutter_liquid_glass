@@ -42,9 +42,10 @@ class AdaptiveGroup extends StatelessWidget {
   }
 }
 
-/// Size of the glyphs on glass controls, matching the SF Symbols in iOS 27
-/// toolbar buttons.
-const controlGlyphSize = 25.0;
+/// Size of the glyphs on glass controls: CupertinoIcons at this size match
+/// the SF Symbols in iOS 27 toolbar buttons (`chevron.left` 18.3 pt tall,
+/// `square.and.arrow.up` 24 pt, `ellipsis` dots 7.8 pt apart).
+const controlGlyphSize = 26.0;
 
 /// Glass for one control, with glyphs that stay legible on it and the touch
 /// glow beneath them.

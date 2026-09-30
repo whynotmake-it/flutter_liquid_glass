@@ -77,8 +77,8 @@ class ControlsScene extends StatelessWidget {
   }
 }
 
-/// Distance of the bottom bar from the sides of the stage.
-const bottomBarSide = 16.0;
+/// Distance of the bottom bar from the sides of the stage, as on iOS 27.
+const bottomBarSide = 20.0;
 
 /// Distance of the bottom bar from the bottom of the screen, for a home
 /// indicator inset of [bottomInset].
@@ -88,8 +88,9 @@ const bottomBarSide = 16.0;
 double bottomBarGap(double bottomInset) => math.max(bottomInset - 13.5, 20);
 
 /// Distance of the row of glass buttons along the top of the stage from the
-/// top of the stage's safe area.
-const topControlsTop = 12.0;
+/// top of the stage's safe area. iOS 27 centers its 44 pt toolbar buttons
+/// 22 pt below it.
+const topControlsTop = 0.0;
 
 /// Distance of the row of glass buttons along the top of the stage from the
 /// sides of the stage's safe area.
@@ -222,7 +223,7 @@ class _ButtonCapsule extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final icon in icons) SizedBox(width: 42, child: Icon(icon)),
+              for (final icon in icons) SizedBox(width: 45, child: Icon(icon)),
             ],
           ),
         ),

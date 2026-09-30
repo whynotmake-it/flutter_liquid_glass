@@ -23,9 +23,10 @@ class BottomBarTab {
 /// Must be inside a [LiquidGlassBlendGroup], which the capsule joins so it
 /// can merge with neighboring bar segments. The loupe renders in its own
 /// small glass layer, mounted only while it is visible, because it has to
-/// refract the capsule and the icons painted beneath it. Its
-/// `backdropShrink` shows the bar smaller inside it; the tinted icons under
-/// it are scaled up by the same amount so they keep their size.
+/// refract the capsule and the icons painted beneath it. Like Apple's, it
+/// shows the bar 1:1; with a `backdropShrink` it would show the bar smaller,
+/// and the tinted icons under it are scaled up by the same amount so they
+/// keep their size.
 ///
 /// The drag and motion follow the original example bottom bar: pointer
 /// positions from a horizontal drag, an interactive spring while dragging,
@@ -72,8 +73,8 @@ class LoupeTabBar extends StatefulWidget {
 
   /// Color of the selected tab, or `null` for the theme's primary color.
   ///
-  /// It blends with the glass per pixel ([VibrantTint]), so it follows the
-  /// backdrop instantly and shows its detail.
+  /// It blends with the glass per pixel ([vibrantTintPaints]), so it
+  /// follows the backdrop instantly and shows its detail.
   final Color? tint;
 
   /// The appearance the [tint] is matched to, or `null` for the theme's.
@@ -108,16 +109,15 @@ class LoupeTabBar extends StatefulWidget {
 
 class _LoupeTabBarState extends State<LoupeTabBar>
     with TickerProviderStateMixin {
-  static const _padding = 4.0;
+  /// Inset of the tab row from the capsule's top and bottom. The slots span
+  /// the whole width, as on iOS 27.
+  static const _inset = 2.0;
 
+  /// Darker than the glass in both appearances, as on iOS 27.
   static const _platterColor = CupertinoDynamicColor.withBrightness(
     color: Color(0x14000000),
-    darkColor: Color(0x24FFFFFF),
+    darkColor: Color(0x40000000),
   );
-
-  static const _loupeShadows = [
-    BoxShadow(color: Color(0x1A000000), blurRadius: 30),
-  ];
 
   /// Pulling past either end stretches the bar sideways by at most
   /// `1 / _stretchResistance` points, 10–12 pt for a long pull as on iOS 27.
@@ -173,7 +173,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   int? _pendingDragFrame;
 
   int get _lastTab => widget.tabs.length - 1;
-  double get _slot => (_size.width - 2 * _padding) / widget.tabs.length;
+  double get _slot => _size.width / widget.tabs.length;
 
   /// How far the indicator may still be from its tab when the loupe settles
   /// back into the platter: 0.3 in the original bar's alignment units.
@@ -241,7 +241,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     final scale = _swell;
     final center = _size.width / 2;
     final x = center + (local.dx - center) / scale;
-    return (x - _padding) / _slot - .5;
+    return x / _slot - .5;
   }
 
   int _tabAt(Offset local) => _positionAt(local).round().clamp(0, _lastTab);
@@ -413,7 +413,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
             child: SizedBox.fromSize(
               size: _size,
               child: Padding(
-                padding: const EdgeInsets.all(_padding),
+                padding: const EdgeInsets.symmetric(vertical: _inset),
                 child: RepaintBoundary(
                   child: _buildRows(
                     label: label,
@@ -482,7 +482,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
                 ),
                 child: _buildRow(
                   tint,
-                  foregrounds: VibrantTint.of(tint, tintBrightness).paints,
+                  foregrounds: vibrantTintPaints(tint, tintBrightness),
                 ),
               ),
             ),
@@ -529,7 +529,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
           builder: (context, show, loupe) =>
               show ? loupe! : const SizedBox.shrink(),
           child: CustomSingleChildLayout(
-            delegate: LoupeLayoutDelegate(_selection, padding: _padding),
+            delegate: LoupeLayoutDelegate(_selection, inset: _inset),
             child: ListenableTransform(
               listenable: _jelly,
               transform: (size) {
@@ -539,20 +539,21 @@ class _LoupeTabBarState extends State<LoupeTabBar>
               child: RepaintBoundary(
                 child: ValueListenableBuilder(
                   valueListenable: _loupeVisibility,
-                  builder: (context, visibility, child) =>
-                      LiquidGlass.withOwnLayer(
-                        key: LoupeTabBar.loupeKey,
-                        settings: widget.loupeSettings,
-                        fake: widget.fake,
-                        appearance: LiquidGlassAppearance(
-                          visibility: visibility,
-                        ),
-                        shape: const LiquidRoundedSuperellipse(
-                          borderRadius: 64,
-                        ),
-                        shadows: _loupeShadows,
-                        child: const SizedBox.expand(),
+                  builder: (context, visibility, child) => CustomPaint(
+                    painter: _LoupeShadowPainter(visibility),
+                    child: LiquidGlass.withOwnLayer(
+                      key: LoupeTabBar.loupeKey,
+                      settings: widget.loupeSettings,
+                      fake: widget.fake,
+                      appearance: LiquidGlassAppearance(
+                        visibility: visibility,
                       ),
+                      shape: const LiquidRoundedSuperellipse(
+                        borderRadius: 64,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -561,6 +562,45 @@ class _LoupeTabBarState extends State<LoupeTabBar>
       ),
     );
   }
+}
+
+/// The loupe's soft shadow, painted only outside it.
+///
+/// A glass shadow would lie beneath the loupe's own layer, which captures
+/// and shows it, dimming the whole lens; Apple's loupe is as bright inside
+/// as the bar.
+class _LoupeShadowPainter extends CustomPainter {
+  const _LoupeShadowPainter(this.visibility);
+
+  final double visibility;
+
+  static const _shadow = BoxShadow(color: Color(0x1A000000), blurRadius: 30);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final opacity = visibility.clamp(0.0, 1.0);
+    if (opacity == 0) return;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(size.shortestSide / 2),
+    );
+    final paint = _shadow.toPaint()
+      ..color = _shadow.color.withValues(alpha: _shadow.color.a * opacity);
+    canvas
+      ..save()
+      ..clipPath(
+        Path()
+          ..addRect(rrect.outerRect.inflate(_shadow.blurRadius * 2))
+          ..addRRect(rrect)
+          ..fillType = PathFillType.evenOdd,
+      )
+      ..drawRRect(rrect, paint)
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_LoupeShadowPainter oldDelegate) =>
+      oldDelegate.visibility != visibility;
 }
 
 class _TabItem extends StatelessWidget {

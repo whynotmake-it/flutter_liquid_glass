@@ -36,39 +36,53 @@ class TabSelection {
 
   late final Listenable listenable = Listenable.merge([position, press, jelly]);
 
-  /// How far the loupe reaches past the platter on each side: a 97 × 72 pt
-  /// loupe over the 72 × 54 pt platter of the iOS 27 tab bar.
-  static const loupeOutset = Size(13, 9);
+  /// Width of the resting platter in slots: 81.7 pt over the 72.3 pt slots
+  /// of the iOS 27 tab bar.
+  static const platterWidth = 1.13;
+
+  /// Width of the loupe in slots: 97 pt over 72.3 pt slots.
+  static const loupeWidth = 1.34;
+
+  /// How far the loupe reaches past the tab row at the top and bottom: the
+  /// 73 pt tall loupe of iOS 27 over its 58 pt row.
+  static const loupeOverhang = 7.5;
 
   double get _pressAmount => math.max(press.value, 0);
 
   /// The indicator within a tab row of [size], before squash and stretch.
+  ///
+  /// It is centered on its tab but, like Apple's, never leaves the row
+  /// sideways, so at the end tabs it sits flush with the bar's ends.
   Rect restingRect(Size size, {double? pressAmount}) {
+    final amount = pressAmount ?? _pressAmount;
     final slot = size.width / tabCount;
-    final grow = loupeOutset * 2 * (pressAmount ?? _pressAmount);
+    final width = math.min(
+      slot * (platterWidth + (loupeWidth - platterWidth) * amount),
+      size.width,
+    );
+    final center = ((position.value + .5) * slot).clamp(
+      width / 2,
+      size.width - width / 2,
+    );
     return Rect.fromCenter(
-      center: Offset((position.value + .5) * slot, size.height / 2),
-      width: slot + grow.width,
-      height: size.height + grow.height,
+      center: Offset(center, size.height / 2),
+      width: width,
+      height: size.height + 2 * loupeOverhang * amount,
     );
   }
 
-  /// How much the indicator's aspect ratio grows per point per second: the
-  /// 97 × 72 pt loupe of iOS 27 is twice as wide as tall at 1100 pt/s.
-  static const _jellyAspectPerSpeed = (2 / (97 / 72) - 1) / 1100;
+  /// Indicator speed in points per second at which [jellyScale] is halfway
+  /// to its strongest.
+  static const _jellySpeed = 300.0;
 
-  static const _maxJellyAspect = 2.0;
-
-  /// Stretch along the motion and squash across it, keeping the area, for
+  /// Squash across the motion, fitted to fast drags on iOS 27: at 270, 540
+  /// and 1100 pt/s the loupe keeps about 0.95 of its width and 0.75, 0.67
+  /// and 0.6 of its height, so it reads as stretched along the motion. For
   /// tabs [slot] points wide.
   ({double x, double y}) jellyScale(double slot) {
     final speed = jelly.value.abs() * slot;
-    final aspect = math.min(
-      1 + speed * _jellyAspectPerSpeed,
-      _maxJellyAspect,
-    );
-    final x = math.sqrt(aspect);
-    return (x: x, y: 1 / x);
+    final amount = speed / (speed + _jellySpeed);
+    return (x: 1 - .1 * amount, y: 1 - .51 * amount);
   }
 
   /// The indicator within a tab row of [size].
@@ -158,20 +172,21 @@ class TabPlatterPainter extends CustomPainter {
       oldDelegate.selection != selection || oldDelegate.color != color;
 }
 
-/// Places the loupe over the indicator of a tab row inset by [padding].
+/// Places the loupe over the indicator of a tab row inset by [inset] at the
+/// top and bottom.
 ///
 /// Relayouts on every move without rebuilding; the child's constraints only
 /// change while the loupe grows or shrinks.
 class LoupeLayoutDelegate extends SingleChildLayoutDelegate {
-  LoupeLayoutDelegate(this.selection, {required this.padding})
+  LoupeLayoutDelegate(this.selection, {required this.inset})
     : super(relayout: selection.listenable);
 
   final TabSelection selection;
-  final double padding;
+  final double inset;
 
   Rect _rect(Size size) => selection
-      .restingRect(Size(size.width - 2 * padding, size.height - 2 * padding))
-      .shift(Offset(padding, padding));
+      .restingRect(Size(size.width, size.height - 2 * inset))
+      .shift(Offset(0, inset));
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
@@ -182,5 +197,5 @@ class LoupeLayoutDelegate extends SingleChildLayoutDelegate {
 
   @override
   bool shouldRelayout(LoupeLayoutDelegate oldDelegate) =>
-      oldDelegate.selection != selection || oldDelegate.padding != padding;
+      oldDelegate.selection != selection || oldDelegate.inset != inset;
 }

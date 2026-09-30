@@ -10,6 +10,7 @@ import 'package:liquid_glass_renderer_example/app.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
+import 'package:liquid_glass_renderer_example/playground/presets.dart';
 
 /// Directory the captures are written to. The test only runs when it is set:
 ///
@@ -51,6 +52,92 @@ void main() {
   setUpAll(() async {
     if (_out.isNotEmpty) await _loadFonts();
   });
+
+  // The scene of the iOS 27 ground-truth capture
+  // `tool/apple_match/references/ios27-iphone17pro-ground-truth-v2/`
+  // `slider-000/tab_bar_holdout`: a three-tab system tab bar, 274 × 62 pt,
+  // centered 20.5 pt above the bottom, over solid black and white.
+  for (final brightness in Brightness.values) {
+    for (final (name, color) in [
+      ('black', const Color(0xFF000000)),
+      ('white', const Color(0xFFFFFFFF)),
+    ]) {
+      testWidgets(
+        'captures the holdout tab bar over $name (${brightness.name})',
+        (tester) async {
+          tester.view
+            ..physicalSize = _screen * _scale
+            ..devicePixelRatio = _scale;
+          addTearDown(tester.view.reset);
+          final material = GlassMaterial.preset(
+            style: GlassStyle.toolbar,
+            brightness: brightness,
+          );
+          final captureKey = GlobalKey();
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: captureKey,
+              child: CupertinoApp(
+                debugShowCheckedModeBanner: false,
+                theme: CupertinoThemeData(brightness: brightness),
+                home: ColoredBox(
+                  color: color,
+                  child: LiquidGlassLayer(
+                    settings: material.settings,
+                    defaultAppearance: material.appearance,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 20.5),
+                        child: SizedBox(
+                          width: 274,
+                          child: LiquidGlassBlendGroup(
+                            child: LoupeTabBar(
+                              tabs: const [
+                                BottomBarTab(
+                                  icon: CupertinoIcons.circle_fill,
+                                  label: 'First',
+                                ),
+                                BottomBarTab(
+                                  icon: CupertinoIcons.square_fill,
+                                  label: 'Second',
+                                ),
+                                BottomBarTab(
+                                  icon: CupertinoIcons.triangle_fill,
+                                  label: 'Third',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          for (var frame = 0; frame < 90; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          final boundary =
+              captureKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: _scale);
+          await tester.runAsync(() async {
+            final png = await image.toByteData(format: ui.ImageByteFormat.png);
+            final file = File('$_out/holdout-${brightness.name}-$name.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(png!.buffer.asUint8List());
+          });
+          image.dispose();
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        },
+        skip: _out.isEmpty,
+      );
+    }
+  }
 
   for (final brightness in Brightness.values) {
     testWidgets(
