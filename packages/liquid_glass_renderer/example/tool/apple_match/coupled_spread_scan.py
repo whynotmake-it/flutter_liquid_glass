@@ -39,7 +39,7 @@ GEOMETRY_KEYS = (
     "shapeOffsetY",
     "cornerRadius",
     "shapeProfile",
-    "thickness",
+    "refractionHeight",
 )
 
 
@@ -52,7 +52,7 @@ def candidate_settings(toolbar: dict, geometry: dict, spread: float, thickness: 
     settings = dict(toolbar)
     for key in GEOMETRY_KEYS:
         settings[key] = geometry[key]
-    settings["thickness"] = thickness
+    settings["refractionHeight"] = thickness
     settings["refractionSpread"] = spread
     return settings
 
@@ -130,7 +130,7 @@ def evaluate_scene(
                     row = {
                         "scene": scene_id,
                         "spread": spread,
-                        "thickness": thickness,
+                        "refractionHeight": thickness,
                         "repetition": repetition,
                         "score": result.score,
                         "fitLoss": optics_loss(result.errors),
@@ -163,7 +163,7 @@ def median(values: list[float]) -> float:
 def summarize(rows: list[dict], spreads: list[float], thicknesses: list[float]) -> dict:
     grouped: dict[tuple[str, float, float], list[dict]] = {}
     for row in rows:
-        key = (row["scene"], float(row["spread"]), float(row["thickness"]))
+        key = (row["scene"], float(row["spread"]), float(row["refractionHeight"]))
         grouped.setdefault(key, []).append(row)
 
     candidates = {}
@@ -178,7 +178,7 @@ def summarize(rows: list[dict], spreads: list[float], thicknesses: list[float]) 
                 }
                 options.append(
                     {
-                        "thickness": thickness,
+                        "refractionHeight": thickness,
                         "scoreMedian": median([value["score"] for value in values]),
                         "fitLossMedian": median([value["fitLoss"] for value in values]),
                         "directMae8BitMedian": median(

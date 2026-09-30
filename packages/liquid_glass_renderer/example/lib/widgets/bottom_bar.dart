@@ -602,8 +602,8 @@ class _TabIndicatorState extends State<_TabIndicator>
                         settings: const LiquidGlassSettings(
                           refractionHeight: 24,
                           refractionAmount: 40,
-                          magnification: .92,
-                          chromaticAberration: .1,
+                          backdropShrink: .08,
+                          dispersion: .1,
                           frost: 0,
                           contourStrength: .1,
                           contourWidth: 1,

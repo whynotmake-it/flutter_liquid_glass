@@ -116,22 +116,21 @@ class PlaygroundPage extends HookWidget {
                       ),
                       _SliderSetting(
                         label: 'Chromatic aberration',
-                        value: settings.chromaticAberration,
+                        value: settings.dispersion,
                         min: 0,
                         max: 1,
                         fractionDigits: 3,
                         onChanged: (value) => setSettings(
-                          settings.copyWith(chromaticAberration: value),
+                          settings.copyWith(dispersion: value),
                         ),
                       ),
                       _SliderSetting(
-                        label: 'Magnification',
-                        // ignore: deprecated_member_use
-                        value: settings.magnification,
-                        min: 0.5,
-                        max: 1.5,
+                        label: 'Backdrop shrink',
+                        value: settings.backdropShrink,
+                        min: 0,
+                        max: 0.5,
                         onChanged: (value) => setSettings(
-                          settings.copyWith(magnification: value),
+                          settings.copyWith(backdropShrink: value),
                         ),
                       ),
                     ],

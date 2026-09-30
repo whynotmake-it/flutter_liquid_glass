@@ -38,7 +38,7 @@ Material knobs on `LiquidGlassSettings`:
 | `highlight` (double) | `lightIntensity` (+`highlightColor` fixed white, `ambientStrength`, `bleedStrength`, `specularWrap` folded/removed) | highlight stage |
 | `contourStrength` | `edgeColor`/`edgeAlpha` + `outerContourColor/Width` + `innerShadowStrength` | outline/darkOutline/materialContour stages |
 | `contourWidth` | `edgeWidth`/`edgeInset` | outline stage |
-| `chromaticAberration` | (kept only if ≥2-scene evidence) | refraction stage CA axis |
+| `dispersion` | (kept only if ≥2-scene evidence) | refraction stage CA axis |
 | `visibility` | (kept — public transition utility, not material model) | n/a |
 
 Removed as public knobs (folded to fixed internals or dropped):

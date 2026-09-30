@@ -5,5 +5,5 @@
   "shapeOffsetY": [2.667, 3.333, 3.667, 4.0],
   "cornerRadius": [31.0, 32.0, 33.0, 35.0],
   "frost": [4.0, 5.0, 6.0],
-  "edgeRefraction": [14.0, 18.3, 22.0]
+  "refractionAmount": [14.0, 18.3, 22.0]
 }

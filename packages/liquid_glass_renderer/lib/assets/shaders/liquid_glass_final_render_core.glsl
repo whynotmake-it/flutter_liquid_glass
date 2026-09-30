@@ -47,7 +47,7 @@ uniform float uSoften;
 uniform vec4 uBackdropBounds;
 
 float uDisplacementScale = uOpticalProps.x;
-float uChromaticAberration = uOpticalProps.y;
+float uDispersion = uOpticalProps.y;
 // Rim lighting depth; the matte encodes edge distance up to 4x this.
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
@@ -77,7 +77,7 @@ float uHighlightOppositeStrength = uLightingShapeConfig.w;
 // rather than by CA alone, so a large-refraction surface does not silently lose
 // visible dispersion. The threshold is a conservative quarter-pixel total
 // red-to-blue spread (an eighth pixel on either side of green).
-const float kChromaticAberrationSubpixelThreshold = 0.25;
+const float kDispersionSubpixelThreshold = 0.25;
 // Border strength; the dark iOS 27 face raises it with the slider.
 float gContourAlpha = uContourColor.a;
 // iOS 27 glint recolor, measured on the pinned solid-palette probes in both
@@ -687,14 +687,15 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // Magnification is one lens over the whole face, about the material
-        // center, uniform up to the silhouette as on the iOS 27 loupe. The
-        // bevel displacement adds on top of it.
+        // backdropShrink is one lens over the whole face, about the material
+        // center of the layer, uniform up to the silhouette. The bevel
+        // displacement adds on top of it. It never enlarges: magnifiers
+        // re-render their content instead (LiquidGlassLoupe).
         vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
             matteCoord - uMaterialCenter,
             uFilterToMatteBasis
         );
-        float magnification = clamp(uBackdropScale, 0.25, 4.0);
+        float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
             filterDeltaFromCenter *
             (1.0 / magnification - 1.0) *
@@ -705,8 +706,8 @@ void main() {
     // subpixel. The uniform predicate stays coherent across the layer and the
     // displacement bound keeps this optimization valid for either CA sign.
     if (
-        abs(uChromaticAberration) * maxDisplacement <=
-        kChromaticAberrationSubpixelThreshold
+        abs(uDispersion) * maxDisplacement <=
+        kDispersionSubpixelThreshold
     ) {
         vec2 sourceOffset = backdropScaleOffset + displacement;
         vec2 refractedUV;
@@ -748,7 +749,7 @@ void main() {
             );
         }
     } else {
-        float dispersionStrength = uChromaticAberration * 0.5;
+        float dispersionStrength = uDispersion * 0.5;
         vec2 redOffset = displacement * (1.0 + dispersionStrength);
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
         
