@@ -42,7 +42,7 @@ class LoupeTabBar extends StatefulWidget {
     this.shadows = const [],
     this.fake = false,
     this.height = 62,
-    this.pressScale = .05,
+    this.pressGrowth = 6,
     this.tint,
     this.tintBrightness,
     this.loupeSettings = defaultLoupeSettings,
@@ -66,8 +66,12 @@ class LoupeTabBar extends StatefulWidget {
 
   final double height;
 
-  /// How much the whole bar grows while held.
-  final double pressScale;
+  /// How many points the bar's width grows while held.
+  ///
+  /// The bar scales uniformly, so it grows by a fixed amount rather than a
+  /// fraction of its width, which would swell a wide bar far more than
+  /// its height.
+  final double pressGrowth;
 
   /// Color of the selected tab, or `null` for the theme's primary color.
   ///
@@ -119,6 +123,10 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     BoxShadow(color: Color(0x1A000000), blurRadius: 30),
   ];
 
+  /// Pulling past the bar stretches it by at most `1 / _stretchResistance`
+  /// points.
+  static const _stretchResistance = .2;
+
   static const _follow = Motion.interactiveSpring(snapToEnd: true);
   static const _settle = Motion.bouncySpring(snapToEnd: true);
   static const _thickness = Motion.snappySpring(
@@ -128,10 +136,6 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   static const _wobble = Motion.bouncySpring(
     duration: Duration(milliseconds: 600),
   );
-
-  /// The loupe's overdrag past the first and last tab approaches this many
-  /// tabs.
-  static const _overdragLimit = .3;
 
   late final _position = SingleMotionController(
     motion: _settle,
@@ -238,20 +242,13 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   /// The tab position under [local], undoing the bar's swell about its
   /// center.
   double _positionAt(Offset local) {
-    final scale = 1 + widget.pressScale * math.max(_press.value, 0);
+    final scale = _swell;
     final center = _size.width / 2;
     final x = center + (local.dx - center) / scale;
     return (x - _padding) / _slot - .5;
   }
 
   int _tabAt(Offset local) => _positionAt(local).round().clamp(0, _lastTab);
-
-  /// Resists overdrag like a scroll view edge: nearly 1:1 at first,
-  /// approaching [_overdragLimit].
-  static double _rubberBand(double overdrag) {
-    final resisted = overdrag.abs() * .5;
-    return overdrag.sign * resisted / (1 + resisted / _overdragLimit);
-  }
 
   /// Retargets [controller], switching to [motion] only if it differs:
   /// setting a motion restarts the running simulation.
@@ -267,17 +264,19 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   void _track(Offset local, {required Motion motion}) {
     _finger = _positionAt(local);
     final clamped = _finger.clamp(0.0, _lastTab.toDouble());
-    final overdrag = _finger - clamped;
-    _springTo(_position, motion, clamped + _rubberBand(overdrag));
+    // The loupe stays within the bar.
+    _springTo(_position, motion, clamped);
 
-    // Pulling past the capsule stretches it toward that side, which is how it
-    // reaches and merges with a neighboring segment.
-    final below = local.dy - widget.height;
-    final overY = local.dy < 0 ? local.dy : (below > 0 ? below : 0.0);
+    // Pulling past the capsule gives it a little toward that side.
+    double past(double value, double extent) =>
+        value < 0 ? value : math.max(value - extent, 0);
     _springTo(
       _stretch,
       _follow,
-      Offset(overdrag * _slot, overY).withResistance(.08) * .5,
+      Offset(
+        past(local.dx, _size.width),
+        past(local.dy, widget.height),
+      ).withResistance(_stretchResistance),
     );
   }
 
@@ -373,12 +372,17 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     _select(tab);
   }
 
+  double get _swell => _size.width == 0
+      ? 1
+      : 1 + widget.pressGrowth / _size.width * math.max(_press.value, 0);
+
   /// The bar's swell and stretch, both about its center.
   Matrix4 _barMatrix(Size size) {
-    final swell = 1 + widget.pressScale * math.max(_press.value, 0);
+    final swell = _swell;
     final stretch = _stretch.value;
     final (x, y) = _stretchScale(stretch, size);
-    final center = size.center(Offset.zero) + stretch * 1.5;
+    // Half the stretch keeps the far edge in place.
+    final center = size.center(Offset.zero) + stretch / 2;
     return Matrix4.translationValues(center.dx, center.dy, 0)
       ..scaleByDouble(x * swell, y * swell, 1, 1)
       ..translateByDouble(-size.width / 2, -size.height / 2, 0, 1);
