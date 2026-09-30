@@ -704,7 +704,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance(saturation: 1.5),
       ),
       BenchmarkScenario.realToolbarMaterial => _realLayer(
-        const LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27ToolbarLight(),
         t,
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
@@ -748,7 +748,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance(saturation: 1.5),
       ),
       BenchmarkScenario.fakeToolbarMaterial => _fakeLayer(
-        const LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27ToolbarLight(),
         t,
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
@@ -1535,7 +1535,7 @@ class _RealThenFakeScenarioState extends State<_RealThenFakeScenario> {
   @override
   Widget build(BuildContext context) => LiquidGlassLayer(
     fake: _fake,
-    settings: const LiquidGlassSettings.ios27ToolbarLight(),
+    settings: LiquidGlassSettings.ios27ToolbarLight(),
     child: Center(
       child: Transform.translate(
         offset: Offset(-180 + 360 * widget.t, 0),
@@ -1593,7 +1593,7 @@ enum _AppChromeKind {
   colorFilterOnly,
 }
 
-const _appToolbarSettings = LiquidGlassSettings.ios27ToolbarLight();
+final _appToolbarSettings = LiquidGlassSettings.ios27ToolbarLight();
 const _appToolbarAppearance = LiquidGlassAppearance.ios27ToolbarLight();
 const _appChromeShadows = [
   BoxShadow(

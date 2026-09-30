@@ -86,8 +86,8 @@ void _docsSnapshot({
   );
 }
 
-const _clearGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 0);
-const _softGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 8);
+final _clearGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 0);
+final _softGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 8);
 const _exampleShadow = BoxShadow(
   color: Color.from(alpha: 0.03, red: 0, green: 0, blue: 0),
   offset: Offset(0, 6),
@@ -99,13 +99,13 @@ class _Hero extends StatelessWidget {
   const _Hero();
 
   @override
-  Widget build(BuildContext context) => const _LoupeGrid(
+  Widget build(BuildContext context) => _LoupeGrid(
     child: Center(
       child: LiquidGlass.withOwnLayer(
         settings: _clearGlass,
-        shadows: [_exampleShadow],
-        shape: LiquidRoundedSuperellipse(borderRadius: 82),
-        child: SizedBox(width: 680, height: 164),
+        shadows: const [_exampleShadow],
+        shape: const LiquidRoundedSuperellipse(borderRadius: 82),
+        child: const SizedBox(width: 680, height: 164),
       ),
     ),
   );
@@ -115,22 +115,22 @@ class _Optics extends StatelessWidget {
   const _Optics();
 
   @override
-  Widget build(BuildContext context) => const _LoupeGrid(
+  Widget build(BuildContext context) => _LoupeGrid(
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         LiquidGlass.withOwnLayer(
           settings: _clearGlass,
-          shadows: [_exampleShadow],
-          shape: LiquidRoundedSuperellipse(borderRadius: 58),
-          child: SizedBox(width: 310, height: 180),
+          shadows: const [_exampleShadow],
+          shape: const LiquidRoundedSuperellipse(borderRadius: 58),
+          child: const SizedBox(width: 310, height: 180),
         ),
-        SizedBox(width: 72),
+        const SizedBox(width: 72),
         LiquidGlass.withOwnLayer(
           settings: _softGlass,
-          shadows: [_exampleShadow],
-          shape: LiquidRoundedSuperellipse(borderRadius: 58),
-          child: SizedBox(width: 310, height: 180),
+          shadows: const [_exampleShadow],
+          shape: const LiquidRoundedSuperellipse(borderRadius: 58),
+          child: const SizedBox(width: 310, height: 180),
         ),
       ],
     ),
@@ -141,14 +141,14 @@ class _Blending extends StatelessWidget {
   const _Blending();
 
   @override
-  Widget build(BuildContext context) => const _LoupeGrid(
+  Widget build(BuildContext context) => _LoupeGrid(
     child: Center(
       child: SizedBox(
         width: 560,
         height: 260,
         child: LiquidGlassLayer(
           settings: _clearGlass,
-          child: LiquidGlassBlendGroup(
+          child: const LiquidGlassBlendGroup(
             blend: 42,
             child: Stack(
               children: [
@@ -183,22 +183,22 @@ class _Fallback extends StatelessWidget {
   const _Fallback();
 
   @override
-  Widget build(BuildContext context) => const _LoupeGrid(
+  Widget build(BuildContext context) => _LoupeGrid(
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         LiquidGlass.withOwnLayer(
           settings: _softGlass,
-          shadows: [_exampleShadow],
-          shape: LiquidRoundedSuperellipse(borderRadius: 58),
-          child: SizedBox(width: 310, height: 180),
+          shadows: const [_exampleShadow],
+          shape: const LiquidRoundedSuperellipse(borderRadius: 58),
+          child: const SizedBox(width: 310, height: 180),
         ),
-        SizedBox(width: 72),
+        const SizedBox(width: 72),
         FakeGlass(
           settings: _softGlass,
-          shadows: [_exampleShadow],
-          shape: LiquidRoundedSuperellipse(borderRadius: 58),
-          child: SizedBox(width: 310, height: 180),
+          shadows: const [_exampleShadow],
+          shape: const LiquidRoundedSuperellipse(borderRadius: 58),
+          child: const SizedBox(width: 310, height: 180),
         ),
       ],
     ),
