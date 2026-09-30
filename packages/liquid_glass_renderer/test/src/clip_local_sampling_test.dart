@@ -257,6 +257,30 @@ void main() {
     expect(source, contains('sourceOffset.x == 0.0 && sourceOffset.y == 0.0'));
   });
 
+  test('displaced samples mirror at the captured backdrop edge', () {
+    final source = File(
+      'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+    ).readAsStringSync();
+    final renderer = File(
+      'lib/src/rendering/liquid_glass_render_object.dart',
+    ).readAsStringSync();
+    final layer = File(
+      'lib/src/rendering/liquid_glass_layer.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('uniform vec4 uBackdropBounds'));
+    // One definition, the displaced sample, and the three dispersion taps.
+    expect(
+      RegExp(r'mirrorIntoBackdrop\s*\(').allMatches(source).length,
+      5,
+    );
+    expect(renderer, contains('initialIndex: 55'));
+    // The bounds are the native filter clip, not the material bounds: the
+    // clip is rounded out to pixel buckets and holds real backdrop.
+    expect(layer, contains('Rect? get backdropSampleBounds'));
+    expect(layer, contains('.expandToPixelBuckets(devicePixelRatio)'));
+  });
+
   test('magnification is one uniform lens about the material center', () {
     final source = File(
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',

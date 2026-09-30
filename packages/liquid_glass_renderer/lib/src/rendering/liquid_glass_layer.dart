@@ -576,12 +576,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final motion = pollCompositorTranslation();
     if (motion.translation case final translation?) {
       setCompositorTranslation(translation);
-      final bounds = _filterMaterialBounds;
-      if (bounds != null && _clipRectLayerHandle.layer != null) {
-        final clip = bounds
-            .shift(translation)
-            .expandToPixelBuckets(devicePixelRatio)
-            .shift(-translation);
+      final clip = backdropSampleBounds;
+      if (clip != null && _clipRectLayerHandle.layer != null) {
         _clipRectLayerHandle.layer!.clipRect = clip.shift(_filterPaintOffset);
       }
       if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
@@ -611,6 +607,19 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       return;
     }
     if (motion.needsRepaint) markNeedsPaint();
+  }
+
+  // The native filter clip, kept on stable pixel buckets in the translated
+  // frame so retained compositor motion does not resize its render target.
+  @override
+  Rect? get backdropSampleBounds {
+    final bounds = _filterMaterialBounds;
+    if (bounds == null) return null;
+    final translation = compositorTranslation;
+    return bounds
+        .shift(translation)
+        .expandToPixelBuckets(devicePixelRatio)
+        .shift(-translation);
   }
 
   ImageFilter? _cachedFilter;
@@ -652,6 +661,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _cachedFilter = null;
       _cachedFilterSnapshot = null;
     } else {
+      syncCoordinateMapping();
       final shader = (_shaderHandle.layer ??= BackdropFilterLayer())
         ..filter = _updateShaderFilter()
         ..backdropKey = backdropKey;

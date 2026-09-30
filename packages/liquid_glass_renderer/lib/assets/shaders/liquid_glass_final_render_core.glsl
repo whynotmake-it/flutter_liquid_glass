@@ -41,6 +41,10 @@ uniform float uBlurFade;
 // of a blur pass. Whole-texel offsets, because the filter input is sampled
 // nearest.
 uniform float uSoften;
+// Matte-space rect (LTRB, device px) the filter captured backdrop for.
+// Outside it the filter input is transparent or clamped, so displaced samples
+// are mirrored back in at its edge.
+uniform vec4 uBackdropBounds;
 
 float uDisplacementScale = uOpticalProps.x;
 float uChromaticAberration = uOpticalProps.y;
@@ -274,6 +278,29 @@ vec2 filterDeltaFromMatteDelta(vec2 matteDelta, vec4 basis) {
         basis.w * matteDelta.x - basis.y * matteDelta.y,
         -basis.z * matteDelta.x + basis.x * matteDelta.y
     ) / determinant;
+}
+
+vec2 mirrorIntoBackdrop(vec2 sourceOffset, vec2 matteCoord) {
+    vec2 sampleMatte = matteCoord + vec2(
+        dot(uFilterToMatteBasis.xy, sourceOffset),
+        dot(uFilterToMatteBasis.zw, sourceOffset)
+    );
+    // Keep bilinear footprints, and the softening taps one texel out, off
+    // the uncaptured side of the edge.
+    float margin = 0.5 + uSoften;
+    vec2 lo = uBackdropBounds.xy + margin;
+    vec2 hi = uBackdropBounds.zw - margin;
+    if (all(greaterThanEqual(sampleMatte, lo)) &&
+        all(lessThanEqual(sampleMatte, hi))) {
+        return sourceOffset;
+    }
+    vec2 extent = max(hi - lo, vec2(0.0));
+    vec2 mirrored = lo + extent - abs(extent - abs(sampleMatte - lo));
+    mirrored = clamp(mirrored, lo, max(hi, lo));
+    return sourceOffset + filterDeltaFromMatteDelta(
+        mirrored - sampleMatte,
+        uFilterToMatteBasis
+    );
 }
 
 vec3 applySpecularHighlights(
@@ -630,7 +657,7 @@ void main() {
         kChromaticAberrationSubpixelThreshold
     ) {
         vec2 sourceOffset = backdropScaleOffset + displacement;
-        vec2 refractedUV = screenUV + sourceOffset * invUSize;
+        vec2 refractedUV;
         if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
             // Undisplaced glass fetches its own texel, bypassing the sampler,
             // so it reproduces the backdrop exactly even when the sampler is
@@ -643,6 +670,8 @@ void main() {
                 0
             );
         } else {
+            refractedUV = screenUV +
+                mirrorIntoBackdrop(sourceOffset, matteCoord) * invUSize;
             refractColor = texture(
                 uBackgroundTexture,
                 mirrorBackgroundUV(refractedUV, invUSize)
@@ -665,15 +694,24 @@ void main() {
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
         
         vec2 redUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + redOffset) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + redOffset,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         vec2 greenUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + displacement) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + displacement,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         vec2 blueUV = mirrorBackgroundUV(
-            screenUV + (backdropScaleOffset + blueOffset) * invUSize,
+            screenUV + mirrorIntoBackdrop(
+                backdropScaleOffset + blueOffset,
+                matteCoord
+            ) * invUSize,
             invUSize
         );
         
