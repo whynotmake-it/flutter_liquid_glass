@@ -16,7 +16,10 @@ void main() {
     expect(light.contourStrength, .43);
     expect(light.contourWidth, .75);
     expect(light.contourDirectionality, .77);
-    expect(light.bevelShadowStrength, 0);
+    expect(light.bevelShadowStrength, .017);
+    expect(light.bevelShadowDepth, 25);
+    expect(light.bevelShadowOffset, 2.5);
+    expect(light.bevelShadowDirectionality, .8);
     expect(light.exteriorShadowSizeResponse, 1);
     expect(dark.thickness, 12);
     expect(dark.frost, 5);
@@ -25,7 +28,10 @@ void main() {
     expect(dark.highlightWidth, light.highlightWidth);
     expect(dark.contourStrength, .88);
     expect(dark.contourDirectionality, 1);
-    expect(dark.bevelShadowStrength, 0);
+    expect(dark.bevelShadowStrength, light.bevelShadowStrength);
+    expect(dark.bevelShadowDepth, light.bevelShadowDepth);
+    expect(dark.bevelShadowOffset, light.bevelShadowOffset);
+    expect(dark.bevelShadowDirectionality, light.bevelShadowDirectionality);
     expect(dark.exteriorShadowSizeResponse, 0);
   });
 

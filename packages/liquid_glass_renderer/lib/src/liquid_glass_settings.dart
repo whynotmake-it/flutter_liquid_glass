@@ -84,8 +84,9 @@ class LiquidGlassSettings with Equatable {
   ///
   /// The lighting is the measured iOS 27 rim: a 1.2 pt glint on both walls
   /// along the light axis and a 0.75 pt dark border outside the silhouette
-  /// that concentrates where the glint fades. iOS 27 shows no inner bevel
-  /// shadow on solid backdrops.
+  /// that concentrates where the glint fades, plus a faint inner shadow
+  /// (about 1.7% on white, strongest below the top wall and gone at the
+  /// bottom) fitted on the Reduce Motion off references.
   const LiquidGlassSettings.ios27ToolbarLight({
     this.frost = 7.0,
     this.tintAmount = 0.0,
@@ -104,10 +105,10 @@ class LiquidGlassSettings with Equatable {
        contourOffset = 0.0,
        contourTransmittance = 0.0,
        contourDirectionality = 0.77,
-       bevelShadowStrength = 0.0,
-       bevelShadowDepth = 18.0,
-       bevelShadowOffset = 4.0,
-       bevelShadowDirectionality = 0.75,
+       bevelShadowStrength = 0.017,
+       bevelShadowDepth = 25.0,
+       bevelShadowOffset = 2.5,
+       bevelShadowDirectionality = 0.8,
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 1.0;
 
@@ -135,10 +136,10 @@ class LiquidGlassSettings with Equatable {
        contourOffset = 0.0,
        contourTransmittance = 0.0,
        contourDirectionality = 1.0,
-       bevelShadowStrength = 0.0,
-       bevelShadowDepth = 18.0,
-       bevelShadowOffset = 4.0,
-       bevelShadowDirectionality = 0.75,
+       bevelShadowStrength = 0.017,
+       bevelShadowDepth = 25.0,
+       bevelShadowOffset = 2.5,
+       bevelShadowDirectionality = 0.8,
        bevelShadowSizeResponse = 0.0,
        exteriorShadowSizeResponse = 0.0;
 
