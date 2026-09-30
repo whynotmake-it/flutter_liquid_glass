@@ -165,7 +165,7 @@ void main() {
       ? 1.0
       : clamp(uOppositeHighlight, 0.0, 1.0);
   float glint = clamp(
-    max(uHighlight, 0.0) * 0.14 * lobe * returnWeight * glintProfile,
+    max(uHighlight, 0.0) * 0.252 * lobe * returnWeight * glintProfile,
     0.0,
     1.0
   );
@@ -195,8 +195,9 @@ void main() {
       litPremultiplied * (1.0 - glint) + vec3(uGlintLuminance * glint);
   litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
   float alpha = litAlpha * materialCoverage + exteriorContourAlpha;
+  // FakeGlass stays SDR: its emissive glint is capped at SDR white.
   fragColor = vec4(
-    max(litPremultiplied * materialCoverage, vec3(0.0)),
+    clamp(litPremultiplied * materialCoverage, vec3(0.0), vec3(1.0)),
     clamp(alpha, 0.0, 1.0)
   );
 }
