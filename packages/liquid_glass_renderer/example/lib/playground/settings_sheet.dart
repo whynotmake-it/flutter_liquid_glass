@@ -9,25 +9,41 @@ import 'package:stupid_simple_sheet/stupid_simple_sheet.dart';
 
 /// Window width from which the sheet floats beside the stage instead of
 /// rising across it.
-const wideBreakpoint = 760.0;
+///
+/// Leaves the stage content beside the open sheet at least as wide as the
+/// controls scene's bottom bar.
+const wideBreakpoint = 840.0;
 
 /// The inspector in a sheet that floats below the stage's top controls.
 ///
 /// Like a non-modal iOS sheet it has no barrier, so the stage stays visible
-/// and interactive while the glass is tuned. It holds no glass, and the route
-/// only exists while the sheet is open, so a closed sheet costs nothing.
-/// Scrolling the inspector past its top drags the sheet down.
+/// and interactive while the glass is tuned, and the stage content moves out
+/// of its way (see [coverage]). It holds no glass, and the route only exists
+/// while the sheet is open, so a closed sheet costs nothing. Scrolling the
+/// inspector past its top drags the sheet down.
 class SettingsSheetRoute extends StupidSimpleSheetRoute<void> {
-  /// Opens at half height on phones, where it can be pulled up to full
-  /// height, and at full height on [wide] windows.
-  SettingsSheetRoute({required PlaygroundState state, required bool wide})
+  /// Rises to half the window height on phones and to full height beside
+  /// the stage on wide windows. Neither can be pulled up any further; the
+  /// inspector scrolls inside.
+  SettingsSheetRoute({required PlaygroundState state})
     : super(
         barrierColor: null,
-        snappingConfig: wide
-            ? SheetSnappingConfig.full
-            : const SheetSnappingConfig([0.5, 1], initialSnap: 0.5),
         child: _SettingsSheet(state: state),
       );
+
+  /// How much of each side of the safe area of a window of [size] with
+  /// [padding] the fully open sheet covers.
+  static EdgeInsets coverage(Size size, EdgeInsets padding) =>
+      size.width >= wideBreakpoint
+      ? const EdgeInsets.only(
+          right: _SettingsSheet._wideWidth + _SettingsSheet._wideInset,
+        )
+      : EdgeInsets.only(
+          bottom: math.max(
+            0,
+            size.height * _SettingsSheet._phoneHeightFactor - padding.bottom,
+          ),
+        );
 
   @override
   Widget buildModalBarrier() => const SizedBox.shrink();
@@ -41,6 +57,10 @@ class _SettingsSheet extends StatelessWidget {
   static const _wideWidth = 380.0;
   static const _wideInset = 16.0;
   static const _phoneInset = 8.0;
+
+  /// The phone sheet's height, including its inset, as a fraction of the
+  /// window height.
+  static const _phoneHeightFactor = 0.5;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +85,20 @@ class _SettingsSheet extends StatelessWidget {
             ),
           ),
         );
+        if (!wide) {
+          return SizedBox(
+            height: constraints.maxHeight * _phoneHeightFactor,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                padding.left + inset,
+                0,
+                padding.right + inset,
+                bottom,
+              ),
+              child: sheet,
+            ),
+          );
+        }
         return Padding(
           padding: EdgeInsets.fromLTRB(
             padding.left + inset,
@@ -72,12 +106,10 @@ class _SettingsSheet extends StatelessWidget {
             padding.right + inset,
             bottom,
           ),
-          child: wide
-              ? Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(width: _wideWidth, child: sheet),
-                )
-              : sheet,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(width: _wideWidth, child: sheet),
+          ),
         );
       },
     );
@@ -132,7 +164,8 @@ class _Panel extends StatelessWidget {
   }
 }
 
-/// The iOS sheet grabber, shown when the sheet can be resized.
+/// The iOS sheet grabber, shown on the phone sheet, which is dragged down to
+/// dismiss.
 class _Grabber extends StatelessWidget {
   const _Grabber();
 

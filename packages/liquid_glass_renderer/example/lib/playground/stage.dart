@@ -6,6 +6,7 @@ import 'package:liquid_glass_renderer_example/playground/scenes/blend_scene.dart
 import 'package:liquid_glass_renderer_example/playground/scenes/colors_scene.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/controls_scene.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/loupe_scene.dart';
+import 'package:liquid_glass_renderer_example/playground/sheet_avoidance.dart';
 
 /// All glass on the stage, rendered by a single [LiquidGlassLayer], with the
 /// settings button in its top trailing corner.
@@ -16,6 +17,9 @@ import 'package:liquid_glass_renderer_example/playground/scenes/loupe_scene.dart
 /// loupe scene sits beneath the layer, which then only holds the settings
 /// button. Empty parts of the stage let pointers through to the scrolling
 /// backdrop.
+///
+/// While the settings sheet is open, the scenes move into the part of the
+/// stage it leaves free (see [AvoidSheet]); the top controls stay put.
 class Stage extends StatelessWidget {
   const Stage({required this.state, required this.onSettings, super.key});
 
@@ -34,11 +38,14 @@ class Stage extends StatelessWidget {
         ValueListenableBuilder(
           valueListenable: state.scene,
           builder: (context, scene, _) => scene == StageScene.loupe
-              ? LoupeScene(
-                  link: state.loupeLink,
-                  loupes: state.loupes,
-                  material: state.material,
-                  magnification: state.loupeScale,
+              ? AvoidSheet(
+                  retainChild: false,
+                  child: LoupeScene(
+                    link: state.loupeLink,
+                    loupes: state.loupes,
+                    material: state.material,
+                    magnification: state.loupeScale,
+                  ),
                 )
               : const SizedBox.shrink(),
         ),
@@ -67,8 +74,12 @@ class Stage extends StatelessWidget {
                         source: state.brightnessSource,
                         fake: state.fake,
                       ),
-                      StageScene.blend => BlendScene(blend: state.blend),
-                      StageScene.colors => ColorsScene(blend: state.blend),
+                      StageScene.blend => AvoidSheet(
+                        child: BlendScene(blend: state.blend),
+                      ),
+                      StageScene.colors => AvoidSheet(
+                        child: ColorsScene(blend: state.blend),
+                      ),
                       StageScene.loupe => const SizedBox.shrink(),
                     },
                   ),

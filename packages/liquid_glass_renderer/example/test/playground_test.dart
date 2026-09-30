@@ -2,12 +2,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/app.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
+import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/inspector.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/material_sections.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
+import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
 
 void main() {
   group('GlassMaterial', () {
@@ -207,6 +210,122 @@ void main() {
     await tester.fling(list, const Offset(0, 600), 2000);
     await tester.pumpAndSettle(frame);
     expect(list, findsNothing);
+  });
+
+  group('the settings sheet displaces the stage content', () {
+    const frame = Duration(milliseconds: 16);
+
+    Rect rectOf(WidgetTester tester, Finder finder) =>
+        tester.getRect(finder.first);
+
+    testWidgets('above the half-height phone sheet', (tester) async {
+      const window = Size(390, 844);
+      tester.view
+        ..physicalSize = window
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const PlaygroundApp());
+      await tester.pump();
+      final bar = find.byType(IosBottomBar);
+      final settings = find.bySemanticsLabel('Settings');
+      final closedBar = rectOf(tester, bar);
+      final closedSettings = rectOf(tester, settings);
+      final backdrop = rectOf(tester, find.byType(BackdropPager));
+      expect(backdrop, Offset.zero & window);
+      expect(closedBar.bottom, window.height - 20);
+
+      await tester.tap(settings);
+      final sheet = find.byType(Inspector);
+      var tracked = 0;
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(frame);
+        final top = rectOf(tester, sheet).top;
+        if (top >= window.height) continue;
+        expect(
+          rectOf(tester, bar).bottom,
+          moreOrLessEquals(top - 20),
+          reason: 'the bar rides 20 pt above the moving sheet',
+        );
+        tracked++;
+      }
+      expect(tracked, greaterThan(5));
+      await tester.pumpAndSettle();
+
+      final open = rectOf(tester, sheet);
+      expect(open.top, window.height / 2);
+      expect(rectOf(tester, bar).bottom, window.height / 2 - 20);
+      expect(rectOf(tester, bar).size, closedBar.size);
+      expect(rectOf(tester, settings), closedSettings);
+      expect(rectOf(tester, find.byType(BackdropPager)), backdrop);
+
+      await tester.drag(sheet, const Offset(0, -300));
+      await tester.pumpAndSettle(frame);
+      expect(
+        rectOf(tester, sheet).top,
+        window.height / 2,
+        reason: 'the sheet never rises above half height',
+      );
+
+      await tester.tap(settings);
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(rectOf(tester, bar), closedBar);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('beside the wide side sheet', (tester) async {
+      const window = Size(1280, 800);
+      tester.view
+        ..physicalSize = window
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const PlaygroundApp());
+      await tester.pump();
+      final settings = find.bySemanticsLabel('Settings');
+      final closedSettings = rectOf(tester, settings);
+      await openSettings(tester);
+      await tester.tap(find.text('Blend'));
+      await tester.pump();
+      await tester.tap(settings);
+      await tester.pumpAndSettle();
+
+      final shape = find.byType(DraggableGlass);
+      final closedShape = rectOf(tester, shape);
+      final backdrop = rectOf(tester, find.byType(BackdropPager));
+      expect(backdrop, Offset.zero & window);
+
+      await tester.tap(settings);
+      final sheet = find.byType(Inspector);
+      var tracked = 0;
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(frame);
+        final shift = closedShape.left - rectOf(tester, shape).left;
+        if (shift > 1 && shift < 197) tracked++;
+      }
+      expect(tracked, greaterThan(5), reason: 'the shift follows the sheet');
+      await tester.pumpAndSettle();
+
+      final open = rectOf(tester, sheet);
+      final openShape = rectOf(tester, shape);
+      expect(
+        openShape,
+        closedShape.shift(Offset(-(window.width - open.left) / 2, 0)),
+      );
+      expect(openShape.right, lessThan(open.left));
+      expect(rectOf(tester, settings), closedSettings);
+      expect(rectOf(tester, find.byType(BackdropPager)), backdrop);
+
+      await tester.drag(shape.first, const Offset(20, 0));
+      await tester.pump();
+      expect(
+        rectOf(tester, shape),
+        openShape.shift(const Offset(20, 0)),
+        reason: 'the displaced stage stays interactive',
+      );
+      expect(tester.takeException(), isNull);
+    });
   });
 
   testWidgets('the playground renders one stage layer and switches scenes', (

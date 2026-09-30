@@ -5,6 +5,7 @@ import 'package:liquid_glass_renderer_example/performance_probe.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/settings_sheet.dart';
+import 'package:liquid_glass_renderer_example/playground/sheet_avoidance.dart';
 import 'package:liquid_glass_renderer_example/playground/stage.dart';
 
 const _enablePerformanceProbe = bool.fromEnvironment(
@@ -60,7 +61,8 @@ class _PlaygroundAppState extends State<PlaygroundApp> {
 }
 
 /// The stage over a backdrop, filling the screen. The settings button in the
-/// stage's top controls toggles the settings sheet.
+/// stage's top controls toggles the settings sheet, which the stage content
+/// makes room for while the backdrop stays in place behind it.
 class Playground extends StatefulWidget {
   const Playground({required this.state, super.key});
 
@@ -73,6 +75,10 @@ class Playground extends StatefulWidget {
 class _PlaygroundState extends State<Playground> {
   var _precached = false;
   SettingsSheetRoute? _settings;
+
+  /// Follows the open settings sheet's position until its route has
+  /// finished closing.
+  final _sheetPosition = ProxyAnimation(kAlwaysDismissedAnimation);
 
   @override
   void didChangeDependencies() {
@@ -90,13 +96,21 @@ class _PlaygroundState extends State<Playground> {
       if (open.isCurrent) navigator.pop();
       return;
     }
-    final route = _settings = SettingsSheetRoute(
-      state: widget.state,
-      wide: MediaQuery.sizeOf(context).width >= wideBreakpoint,
-    );
+    final route = _settings = SettingsSheetRoute(state: widget.state);
     navigator.push(route).whenComplete(() {
       if (_settings == route) _settings = null;
     });
+    final position = route.animation!;
+    _sheetPosition.parent = position;
+    void release(AnimationStatus status) {
+      if (!status.isDismissed) return;
+      position.removeStatusListener(release);
+      if (_sheetPosition.parent == position) {
+        _sheetPosition.parent = kAlwaysDismissedAnimation;
+      }
+    }
+
+    position.addStatusListener(release);
   }
 
   @override
@@ -116,8 +130,15 @@ class _PlaygroundState extends State<Playground> {
           ),
           Positioned.fill(
             child: SafeArea(
-              child: RepaintBoundary(
-                child: Stage(state: state, onSettings: _toggleSettings),
+              child: SheetAvoidance(
+                position: _sheetPosition,
+                coverage: SettingsSheetRoute.coverage(
+                  MediaQuery.sizeOf(context),
+                  MediaQuery.paddingOf(context),
+                ),
+                child: RepaintBoundary(
+                  child: Stage(state: state, onSettings: _toggleSettings),
+                ),
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/adaptive_controls.dart';
+import 'package:liquid_glass_renderer_example/playground/sheet_avoidance.dart';
 import 'package:motor/motor.dart';
 
 /// Everyday controls: navigation buttons at the top and a bottom bar. Every
@@ -50,12 +51,15 @@ class ControlsScene extends StatelessWidget {
             child: AdaptiveGroup(child: _TopControls()),
           ),
           const Spacer(),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                child: _BottomBar(fake: fake),
+          AvoidSheet(
+            alignment: Alignment.bottomCenter,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: _BottomBar(fake: fake),
+                ),
               ),
             ),
           ),
