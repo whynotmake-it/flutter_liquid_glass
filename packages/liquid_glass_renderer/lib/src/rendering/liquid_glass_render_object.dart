@@ -532,6 +532,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ],
   ];
 
+  /// Bounds of the clips between this object and its shapes that are
+  /// re-applied around the glass filter, in local coordinates, or `null`.
+  @protected
+  Rect? get retainedClipBounds =>
+      _idleComposition ? null : _ancestorClips.ownerBounds;
+
   @protected
   void syncAncestorClips() =>
       (_idleComposition ? _idleAncestorClips : _ancestorClips).sync();
@@ -1188,13 +1194,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   );
 
   (double, double, double, double, double, double)? _coordinateMapping;
+  Rect? _backdropBounds;
+
+  /// Layer-local rect the native filter captures backdrop for, or `null`
+  /// when it is unbounded. Refraction mirrors samples that would leave it:
+  /// outside the clip the filter input is transparent.
+  @protected
+  Rect? get backdropSampleBounds => null;
+
+  /// The [backdropSampleBounds] last written to the shader.
+  @visibleForTesting
+  Rect? get debugBackdropSampleBounds => _backdropBounds;
 
   @protected
   bool syncCoordinateMapping() {
     final mapping = _currentCoordinateMapping();
-    final changed = mapping != _coordinateMapping;
+    final backdropBounds = backdropSampleBounds;
+    final changed =
+        mapping != _coordinateMapping || backdropBounds != _backdropBounds;
     _coordinateMapping = mapping;
-    _writeCoordinateMapping(renderShader, mapping);
+    _backdropBounds = backdropBounds;
+    _writeCoordinateMapping(renderShader, mapping, backdropBounds);
     return changed;
   }
 
@@ -1216,6 +1236,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   void _writeCoordinateMapping(
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
+    Rect? backdropBounds,
   ) {
     shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
@@ -1225,6 +1246,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         mapping.$4,
         mapping.$5,
         mapping.$6,
+      ]);
+    });
+    // Float index 55, after the frost flags.
+    final matteBounds = backdropBounds == null
+        ? Rect.largest
+        : MatrixUtils.transformRect(matteTransform, backdropBounds);
+    shader.setFloatUniforms(initialIndex: 55, (value) {
+      value.setFloats([
+        matteBounds.left * devicePixelRatio,
+        matteBounds.top * devicePixelRatio,
+        matteBounds.right * devicePixelRatio,
+        matteBounds.bottom * devicePixelRatio,
       ]);
     });
   }
@@ -1257,7 +1290,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// shader may only be reused across paints while this snapshot compares
   /// equal.
   @protected
-  Object get shaderInputSnapshot => (_shaderInputSnapshot, _coordinateMapping);
+  Object get shaderInputSnapshot =>
+      (_shaderInputSnapshot, _coordinateMapping, _backdropBounds);
   late Object _shaderInputSnapshot;
 
   void _debugPaintGeometry(PaintingContext context, Offset offset) {
