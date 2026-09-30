@@ -1,22 +1,59 @@
-# example
+# Liquid Glass playground
 
-Run the interactive renderer example from the repository root with:
+A settings playground for `liquid_glass_renderer`. Run it from the repository
+root with:
 
 ```sh
 cd packages/liquid_glass_renderer/example
-fvm flutter run -d macos -t lib/basic_app.dart
+fvm flutter run -d macos
 ```
 
-For a deterministic grid background (useful for screenshots):
+Use `fvm flutter devices` to pick an iOS or Android Impeller device instead of
+`macos`.
+
+The stage fills the window and shows glass over backdrops that page
+horizontally and scroll vertically, so the glass moves over real content: a
+photo feed, a night page, a long article and a grid. The settings button in
+its top trailing corner opens a settings sheet
+([`stupid_simple_sheet`](https://pub.dev/packages/stupid_simple_sheet)) that
+floats beside the stage on wide windows and rises to half height on phones.
+The stage stays interactive while the sheet is open, and scrolling the sheet
+past its top drags it closed. The sheet controls:
+
+- **Scene**: everyday controls, shapes that merge in a `LiquidGlassBlendGroup`,
+  light, dark, clear and tinted glass blending in one layer, and
+  `LiquidGlassLoupe`s magnifying the backdrop.
+- **Material**: the Regular, Toolbar, Clear and Loupe presets in light or dark,
+  or Auto, where the top controls and the bottom bar each flip as a group with
+  the brightness of the backdrop behind them
+  (`LiquidGlassAdaptiveBrightness`). The Liquid Glass slider sets
+  `LiquidGlassSettings.tintAmount` and the preset's blur
+  (`ios27RegularFrost`, `ios27ClearFrost`). The loupe ignores it, as on iOS.
+- **FakeGlass** instead of the full renderer, plus **Refraction** and
+  **Lighting** controls. **Copy as Dart** puts the current
+  `LiquidGlassSettings` on the clipboard.
+
+Interactive glass shows the package's `GlassGlow` under the pointer. All glass
+on the stage, including the settings button, renders in a single
+`LiquidGlassLayer`; each loupe brings its own. The sheet has no glass and only
+exists while it is open.
+
+For a deterministic grid backdrop and a fixed blur (useful for screenshots):
 
 ```sh
-fvm flutter run -d macos -t lib/basic_app.dart \
+fvm flutter run -d macos \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=0
 ```
 
-Use `fvm flutter devices` to select an iOS or Android Impeller device instead
-of `macos`. The running app's sidebar exposes material controls, black/white/
-grid/image backgrounds, and YAML presets. Enter a name and choose **Save
-current** to persist the current material in the app documents directory; tap
-one of the listed names to load it again.
+Other entry points:
+
+- `lib/adaptive_brightness_main.dart`: a focused adaptive brightness demo.
+- `integration_test/benchmark_test.dart`: the benchmark harness, see
+  [`tool/README.md`](tool/README.md).
+- `--dart-define=LIQUID_GLASS_EXAMPLE_PERFORMANCE_PROBE=true` logs frame timing
+  windows, and `--dart-define=LIQUID_GLASS_DEBUG_GEOMETRY=true` paints the
+  geometry textures instead of glass.
+
+The photographic backdrops in `assets/backdrops/` are AI-generated for this
+example.

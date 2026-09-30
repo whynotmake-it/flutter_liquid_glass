@@ -1,27 +1,23 @@
 // This regression intentionally inspects the renderer's compositor counters.
 // ignore_for_file: invalid_use_of_internal_member
 
-import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer_example/pages/playground_page.dart';
-import 'package:liquid_glass_renderer_example/pages/showcase_page.dart';
-import 'package:liquid_glass_renderer_example/state.dart';
 
 import '../../test/src/submitted_scene_binding.dart';
+import 'support/scrolling_glass.dart';
 
 void main() {
   final binding = SubmittedSceneBinding();
   for (final fake in [true, false]) {
-    for (final playground in [false, true]) {
+    for (final blended in [false, true]) {
       testWidgets(
         'glass tracks every submitted scroll frame '
-        'playground=$playground fake=$fake',
+        'blended=$blended fake=$fake',
         (
           tester,
         ) async {
@@ -29,24 +25,14 @@ void main() {
             ..physicalSize = const Size(1080, 2100)
             ..devicePixelRatio = 2.625;
           addTearDown(tester.view.reset);
-          final presets = Directory.systemTemp.createTempSync(
-            'glass-scroll-test-',
-          );
-          addTearDown(() => presets.deleteSync(recursive: true));
-          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-            const MethodChannel('plugins.flutter.io/path_provider'),
-            (_) async => presets.path,
-          );
-          fakeNotifier.value = fake;
           await tester.pumpWidget(
             CupertinoApp(
               home: LiquidGlassLayer(
                 fake: fake,
-                settings: settingsNotifier.value,
-                defaultAppearance: appearanceNotifier.value,
-                child: playground
-                    ? const PlaygroundPage()
-                    : const ShowcasePage(),
+                settings: LiquidGlassSettings.ios27ToolbarLight(),
+                defaultAppearance:
+                    const LiquidGlassAppearance.ios27ToolbarLight(),
+                child: ScrollingGlass(blended: blended),
               ),
             ),
           );
@@ -75,6 +61,9 @@ void main() {
                   )
                   .every((s) => !s.consolidatesFakeBackdrop),
               isTrue,
+              reason:
+                  'Real glass falls back to fake glass unless the tests run '
+                  'with --enable-impeller --enable-flutter-gpu.',
             );
           }
           final position = tester
