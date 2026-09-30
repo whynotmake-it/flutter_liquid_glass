@@ -71,7 +71,7 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('vec3 ios27TintTone('));
-    expect(source, contains('baseColor = mix(neutralBase, tintTone'));
+    expect(source, contains('ios27Base = mix(neutralBase, tintTone'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
       4,
