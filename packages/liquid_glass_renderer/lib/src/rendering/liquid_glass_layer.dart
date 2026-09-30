@@ -7,13 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
+import 'package:liquid_glass_renderer/src/internal/filter_pass_transform.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
@@ -531,36 +530,12 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Matrix4 get matteTransform => Matrix4.identity();
 
   @override
-  Matrix4 get shaderCoordinateTransform {
-    // Filter fragment coordinates are local to the enclosing render pass. At
-    // the root that is the screen; inside a [LiquidGlassCapture] it is the
-    // capture's pixel-snapped clip. Inside a seeded fractional-opacity pass
-    // it is that pass, which the engine bounds by the enclosing clips
-    // (including any capture's). The innermost pass wins.
-    final Matrix4 transform;
-    final capture = RenderLiquidGlassCapture.enclosing(this);
-    if (compositionProbeSeeding) {
-      final origin = GlassCompositionProbe.seededPassOrigin(
-        this,
-        devicePixelRatio,
-      );
-      transform = getTransformTo(null)
-        ..leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
-    } else if (capture != null) {
-      transform = getTransformTo(capture);
-      final origin = capture.passOrigin;
-      transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
-    } else {
-      transform = getTransformTo(null);
-    }
-    final translation = compositorTranslation;
-    if (translation != Offset.zero) {
-      transform.multiply(
-        Matrix4.translationValues(translation.dx, translation.dy, 0),
-      );
-    }
-    return transform;
-  }
+  Matrix4 get shaderCoordinateTransform => filterPassTransform(
+    this,
+    seeding: compositionProbeSeeding,
+    devicePixelRatio: devicePixelRatio,
+    translation: compositorTranslation,
+  );
 
   @override
   void onTransformChanged() {
