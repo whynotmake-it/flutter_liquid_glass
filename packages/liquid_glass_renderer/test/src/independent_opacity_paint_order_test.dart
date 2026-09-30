@@ -51,7 +51,6 @@ void runIndependentOpacityPaintOrderTests(SubmittedSceneCapture binding) {
               frost: 8,
               refractionAmount: 0,
               highlight: 0,
-              chromaticAberration: 0,
             ),
             child: const Stack(
               children: [

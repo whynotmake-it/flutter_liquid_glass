@@ -18,11 +18,12 @@ class LiquidGlassSettings with Equatable {
   /// Distances are logical pixels. Strength, wrap, directionality, and size
   /// response values conventionally use the `0` to `1` range.
   const LiquidGlassSettings({
-    this.refractionHeight = 12.0,
-    this.refractionAmount = 36.0,
+    this.refractionHeight = 20.0,
+    this.refractionAmount = 60.0,
+    this.refractionFitsShape = true,
     this.magnification = 1.0,
     this.frost = 5.0,
-    this.chromaticAberration = 0.01,
+    this.chromaticAberration = 0.0,
     this.highlight = 1.0,
     this.highlightWidth = 0.0,
     this.highlightWrap = 0.25,
@@ -54,11 +55,16 @@ class LiquidGlassSettings with Equatable {
     double legacy(String key, String legacyKey, double fallback) =>
         number(key, number(legacyKey, fallback));
     return LiquidGlassSettings(
-      refractionHeight: legacy('refractionHeight', 'thickness', 12),
-      refractionAmount: legacy('refractionAmount', 'edgeRefraction', 36),
+      refractionHeight: legacy('refractionHeight', 'thickness', 20),
+      refractionAmount: legacy('refractionAmount', 'edgeRefraction', 60),
+      refractionFitsShape: switch (json['refractionFitsShape']) {
+        final bool value => value,
+        'false' => false,
+        _ => true,
+      },
       magnification: legacy('magnification', 'backdropScale', 1),
       frost: number('frost', 5),
-      chromaticAberration: number('chromaticAberration', .01),
+      chromaticAberration: number('chromaticAberration', 0),
       highlight: number('highlight', 1),
       highlightWidth: number('highlightWidth', 0),
       highlightWrap: number('highlightWrap', .25),
@@ -85,10 +91,11 @@ class LiquidGlassSettings with Equatable {
   /// softer surface.
   const LiquidGlassSettings.ios27ToolbarLight({
     this.frost = 7.0,
-  }) : refractionHeight = 12.0,
-       refractionAmount = 36.0,
+  }) : refractionHeight = 20.0,
+       refractionAmount = 60.0,
+       refractionFitsShape = true,
        magnification = 1.0,
-       chromaticAberration = 0.005,
+       chromaticAberration = 0.0,
        highlight = 0.25,
        highlightWidth = 0.75,
        highlightWrap = 0.25,
@@ -111,10 +118,11 @@ class LiquidGlassSettings with Equatable {
   /// surrounding application follows the platform brightness.
   const LiquidGlassSettings.ios27ToolbarDark({
     this.frost = 5.0,
-  }) : refractionHeight = 12.0,
-       refractionAmount = 36.0,
+  }) : refractionHeight = 20.0,
+       refractionAmount = 60.0,
+       refractionFitsShape = true,
        magnification = 1.0,
-       chromaticAberration = 0.005,
+       chromaticAberration = 0.0,
        highlight = 0.25,
        highlightWidth = 0.0,
        highlightWrap = 0.25,
@@ -171,9 +179,9 @@ class LiquidGlassSettings with Equatable {
   ///
   /// Glass is modeled as a flat face with a rounded bevel of this width.
   /// Only the bevel refracts; the face beyond it shows the backdrop
-  /// undisplaced. Shapes whose short side is below twice this width scale
-  /// the whole lens down with it, so one setting keeps its look across
-  /// control sizes. Apple calls this the refraction height.
+  /// undisplaced. Apple calls this the refraction height; iOS 27 glass
+  /// measures `20`, the text loupe `8`. See [refractionFitsShape] for how
+  /// small shapes limit it.
   final double refractionHeight;
 
   /// How far inside the silhouette, in logical pixels, the outermost pixel
@@ -184,8 +192,22 @@ class LiquidGlassSettings with Equatable {
   /// the silhouette to `0` at [refractionHeight], so the bevel joins the
   /// face without a crease. The ratio to [refractionHeight] sets how
   /// rod-like the rim reads: above `1`, content near the rim is mirrored.
-  /// `0` disables refraction.
+  /// iOS 27 glass measures `60`, the text loupe `28`. `0` disables
+  /// refraction.
   final double refractionAmount;
+
+  /// Whether small shapes shrink the lens to fit.
+  ///
+  /// When `true`, as on iOS 27 regular glass, buttons and toolbars, the
+  /// bevel is at most a quarter of the shape's short side and the rim
+  /// samples no deeper than the shape's center line. A 63 pt tall button
+  /// therefore refracts with a height of about `16` and an amount of about
+  /// `32`, while large surfaces keep the configured values.
+  ///
+  /// When `false`, as on iOS 27 `.clear` glass, the configured lens is kept
+  /// until the bevel would pass the center line; below that the whole lens
+  /// scales down with the shape.
+  final bool refractionFitsShape;
 
   /// Magnification of the backdrop seen through the whole face, about the
   /// center of the glass.
@@ -294,6 +316,9 @@ class LiquidGlassSettings with Equatable {
   /// Effective edge displacement; never negative.
   double get effectiveRefractionAmount => math.max(0, refractionAmount);
 
+  /// Effective shape-fitting mode of the lens.
+  bool get effectiveRefractionFitsShape => refractionFitsShape;
+
   /// Effective magnification constrained to the supported range.
   double get effectiveMagnification => magnification.clamp(.25, 4.0);
 
@@ -365,6 +390,7 @@ class LiquidGlassSettings with Equatable {
   LiquidGlassSettings copyWith({
     double? refractionHeight,
     double? refractionAmount,
+    bool? refractionFitsShape,
     double? magnification,
     double? frost,
     double? chromaticAberration,
@@ -386,6 +412,7 @@ class LiquidGlassSettings with Equatable {
   }) => LiquidGlassSettings(
     refractionHeight: refractionHeight ?? this.refractionHeight,
     refractionAmount: refractionAmount ?? this.refractionAmount,
+    refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
     magnification: magnification ?? this.magnification,
     frost: frost ?? this.frost,
     chromaticAberration: chromaticAberration ?? this.chromaticAberration,
@@ -414,6 +441,7 @@ class LiquidGlassSettings with Equatable {
   Map<String, Object> toJson() => {
     'refractionHeight': refractionHeight,
     'refractionAmount': refractionAmount,
+    'refractionFitsShape': refractionFitsShape,
     'magnification': magnification,
     'frost': frost,
     'chromaticAberration': chromaticAberration,
@@ -438,6 +466,7 @@ class LiquidGlassSettings with Equatable {
   List<Object?> get props => [
     refractionHeight,
     refractionAmount,
+    refractionFitsShape,
     magnification,
     frost,
     chromaticAberration,

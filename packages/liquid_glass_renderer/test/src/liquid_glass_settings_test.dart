@@ -7,15 +7,17 @@ void main() {
     const light = LiquidGlassSettings.ios27ToolbarLight();
     const dark = LiquidGlassSettings.ios27ToolbarDark();
 
-    expect(light.refractionHeight, 12);
+    expect(light.refractionHeight, 20);
     expect(light.frost, 7);
-    expect(light.refractionAmount, 36);
+    expect(light.refractionAmount, 60);
+    expect(light.refractionFitsShape, isTrue);
+    expect(light.chromaticAberration, 0);
     expect(light.highlightWidth, .75);
     expect(light.contourStrength, .15);
     expect(light.exteriorShadowSizeResponse, 1);
-    expect(dark.refractionHeight, 12);
+    expect(dark.refractionHeight, 20);
     expect(dark.frost, 5);
-    expect(dark.refractionAmount, 36);
+    expect(dark.refractionAmount, 60);
     expect(dark.highlightWidth, 0);
     expect(dark.contourStrength, .25);
     expect(dark.exteriorShadowSizeResponse, 0);
@@ -73,6 +75,7 @@ void main() {
     final original = const LiquidGlassSettings().copyWith(
       refractionHeight: 31,
       refractionAmount: 42,
+      refractionFitsShape: false,
       magnification: .8,
       frost: 7,
       chromaticAberration: .2,
@@ -104,6 +107,7 @@ void main() {
     expect(restored.refractionHeight, 12);
     expect(restored.refractionAmount, 27.42);
     expect(restored.magnification, .9);
+    expect(restored.refractionFitsShape, isTrue);
   });
 
   test('refraction and lighting depth stay independent', () {

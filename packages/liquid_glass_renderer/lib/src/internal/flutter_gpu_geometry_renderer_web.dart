@@ -51,6 +51,7 @@ class FlutterGpuGeometryRenderer {
     required double offsetX,
     required double offsetY,
     double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,

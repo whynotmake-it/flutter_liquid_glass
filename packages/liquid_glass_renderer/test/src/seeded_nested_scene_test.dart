@@ -240,7 +240,6 @@ Widget _nestedForeground(bool fake, ValueNotifier<Offset> translation) =>
         refractionHeight: 18,
         frost: 4,
         highlight: 0,
-        chromaticAberration: 0,
       ),
       defaultAppearance: const LiquidGlassAppearance(tint: Color(0x4020A0FF)),
       child: Stack(

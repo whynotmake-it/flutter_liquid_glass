@@ -156,6 +156,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
             value.effectiveRefractionHeight ||
         _settings?.effectiveRefractionAmount !=
             value.effectiveRefractionAmount ||
+        _settings?.effectiveRefractionFitsShape !=
+            value.effectiveRefractionFitsShape ||
         _settings?.effectiveContourWidth != value.effectiveContourWidth ||
         _settings?.effectiveContourOffset != value.effectiveContourOffset;
     _settings = value;
@@ -1544,6 +1546,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         refractionAmount: settings.effectiveRefractionAmount * devicePixelRatio,
         edgeDistanceRange:
             settings.effectiveEdgeDistanceRange * devicePixelRatio,
+        refractionFitsShape: settings.effectiveRefractionFitsShape,
         contourExtent: aaPadding * devicePixelRatio,
         writeMaterials: usesShapeAppearances,
         writeTintOnly: usesTintOnlyAppearance,

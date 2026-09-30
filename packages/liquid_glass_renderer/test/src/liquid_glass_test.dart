@@ -425,7 +425,6 @@ void main() {
                   LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
                       refractionHeight: height.toDouble(),
-                      refractionAmount: 3 * height.toDouble(),
                     ),
                     shape: const LiquidRoundedSuperellipse(
                       borderRadius: 100,
