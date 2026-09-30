@@ -575,9 +575,11 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     for (final (_, geometry, geometryToLayer) in geometries) {
       for (final shape in geometry.shapes) {
         if (_visibilityClass(shape.appearance) != 1) continue;
+        // The shared filter of fully visible shapes applies the layer's
+        // backdrop transfer, so a shape leaving it keeps that transfer.
         final filter = fakeGlassBackdropFilter(
           settings,
-          shape.appearance,
+          defaultAppearance.copyWith(visibility: shape.appearance.visibility),
           shortSide: shape.renderObject.size.shortestSide,
         );
         if (filter == null) continue;
