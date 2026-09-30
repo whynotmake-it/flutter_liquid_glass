@@ -142,10 +142,11 @@ ImageFilter? fakeGlassBackdropFilter(
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
-  final blur = settings.effectiveFrost != 0
+  final frost = settings.frostFor(appearance.colorModel);
+  final blur = frost != 0
       ? ImageFilter.blur(
-          sigmaX: settings.effectiveFrost,
-          sigmaY: settings.effectiveFrost,
+          sigmaX: frost,
+          sigmaY: frost,
           tileMode: TileMode.mirror,
         )
       : null;

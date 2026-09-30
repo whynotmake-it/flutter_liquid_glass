@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_appearance.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 /// Material parameters for the liquid-glass compositor.
@@ -360,16 +361,19 @@ class LiquidGlassSettings with Equatable {
   /// Effective slider position, clamped to `0...1`.
   double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
 
-  /// Effective backdrop blur sigma.
+  /// Effective backdrop blur sigma for regular glass.
+  double get effectiveFrost => frostFor(const LiquidGlassColorModel.direct());
+
+  /// Backdrop blur sigma for glass using [colorModel].
   ///
-  /// Apple fades backdrop detail almost linearly with [tintAmount], by mixing
-  /// toward a fully diffused face. A single Gaussian cannot mix, so the
-  /// slider adds the blur that attenuates detail with a 26 pt period by the
-  /// same measured fraction.
-  double get effectiveFrost {
+  /// Apple fades backdrop detail with [tintAmount] by mixing toward a fully
+  /// diffused face; clear glass keeps more detail until the middle tick. A
+  /// single Gaussian cannot mix, so the slider adds the blur that attenuates
+  /// detail with a 26 pt period by the same measured fraction.
+  double frostFor(LiquidGlassColorModel colorModel) {
     final amount = effectiveTintAmount;
     if (amount <= 0) return frost;
-    final detail = 1 - 0.965 * amount;
+    final detail = colorModel.sliderDetail(amount);
     const referenceVariance = 26.0 * 26.0 / (2 * math.pi * math.pi);
     return math.sqrt(frost * frost - referenceVariance * math.log(detail));
   }
