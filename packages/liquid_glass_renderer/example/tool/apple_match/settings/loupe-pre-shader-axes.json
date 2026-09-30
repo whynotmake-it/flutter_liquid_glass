@@ -1,6 +1,6 @@
 {
-  "thickness": [12.0, 20.0, 28.0, 36.0],
-  "edgeRefraction": [180.0, 280.0, 380.0, 520.0, 700.0],
+  "refractionHeight": [12.0, 20.0, 28.0, 36.0],
+  "refractionAmount": [180.0, 280.0, 380.0, 520.0, 700.0],
   "tintAlpha": [0.0, 0.05, 0.1, 0.2, 0.4],
   "saturation": [0.8, 0.9, 1.0, 1.1],
   "transmissionGamma": [0.8, 0.9, 1.0, 1.1],

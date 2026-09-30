@@ -170,7 +170,7 @@ def run_scene(*, scene_id, base, args, out, fit):
                     optics_loss,
                     best_params,
                     {
-                        "thickness": [best_params["thickness"]]
+                        "refractionHeight": [best_params["refractionHeight"]]
                         if args.quick
                         else [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 16.0]
                     },
@@ -248,17 +248,17 @@ def main():
     base = loaded_settings.get("settings", loaded_settings)
     toolbar_card = json.loads(args.toolbar_card.resolve().read_text())
     toolbar_settings = toolbar_card.get("settings", {})
-    if not args.fit_thickness and "thickness" in toolbar_settings:
+    if not args.fit_thickness and "refractionHeight" in toolbar_settings:
         # The formal generalization gate is frozen-parameter. Use the
         # authoritative toolbar thickness for every fitted capsule; allowing
         # each scene to optimize this field is a useful diagnostic, but cannot
         # be reported as generalization evidence.
-        base = {**base, "thickness": toolbar_settings["thickness"]}
+        base = {**base, "refractionHeight": toolbar_settings["refractionHeight"]}
     shared = {
         key: base[key]
         for key in (
             "shapeProfile",
-            "edgeRefraction",
+            "refractionAmount",
             "refractionSpread",
             "frost",
             "tintRed",
@@ -306,12 +306,12 @@ def main():
     points = [
         (
             float(toolbar_settings.get("shapeHeight", 94.0)),
-            float(toolbar_settings.get("thickness", 12.0)),
+            float(toolbar_settings.get("refractionHeight", 12.0)),
         ),
         *[
             (
                 results[scene_id]["settings"]["shapeHeight"],
-                results[scene_id]["settings"]["thickness"],
+                results[scene_id]["settings"]["refractionHeight"],
             )
             for scene_id in TRAINING_SCENES
         ],
@@ -341,7 +341,7 @@ def main():
             "score": toolbar_card["score"],
             "errors": toolbar_card["errors"],
             "height": float(toolbar_settings.get("shapeHeight", 94.0)),
-            "thickness": float(toolbar_settings.get("thickness", 12.0)),
+            "refractionHeight": float(toolbar_settings.get("refractionHeight", 12.0)),
         },
         "controls": {
             scene_id: {
@@ -349,7 +349,7 @@ def main():
                 "fitLoss": results[scene_id]["fitLoss"],
                 "errors": results[scene_id]["errors"],
                 "height": results[scene_id]["settings"]["shapeHeight"],
-                "thickness": results[scene_id]["settings"]["thickness"],
+                "refractionHeight": results[scene_id]["settings"]["refractionHeight"],
                 "evidence": str((out / scene_id / "final").resolve()),
             }
             for scene_id in TRAINING_SCENES
@@ -387,7 +387,7 @@ def main():
             "linearIntercept": float(intercept),
             "rmse": residual,
             "points": [
-                {"height": float(height), "thickness": float(thickness)}
+                {"height": float(height), "refractionHeight": float(thickness)}
                 for height, thickness in points
             ],
         },

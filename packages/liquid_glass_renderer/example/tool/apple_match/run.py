@@ -125,11 +125,11 @@ def main():
     current = dict(baseline)
     current.update(
         {
-            "thickness": 28.0,
+            "refractionHeight": 28.0,
             "frost": 0.0,
             "highlight": 0.0,
             "contourStrength": 0.0,
-            "edgeRefraction": 106.13,
+            "refractionAmount": 106.13,
             "refractionSpread": 0.0,
             "saturation": 1.0,
             "dispersion": 0.0,

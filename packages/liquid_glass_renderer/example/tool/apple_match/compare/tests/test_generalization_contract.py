@@ -21,7 +21,7 @@ class GeneralizationContractTest(unittest.TestCase):
         )
         self.assertIn("--fit-thickness", completed.stdout)
         source = (ROOT / "generalization.py").read_text()
-        self.assertIn('"thickness": toolbar_settings["thickness"]', source)
+        self.assertIn('"refractionHeight": toolbar_settings["refractionHeight"]', source)
         self.assertIn('"thicknessPolicy"', source)
         self.assertIn('"generalizationGate"', source)
 

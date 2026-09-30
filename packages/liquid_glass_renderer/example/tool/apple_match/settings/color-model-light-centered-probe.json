@@ -1,7 +1,6 @@
 {
-  "thickness": 12,
-  "edgeRefraction": 27.42,
-  "refractionSpread": 0,
+  "refractionHeight": 12,
+  "refractionAmount": 27.42,
   "frost": 0,
   "tintRed": 253,
   "tintGreen": 252,

@@ -43,9 +43,9 @@ class OnlineLoopSmokeTests(unittest.TestCase):
         )
         flat = {
             **baseline,
-            "thickness": 0.0,
-            "blur": 0.0,
-            "lightIntensity": 0.0,
+            "refractionHeight": 0.0,
+            "frost": 0.0,
+            "highlight": 0.0,
             "glassAlpha": 0.0,
             "refractiveIndex": 1.0,
             "saturation": 1.0,

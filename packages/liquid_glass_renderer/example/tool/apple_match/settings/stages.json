@@ -14,14 +14,14 @@
     {"shapeWidth": 224.0, "shapeHeight": 96.0, "shapeOffsetY": 0.0, "cornerRadius": 48.0, "shapeProfile": "superellipse"}
   ],
   "refraction": [
-    {"thickness": 4.0, "edgeRefraction": 10.25, "dispersion": 0.0},
-    {"thickness": 6.0, "edgeRefraction": 19.6, "dispersion": 0.0},
-    {"thickness": 8.0, "edgeRefraction": 29.3, "dispersion": 0.0},
-    {"thickness": 10.0, "edgeRefraction": 36.6, "dispersion": 0.0},
-    {"thickness": 12.0, "edgeRefraction": 54.5, "dispersion": 0.0},
-    {"thickness": 16.0, "edgeRefraction": 72.7, "dispersion": 0.01},
-    {"thickness": 20.0, "edgeRefraction": 106.1, "dispersion": 0.01},
-    {"thickness": 24.0, "edgeRefraction": 127.3, "dispersion": 0.01}
+    {"refractionHeight": 4.0, "refractionAmount": 10.25, "dispersion": 0.0},
+    {"refractionHeight": 6.0, "refractionAmount": 19.6, "dispersion": 0.0},
+    {"refractionHeight": 8.0, "refractionAmount": 29.3, "dispersion": 0.0},
+    {"refractionHeight": 10.0, "refractionAmount": 36.6, "dispersion": 0.0},
+    {"refractionHeight": 12.0, "refractionAmount": 54.5, "dispersion": 0.0},
+    {"refractionHeight": 16.0, "refractionAmount": 72.7, "dispersion": 0.01},
+    {"refractionHeight": 20.0, "refractionAmount": 106.1, "dispersion": 0.01},
+    {"refractionHeight": 24.0, "refractionAmount": 127.3, "dispersion": 0.01}
   ],
   "blurMtf": [
     {"frost": 1.0},
@@ -55,19 +55,19 @@
     {"highlight": 0.80}
   ],
   "refinement": [
-    {"thickness": 4.0, "edgeRefraction": 10.25, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 4.0, "edgeRefraction": 10.25, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 12.0, "edgeRefraction": 54.5, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 12.0, "edgeRefraction": 54.5, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 6.0, "edgeRefraction": 19.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 10.0, "edgeRefraction": 36.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
-    {"thickness": 8.0, "edgeRefraction": 29.3, "frost": 9.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255}
+    {"refractionHeight": 4.0, "refractionAmount": 10.25, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 4.0, "refractionAmount": 10.25, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 6.0, "refractionAmount": 19.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 6.0, "refractionAmount": 19.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 8.0, "refractionAmount": 29.3, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 8.0, "refractionAmount": 29.3, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 10.0, "refractionAmount": 36.6, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 10.0, "refractionAmount": 36.6, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 12.0, "refractionAmount": 54.5, "frost": 6.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 12.0, "refractionAmount": 54.5, "frost": 8.0, "tintAlpha": 0.56, "saturation": 1.2, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 6.0, "refractionAmount": 19.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 8.0, "refractionAmount": 29.3, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 10.0, "refractionAmount": 36.6, "frost": 7.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255},
+    {"refractionHeight": 8.0, "refractionAmount": 29.3, "frost": 9.0, "tintAlpha": 0.58, "saturation": 1.4, "tintRed": 255, "tintGreen": 255, "tintBlue": 255}
   ]
 }
