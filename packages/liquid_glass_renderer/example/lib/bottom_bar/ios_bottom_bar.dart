@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart';
+import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
+import 'package:motor/motor.dart';
 
 export 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart'
     show BottomBarTab;
@@ -156,7 +158,6 @@ class _GlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyph = CupertinoColors.label.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
       child: LiquidStretch(
@@ -165,17 +166,23 @@ class _GlassButton extends StatelessWidget {
           shape: shape,
           appearance: appearance,
           shadows: IosBottomBar.shadows,
-          child: GlassGlow(
-            child: IconTheme(
-              data: IconThemeData(color: glyph, size: 22),
-              child: DefaultTextStyle(
-                style: TextStyle(
-                  color: glyph,
-                  fontSize: 15,
-                  letterSpacing: -0.2,
+          child: GlowContent(
+            child: MotionBuilder(
+              motion: const CupertinoMotion.smooth(),
+              converter: const ColorRgbMotionConverter(),
+              value: CupertinoColors.label.resolveFrom(context),
+              builder: (context, glyph, child) => IconTheme(
+                data: IconThemeData(color: glyph, size: 22),
+                child: DefaultTextStyle(
+                  style: TextStyle(
+                    color: glyph,
+                    fontSize: 15,
+                    letterSpacing: -0.2,
+                  ),
+                  child: child!,
                 ),
-                child: child,
               ),
+              child: child,
             ),
           ),
         ),

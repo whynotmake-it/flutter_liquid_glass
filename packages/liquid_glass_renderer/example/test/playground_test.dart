@@ -85,7 +85,7 @@ void main() {
       allOf(
         startsWith('const LiquidGlassSettings(\n'),
         contains('  refractionHeight: 8.0,\n'),
-        contains('  magnification: 1.25,\n'),
+        contains('  refractionAmount: 28.0,\n'),
         isNot(contains('smoothRefraction')),
       ),
     );
@@ -109,12 +109,38 @@ void main() {
     await tester.tap(find.text('Blend'));
     await tester.pump();
     expect(find.byType(LiquidGlassBlendGroup), findsOneWidget);
-    expect(find.text('Blending'), findsOneWidget);
+    expect(find.text('Blend'), findsNWidgets(2), reason: 'Blend slider');
 
     await tester.tap(find.text('Colors'));
     await tester.pump();
     expect(find.text('Clear'), findsWidgets);
     expect(find.byType(LiquidGlassLayer), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the loupe scene shows package loupes over the backdrop', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1280, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlaygroundApp());
+    await tester.pump();
+    await tester.tap(find.text('Loupe').first);
+    await tester.pump();
+
+    final loupes = tester.widgetList<LiquidGlassLoupe>(
+      find.byType(LiquidGlassLoupe),
+    );
+    expect(loupes, hasLength(2));
+    expect(loupes.map((loupe) => loupe.magnification), everyElement(1.25));
+    expect(find.byType(LiquidGlassLoupeSource), findsOneWidget);
+    expect(find.text('Magnification'), findsOneWidget);
+
+    await tester.drag(find.byType(LiquidGlassLoupe).first, const Offset(40, 0));
+    await tester.pump();
     expect(tester.takeException(), isNull);
   });
 }

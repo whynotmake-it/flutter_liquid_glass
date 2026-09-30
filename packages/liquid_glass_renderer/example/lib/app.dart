@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/performance_probe.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
+import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/inspector.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/stage.dart';
@@ -60,7 +61,7 @@ class Playground extends StatefulWidget {
 
   static const wideBreakpoint = 760.0;
   static const _inspectorWidth = 380.0;
-  static const _panelRadius = Radius.circular(34);
+  static const _panelRadius = Radius.circular(panelRadius);
 
   @override
   State<Playground> createState() => _PlaygroundState();
@@ -74,7 +75,7 @@ class _PlaygroundState extends State<Playground> {
     super.didChangeDependencies();
     if (_precached) return;
     _precached = true;
-    for (final asset in Backdrop.photoAssets) {
+    for (final asset in backdropPhotos) {
       precacheImage(AssetImage(asset), context);
     }
   }
@@ -94,13 +95,12 @@ class _PlaygroundState extends State<Playground> {
           return Stack(
             children: [
               Positioned.fill(
-                child: ValueListenableBuilder(
-                  valueListenable: state.backdrop,
-                  builder: (context, backdrop, _) =>
-                      LiquidGlassBrightnessBackdrop(
-                        source: state.brightnessSource,
-                        child: BackdropView(backdrop: backdrop),
-                      ),
+                child: LiquidGlassLoupeSource(
+                  link: state.loupeLink,
+                  child: LiquidGlassBrightnessBackdrop(
+                    source: state.brightnessSource,
+                    child: BackdropPager(backdrop: state.backdrop),
+                  ),
                 ),
               ),
               if (wide) ...[
@@ -184,9 +184,9 @@ class _Panel extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: borderRadius,
-          boxShadow: const [
+        decoration: ShapeDecoration(
+          shape: RoundedSuperellipseBorder(borderRadius: borderRadius),
+          shadows: const [
             BoxShadow(
               color: Color(0x33000000),
               blurRadius: 32,
@@ -194,7 +194,7 @@ class _Panel extends StatelessWidget {
             ),
           ],
         ),
-        child: ClipRRect(
+        child: ClipRSuperellipse(
           borderRadius: borderRadius,
           child: ColoredBox(
             color: CupertinoColors.systemGroupedBackground.resolveFrom(context),

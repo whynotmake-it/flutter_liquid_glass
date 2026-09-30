@@ -6,30 +6,58 @@ const glassShadows = [
   BoxShadow(color: Color(0x1F000000), blurRadius: 24, offset: Offset(0, 8)),
 ];
 
+/// Content of an interactive glass element, with the package's touch glow
+/// following the pointer beneath it.
+class GlowContent extends StatelessWidget {
+  const GlowContent({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassGlowLayer(
+      child: GlassGlow(glowColor: const Color(0x29FFFFFF), child: child),
+    );
+  }
+}
+
 /// A glass shape that can be dragged around the stage.
 ///
-/// Must be a direct child of a [Stack]. [offset] is measured from [center],
-/// so the shape keeps its place relative to the middle of the stage when the
-/// window resizes. Dragging rebuilds only this shape's [Positioned].
+/// Must be a direct child of a [Stack]. The offset is measured from
+/// [center], so the shape keeps its place relative to the middle of the
+/// stage when the window resizes. Dragging rebuilds only this shape's
+/// [Positioned].
 class DraggableGlass extends StatefulWidget {
   const DraggableGlass({
     required this.center,
-    required this.offset,
     required this.size,
     required this.shape,
+    this.offset = Offset.zero,
+    this.position,
     this.grouped = false,
+    this.interactive = true,
     this.appearance,
     this.child = const SizedBox.shrink(),
     super.key,
   });
 
   final Offset center;
+
+  /// The initial offset from [center] when [position] is not given.
   final Offset offset;
+
+  /// Drives the offset from [center] when something else needs to follow the
+  /// shape.
+  final ValueNotifier<Offset>? position;
+
   final Size size;
   final LiquidShape shape;
 
   /// Whether the shape blends with its siblings in a [LiquidGlassBlendGroup].
   final bool grouped;
+
+  /// Whether the shape stretches and glows under the pointer.
+  final bool interactive;
 
   final LiquidGlassAppearance? appearance;
   final Widget child;
@@ -39,18 +67,21 @@ class DraggableGlass extends StatefulWidget {
 }
 
 class _DraggableGlassState extends State<DraggableGlass> {
-  late final _offset = ValueNotifier(widget.offset);
+  ValueNotifier<Offset>? _ownPosition;
+
+  ValueNotifier<Offset> get _position =>
+      widget.position ?? (_ownPosition ??= ValueNotifier(widget.offset));
 
   @override
   void dispose() {
-    _offset.dispose();
+    _ownPosition?.dispose();
     super.dispose();
   }
 
   void _drag(DragUpdateDetails details) {
     final limit = widget.center - widget.size.center(Offset.zero);
-    final next = _offset.value + details.delta;
-    _offset.value = Offset(
+    final next = _position.value + details.delta;
+    _position.value = Offset(
       next.dx.clamp(-limit.dx, limit.dx),
       next.dy.clamp(-limit.dy, limit.dy),
     );
@@ -58,21 +89,24 @@ class _DraggableGlassState extends State<DraggableGlass> {
 
   @override
   Widget build(BuildContext context) {
-    final glass = widget.grouped
+    final content = Center(child: widget.child);
+    final child = widget.interactive ? GlowContent(child: content) : content;
+    Widget glass = widget.grouped
         ? LiquidGlass.grouped(
             shape: widget.shape,
             appearance: widget.appearance,
             shadows: glassShadows,
-            child: Center(child: widget.child),
+            child: child,
           )
         : LiquidGlass(
             shape: widget.shape,
             appearance: widget.appearance,
             shadows: glassShadows,
-            child: Center(child: widget.child),
+            child: child,
           );
+    if (widget.interactive) glass = LiquidStretch(child: glass);
     return ValueListenableBuilder(
-      valueListenable: _offset,
+      valueListenable: _position,
       builder: (context, offset, child) {
         final topLeft =
             widget.center + offset - widget.size.center(Offset.zero);
@@ -84,10 +118,7 @@ class _DraggableGlassState extends State<DraggableGlass> {
           child: child!,
         );
       },
-      child: GestureDetector(
-        onPanUpdate: _drag,
-        child: LiquidStretch(child: glass),
-      ),
+      child: GestureDetector(onPanUpdate: _drag, child: glass),
     );
   }
 }

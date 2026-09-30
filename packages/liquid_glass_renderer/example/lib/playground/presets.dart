@@ -40,13 +40,6 @@ enum GlassStyle {
   };
 }
 
-/// The iOS 27 text loupe: a clear, unfrosted lens with a narrow bevel over a
-/// 1.25x magnified backdrop.
-const loupeSettings = LiquidGlassSettings(
-  refractionHeight: 8,
-  refractionAmount: 28,
-  magnification: 1.25,
-  frost: 0,
-  contourStrength: 0.08,
-  contourWidth: 0.75,
-);
+/// The glass of the iOS 27 text loupe: a clear, unfrosted lens with a narrow
+/// bevel.
+const loupeSettings = LiquidGlassLoupe.defaultSettings;

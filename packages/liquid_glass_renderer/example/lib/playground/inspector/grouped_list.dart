@@ -1,154 +1,67 @@
 import 'package:flutter/cupertino.dart';
 
-/// An inset grouped section in the style of iOS Settings.
-class InspectorSection extends StatelessWidget {
-  const InspectorSection({
-    required this.children,
-    this.header,
-    this.footer,
-    super.key,
-  });
+/// Corner radius of the sheet that hosts the inspector.
+const panelRadius = 34.0;
+
+/// Distance of the inspector's content from the sheet edge.
+const inspectorInset = 12.0;
+
+/// Corner radius of cards and buttons, concentric with the sheet corners.
+const cardRadius = panelRadius - inspectorInset;
+
+/// Rows grouped on one card, in the style of iOS Settings.
+class InspectorCard extends StatelessWidget {
+  const InspectorCard({required this.children, this.header, super.key});
 
   final String? header;
-  final String? footer;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final separator = CupertinoColors.separator.resolveFrom(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (header case final header?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                header,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.4,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (header case final header?)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              header,
+              style: TextStyle(
+                color: CupertinoColors.label.resolveFrom(context),
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.4,
               ),
-            ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: CupertinoColors.secondarySystemGroupedBackground
-                  .resolveFrom(context),
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (index, child) in children.indexed) ...[
-                  if (index > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: SizedBox(
-                        height: 0.5,
-                        child: ColoredBox(color: separator),
-                      ),
-                    ),
-                  child,
-                ],
-              ],
             ),
           ),
-          if (footer case final footer?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(
-                footer,
-                style: TextStyle(color: secondary, fontSize: 13, height: 1.3),
-              ),
+        DecoratedBox(
+          decoration: ShapeDecoration(
+            color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+              context,
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A plain row with a title and an optional trailing widget.
-class InspectorRow extends StatelessWidget {
-  const InspectorRow({
-    required this.title,
-    this.trailing,
-    this.onTap,
-    this.titleColor,
-    super.key,
-  });
-
-  final String title;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final Color? titleColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 52),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
+            shape: const RoundedSuperellipseBorder(
+              borderRadius: BorderRadius.all(Radius.circular(cardRadius)),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color:
-                        titleColor ??
-                        CupertinoColors.label.resolveFrom(context),
-                    fontSize: 17,
-                    letterSpacing: -0.4,
+              for (final (index, child) in children.indexed) ...[
+                if (index > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: SizedBox(
+                      height: 0.5,
+                      child: ColoredBox(color: separator),
+                    ),
                   ),
-                ),
-              ),
-              ?trailing,
+                child,
+              ],
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// A full-width segmented control inside a section.
-class SegmentedRow<T extends Object> extends StatelessWidget {
-  const SegmentedRow({
-    required this.value,
-    required this.segments,
-    required this.onChanged,
-    super.key,
-  });
-
-  final T value;
-  final Map<T, String> segments;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: CupertinoSlidingSegmentedControl<T>(
-        groupValue: value,
-        onValueChanged: (value) {
-          if (value != null) onChanged(value);
-        },
-        children: {
-          for (final MapEntry(:key, value: label) in segments.entries)
-            key: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(label, style: const TextStyle(fontSize: 14)),
-            ),
-        },
-      ),
+      ],
     );
   }
 }
@@ -190,16 +103,7 @@ class SliderRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: CupertinoColors.label.resolveFrom(context),
-                    fontSize: 17,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-              ),
+              Expanded(child: _Title(title)),
               if (format case final format?)
                 Text(
                   format(value),
@@ -249,10 +153,87 @@ class SwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InspectorRow(
-      title: title,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => onChanged(!value),
-      trailing: CupertinoSwitch(value: value, onChanged: onChanged),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+        child: Row(
+          children: [
+            Expanded(child: _Title(title)),
+            CupertinoSwitch(value: value, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A capsule button, concentric with the sheet like the cards.
+class CapsuleButton extends StatelessWidget {
+  const CapsuleButton({
+    required this.label,
+    required this.onPressed,
+    this.prominent = false,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  /// Whether the button is tinted with the accent color.
+  final bool prominent;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = CupertinoTheme.of(context).primaryColor;
+    final enabled = onPressed != null;
+    return GestureDetector(
+      onTap: onPressed,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          color: prominent
+              ? accent.withValues(alpha: 0.15)
+              : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          shape: const StadiumBorder(),
+        ),
+        child: SizedBox(
+          height: cardRadius * 2,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: enabled
+                    ? (prominent
+                          ? accent
+                          : CupertinoColors.label.resolveFrom(context))
+                    : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Title extends StatelessWidget {
+  const _Title(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: CupertinoColors.label.resolveFrom(context),
+        fontSize: 17,
+        letterSpacing: -0.4,
+      ),
     );
   }
 }

@@ -61,6 +61,18 @@ class RetainedGlassClip {
     }
   }
 
+  /// Intersection of the enabled clips' bounds in the owner's coordinates,
+  /// as of the last [sync], or `null` when none clips.
+  Rect? get ownerBounds {
+    Rect? result;
+    for (final entry in _entries) {
+      final bounds = entry.ownerBounds;
+      if (bounds == null) continue;
+      result = result?.intersect(bounds) ?? bounds;
+    }
+    return result;
+  }
+
   void pushLayer(
     PaintingContext context,
     ContainerLayer effect,
@@ -173,6 +185,22 @@ class _ClipEntry {
     layer.geometry = source is RenderClipOval
         ? (Path()..addOval(geometry as Rect))
         : geometry;
+  }
+
+  Rect? get ownerBounds {
+    final transform = _transform;
+    if (!handle.layer!.enabled || transform == null) return null;
+    final bounds = switch (_geometry) {
+      final Rect rect => rect,
+      final RRect rect => rect.outerRect,
+      final RSuperellipse rect => rect.outerRect,
+      final Path path => path.getBounds(),
+      _ => null,
+    };
+    if (bounds == null) return null;
+    final m = transform.storage;
+    if (m[1].abs() > 1e-9 || m[4].abs() > 1e-9) return null;
+    return MatrixUtils.transformRect(transform, bounds);
   }
 
   void push(

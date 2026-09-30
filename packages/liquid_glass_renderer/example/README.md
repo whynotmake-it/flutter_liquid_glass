@@ -11,22 +11,25 @@ fvm flutter run -d macos
 Use `fvm flutter devices` to pick an iOS or Android Impeller device instead of
 `macos`.
 
-The stage shows glass over a backdrop you can switch between photographs and
-high-contrast type and grid pages. The inspector next to it (below it on
-phones) controls:
+The stage shows glass over backdrops that page horizontally and scroll
+vertically, so the glass moves over real content: a photo feed, a night page,
+a long article and a grid. The inspector next to it (below it on phones)
+controls:
 
 - **Scene**: everyday controls, shapes that merge in a `LiquidGlassBlendGroup`,
-  light, dark, clear and tinted glass blending in one layer, and large lenses
-  for judging refraction.
+  light, dark, clear and tinted glass blending in one layer, and
+  `LiquidGlassLoupe`s magnifying the backdrop.
 - **Material**: the Regular, Toolbar, Clear and Loupe presets in light or dark,
-  or Auto, where each control flips with the brightness of the backdrop behind
-  it (`LiquidGlassAdaptiveBrightness`). The Liquid Glass slider sets
+  or Auto, where the top controls and the bottom bar each flip as a group with
+  the brightness of the backdrop behind them
+  (`LiquidGlassAdaptiveBrightness`). The Liquid Glass slider sets
   `LiquidGlassSettings.tintAmount`.
-- **Renderer**: the full renderer or `FakeGlass`.
-- **Refraction**, **Lighting** and **Blending** controls. **Copy Settings as
-  Dart** puts the current `LiquidGlassSettings` on the clipboard.
+- **FakeGlass** instead of the full renderer, plus **Refraction** and
+  **Lighting** controls. **Copy as Dart** puts the current
+  `LiquidGlassSettings` on the clipboard.
 
-All glass on the stage renders in a single `LiquidGlassLayer`.
+Interactive glass shows the package's `GlassGlow` under the pointer. All glass
+on the stage renders in a single `LiquidGlassLayer`; each loupe brings its own.
 
 For a deterministic grid backdrop and a fixed blur (useful for screenshots):
 

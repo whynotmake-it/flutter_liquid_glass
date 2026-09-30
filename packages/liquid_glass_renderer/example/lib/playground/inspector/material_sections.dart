@@ -21,13 +21,8 @@ class MaterialSections extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InspectorSection(
+            InspectorCard(
               header: 'Refraction',
-              footer:
-                  'Glass is a flat face with a rounded bevel. Height is the '
-                  'bevel width, amount how far inside the silhouette the rim '
-                  'samples. Fitting shrinks the lens on small shapes, like '
-                  'regular glass; clear glass keeps it.',
               children: [
                 SliderRow(
                   title: 'Height',
@@ -46,14 +41,6 @@ class MaterialSections extends StatelessWidget {
                   format: _points,
                   onChanged: (v) =>
                       edit(settings.copyWith(refractionAmount: v)),
-                ),
-                SliderRow(
-                  title: 'Magnification',
-                  value: settings.magnification,
-                  min: 0.5,
-                  max: 2,
-                  format: (v) => '${v.toStringAsFixed(2)}×',
-                  onChanged: (v) => edit(settings.copyWith(magnification: v)),
                 ),
                 SliderRow(
                   title: 'Dispersion',
@@ -86,7 +73,8 @@ class MaterialSections extends StatelessWidget {
                 ),
               ],
             ),
-            InspectorSection(
+            const SizedBox(height: 28),
+            InspectorCard(
               header: 'Lighting',
               children: [
                 SliderRow(
@@ -107,6 +95,7 @@ class MaterialSections extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 28),
           ],
         );
       },

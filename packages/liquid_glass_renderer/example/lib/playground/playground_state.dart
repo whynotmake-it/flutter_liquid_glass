@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
@@ -8,7 +9,7 @@ enum StageScene {
   controls('Controls'),
   blend('Blend'),
   colors('Colors'),
-  lens('Lens');
+  loupe('Loupe');
 
   const StageScene(this.label);
 
@@ -135,8 +136,30 @@ class PlaygroundState {
   final scene = ValueNotifier<StageScene>(StageScene.controls);
 
   final backdrop = ValueNotifier<Backdrop>(
-    _useTestBackground ? Backdrop.grid : Backdrop.coast,
+    _useTestBackground ? Backdrop.grid : Backdrop.photos,
   );
+
+  /// How much the loupes enlarge the backdrop. The iOS 27 text loupe
+  /// measures 1.25.
+  final loupeScale = ValueNotifier<double>(1.25);
+
+  /// Connects the loupes to the backdrop they magnify.
+  final loupeLink = LiquidGlassLoupeLink();
+
+  /// The iOS 27 text loupe, floating above the point it shows, and a round
+  /// magnifier centered on its point.
+  final loupes = [
+    LoupeSpec(
+      size: const Size(116, 86),
+      offset: const Offset(-40, -70),
+      focalPointOffset: const Offset(0, 75),
+    ),
+    LoupeSpec(
+      size: const Size.square(150),
+      offset: const Offset(70, 80),
+      shape: const LiquidOval(),
+    ),
+  ];
 
   /// Distance in logical pixels at which grouped shapes start to merge.
   final blend = ValueNotifier<double>(24);
@@ -149,7 +172,32 @@ class PlaygroundState {
     scene.dispose();
     backdrop.dispose();
     blend.dispose();
+    loupeScale.dispose();
+    for (final loupe in loupes) {
+      loupe.offset.dispose();
+    }
   }
+}
+
+/// A draggable loupe on the stage.
+class LoupeSpec {
+  LoupeSpec({
+    required this.size,
+    required Offset offset,
+    this.shape,
+    this.focalPointOffset = Offset.zero,
+  }) : offset = ValueNotifier(offset);
+
+  final Size size;
+
+  /// The lens shape, or `null` for the loupe's default capsule.
+  final LiquidShape? shape;
+
+  /// Offset from the lens center to the point it magnifies.
+  final Offset focalPointOffset;
+
+  /// Offset of the lens center from the center of the stage.
+  final ValueNotifier<Offset> offset;
 }
 
 /// A value derived from another listenable that only notifies when the

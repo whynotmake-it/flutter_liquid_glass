@@ -58,7 +58,7 @@ class LoupeTabBar extends StatefulWidget {
   /// Settings of the loupe's own glass layer.
   ///
   /// Apple's loupe appears to shrink what it covers slightly; set
-  /// [LiquidGlassSettings.magnification] here for that. Never enlarge: the
+  /// `magnification` here for that. Never enlarge: the
   /// icons already scale up while the bar is held.
   final LiquidGlassSettings loupeSettings;
 
@@ -281,53 +281,57 @@ class _LoupeTabBarState extends State<LoupeTabBar>
 
   @override
   Widget build(BuildContext context) {
-    final label = CupertinoColors.label.resolveFrom(context);
     final tint = CupertinoTheme.of(context).primaryColor;
     final platter = _platterColor.resolveFrom(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, widget.height);
-        _rowWidth = size.width - 2 * _padding;
-        final rowSize = Size(_rowWidth, size.height - 2 * _padding);
-        final bar = LiquidGlass.grouped(
-          shape: LiquidRoundedSuperellipse(borderRadius: size.height / 2),
-          clipBehavior: Clip.none,
-          appearance: widget.appearance,
-          shadows: widget.shadows,
-          child: SizedBox.fromSize(
-            size: size,
-            child: Padding(
-              padding: const EdgeInsets.all(_padding),
-              child: RepaintBoundary(
-                child: _buildRows(label: label, tint: tint, platter: platter),
+    return MotionBuilder(
+      motion: const CupertinoMotion.smooth(),
+      converter: const ColorRgbMotionConverter(),
+      value: CupertinoColors.label.resolveFrom(context),
+      builder: (context, label, _) => LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(constraints.maxWidth, widget.height);
+          _rowWidth = size.width - 2 * _padding;
+          final rowSize = Size(_rowWidth, size.height - 2 * _padding);
+          final bar = LiquidGlass.grouped(
+            shape: LiquidRoundedSuperellipse(borderRadius: size.height / 2),
+            clipBehavior: Clip.none,
+            appearance: widget.appearance,
+            shadows: widget.shadows,
+            child: SizedBox.fromSize(
+              size: size,
+              child: Padding(
+                padding: const EdgeInsets.all(_padding),
+                child: RepaintBoundary(
+                  child: _buildRows(label: label, tint: tint, platter: platter),
+                ),
               ),
             ),
-          ),
-        );
-        final loupe = _buildLoupe(rowSize);
-        return Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: _onDown,
-          onPointerMove: _onMove,
-          onPointerUp: _onUp,
-          onPointerCancel: _onCancel,
-          child: ListenableBuilder(
-            listenable: _stretch,
-            builder: (context, child) =>
-                RawLiquidStretch(stretchPixels: _stretch.value, child: child),
-            // Fake glass cannot sample what is painted above its own
-            // backdrop filter, so a fake loupe sits beneath the capsule.
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                if (widget.fake) loupe,
-                bar,
-                if (!widget.fake) loupe,
-              ],
+          );
+          final loupe = _buildLoupe(rowSize);
+          return Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: _onDown,
+            onPointerMove: _onMove,
+            onPointerUp: _onUp,
+            onPointerCancel: _onCancel,
+            child: ListenableBuilder(
+              listenable: _stretch,
+              builder: (context, child) =>
+                  RawLiquidStretch(stretchPixels: _stretch.value, child: child),
+              // Fake glass cannot sample what is painted above its own
+              // backdrop filter, so a fake loupe sits beneath the capsule.
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (widget.fake) loupe,
+                  bar,
+                  if (!widget.fake) loupe,
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
