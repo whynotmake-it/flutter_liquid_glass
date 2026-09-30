@@ -33,28 +33,25 @@ uniform float uExteriorOnly;
 // Luminance of the neutral glint target: FakeGlass cannot scale it by the
 // face it cannot see, so clear glass uses its best constant.
 uniform float uGlintLuminance;
+// Rounded superellipse parameters (see roundedSuperellipseParameters).
+uniform vec4 uRseDegreeAndSpans;
+uniform vec4 uRseCircleCenters;
+uniform vec4 uRseSemiAxisAndRadii;
 
 layout(location = 0) out vec4 fragColor;
 
-float sdRoundedBox(vec2 p, vec2 halfSize, float radius) {
-  radius = clamp(radius, 0.0, min(halfSize.x, halfSize.y));
-  vec2 q = abs(p) - halfSize + vec2(radius);
-  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-}
-
-float sdEllipse(vec2 p, vec2 radius) {
-  radius = max(radius, vec2(0.001));
-  float k0 = length(p / radius);
-  float k1 = length(p / (radius * radius));
-  return k0 * (k0 - 1.0) / max(k1, 0.001);
-}
+#include "fake_glass_shape.glsl"
 
 float shapeDistance(vec2 p) {
-  vec2 halfSize = uSize * 0.5;
-  if (uShapeType < 0.5) {
-    return sdEllipse(p, halfSize);
-  }
-  return sdRoundedBox(p, halfSize, uCornerRadius);
+  return sdFakeGlassShape(
+    uShapeType,
+    p,
+    uSize * 0.5,
+    uCornerRadius,
+    uRseDegreeAndSpans,
+    uRseCircleCenters,
+    uRseSemiAxisAndRadii
+  );
 }
 
 vec2 shapeNormal(vec2 p) {

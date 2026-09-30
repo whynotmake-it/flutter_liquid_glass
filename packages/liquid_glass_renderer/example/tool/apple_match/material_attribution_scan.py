@@ -65,7 +65,6 @@ def candidate_settings(toolbar: dict, geometry: dict, axis: str, value: float) -
     for key in GEOMETRY_KEYS:
         settings[key] = geometry[key]
     settings[axis] = value
-    settings["refractionSpread"] = 0.0
     return settings
 
 

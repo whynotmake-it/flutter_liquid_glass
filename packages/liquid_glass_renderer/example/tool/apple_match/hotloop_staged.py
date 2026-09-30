@@ -54,29 +54,18 @@ STAGES = {
         "shapeOffsetY": [-0.3333, -0.1667, 0.0, 0.1667, 0.3333],
     },
     "refraction": {
-        "refractionHeight": [8.0, 10.0, 12.0, 14.0, 16.0],
-        "refractionAmount": [18.3, 22.85, 27.42, 32.0, 36.6],
-        "refractionSpread": [0.0, 0.25, 0.5, 0.75, 1.0],
-        "dispersion": [0.0, 0.0025, 0.005, 0.0075, 0.01],
+        "refractionHeight": [12.0, 16.0, 20.0, 24.0, 28.0],
+        "refractionAmount": [30.0, 45.0, 60.0, 75.0, 90.0],
+        "dispersion": [-0.06, -0.03, 0.0, 0.03],
     },
-    # The loupe's RawMagnifier owns enlargement; only these material controls
-    # remain effective on its clear glass shell. Keep this bounded stage
-    # separate from the ordinary pill search so a loupe fit cannot report
-    # changes to controls that _MatchLoupe intentionally overrides.
+    # LiquidGlassLoupe owns enlargement; only these material controls remain
+    # effective on its clear glass shell. Keep this bounded stage separate
+    # from the ordinary pill search so a loupe fit cannot report changes to
+    # controls that _MatchLoupe intentionally overrides.
     "loupeMaterial": {
-        "refractionHeight": [0.0, 8.0, 12.0, 20.0, 28.0, 36.0],
-        "refractionAmount": [
-            0.0,
-            20.0,
-            40.0,
-            80.0,
-            120.0,
-            180.0,
-            240.0,
-            300.0,
-            400.0,
-        ],
-        "dispersion": [0.0, 0.001, 0.0025, 0.005],
+        "refractionHeight": [0.0, 4.0, 8.0, 12.0, 20.0],
+        "refractionAmount": [0.0, 20.0, 28.0, 34.5, 45.0, 60.0],
+        "dispersion": [-0.1, -0.06, -0.03, 0.0],
         "highlight": [0.0, 0.1, 0.2, 0.3, 0.5],
         "contourStrength": [0.0, 0.05, 0.1, 0.2, 0.35],
         "contourWidth": [0.5, 1.0, 1.5],
@@ -102,28 +91,16 @@ STAGES = {
         "contourStrength": [0.1, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8],
         "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5],
     },
-    "ambientRim": {
-        "ambientStrength": [0.0, 0.08, 0.15, 0.25, 0.4, 0.6, 0.8, 1.0],
-    },
     "outline": {
         "contourWidth": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0],
-        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
-        "edgeLuminance": [0, 64, 128, 192, 255],
         "contourStrength": [0.0, 0.1, 0.2, 0.35, 0.5],
     },
     "transmissionContour": {
-        "edgeLuminance": [0],
         "contourStrength": [0.075, 0.1, 0.15, 0.2],
     },
     "darkOutline": {
         "contourWidth": [0.5, 1.0, 1.5, 2.0],
-        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
         "contourStrength": [0.2, 0.35, 0.5, 0.65, 0.8],
-    },
-    "materialContour": {
-        "outerContourWidth": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
-        "outerContourAlpha": [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4],
-        "outerContourLuminance": [0],
     },
     "innerShadow": {
         "bevelShadowStrength": [
@@ -182,9 +159,7 @@ STAGES = {
         "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
         "contourStrength": [0.2, 0.35, 0.5, 0.65, 0.8],
         "highlight": [0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
-        "highlightAlpha": [0.5, 0.65, 0.8, 1.0],
-        "specularWrap": [0.05, 0.15, 0.25, 0.35],
-        "bleedStrength": [0.0, 0.25, 0.5, 0.75],
+        "highlightWrap": [0.05, 0.15, 0.25, 0.35],
     },
     "layeredBevel": {
         "bevelShadowStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
@@ -192,12 +167,9 @@ STAGES = {
     },
     "coupledRim": {
         "contourWidth": [0.25, 0.5, 0.75, 1.0, 1.25],
-        "edgeInset": [0.0, 0.25, 0.5, 0.75, 1.0],
-        "edgeLuminance": [0, 32, 64, 96, 128],
         "contourStrength": [0.05, 0.1, 0.15, 0.2, 0.3],
         "highlight": [0.4, 0.5, 0.6, 0.7, 0.8],
-        "specularWrap": [0.15, 0.25, 0.35, 0.45, 0.55],
-        "bleedStrength": [0.25, 0.5, 0.75],
+        "highlightWrap": [0.15, 0.25, 0.35, 0.45, 0.55],
     },
 }
 
@@ -214,9 +186,7 @@ def diagnostic_stage_name(stage_name):
         "toneResponse": "tintColor",
         "vibrancy": "tintColor",
         "innerShadow": "highlight",
-        "ambientRim": "highlight",
         "darkOutline": "highlight",
-        "materialContour": "highlight",
         "transmissionContour": "highlight",
         "shapeProfile": "shape",
         "loupeMaterial": "refinement",
@@ -265,19 +235,14 @@ def optimization_objective(stage_name, result):
             for probe in "CD"
         ) / 2.0
         return "solidCoreMeanAbsoluteError8Bit", loss
-    if stage_name in ("highlight", "ambientRim"):
+    if stage_name == "highlight":
         # A bright specular rim is observable without being washed out only
         # on the solid-black probe.
         return (
             "blackBackgroundBrightRimMeanAbsoluteError8Bit",
             residuals["C"]["outerContour"]["meanAbsoluteError8Bit"],
         )
-    if stage_name in (
-        "outline",
-        "darkOutline",
-        "outerContour",
-        "materialContour",
-    ):
+    if stage_name in ("outline", "darkOutline"):
         # Conversely, Apple's dark containment edge is isolated by white.
         return (
             "whiteBackgroundDarkRimMeanAbsoluteError8Bit",
@@ -605,19 +570,6 @@ def main() -> None:
                     save_best(stage_dir / "best", best_params, evaluator, reference)
                 return loss
 
-            if stage_name == "materialContour":
-                # Add explicit zero-valued axes when comparing against an old
-                # settings file. This keeps the no-material-contour baseline
-                # in the same optimization domain as the new layer.
-                initial = {
-                    **initial,
-                    "outerContourWidth": initial.get("outerContourWidth", 1.0),
-                    "outerContourAlpha": initial.get("outerContourAlpha", 0.0),
-                    "outerContourLuminance": initial.get(
-                        "outerContourLuminance", 0
-                    ),
-                }
-
             # Edge occlusion is intentionally a product of width and opacity.
             # Starting from the transparent default makes one-at-a-time
             # coordinate descent see both axes as flat, so test a small set of
@@ -627,16 +579,13 @@ def main() -> None:
                 transparent_loss = evaluate(transparent)
                 seeded = []
                 for edge_width in (0.5, 1.0, 1.5):
-                    for edge_inset in (0.25, 0.5, 0.75):
-                        for edge_alpha in (0.1, 0.2):
-                            candidate = {
-                                **initial,
-                                "contourWidth": edge_width,
-                                "edgeInset": edge_inset,
-                                "edgeLuminance": 0,
-                                "contourStrength": edge_alpha,
-                            }
-                            seeded.append((evaluate(candidate), candidate))
+                    for edge_alpha in (0.1, 0.2):
+                        candidate = {
+                            **initial,
+                            "contourWidth": edge_width,
+                            "contourStrength": edge_alpha,
+                        }
+                        seeded.append((evaluate(candidate), candidate))
                 seed_loss, initial = min(seeded, key=lambda item: item[0])
                 # Preserve the transparent treatment when every coupled edge
                 # candidate is worse than the input image.
