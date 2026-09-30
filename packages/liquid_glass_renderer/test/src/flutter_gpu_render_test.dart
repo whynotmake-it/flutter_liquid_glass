@@ -142,21 +142,28 @@ void main() {
       );
       addTearDown(renderer.dispose);
 
-      ({ui.Image image, int width, int height}) render(int size) =>
-          renderer.render(
-            width: size,
-            height: size,
-            shapeData: const [
-              1, 40, 30, 8, // Rounded rectangle.
-              1, 0, 0, 1, // Identity inverse affine basis.
-              32, 32, 1, -1, // Center, distance scale, new group marker.
-            ],
-            numShapes: 1,
-            refractionAmount: 24,
-            refractionHeight: 10,
-            offsetX: 0,
-            offsetY: 0,
-          );
+      ({
+        ui.Image image,
+        int width,
+        int height,
+        int textureWidth,
+        int textureHeight,
+        int serial,
+      })
+      render(int size) => renderer.render(
+        width: size,
+        height: size,
+        shapeData: const [
+          1, 40, 30, 8, // Rounded rectangle.
+          1, 0, 0, 1, // Identity inverse affine basis.
+          32, 32, 1, -1, // Center, distance scale, new group marker.
+        ],
+        numShapes: 1,
+        refractionAmount: 24,
+        refractionHeight: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
 
       final first = render(33);
       final sameBucket = render(63);

@@ -9,6 +9,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
+import '../../test/src/submitted_scene_binding.dart';
+
 const _defaultScenarioName = String.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_SCENARIO',
   defaultValue: 'staticSingle',
@@ -56,8 +58,65 @@ Future<void> _ensurePassthroughFilter() async {
   );
 }
 
+/// Harness-only render-order check: the renderer stamps each matte with a
+/// serial and the glass shader paints magenta where a frame samples a matte
+/// rewritten before that frame was rasterized.
+const _validateMatteOrder = bool.fromEnvironment(
+  'LIQUID_GLASS_VALIDATE_MATTE_ORDER',
+);
+
+class _MatteOrderBinding extends WidgetsFlutterBinding
+    with SubmittedSceneCapture {}
+
+/// Captures submitted scenes back to back for [window] and counts magenta
+/// pixels (opaque 255, 0, 255).
+Future<Map<String, Object?>> _checkMatteOrder(Duration window) async {
+  final binding = WidgetsBinding.instance as _MatteOrderBinding;
+  final view = binding.platformDispatcher.views.first;
+  binding
+    ..captureWidth = view.physicalSize.width.round()
+    ..captureHeight = view.physicalSize.height.round();
+  var captured = 0;
+  var framesWithMagenta = 0;
+  var magentaPixels = 0;
+  final end = DateTime.now().add(window);
+  while (DateTime.now().isBefore(end)) {
+    binding
+      ..captureNextScene = true
+      ..scheduleFrame();
+    await binding.endOfFrame;
+    final pending = binding.captured;
+    binding.captured = null;
+    if (pending == null) continue;
+    final image = await pending;
+    final bytes = (await image.toByteData())!.buffer.asUint8List();
+    image.dispose();
+    var magenta = 0;
+    for (var i = 0; i < bytes.length; i += 4) {
+      if (bytes[i] == 255 &&
+          bytes[i + 1] == 0 &&
+          bytes[i + 2] == 255 &&
+          bytes[i + 3] == 255) {
+        magenta++;
+      }
+    }
+    captured++;
+    if (magenta > 0) framesWithMagenta++;
+    magentaPixels += magenta;
+  }
+  return <String, Object?>{
+    'capturedFrames': captured,
+    'framesWithMagenta': framesWithMagenta,
+    'magentaPixels': magentaPixels,
+  };
+}
+
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  if (_validateMatteOrder) {
+    _MatteOrderBinding();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
   await _ensurePassthroughFilter();
   final nativeConfiguration = await _readNativeConfiguration();
   final scenario = BenchmarkScenario.values.byName(
@@ -152,7 +211,18 @@ Future<void> main() async {
   await _startGpuTiming();
   await _invokeNativeVoid('beginInterval', scenario.name);
   debugPrint('LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:${scenario.name}');
+  final matteOrderCheck = _validateMatteOrder
+      ? _checkMatteOrder(Duration(seconds: measureSeconds))
+      : null;
   await Future<void>.delayed(Duration(seconds: measureSeconds));
+  final matteOrder = await matteOrderCheck;
+  if (matteOrder != null) {
+    debugPrint(
+      'LIQUID_GLASS_MATTE_ORDER:${scenario.name}:'
+      '${matteOrder['capturedFrames']}:${matteOrder['framesWithMagenta']}:'
+      '${matteOrder['magentaPixels']}',
+    );
+  }
   measuring = false;
   await SchedulerBinding.instance.endOfFrame;
   await _invokeNativeVoid('endInterval', scenario.name);
@@ -171,6 +241,7 @@ Future<void> main() async {
     'warmupSeconds': warmupSeconds,
     'measureSeconds': measureSeconds,
     'commandBufferGpu': commandBufferGpu,
+    'matteOrderCheck': matteOrder,
     'frames': timings
         .map(
           (timing) => <String, int>{

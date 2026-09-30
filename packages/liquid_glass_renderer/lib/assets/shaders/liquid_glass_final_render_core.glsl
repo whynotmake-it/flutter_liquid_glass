@@ -47,6 +47,13 @@ uniform float uSoften;
 // Outside it the filter input is transparent or clamped, so displaced samples
 // are mirrored back in at its edge.
 uniform vec4 uBackdropBounds;
+// The matte fills the top-left of a texture that only grows: sub-rect size
+// over texture size. uGeometrySize is the sub-rect in device px.
+uniform vec2 uGeometryUVScale;
+// Texel size of the material map's texture; the map fills its top-left.
+uniform vec2 uMaterialTextureSize;
+// Harness-only render-order check: the serial the matte must carry, or -1.
+uniform float uMatteSerial;
 
 float uDisplacementScale = uOpticalProps.x;
 float uDispersion = uOpticalProps.y;
@@ -523,7 +530,24 @@ void main() {
         return;
     }
 
-    vec4 geometryData = texture(uGeometryTexture, geometryUV);
+    vec4 geometryData = texture(
+        uGeometryTexture,
+        geometryUV * uGeometryUVScale
+    );
+    if (uMatteSerial >= 0.0) {
+        // The serial sits in the texel row just below the matte.
+        vec2 textureSize = uGeometrySize / uGeometryUVScale;
+        vec3 stamp = floor(
+            texture(
+                uGeometryTexture,
+                vec2(0.5, uGeometrySize.y + 0.5) / textureSize
+            ).rgb * 255.0 + 0.5
+        );
+        if (stamp.r * 65536.0 + stamp.g * 256.0 + stamp.b != uMatteSerial) {
+            fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+            return;
+        }
+    }
 
     #if DEBUG_GEOMETRY
         fragColor = geometryData;
@@ -545,10 +569,7 @@ void main() {
             ceil(uGeometrySize / materialRasterScale),
             vec2(1.0)
         );
-        vec2 materialTextureSize = vec2(
-            materialSize.x,
-            materialSize.y
-        );
+        vec2 materialTextureSize = uMaterialTextureSize;
         vec2 materialLinearUV =
             (geometryUV * (materialSize - vec2(1.0)) + vec2(0.5)) /
             materialTextureSize;
@@ -561,10 +582,7 @@ void main() {
             ceil(uGeometrySize / materialRasterScale),
             vec2(1.0)
         );
-        vec2 materialTextureSize = vec2(
-            max(materialSize.x, 16.0),
-            materialSize.y + 2.0
-        );
+        vec2 materialTextureSize = uMaterialTextureSize;
         vec2 materialNearestUV =
             (floor(geometryUV * materialSize) + vec2(0.5)) /
             materialTextureSize;

@@ -544,9 +544,15 @@ run_scenario() {
 
 if [[ "$SKIP_BUILD" != true ]]; then
   echo "Building profile benchmark executable"
+  # Space-separated KEY=VALUE pairs, e.g. for renderer A/B switches.
+  dart_defines=()
+  for define in ${LIQUID_GLASS_BENCHMARK_DART_DEFINES:-}; do
+    dart_defines+=("--dart-define=$define")
+  done
   "$FLUTTER_BIN" build macos \
     --profile \
-    --target=integration_test/benchmark_test.dart
+    --target=integration_test/benchmark_test.dart \
+    ${dart_defines[@]+"${dart_defines[@]}"}
 fi
 if [[ ! -x "$APP_EXECUTABLE" ]]; then
   printf 'Benchmark executable was not found at %s\n' "$APP_EXECUTABLE" >&2

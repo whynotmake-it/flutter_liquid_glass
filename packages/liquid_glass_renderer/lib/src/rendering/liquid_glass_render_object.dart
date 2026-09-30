@@ -214,6 +214,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
+  // The matte and material map fill the top-left of textures that only grow.
+  Size _geometryTextureSize = Size.zero;
+  Size _materialTextureSize = const Size(1, 1);
+  int _matteSerial = 0;
 
   /// Shorter side in logical pixels of the smallest shape in this layer.
   /// Adaptive color models use it to choose the material density; it is
@@ -226,6 +230,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// specular layer) from the same geometry texture.
   @protected
   ui.Image? get geometryImage => _geometryImage;
+
+  @visibleForTesting
+  ui.Image? get debugGeometryImage => _geometryImage;
 
   /// The bounding box of the geometry matte in screen space.
   ///
@@ -491,6 +498,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       _geometryImage = result.image;
       _materialImage = result.materialImage;
       _geometryMatteBounds = result.matteBounds;
+      _geometryTextureSize = result.textureSize;
+      _materialTextureSize = result.materialTextureSize;
+      _matteSerial = result.serial;
       _materialCenterInMatte = result.materialCenter;
       _setShapeAppearances(result.appearances);
       _rememberEncodedGeometry(bounds);
@@ -643,6 +653,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         _geometryImage = gpuResult.image;
         _materialImage = gpuResult.materialImage;
         _geometryMatteBounds = gpuResult.matteBounds;
+        _geometryTextureSize = gpuResult.textureSize;
+        _materialTextureSize = gpuResult.materialTextureSize;
+        _matteSerial = gpuResult.serial;
         _materialCenterInMatte = gpuResult.materialCenter;
         _setShapeAppearances(gpuResult.appearances);
         _rememberEncodedGeometry(boundingBox);
@@ -785,6 +798,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       })
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
+      })
+      // Float index 59, after uBackdropBounds.
+      ..setFloatUniforms(initialIndex: 59, (value) {
+        final matteSize = _geometryMatteBounds.size * devicePixelRatio;
+        value.setFloats([
+          if (_geometryTextureSize.isEmpty) ...[
+            1,
+            1,
+          ] else ...[
+            matteSize.width / _geometryTextureSize.width,
+            matteSize.height / _geometryTextureSize.height,
+          ],
+          _materialTextureSize.width,
+          _materialTextureSize.height,
+          if (FlutterGpuGeometryRenderer.validateMatteOrder)
+            ((_matteSerial + FlutterGpuGeometryRenderer.debugMatteSerialSkew) &
+                    0xFFFFFF)
+                .toDouble()
+          else
+            -1,
+        ]);
       })
       // Sampler 0 is the image-filter input. The engine replaces its texture
       // with the backdrop but keeps the sampling set here, so any bound image
@@ -1295,9 +1329,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           bounds.top,
         )
         ..scale(1 / devicePixelRatio)
-        ..drawImage(
+        ..drawImageRect(
           geometryImage,
-          offset * devicePixelRatio,
+          Offset.zero & bounds.size * devicePixelRatio,
+          (offset * devicePixelRatio) & bounds.size * devicePixelRatio,
           Paint()..blendMode = BlendMode.src,
         )
         ..restore();
@@ -1578,6 +1613,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         image: result.image,
         materialImage: renderer.materialImage,
         materialCenter: materialCenter,
+        textureSize: Size(
+          result.textureWidth.toDouble(),
+          result.textureHeight.toDouble(),
+        ),
+        materialTextureSize: switch (renderer.materialImage) {
+          final image? => Size(image.width.toDouble(), image.height.toDouble()),
+          null => const Size(1, 1),
+        },
+        serial: result.serial,
         appearances: appearances,
         matteBounds: Rect.fromLTWH(
           boundsInMatteSpace.left,
@@ -1595,6 +1639,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 // Images here borrow the renderer's handles. A retained temporary frame must
 // clone both images before another render can dispose those borrowed handles.
 typedef _GpuGeometryFrame = ({
+  Size textureSize,
+  Size materialTextureSize,
+  int serial,
   ui.Image image,
   ui.Image? materialImage,
   Rect matteBounds,

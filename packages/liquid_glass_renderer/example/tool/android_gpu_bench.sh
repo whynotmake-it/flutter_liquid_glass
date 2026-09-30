@@ -386,10 +386,18 @@ cmd_scenarios() {
     echo "Building profile APK with $flutter_bin"
     (
       cd "$EXAMPLE_DIR"
+      # Space-separated KEY=VALUE pairs, e.g. for renderer A/B switches.
+      local -a dart_defines=()
+      local define
+      for define in ${LIQUID_GLASS_BENCHMARK_DART_DEFINES:-}; do
+        dart_defines+=("--dart-define=$define")
+      done
       if [[ "$flutter_bin" == "fvm flutter" ]]; then
-        fvm flutter build apk --profile -t integration_test/benchmark_test.dart
+        fvm flutter build apk --profile -t integration_test/benchmark_test.dart \
+          ${dart_defines[@]+"${dart_defines[@]}"}
       else
-        "$flutter_bin" build apk --profile -t integration_test/benchmark_test.dart
+        "$flutter_bin" build apk --profile -t integration_test/benchmark_test.dart \
+          ${dart_defines[@]+"${dart_defines[@]}"}
       fi
     )
   fi

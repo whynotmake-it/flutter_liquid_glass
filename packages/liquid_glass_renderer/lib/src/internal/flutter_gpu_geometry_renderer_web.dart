@@ -29,6 +29,19 @@ class FlutterGpuGeometryRenderer {
   static int get debugActiveGeometryTextureCount => 0;
   static int get debugActiveMaterialTextureCount => 0;
 
+  /// Matches the native renderer's reuse horizon; nothing is reused here.
+  static const int reuseAfterFrames = 1;
+  static const bool validateMatteOrder = false;
+  static int debugMatteSerialSkew = 0;
+  static int debugReusedTextureCount = 0;
+  static int debugAllocatedTextureCount = 0;
+  static int debugDroppedTextureCount = 0;
+  static int get debugReleasedTextureCount => 0;
+  int get debugRetiredTextureCount => 0;
+  int get debugMatteTextureCount => 0;
+  Object? get debugMatteTexture => null;
+  (int, int)? get debugMatteTextureSize => null;
+
   /// Material map texels per matte pixel; shared constant with the native
   /// renderer so uniform math stays identical.
   static const int materialRasterScale = 8;
@@ -41,7 +54,15 @@ class FlutterGpuGeometryRenderer {
   ui.Image? get materialImage => null;
 
   // ignore: avoid_unused_constructor_parameters
-  ({ui.Image image, int width, int height}) render({
+  ({
+    ui.Image image,
+    int width,
+    int height,
+    int textureWidth,
+    int textureHeight,
+    int serial,
+  })
+  render({
     required int width,
     required int height,
     required List<double> shapeData,

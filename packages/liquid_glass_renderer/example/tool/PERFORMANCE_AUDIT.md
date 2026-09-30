@@ -4,6 +4,24 @@ This is the prioritized backlog for the native benchmark harness. Every change
 should be compared against the relevant control scenario on the same runner;
 visual output and native `phys_footprint` remain regression gates.
 
+## 2026-09-29 geometry-pass scissor, Flutter GPU object lifetimes (Pixel 10)
+
+Details: `OPTIMIZATION_LOG_2026-09.md` K–M.
+
+- **Scissored single-shape geometry passes (rejected).** The scissor needs a
+  cleared attachment because the final pass samples the bucket padding, and
+  `LoadAction.clear` adds ~1.5 ms of UI-thread `PAINT` per rebuild frame on
+  the Pixel 10 (button stretch 103 → 92 fps). The GPU saving is ~1 % of the
+  frame. Reverted.
+- **GC size-reporting leases for Flutter GPU objects (rejected).** Flutter GPU
+  textures, command buffers and render passes report only their C++ object
+  size to the GC, and a submitted pass pins its render target. Leasing them
+  with `NativeFinalizer(externalSize:)` made the Pixel run ~190 scavenges/s,
+  cost 7–21 % fps and raised peak PSS + GPU by 32–61 %. The fix has to be
+  engine-side (`GetAllocationSize` or `dispose()`).
+- Two render passes in one Flutter GPU command buffer segfault
+  `flutter_tester` deterministically; passes stay in separate buffers.
+
 ## 2026-09-15 shadow pass, matte resolution, indicator capture (Pixel 10)
 
 Full log with every measurement and rejection: `OPTIMIZATION_LOG_2026-09.md`.
