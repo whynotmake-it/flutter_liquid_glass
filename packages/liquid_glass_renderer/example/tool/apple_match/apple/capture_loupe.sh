@@ -86,6 +86,12 @@ if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
   echo "declared Reduce Motion $REDUCE_MOTION != readback $REDUCE_MOTION_READBACK" >&2
   exit 4
 fi
+if [[ -n "${LIQUID_GLASS_TINT_POSITION:-}" ]]; then
+  bash "$ROOT/apple/set_transparency_slider.sh" "$LIQUID_GLASS_TINT_POSITION" >/dev/null
+fi
+LIQUID_GLASS_TINT_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
+  com.apple.UIKit UIViewGlassTintAmount 2>/dev/null || true)"
+export LIQUID_GLASS_TINT_READBACK
 xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
 xcrun simctl ui "$IOS_27_UDID" appearance "$APPEARANCE"
 xcrun simctl ui "$IOS_27_UDID" content_size large
@@ -219,6 +225,18 @@ Path(sys.argv[1]).write_text(
             "loupeCaptureDelaySeconds": float(os.environ["LOUPE_CAPTURE_DELAY"]),
             "medianFrameCount": int(os.environ.get("CAPTURE_FRAMES", "3")),
             "reduceTransparency": False,
+            "liquidGlassTintPosition": (
+                float(os.environ["LIQUID_GLASS_TINT_POSITION"])
+                if os.environ.get("LIQUID_GLASS_TINT_POSITION")
+                else None
+            ),
+            "liquidGlassTintPositionReadback": (
+                float(os.environ["LIQUID_GLASS_TINT_READBACK"])
+                if os.environ.get("LIQUID_GLASS_TINT_READBACK")
+                else None
+            ),
+            "liquidGlassTintControlMethod":
+                "simctl defaults write com.apple.UIKit UIViewGlassTintAmount",
             "api": os.environ["APPLE_MATCH_API"],
             "scene": os.environ["SCENE_ID"],
             "touchPoint": [
