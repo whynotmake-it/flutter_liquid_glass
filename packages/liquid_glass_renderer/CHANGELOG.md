@@ -26,10 +26,10 @@
 - Add `LiquidGlassSettings.smoothRefraction`: bilinear instead of
   nearest backdrop sampling, so refracted lines stop snapping to whole
   pixels. Undisplaced glass still reproduces the backdrop exactly.
-- Add `LiquidGlassSettings.ios27Clear()` (the full lens, no frost by
-  default) and `LiquidGlassSettings.ios27ClearFrost(tintAmount)`, the
-  clear-glass blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at
-  0). Frost up to 1.25 device pixels now runs as a three-texel kernel in the
+- Add `LiquidGlassSettings.ios27Clear(tintAmount:)` (the full lens plus
+  the fitted clear-glass blur) and `LiquidGlassSettings.ios27ClearFrost`,
+  the blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at 0).
+  Frost up to 1.25 device pixels now runs as a three-texel kernel in the
   final pass instead of a separate blur pass.
 
 ## 1.0.0-dev.1

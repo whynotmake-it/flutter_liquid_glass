@@ -159,17 +159,23 @@ class LiquidGlassSettings with Equatable {
           frost: frost ?? 7.0,
         );
 
-  /// Optics of iOS 27 `.clear` glass: the full 20 pt / 60 pt lens is kept
-  /// on small shapes. Lighting uses the defaults.
+  /// Optics of iOS 27 `.clear` glass at the Settings Liquid Glass slider
+  /// position [tintAmount] (`0` Clear, `1` Tinted): the full 20 pt / 60 pt
+  /// lens on every shape and the fitted clear-glass blur,
+  /// [ios27ClearFrost]. Lighting uses the defaults.
   ///
-  /// Apple's clear glass is slightly soft: at slider 0 a [frost] of
-  /// 0.35 pt matches it best (face error 0.069 -> 0.023 against the Reduce
-  /// Motion off references), and [ios27ClearFrost] gives the blur for other
-  /// slider positions. Frost is off by default. Up to 1.25 device pixels it
-  /// is folded into the final pass as a three-texel kernel instead of a
-  /// blur pass.
-  factory LiquidGlassSettings.ios27Clear({double frost = 0}) =>
-      LiquidGlassSettings(frost: frost, refractionFitsShape: false);
+  /// At slider 0 the blur is 0.35 pt. Up to about 3.5x device pixel ratio
+  /// that stays within the renderer's 1.25 device-pixel in-pass kernel, so
+  /// it costs no blur pass (measured within noise on Metal). Larger slider
+  /// positions need a real blur and use the blur pass.
+  /// Pass [frost] to override, for example `frost: 0` for unsoftened glass.
+  factory LiquidGlassSettings.ios27Clear({
+    double tintAmount = 0,
+    double? frost,
+  }) => LiquidGlassSettings(
+    frost: frost ?? ios27ClearFrost(tintAmount),
+    refractionFitsShape: false,
+  );
 
   /// Creates settings from Figma-style percentage controls.
   ///
