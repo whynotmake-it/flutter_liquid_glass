@@ -17,11 +17,12 @@ CAPTURE_ENCODING = "SDR tone-mapped 8-bit PNG"
 PINNED_RUNTIME_IDENTIFIER = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
 PINNED_UDID = "DB4F41F3-1C36-476D-B775-AFDC3686C75B"
 # Every simulator that produced a committed reference. The Reduce Motion off
-# set came from a dedicated, since-deleted "lg-agent-capture" device so the
+# set came from dedicated, since-deleted "lg-agent-capture" devices so the
 # pinned device's settings were never changed.
 CAPTURE_UDIDS = {
     PINNED_UDID,
     "AF1E2F44-34B6-4E7D-BAA6-352DF8F5B173",
+    "4E04B1F8-EDC5-4EE6-9A26-C58A2B84652E",
 }
 PINNED_DEVICE = "iPhone 17 Pro"
 
