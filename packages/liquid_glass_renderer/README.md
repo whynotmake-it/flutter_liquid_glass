@@ -246,11 +246,13 @@ Values measured on iOS 27 (Reduce Motion off):
 | Look | `refractionHeight` | `refractionAmount` | Other |
 | --- | --- | --- | --- |
 | Regular glass, buttons, toolbars (default) | `20` | `60` | |
-| Clear glass (`LiquidGlassSettings.ios27Clear()`) | `20` | `60` | `refractionFitsShape: false`, `frost: 0.35` |
+| Clear glass (`LiquidGlassSettings.ios27Clear()`) | `20` | `60` | `refractionFitsShape: false`; optional `frost: LiquidGlassSettings.ios27ClearFrost(slider)` (0.35 at slider 0) |
 | Text loupe | `8` | `28` | `magnification: 1.25` |
 
 iOS 27 shows no chromatic dispersion in refraction, so `chromaticAberration`
-defaults to `0`. Strong magnification enlarges an already captured image and
+defaults to `0`. Frost up to 1.25 device pixels (such as clear glass's 0.35 pt on
+a 3x screen) is applied as a three-texel kernel inside the final pass instead
+of a separate blur pass. Strong magnification enlarges an already captured image and
 loses detail; for a large zoom, paint the backdrop with Flutter's
 `RawMagnifier` before applying glass.
 
