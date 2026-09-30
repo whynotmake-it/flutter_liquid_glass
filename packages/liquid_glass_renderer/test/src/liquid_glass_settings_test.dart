@@ -30,10 +30,30 @@ void main() {
   });
 
   test('iOS 27 clear preset keeps the toolbar glint shape', () {
-    const clear = LiquidGlassSettings.ios27Clear();
+    final clear = LiquidGlassSettings.ios27Clear();
     const toolbar = LiquidGlassSettings.ios27ToolbarLight();
 
-    expect(clear.frost, 0);
+    expect(clear.frost, closeTo(.35, 1e-9));
+    // Clear glass's slider blur: 0.35/0.67/1.28/4.6/16.4 pt.
+    for (final (position, sigma) in [
+      (0.0, .35),
+      (.25, .67),
+      (.5, 1.28),
+      (.75, 4.6),
+      (1.0, 16.4),
+    ]) {
+      expect(
+        LiquidGlassSettings.ios27Clear(tintAmount: position).frost,
+        closeTo(sigma, sigma * .03),
+      );
+      expect(
+        LiquidGlassSettings.ios27Clear(
+          tintAmount: position,
+        ).frostFor(const LiquidGlassColorModel.ios27Clear()),
+        closeTo(sigma, sigma * .03),
+        reason: 'no generic slider blur on top',
+      );
+    }
     expect(clear.highlight, 1);
     expect(clear.highlightWidth, toolbar.highlightWidth);
     expect(clear.highlightWrap, toolbar.highlightWrap);
