@@ -45,6 +45,8 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
     refractionFitsShape:
         settings['refractionFitsShape'] as bool? ??
         defaults.refractionFitsShape,
+    smoothRefraction:
+        settings['smoothRefraction'] as bool? ?? defaults.smoothRefraction,
     frost: number('frost', number('blur', defaults.frost)),
     highlight: number(
       'highlight',

@@ -21,6 +21,7 @@ class LiquidGlassSettings with Equatable {
     this.refractionHeight = 20.0,
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
+    this.smoothRefraction = false,
     this.magnification = 1.0,
     this.frost = 5.0,
     this.chromaticAberration = 0.0,
@@ -62,6 +63,11 @@ class LiquidGlassSettings with Equatable {
         'false' => false,
         _ => true,
       },
+      smoothRefraction: switch (json['smoothRefraction']) {
+        final bool value => value,
+        'true' => true,
+        _ => false,
+      },
       magnification: legacy('magnification', 'backdropScale', 1),
       frost: number('frost', 5),
       chromaticAberration: number('chromaticAberration', 0),
@@ -94,6 +100,7 @@ class LiquidGlassSettings with Equatable {
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
+       smoothRefraction = false,
        magnification = 1.0,
        chromaticAberration = 0.0,
        highlight = 0.25,
@@ -121,6 +128,7 @@ class LiquidGlassSettings with Equatable {
   }) : refractionHeight = 20.0,
        refractionAmount = 60.0,
        refractionFitsShape = true,
+       smoothRefraction = false,
        magnification = 1.0,
        chromaticAberration = 0.0,
        highlight = 0.25,
@@ -237,6 +245,16 @@ class LiquidGlassSettings with Equatable {
   /// scales down with the shape.
   final bool refractionFitsShape;
 
+  /// Whether the backdrop is sampled bilinearly instead of from the nearest
+  /// pixel.
+  ///
+  /// Refraction samples the backdrop at fractional positions. With nearest
+  /// sampling, refracted lines snap to whole device pixels and read as
+  /// jagged; bilinear sampling moves them smoothly, as on Apple's glass.
+  /// Undisplaced glass still reproduces the backdrop exactly. It uses the
+  /// same single texture fetch and no extra pass.
+  final bool smoothRefraction;
+
   /// Magnification of the backdrop seen through the whole face, about the
   /// center of the glass.
   ///
@@ -347,6 +365,9 @@ class LiquidGlassSettings with Equatable {
   /// Effective shape-fitting mode of the lens.
   bool get effectiveRefractionFitsShape => refractionFitsShape;
 
+  /// Effective backdrop sampling mode.
+  bool get effectiveSmoothRefraction => smoothRefraction;
+
   /// Effective magnification constrained to the supported range.
   double get effectiveMagnification => magnification.clamp(.25, 4.0);
 
@@ -419,6 +440,7 @@ class LiquidGlassSettings with Equatable {
     double? refractionHeight,
     double? refractionAmount,
     bool? refractionFitsShape,
+    bool? smoothRefraction,
     double? magnification,
     double? frost,
     double? chromaticAberration,
@@ -441,6 +463,7 @@ class LiquidGlassSettings with Equatable {
     refractionHeight: refractionHeight ?? this.refractionHeight,
     refractionAmount: refractionAmount ?? this.refractionAmount,
     refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
+    smoothRefraction: smoothRefraction ?? this.smoothRefraction,
     magnification: magnification ?? this.magnification,
     frost: frost ?? this.frost,
     chromaticAberration: chromaticAberration ?? this.chromaticAberration,
@@ -470,6 +493,7 @@ class LiquidGlassSettings with Equatable {
     'refractionHeight': refractionHeight,
     'refractionAmount': refractionAmount,
     'refractionFitsShape': refractionFitsShape,
+    'smoothRefraction': smoothRefraction,
     'magnification': magnification,
     'frost': frost,
     'chromaticAberration': chromaticAberration,
@@ -495,6 +519,7 @@ class LiquidGlassSettings with Equatable {
     refractionHeight,
     refractionAmount,
     refractionFitsShape,
+    smoothRefraction,
     magnification,
     frost,
     chromaticAberration,

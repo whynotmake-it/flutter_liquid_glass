@@ -604,12 +604,25 @@ void main() {
         abs(uChromaticAberration) * maxDisplacement <=
         kChromaticAberrationSubpixelThreshold
     ) {
-        vec2 refractedUV =
-            screenUV + (backdropScaleOffset + displacement) * invUSize;
-        refractColor = texture(
-            uBackgroundTexture,
-            mirrorBackgroundUV(refractedUV, invUSize)
-        );
+        vec2 sourceOffset = backdropScaleOffset + displacement;
+        vec2 refractedUV = screenUV + sourceOffset * invUSize;
+        if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
+            // Undisplaced glass fetches its own texel, bypassing the sampler,
+            // so it reproduces the backdrop exactly even when the sampler is
+            // bilinear (whose fixed-point sub-texel weights are never exactly
+            // zero at texel centres).
+            refractedUV = (floor(fragCoord) + 0.5) * invUSize;
+            refractColor = texelFetch(
+                uBackgroundTexture,
+                ivec2(floor(fragCoord)),
+                0
+            );
+        } else {
+            refractColor = texture(
+                uBackgroundTexture,
+                mirrorBackgroundUV(refractedUV, invUSize)
+            );
+        }
         if (uSoften > 0.5) {
             // The offset scales with visibility, so hidden glass collapses
             // the kernel onto the unfiltered backdrop.

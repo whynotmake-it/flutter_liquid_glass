@@ -236,6 +236,10 @@ bevel refracts, pulling content inward:
   content near the rim is mirrored, as on Apple's glass.
 - `magnification` scales the backdrop seen through the whole face about its
   center.
+- `smoothRefraction` (default `false`) samples the backdrop bilinearly, so
+  refracted lines move smoothly instead of snapping to whole pixels.
+  Undisplaced glass still copies the backdrop exactly, and it costs no extra
+  fetch or pass.
 - `refractionFitsShape` (default `true`) shrinks the lens on small shapes the
   way iOS 27 regular glass does: the bevel is at most a quarter of the short
   side and the rim samples no deeper than the center line. Set it to `false`
