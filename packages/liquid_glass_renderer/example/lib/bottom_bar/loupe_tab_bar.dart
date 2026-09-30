@@ -158,14 +158,14 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   /// tabs (72 → 81.3 pt), then settles within about half a second.
   static const _popVelocity = -3.2;
 
-  /// At the end tabs Apple's loupe pops without an undershoot (+17% at the
-  /// first tab, +6% at the last): the same frequency, damping ratio 0.8,
-  /// peaking 13% taller about 0.18 s after the touch.
+  /// At the end tabs Apple's loupe pops slower and without an undershoot
+  /// (+17% at the first tab after about 0.35 s, +6% at the last): damping
+  /// ratio 0.8 at a lower frequency.
   static const _endRecover = Motion.cupertino(
-    duration: Duration(milliseconds: 618),
+    duration: Duration(milliseconds: 1000),
     bounce: .2,
   );
-  static const _endPopVelocity = -4.2;
+  static const _endPopVelocity = -2.6;
 
   late final _position = SingleMotionController(
     motion: _settle,
