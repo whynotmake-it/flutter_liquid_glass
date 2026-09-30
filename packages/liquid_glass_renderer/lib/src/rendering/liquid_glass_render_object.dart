@@ -358,8 +358,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   /// Whether the composed filter blurs the backdrop, with the same frost as
-  /// the layer's blur, including the Liquid Glass slider's diffusion.
-  bool get _blurFades => settings.frostFor(defaultAppearance.colorModel) > 0;
+  /// the layer's blur.
+  bool get _blurFades => settings.effectiveFrost > 0;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,

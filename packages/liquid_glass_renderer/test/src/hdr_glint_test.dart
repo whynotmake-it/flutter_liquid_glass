@@ -22,7 +22,7 @@ void main() {
       shader: program.fragmentShader(),
       size: size,
       shape: const LiquidRoundedSuperellipse(borderRadius: 30),
-      settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
       appearance: const LiquidGlassAppearance(),
       devicePixelRatio: 1,
     );

@@ -29,7 +29,7 @@ void main() {
               color: const Color(0xFF2A9D8F),
               child: LiquidGlassLayer(
                 fake: true,
-                settings: const LiquidGlassSettings.ios27ToolbarLight(
+                settings: LiquidGlassSettings.ios27ToolbarLight(
                   frost: 0,
                 ).copyWith(highlight: 0, contourStrength: 0),
                 defaultAppearance:
