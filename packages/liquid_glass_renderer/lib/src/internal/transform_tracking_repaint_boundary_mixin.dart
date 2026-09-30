@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:meta/meta.dart';
 
 @internal
@@ -154,5 +155,9 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
   }
 
   @override
-  void addToScene(ui.SceneBuilder builder) {}
+  void addToScene(ui.SceneBuilder builder) {
+    // Every scene containing glass is built through this layer, before the
+    // effect that samples its matte and before the scene is rendered.
+    FlutterGpuGeometryRenderer.flushPendingSubmissions();
+  }
 }

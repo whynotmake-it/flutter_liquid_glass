@@ -483,14 +483,14 @@ class FlutterGpuGeometryRenderer {
       _uniformSize,
     ).emplace(_uniformData);
 
-    final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
+    final geometryCommandBuffer = _commandBufferForPass();
     final geometryPass = geometryCommandBuffer.createRenderPass(_renderTarget!)
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
       ..bindVertexBuffer(_vertexBufferView)
       ..draw(4);
-    geometryCommandBuffer.submit();
+    _submitUnlessDeferred(geometryCommandBuffer);
     if (GpuAllocationDiagnostics.enabled) {
       GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
       GpuAllocationDiagnostics.observe('pass', geometryPass);
@@ -500,7 +500,7 @@ class FlutterGpuGeometryRenderer {
       );
     }
     if (writeMaterials) {
-      final materialCommandBuffer = gpu.gpuContext.createCommandBuffer();
+      final materialCommandBuffer = _commandBufferForPass();
       final materialPass =
           materialCommandBuffer.createRenderPass(_materialRenderTarget!)
             ..bindPipeline(
@@ -512,7 +512,7 @@ class FlutterGpuGeometryRenderer {
             ..bindUniform(_uniformSlot, uniformView)
             ..bindVertexBuffer(_vertexBufferView)
             ..draw(4);
-      materialCommandBuffer.submit();
+      _submitUnlessDeferred(materialCommandBuffer);
       if (GpuAllocationDiagnostics.enabled) {
         GpuAllocationDiagnostics.observe('command', materialCommandBuffer);
         GpuAllocationDiagnostics.observe('pass', materialPass);
@@ -524,6 +524,117 @@ class FlutterGpuGeometryRenderer {
   }
 
   static int _bucketDimension(int value) => (value + 63) & ~63;
+
+  /// Whether passes recorded during a frame are submitted together when the
+  /// frame's scene is built instead of one command buffer each.
+  static const bool _batchSubmissions = bool.fromEnvironment(
+    'LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS',
+    defaultValue: true,
+  );
+
+  /// Submits every pass immediately, as renders outside a frame always do.
+  @visibleForTesting
+  static bool debugSubmitImmediately = false;
+
+  /// `flutter_tester` (Flutter 3.47, Vulkan on SwiftShader) segfaults when one
+  /// Flutter GPU command buffer holds two render passes: 3 of 3 runs, against
+  /// 0 of 3 with one pass per buffer. Metal and the Pixel 10 are verified by
+  /// `example/integration_test/geometry_batch_test.dart` instead. Under the
+  /// test runner each pass keeps its own command buffer, but submission is
+  /// still deferred to the same flush points, so widget tests exercise them.
+  static final bool _onePassPerCommandBuffer = Platform.environment.containsKey(
+    'FLUTTER_TEST',
+  );
+
+  static gpu.CommandBuffer? _frameCommandBuffer;
+  static final List<gpu.CommandBuffer> _pendingCommandBuffers = [];
+  static bool _postFrameFlushScheduled = false;
+
+  /// Command buffers submitted by [flushPendingSubmissions].
+  @visibleForTesting
+  static int debugBatchedSubmitCount = 0;
+
+  /// Flushes left to the post-frame safety net because no glass layer of the
+  /// frame's scene flushed first.
+  @visibleForTesting
+  static int debugPostFrameFlushCount = 0;
+
+  /// Passes recorded into a deferred command buffer.
+  @visibleForTesting
+  static int debugDeferredPassCount = 0;
+
+  /// Whether passes share one command buffer per frame on this platform.
+  @visibleForTesting
+  static bool get debugSharesCommandBuffer =>
+      _batchSubmissions && !_onePassPerCommandBuffer;
+
+  // Only the paint and compositing phases are followed by a scene build that
+  // flushes before the scene reaches the raster thread.
+  static bool get _deferring =>
+      _batchSubmissions &&
+      !debugSubmitImmediately &&
+      SchedulerBinding.instance.schedulerPhase ==
+          SchedulerPhase.persistentCallbacks;
+
+  static gpu.CommandBuffer _commandBufferForPass() {
+    if (!_deferring) return gpu.gpuContext.createCommandBuffer();
+    assert(() {
+      debugDeferredPassCount++;
+      return true;
+    }(), 'Count deferred geometry passes in debug builds.');
+    if (!_postFrameFlushScheduled) {
+      _postFrameFlushScheduled = true;
+      // Covers passes whose layer was painted but not composited this frame.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _postFrameFlushScheduled = false;
+        if (_frameCommandBuffer == null && _pendingCommandBuffers.isEmpty) {
+          return;
+        }
+        assert(() {
+          debugPostFrameFlushCount++;
+          return true;
+        }(), 'Count safety-net flushes in debug builds.');
+        flushPendingSubmissions();
+      });
+    }
+    if (_onePassPerCommandBuffer) {
+      final commandBuffer = gpu.gpuContext.createCommandBuffer();
+      _pendingCommandBuffers.add(commandBuffer);
+      return commandBuffer;
+    }
+    return _frameCommandBuffer ??= gpu.gpuContext.createCommandBuffer();
+  }
+
+  static void _submitUnlessDeferred(gpu.CommandBuffer commandBuffer) {
+    if (!_deferring) commandBuffer.submit();
+  }
+
+  /// Submits the passes recorded since the last flush.
+  ///
+  /// Glass layers call this while the scene is built, which is before the
+  /// scene is handed to the raster thread, so every matte a scene samples has
+  /// been submitted ahead of it on the GPU queue. A post-frame callback
+  /// flushes passes of layers that were painted but not composited.
+  static void flushPendingSubmissions() {
+    final frameCommandBuffer = _frameCommandBuffer;
+    if (frameCommandBuffer == null && _pendingCommandBuffers.isEmpty) return;
+    _frameCommandBuffer = null;
+    if (frameCommandBuffer != null) {
+      frameCommandBuffer.submit();
+      assert(() {
+        debugBatchedSubmitCount++;
+        return true;
+      }(), 'Count batched submissions in debug builds.');
+    }
+    for (final commandBuffer in _pendingCommandBuffers) {
+      commandBuffer.submit();
+      assert(() {
+        debugBatchedSubmitCount++;
+        return true;
+      }(), 'Count batched submissions in debug builds.');
+    }
+    _pendingCommandBuffers.clear();
+  }
 
   /// Frames after its replacement before a texture may be rendered into
   /// again.

@@ -32,6 +32,14 @@ class FlutterGpuGeometryRenderer {
   /// Matches the native renderer's reuse horizon; nothing is reused here.
   static const int reuseAfterFrames = 6;
   static int debugReusedTextureCount = 0;
+
+  /// Nothing is ever deferred on the web.
+  static void flushPendingSubmissions() {}
+  static bool debugSubmitImmediately = false;
+  static int debugBatchedSubmitCount = 0;
+  static int debugDeferredPassCount = 0;
+  static int debugPostFrameFlushCount = 0;
+  static bool get debugSharesCommandBuffer => false;
   int get debugRetiredTextureCount => 0;
 
   /// Material map texels per matte pixel; shared constant with the native

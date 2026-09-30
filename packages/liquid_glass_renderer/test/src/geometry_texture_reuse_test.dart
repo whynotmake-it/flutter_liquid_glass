@@ -50,6 +50,12 @@ Future<Uint8List> _bytes(WidgetTester tester, ui.Image image) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  runGeometryTextureReuseTests();
+}
+
+/// Also runs on devices from `example/integration_test/geometry_batch_test.dart`.
+void runGeometryTextureReuseTests() {
   setUp(() {
     FlutterGpuGeometryRenderer.debugReusedTextureCount = 0;
   });
