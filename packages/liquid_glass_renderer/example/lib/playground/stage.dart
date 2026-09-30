@@ -38,6 +38,7 @@ class Stage extends StatelessWidget {
               adaptive: state.adaptive,
               style: state.style,
               source: state.brightnessSource,
+              fake: state.fake,
             ),
             StageScene.blend => BlendScene(blend: state.blend),
             StageScene.colors => ColorsScene(blend: state.blend),

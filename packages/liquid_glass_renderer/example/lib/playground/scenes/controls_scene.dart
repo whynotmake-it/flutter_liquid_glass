@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
 
@@ -14,12 +15,14 @@ class ControlsScene extends StatelessWidget {
     required this.adaptive,
     required this.style,
     required this.source,
+    required this.fake,
     super.key,
   });
 
   final ValueListenable<bool> adaptive;
   final ValueListenable<GlassStyle> style;
   final LiquidGlassBrightnessSource source;
+  final ValueListenable<bool> fake;
 
   @override
   Widget build(BuildContext context) {
@@ -33,11 +36,11 @@ class ControlsScene extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
-          child: const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               children: [
-                Row(
+                const Row(
                   children: [
                     _CircleButton(icon: CupertinoIcons.chevron_left),
                     Spacer(),
@@ -49,16 +52,8 @@ class ControlsScene extends StatelessWidget {
                     ),
                   ],
                 ),
-                Spacer(),
-                _MiniPlayer(),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: _TabBar()),
-                    SizedBox(width: 10),
-                    _CircleButton(icon: CupertinoIcons.search, size: 62),
-                  ],
-                ),
+                const Spacer(),
+                _BottomBar(fake: fake),
               ],
             ),
           ),
@@ -135,16 +130,15 @@ class _ControlGlass extends StatelessWidget {
 }
 
 class _CircleButton extends StatelessWidget {
-  const _CircleButton({required this.icon, this.size = 48});
+  const _CircleButton({required this.icon});
 
   final IconData icon;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
     return _ControlGlass(
       shape: const LiquidOval(),
-      child: SizedBox.square(dimension: size, child: Icon(icon)),
+      child: SizedBox.square(dimension: 48, child: Icon(icon)),
     );
   }
 }
@@ -174,172 +168,35 @@ class _ButtonCapsule extends StatelessWidget {
   }
 }
 
-class _MiniPlayer extends StatelessWidget {
-  const _MiniPlayer();
+/// The tab bar, search button and mini player, sharing one brightness
+/// estimate when adaptive.
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({required this.fake});
 
-  @override
-  Widget build(BuildContext context) {
-    return _ControlGlass(
-      shape: const LiquidRoundedSuperellipse(borderRadius: 28),
-      child: Builder(
-        builder: (context) => SizedBox(
-          height: 56,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
-            child: Row(
-              children: [
-                const _Artwork(),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Refraction',
-                        maxLines: 1,
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        'The Bevels',
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: CupertinoColors.secondaryLabel.resolveFrom(
-                            context,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(
-                  width: 44,
-                  child: Icon(CupertinoIcons.play_fill),
-                ),
-                const SizedBox(
-                  width: 44,
-                  child: Icon(CupertinoIcons.forward_fill),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+  final ValueListenable<bool> fake;
 
-class _Artwork extends StatelessWidget {
-  const _Artwork();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox.square(
-      dimension: 38,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFF6A3D), Color(0xFFD9236B), Color(0xFF5B2BE0)],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TabBar extends StatefulWidget {
-  const _TabBar();
-
-  @override
-  State<_TabBar> createState() => _TabBarState();
-}
-
-class _TabBarState extends State<_TabBar> {
   static const _tabs = [
-    (icon: CupertinoIcons.house_fill, label: 'Home'),
-    (icon: CupertinoIcons.square_grid_2x2_fill, label: 'New'),
-    (icon: CupertinoIcons.dot_radiowaves_left_right, label: 'Radio'),
-    (icon: CupertinoIcons.music_albums_fill, label: 'Library'),
+    BottomBarTab(icon: CupertinoIcons.house_fill, label: 'Home'),
+    BottomBarTab(icon: CupertinoIcons.square_grid_2x2_fill, label: 'New'),
+    BottomBarTab(
+      icon: CupertinoIcons.dot_radiowaves_left_right,
+      label: 'Radio',
+    ),
+    BottomBarTab(icon: CupertinoIcons.music_albums_fill, label: 'Library'),
   ];
 
-  var _selected = 0;
-
   @override
   Widget build(BuildContext context) {
-    return _ControlGlass(
-      shape: const LiquidRoundedSuperellipse(borderRadius: 31),
-      child: Builder(builder: _buildTabs),
-    );
-  }
-
-  Widget _buildTabs(BuildContext context) {
-    final accent = CupertinoTheme.of(context).primaryColor;
-    final platter = CupertinoDynamicColor.resolve(
-      const CupertinoDynamicColor.withBrightness(
-        color: Color(0x14000000),
-        darkColor: Color(0x24FFFFFF),
+    final scope = _AdaptiveScope.of(context);
+    return ValueListenableBuilder(
+      valueListenable: fake,
+      builder: (context, fake, _) => IosBottomBar(
+        tabs: _tabs,
+        accessory: const NowPlayingAccessory(),
+        brightnessSource: scope.source,
+        appearanceFor: scope.style.appearance,
+        fake: fake,
       ),
-      context,
-    );
-    return SizedBox(
-      height: 62,
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Row(
-          children: [
-            for (final (index, tab) in _tabs.indexed)
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _selected = index),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: index == _selected ? platter : null,
-                      borderRadius: BorderRadius.circular(27),
-                    ),
-                    child: _TabItem(
-                      icon: tab.icon,
-                      label: tab.label,
-                      color: index == _selected ? accent : null,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TabItem extends StatelessWidget {
-  const _TabItem({required this.icon, required this.label, this.color});
-
-  final IconData icon;
-  final String label;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0,
-          ),
-        ),
-      ],
     );
   }
 }
