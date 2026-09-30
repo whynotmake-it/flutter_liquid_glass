@@ -291,24 +291,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     LiquidGlassAppearance appearance,
     Offset materialCenter,
   ) {
-    final appearanceVisibility = appearance.visibility;
-    final tint = appearance.tint.withValues(
-      alpha: appearance.tint.a * appearanceVisibility,
-    );
-    final saturation = 1 + (appearance.saturation - 1) * appearanceVisibility;
-    final transmissionGamma =
-        1 + (appearance.transmissionGamma - 1) * appearanceVisibility;
-    final vibrancy = appearance.vibrancy * appearanceVisibility;
+    // The final shader fades the whole material with visibility, so the
+    // color factors are written at full strength.
     shader.setFloatUniforms(initialIndex: 6, (value) {
       value
-        ..setColor(tint)
+        ..setColor(appearance.tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
           settings.effectiveChromaticAberration,
           settings.effectiveThickness * devicePixelRatio,
           settings.effectiveHighlight,
           settings.effectiveBackdropScale,
-          saturation,
+          appearance.saturation,
         ])
         ..setOffset(
           const Offset(0, 1),
@@ -340,8 +334,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           settings.effectiveHighlightWrap,
         ])
         ..setFloats([
-          transmissionGamma,
-          vibrancy,
+          appearance.transmissionGamma,
+          appearance.vibrancy,
           settings.effectiveTintAmount,
         ])
         ..setFloats([
@@ -351,16 +345,21 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ])
         ..setFloats([
           appearance.colorModel.shaderValue,
-          appearanceVisibility,
+          appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
           _materialShortSide,
         ]);
     });
     // Float index 53, after the 47-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
-    // unfrosted glass stays alpha-1 and matches the backdrop exactly.
-    shader.setFloat(53, settings.effectiveFrost > 0 ? 1 : 0);
+    // unfrosted glass stays alpha-1 and cross-fades its material in the
+    // shader, so both match the backdrop exactly at visibility 0.
+    shader.setFloat(53, _blurFades ? 1 : 0);
   }
+
+  /// Whether the composed filter blurs the backdrop, with the same frost as
+  /// the layer's blur, including the Liquid Glass slider's diffusion.
+  bool get _blurFades => settings.frostFor(defaultAppearance.colorModel) > 0;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,

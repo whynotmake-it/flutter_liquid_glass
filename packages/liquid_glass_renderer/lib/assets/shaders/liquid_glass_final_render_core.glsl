@@ -33,8 +33,10 @@ uniform vec3 uBevelShadowConfig;
 uniform vec4 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
-// 1.0 lets material alpha cross-fade the frost away; 0.0 keeps unfrosted
-// glass opaque so visibility 0 is an exact identity of the backdrop.
+// 1.0 lets material alpha cross-fade the frost away, and the rest of the
+// material with it; 0.0 keeps unfrosted glass opaque and cross-fades the
+// material to the refracted backdrop instead, so visibility 0 is an exact
+// identity of the backdrop.
 uniform float uBlurFade;
 
 float uDisplacementScale = uOpticalProps.x;
@@ -501,6 +503,11 @@ void main() {
     
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
+    // Weight of the material over the refracted backdrop. Frosted glass
+    // renders the material in full and its alpha fades it with the frost;
+    // opaque unfrosted glass fades it here. Either way it fades linearly,
+    // never twice.
+    float materialVisibility = mix(appearanceVisibility, 1.0, uBlurFade);
     vec3 colorModelShares = colorModelSharesOf(uAppearanceConfig.x);
     #if SHAPE_TINT
     {
@@ -618,14 +625,10 @@ void main() {
             colorModelSharesOf(primaryColorModel),
             primaryWeight
         );
-        materialTint.a *= appearanceVisibility;
-        uSaturation = mix(1.0, appearance.x, appearanceVisibility);
-        uTransmissionGamma = mix(
-            1.0,
-            appearance.y,
-            appearanceVisibility
-        );
-        uVibrancy = appearance.z * appearanceVisibility;
+        materialVisibility = mix(appearanceVisibility, 1.0, uBlurFade);
+        uSaturation = appearance.x;
+        uTransmissionGamma = appearance.y;
+        uVibrancy = appearance.z;
     }
     #endif
 
@@ -846,13 +849,16 @@ void main() {
         signedEdgeDistance,
         surfaceNormal
     );
-    // Highlights, bevel shadow, and in-material contour are incident effects
-    // of the glass: they fade to the untinted transmitted material as
-    // visibility reaches zero instead of ghosting a hidden shape.
-    vec3 finalColor = mix(baseColor, litColor, appearanceVisibility);
+    // The lit material (face, tint, saturation, lighting and in-material
+    // contour) cross-fades to the refracted backdrop, whose refraction
+    // scales with visibility. Fading the output rather than each parameter
+    // keeps coupled factors, such as the dark face's wash and lift, linear
+    // and monotonic.
+    vec3 finalColor = mix(refractColor.rgb, litColor, materialVisibility);
     // Inside the material, contour absorption is handled before highlights so
     // specular light can eclipse it. Only the part outside the material is
-    // composited as a translucent attached boundary.
+    // composited as a translucent attached boundary. It lies outside the
+    // alpha fade, so it always scales with visibility.
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float externalContourAlpha =
