@@ -716,7 +716,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance(),
       ),
       BenchmarkScenario.realClearUnfrosted => _realLayer(
-        LiquidGlassSettings.ios27Clear(frost: 0),
+        LiquidGlassSettings.ios27Clear(),
         t,
         appearance: const LiquidGlassAppearance(),
       ),
