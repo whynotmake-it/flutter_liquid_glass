@@ -275,7 +275,12 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
       return;
     }
     _syncBackdropEdge();
-    if (!motion.needsRepaint || _repaintAfterCompositingScheduled) return;
+    if (motion.needsRepaint) _repaintAfterCompositing();
+  }
+
+  // The retained layers of this frame are already in the scene.
+  void _repaintAfterCompositing() {
+    if (_repaintAfterCompositingScheduled) return;
     _repaintAfterCompositingScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _repaintAfterCompositingScheduled = false;
@@ -832,6 +837,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     final shader = _backdropEdgeShader;
     final shapes = _edgeShapes;
     if (shader == null || shapes == null || shapes.isEmpty) return null;
+    if (_underOpacity()) return null;
     final mapping = _edgeMapping();
     if (mapping == null) return null;
     if (_edgeFilter != null && listEquals(_edgeFilterMapping, mapping)) {
@@ -853,6 +859,22 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     return _edgeFilter = ImageFilter.shader(shader);
   }
 
+  /// Whether an opacity widget sits above this layer. The edge pass shares a
+  /// keyed backdrop snapshot, and keyed backdrops inside an opacity pass
+  /// escape its fade; a fade can start without repainting this subtree, so
+  /// any opacity ancestor keeps the unkeyed path clip.
+  bool _underOpacity() {
+    for (var node = parent; node != null; node = node.parent) {
+      if (node is RenderOpacity ||
+          node is RenderAnimatedOpacity ||
+          node is RenderSliverOpacity ||
+          node is RenderSliverAnimatedOpacity) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Keeps the edge pass aligned when retained motion moves this layer
   /// without a repaint.
   void _syncBackdropEdge() {
@@ -860,7 +882,7 @@ class RenderConsolidatedFakeGlassLayer extends RenderProxyBox
     if (layer == null) return;
     final filter = _backdropEdgeFilter();
     if (filter == null) {
-      markNeedsPaint();
+      _repaintAfterCompositing();
       return;
     }
     if (!identical(layer.filter, filter)) layer.filter = filter;
