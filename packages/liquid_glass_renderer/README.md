@@ -246,7 +246,7 @@ Values measured on iOS 27 (Reduce Motion off):
 | Look | `refractionHeight` | `refractionAmount` | Other |
 | --- | --- | --- | --- |
 | Regular glass, buttons, toolbars (default) | `20` | `60` | |
-| Clear glass | `20` | `60` | `refractionFitsShape: false` |
+| Clear glass (`LiquidGlassSettings.ios27Clear()`) | `20` | `60` | `refractionFitsShape: false`, `frost: 0.35` |
 | Text loupe | `8` | `28` | `magnification: 1.25` |
 
 iOS 27 shows no chromatic dispersion in refraction, so `chromaticAberration`

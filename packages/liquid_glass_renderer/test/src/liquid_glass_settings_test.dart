@@ -23,6 +23,15 @@ void main() {
     expect(dark.exteriorShadowSizeResponse, 0);
   });
 
+  test('iOS 27 clear preset keeps the full lens with a slight blur', () {
+    final clear = LiquidGlassSettings.ios27Clear();
+    expect(clear.refractionHeight, 20);
+    expect(clear.refractionAmount, 60);
+    expect(clear.refractionFitsShape, isFalse);
+    expect(clear.frost, .35);
+    expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
+  });
+
   test('brightness-aware toolbar factory selects structural presets', () {
     expect(
       LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
