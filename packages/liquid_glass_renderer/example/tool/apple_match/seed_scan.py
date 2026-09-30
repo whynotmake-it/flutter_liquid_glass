@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
-import math
 import os
 import shutil
 import sys
@@ -34,17 +33,16 @@ REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
 PINNED_RUNTIME = "iOS 27.0 (24A5408d)"
 PINNED_RUNTIME_IDENTIFIER = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
 
-# The example loupe deliberately composes a pre-shader RawMagnifier with a
-# clear glass shell.  _MatchLoupe applies these overrides after the candidate
-# settings are mapped, so scanning them would produce duplicate captures while
-# falsely claiming that they were searched.
+# The loupe scene composes LiquidGlassLoupe (full-resolution magnification)
+# with a clear glass shell.  _MatchLoupe applies these overrides after the
+# candidate settings are mapped, so scanning them would produce duplicate
+# captures while falsely claiming that they were searched.
 LOUPE_FORCED_SETTINGS = {
     "tintRed": 255.0,
     "tintGreen": 255.0,
     "tintBlue": 255.0,
     "tintAlpha": 0.0,
     "frost": 0.0,
-    "refractionSpread": 0.0,
     "saturation": 1.0,
     "transmissionGamma": 1.0,
     "vibrancy": 0.0,
@@ -153,22 +151,18 @@ def validate_scene_geometry(scene: dict, settings: dict) -> None:
             )
 
 
+SEED_AXES = ("tintAlpha", "frost", "refractionHeight", "refractionAmount")
+
+
 def search_space(
     seeds: list[dict],
-    profile_gate: bool,
     *,
     axes: tuple[str, ...] | None = None,
     forced_settings: dict | None = None,
 ) -> dict:
-    axes = axes or (
-        "tintAlpha",
-        "frost",
-        "refractionHeight",
-        "refractionAmount",
-        "refractionSpread",
-    )
+    axes = axes or SEED_AXES
     return {
-        "mode": "profile-gate" if profile_gate else "ordinary-seed-grid",
+        "mode": "seed-grid",
         "axes": {
             key: sorted({seed[key] for seed in seeds})
             for key in axes
@@ -195,28 +189,21 @@ def build_seed_candidates(
     scene_id: str,
     scene: dict,
     base: dict,
-    spread: float = 0.0,
-    profile_gate: bool = False,
 ) -> tuple[list[dict], tuple[str, ...], dict]:
     """Build truthful candidates and report the axes that affect this scene."""
     base = apply_scene_geometry(scene, base)
     if scene_id == "loupe":
-        if spread != 0.0 or profile_gate:
-            raise ValueError(
-                "loupe candidates use the pre-shader magnifier; --spread and "
-                "--profile-gate are not effective controls"
-            )
         candidates = []
-        for thickness in (12.0, 20.0, 28.0):
-            for refractive_index in (1.08, 1.2, 1.6, 2.5):
+        # Bevel width and edge displacement on the magnified content; the
+        # iOS 27 fit is 8 / 34.5.
+        for height in (8.0, 12.0, 20.0):
+            for amount in (20.0, 28.0, 35.0, 45.0):
                 seed = dict(base)
                 seed.update(LOUPE_FORCED_SETTINGS)
                 seed.update(
                     {
-                        "refractionHeight": thickness,
-                        "refractionAmount": 8.0
-                        * thickness
-                        * math.sqrt(max(0.0, refractive_index**2 - 1.0)),
+                        "refractionHeight": height,
+                        "refractionAmount": amount,
                         "contourStrength": 0.35,
                         "contourWidth": 1.0,
                         "highlight": 0.5,
@@ -227,54 +214,28 @@ def build_seed_candidates(
             LOUPE_FORCED_SETTINGS
         )
 
-    if profile_gate:
-        seed_specs = (
-            (0.05, 0.0, 12.0, edge, candidate_spread)
-            for edge, candidate_spread in itertools.product(
-                [25.0, 35.0, 45.0, 55.0], [0.75, 1.0]
-            )
-        )
-    else:
-        if not 0.0 <= spread <= 1.0:
-            raise ValueError("spread must be between 0 and 1")
-        seed_specs = (
-            (
-                alpha,
-                frost,
-                thickness,
-                8.0 * thickness * math.sqrt(max(0.0, ri**2 - 1.0)),
-                spread,
-            )
-            for alpha, frost, thickness, ri in itertools.product(
-                [0.05, 0.12, 0.25, 0.4],
-                [0.0, 2.0, 7.0],
-                [12.0, 20.0, 28.0],
-                [1.08, 1.2, 1.6, 2.5],
-            )
-        )
     candidates = []
-    for alpha, frost, thickness, edge_refraction, candidate_spread in seed_specs:
+    # Bevel grid around the iOS 27 regular-glass fit (20 / 60).
+    for alpha, frost, height, amount in itertools.product(
+        [0.05, 0.12, 0.25, 0.4],
+        [0.0, 2.0, 7.0],
+        [12.0, 20.0, 28.0],
+        [30.0, 45.0, 60.0, 80.0],
+    ):
         seed = dict(base)
         seed.update(
             {
                 "tintAlpha": alpha,
                 "frost": frost,
-                "refractionHeight": thickness,
-                "refractionAmount": edge_refraction,
-                "refractionSpread": candidate_spread,
+                "refractionHeight": height,
+                "refractionAmount": amount,
                 "contourStrength": 0.35,
                 "contourWidth": 1.0,
                 "highlight": 0.5,
             }
         )
         candidates.append(seed)
-    return deduplicate_settings(candidates), (
-        "tintAlpha",
-        "frost",
-        "refractionHeight",
-        "refractionAmount",
-        "refractionSpread",
-    ), {}
+    return deduplicate_settings(candidates), SEED_AXES, {}
 
 
 def scan_summary(
@@ -288,7 +249,6 @@ def scan_summary(
     reference_metadata: dict,
     reference_metadata_path: Path,
     out: Path,
-    profile_gate: bool,
     scene_shape: dict,
     effective_axes: tuple[str, ...] | None = None,
     forced_settings: dict | None = None,
@@ -303,8 +263,8 @@ def scan_summary(
         "comparisonContract": {
             "s0Status": "retired",
             "reason": (
-                "Intentional pre-shader RawMagnifier enlargement is evaluated "
-                "as example composition, not as a renderer-only S0."
+                "Intentional LiquidGlassLoupe enlargement is evaluated as "
+                "composition, not as a renderer-only S0."
             ),
         },
         "scene": scene_id,
@@ -324,13 +284,11 @@ def scan_summary(
             "udid": PINNED_DEVICE_UDID,
         },
         "composition": {
-            "preShaderMagnification": True,
-            "magnificationScale": 1.55,
+            "loupeMagnification": 1.25,
             "shaderLevelMagnification": False,
         },
         "search": search_space(
             all_seed_settings,
-            profile_gate,
             axes=effective_axes,
             forced_settings=forced_settings,
         ),
@@ -381,20 +339,6 @@ def main() -> None:
         type=int,
         help="Evaluate an evenly spaced subset of the full grid (partial scan)",
     )
-    parser.add_argument(
-        "--spread",
-        type=float,
-        default=0.0,
-        help=(
-            "Profile reach for the ordinary seed scan; defaults to 0 for a "
-            "fair pre-redesign baseline"
-        ),
-    )
-    parser.add_argument(
-        "--profile-gate",
-        action="store_true",
-        help="Run the bounded loupe profile gate (E={25,35,45,55}, spread={.75,1})",
-    )
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
@@ -426,8 +370,6 @@ def main() -> None:
             scene_id=args.scene_id,
             scene=scene,
             base=base,
-            spread=args.spread,
-            profile_gate=args.profile_gate,
         )
     except ValueError as error:
         parser.error(str(error))
@@ -495,8 +437,8 @@ def main() -> None:
             print(
                 f"SEED {index:02d} score={score:.4f} "
                 f"alpha={seed['tintAlpha']} frost={seed['frost']} "
-                f"thickness={seed['refractionHeight']} edge={seed['refractionAmount']:.2f} "
-                f"spread={seed['refractionSpread']}",
+                f"height={seed['refractionHeight']} "
+                f"amount={seed['refractionAmount']:.2f}",
                 flush=True,
             )
 
@@ -517,7 +459,6 @@ def main() -> None:
         reference_metadata=reference_metadata,
         reference_metadata_path=reference_metadata_path,
         out=out,
-        profile_gate=args.profile_gate,
         scene_shape=scene["shape"],
         effective_axes=effective_axes,
         forced_settings=forced_settings,
