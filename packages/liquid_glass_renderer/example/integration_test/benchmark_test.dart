@@ -711,7 +711,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
       ),
       BenchmarkScenario.realClearMaterial => _realLayer(
-        LiquidGlassSettings.ios27Clear(),
+        LiquidGlassSettings.ios27Clear(frost: .35),
         t,
         appearance: const LiquidGlassAppearance(),
       ),
