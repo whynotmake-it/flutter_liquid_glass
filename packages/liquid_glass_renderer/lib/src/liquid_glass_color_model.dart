@@ -256,9 +256,10 @@ final class Ios27ClearLiquidGlassColorModel extends LiquidGlassColorModel {
   @override
   double get fakeGlintLuminance => 3.26;
 
+  /// Clear glass carries its slider blur in its frost
+  /// (`LiquidGlassSettings.ios27ClearFrost`), so no detail fade is added.
   @override
-  double sliderDetail(double tintAmount) =>
-      sliderKeyframes(tintAmount, 1, 0.95, 0.02);
+  double sliderDetail(double tintAmount) => 1;
 
   @override
   ({Color emission, double transmittance, double lift, double chromaGain})

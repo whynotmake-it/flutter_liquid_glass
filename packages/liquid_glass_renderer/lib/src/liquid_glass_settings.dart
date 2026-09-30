@@ -146,11 +146,21 @@ class LiquidGlassSettings with Equatable {
   ///
   /// Clear glass has the same glint line and angular falloff as the toolbar;
   /// its brighter glint comes from its color model. The border exists only
-  /// where the normal is perpendicular to the light axis. Pair it with
+  /// where the normal is perpendicular to the light axis. The Liquid Glass
+  /// slider only blurs clear glass, so [frost] defaults to
+  /// [ios27ClearFrost] for [tintAmount]. Pair it with
   /// [LiquidGlassAppearance.ios27Clear].
-  const LiquidGlassSettings.ios27Clear({
-    this.frost = 0.0,
-    this.tintAmount = 0.0,
+  factory LiquidGlassSettings.ios27Clear({
+    double tintAmount = 0,
+    double? frost,
+  }) => LiquidGlassSettings._ios27Clear(
+    frost: frost ?? ios27ClearFrost(tintAmount),
+    tintAmount: tintAmount,
+  );
+
+  const LiquidGlassSettings._ios27Clear({
+    required this.frost,
+    required this.tintAmount,
   }) : thickness = 12.0,
        edgeRefraction = 27.42,
        refractionSpread = 0.0,
@@ -204,6 +214,22 @@ class LiquidGlassSettings with Equatable {
          chromaticAberration: 4 * (dispersion / 100),
          frost: frost,
        );
+
+  /// Backdrop blur of iOS 27 `.clear` glass, in logical pixels, for the
+  /// Settings Liquid Glass slider position [tintAmount] (`0` Clear, `1`
+  /// Tinted).
+  ///
+  /// Clear glass has no wash or tint at any position; the slider only
+  /// blurs. The blur grows exponentially at one rate up to the Settings
+  /// middle tick and at twice that rate beyond it: 0.35, 1.28 and 16.4 pt at
+  /// 0, 0.5 and 1.
+  static double ios27ClearFrost(double tintAmount) {
+    final amount = tintAmount.clamp(0.0, 1.0);
+    return 0.35 *
+        math.exp(
+          2.6 * math.min(amount, 0.5) + 5.1 * math.max(amount - 0.5, 0.0),
+        );
+  }
 
   /// Returns the material settings supplied by the nearest glass layer.
   static LiquidGlassSettings of(BuildContext context) {
@@ -367,10 +393,10 @@ class LiquidGlassSettings with Equatable {
   /// Backdrop blur sigma for glass using [colorModel].
   ///
   /// Apple fades backdrop detail with [tintAmount] by mixing toward a fully
-  /// diffused face; clear glass keeps more detail until the middle tick. A
-  /// single Gaussian cannot mix, so the slider adds the blur that attenuates
-  /// detail with a 23 pt period by the same fraction, calibrated against
-  /// Apple's toolbar captures.
+  /// diffused face. A single Gaussian cannot mix, so the slider adds the
+  /// blur that attenuates detail with a 23 pt period by the same fraction,
+  /// calibrated against Apple's toolbar captures. Clear glass carries its
+  /// slider blur in [frost] instead (see [ios27ClearFrost]).
   double frostFor(LiquidGlassColorModel colorModel) {
     final amount = effectiveTintAmount;
     if (amount <= 0) return frost;
