@@ -28,6 +28,8 @@
 	<true/>
 	<key>FLTEnableImpeller</key>
 	<true/>
+	<key>FLTEnableWideGamut</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
