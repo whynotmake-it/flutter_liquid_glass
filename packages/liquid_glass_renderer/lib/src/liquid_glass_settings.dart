@@ -272,7 +272,8 @@ class LiquidGlassSettings with Equatable {
   /// The glint recolors the face instead of adding white: it pulls the lit
   /// material toward a target brighter than SDR white carrying the face's own
   /// chroma amplified, so glass over color glints in that color. `1` is the
-  /// strength measured on iOS 27 in both appearances.
+  /// strength an iPhone shows on iOS 27 in both appearances. Apple's
+  /// simulator captures, which are SDR, correspond to about `0.56`.
   final double highlight;
 
   /// Width of the glint line in logical pixels, measured inward from the

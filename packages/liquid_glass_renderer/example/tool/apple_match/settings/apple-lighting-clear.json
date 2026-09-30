@@ -23,7 +23,7 @@
   "saturation": 1.0,
   "transmissionGamma": 1.0,
   "vibrancy": 0.0,
-  "highlight": 1.0,
+  "highlight": 0.556,
   "highlightWidth": 1.2,
   "highlightWrap": 0.5,
   "highlightOppositeStrength": 1.0,
