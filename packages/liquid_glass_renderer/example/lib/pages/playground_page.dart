@@ -126,6 +126,7 @@ class PlaygroundPage extends HookWidget {
                       ),
                       _SliderSetting(
                         label: 'Magnification',
+                        // ignore: deprecated_member_use
                         value: settings.magnification,
                         min: 0.5,
                         max: 1.5,

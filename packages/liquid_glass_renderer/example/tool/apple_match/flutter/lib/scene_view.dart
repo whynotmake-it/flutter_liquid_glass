@@ -38,8 +38,10 @@ LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
             : defaults.refractionAmount,
       ),
     ),
+    // ignore: deprecated_member_use
     magnification: number(
       'magnification',
+      // ignore: deprecated_member_use
       number('backdropScale', defaults.magnification),
     ),
     refractionFitsShape:
@@ -207,12 +209,18 @@ class MatchSceneView extends StatelessWidget {
       height: shapeHeight,
     );
     final cornerRadius = _number('cornerRadius', scene.cornerRadius);
+    final loupeLink = LiquidGlassLoupeLink();
     return SizedBox(
       width: scene.width,
       height: scene.height,
       child: Stack(
         children: [
-          Positioned.fill(child: ProbeBackground(spec: background)),
+          Positioned.fill(
+            child: LiquidGlassLoupeSource(
+              link: loupeLink,
+              child: ProbeBackground(spec: background),
+            ),
+          ),
           // The reference capture retains the iPhone 17 Pro Dynamic Island
           // even though the harness hides system overlays. Reproduce that
           // device chrome deterministically so full-frame RGBW registration
@@ -233,6 +241,7 @@ class MatchSceneView extends StatelessWidget {
             ),
           if (scene.profile == 'loupe')
             _MatchLoupe(
+              link: loupeLink,
               rect: shapeRect,
               cornerRadius: cornerRadius,
               settings: matchGlassSettings(settings),
@@ -450,12 +459,11 @@ class _TabGlyphPainter extends CustomPainter {
       oldDelegate.glyph != glyph || oldDelegate.color != color;
 }
 
-/// Composes the iOS loupe as Flutter does: magnify the painted backdrop first,
-/// then apply the ordinary liquid-glass pass to that higher-resolution source.
-/// This keeps intentional loupe enlargement out of the renderer shader and
-/// avoids magnifying already filtered pixels.
+/// The iOS loupe through the package's [LiquidGlassLoupe]: the probe is
+/// re-rendered at 1.25x under the lens, then refracted and lit by the glass.
 class _MatchLoupe extends StatelessWidget {
   const _MatchLoupe({
+    required this.link,
     required this.rect,
     required this.cornerRadius,
     required this.settings,
@@ -463,6 +471,7 @@ class _MatchLoupe extends StatelessWidget {
     required this.shadows,
   });
 
+  final LiquidGlassLoupeLink link;
   final Rect rect;
   final double cornerRadius;
   final LiquidGlassSettings settings;
@@ -471,37 +480,21 @@ class _MatchLoupe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = rect.size;
-    final borderRadius = BorderRadius.circular(cornerRadius);
     return Positioned.fromRect(
       rect: rect,
-      child: SizedBox.fromSize(
-        size: size,
-        child: Stack(
-          children: [
-            RawMagnifier(
-              size: size,
-              // Fitted to the iOS 27 loupe capture: interior rms 0.009 on
-              // both grid probes.
-              magnificationScale: 1.25,
-              focalPointOffset: const Offset(0, 75),
-              decoration: MagnifierDecoration(
-                shape: RoundedRectangleBorder(borderRadius: borderRadius),
-              ),
-            ),
-            LiquidGlass.withOwnLayer(
-              // The system text-selection loupe is a clear lens. Its
-              // magnification belongs to RawMagnifier above; never let a
-              // candidate's ordinary material vector turn this holdout into
-              // a frosted, opaque pill or a full-face shader zoom.
-              settings: settings.copyWith(magnification: 1, frost: 0),
-              appearance: const LiquidGlassAppearance(),
-              shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
-              shadows: shadows,
-              child: const SizedBox.expand(),
-            ),
-          ],
-        ),
+      child: LiquidGlassLoupe(
+        link: link,
+        size: rect.size,
+        shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
+        // Fitted to the iOS 27 loupe capture: interior rms 0.009 on both
+        // grid probes.
+        focalPointOffset: const Offset(0, 75),
+        // The system text-selection loupe is a clear lens. Never let a
+        // candidate's ordinary material vector turn this holdout into a
+        // frosted, opaque pill or a full-face shader zoom.
+        settings: settings.copyWith(magnification: 1, frost: 0),
+        appearance: const LiquidGlassAppearance(),
+        shadows: shadows,
       ),
     );
   }
