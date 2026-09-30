@@ -11,7 +11,7 @@ import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 /// Per-shape color response and materialization belong to
 /// [LiquidGlassAppearance]. The renderer derives paired edge highlights and
 /// the dark silhouette from the same SDF, so these controls remain stable
-/// across the toolbar, capsule, tab, and loupe scenes.
+/// across toolbars, capsules, and tabs.
 class LiquidGlassSettings with Equatable {
   /// Creates a material from optical and lighting controls.
   ///
@@ -292,7 +292,7 @@ class LiquidGlassSettings with Equatable {
   /// Glass is modeled as a flat face with a rounded bevel of this width.
   /// Only the bevel refracts; the face beyond it shows the backdrop
   /// undisplaced. Apple calls this the refraction height; iOS 27 glass
-  /// measures `20`, the text loupe `8`. See [refractionFitsShape] for how
+  /// measures `20`, Apple's text loupe `8`. See [refractionFitsShape] for how
   /// small shapes limit it.
   final double refractionHeight;
 
@@ -304,7 +304,7 @@ class LiquidGlassSettings with Equatable {
   /// the silhouette to `0` at [refractionHeight], so the bevel joins the
   /// face without a crease. The ratio to [refractionHeight] sets how
   /// rod-like the rim reads: above `1`, content near the rim is mirrored.
-  /// iOS 27 glass measures `60`, the text loupe `28`. `0` disables
+  /// iOS 27 glass measures `60`, Apple's text loupe `28`. `0` disables
   /// refraction.
   final double refractionAmount;
 
@@ -354,7 +354,7 @@ class LiquidGlassSettings with Equatable {
   ///
   /// Red is displaced by `1 + dispersion / 2` and blue by
   /// `1 - dispersion / 2` times the edge displacement. Negative values bend
-  /// blue more, as real glass does; the iOS 27 loupe measures about `-0.07`
+  /// blue more, as real glass does; the iOS 27 loupe measures about `-0.06`
   /// and other iOS 27 glass `0`. At `0` the glass reads the backdrop once
   /// per pixel instead of three times.
   final double dispersion;
@@ -497,7 +497,7 @@ class LiquidGlassSettings with Equatable {
   /// Effective backdrop blur sigma; never negative.
   double get effectiveFrost => math.max(0, frost);
 
-  /// Effective chromatic aberration.
+  /// Effective dispersion.
   double get effectiveDispersion => dispersion;
 
   /// Effective highlight strength.

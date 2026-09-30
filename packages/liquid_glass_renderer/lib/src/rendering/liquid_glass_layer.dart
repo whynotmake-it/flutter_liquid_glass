@@ -50,8 +50,8 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///         ),
 ///         const SizedBox(height: 100),
 ///         LiquidGlassBlendGroup(
-///          blend: 20,
-///          child: Row(
+///           blend: 20,
+///           child: Row(
 ///             children: [
 ///               LiquidGlass.grouped(
 ///                 shape: const LiquidOval(),
@@ -74,6 +74,7 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///     ),
 ///   );
 /// }
+/// ```
 class LiquidGlassLayer extends StatefulWidget {
   /// Creates a new [LiquidGlassLayer] with the given [child] and [settings].
   const LiquidGlassLayer({
@@ -103,6 +104,9 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// Whether to replace all liquid glass effects in this layer with
   /// [FakeGlass] effects.
+  ///
+  /// The layer also uses [FakeGlass] when Impeller shader filters or Flutter
+  /// GPU are unavailable, for example on Skia.
   final bool fake;
 
   /// Whether to share a [BackdropGroup] capture for backdrop effects.

@@ -9,8 +9,8 @@ import 'package:motor/motor.dart';
 /// A widget that provides a squash and stretch effect to its child based on
 /// user interaction.
 ///
-/// Will listen to drag gestures from the user without interfering with other
-/// gestures.
+/// By default, listens to drag gestures from the user without interfering
+/// with other gestures. See [gestureMode].
 class LiquidStretch extends StatelessWidget {
   /// Creates a new [LiquidStretch] widget with the given [child],
   /// [interactionScale], and [stretch].
@@ -28,8 +28,7 @@ class LiquidStretch extends StatelessWidget {
   ///
   /// A value of 1.0 means no scaling.
   ///
-  /// A value greater than 2.0 means the widget will grow to double its
-  /// original size.
+  /// A value of 2.0 means the widget will grow to double its original size.
   ///
   /// A value less than 1.0 means the widget will scale down.
   ///
@@ -47,14 +46,14 @@ class LiquidStretch extends StatelessWidget {
 
   /// The resistance factor to apply to the drag offset.
   ///
-  /// The higher the resisance, the more sticky the drag will feel.
+  /// The higher the resistance, the more sticky the drag will feel.
   /// See [OffsetResistanceExtension.withResistance] for details on how this
   /// works.
   ///
   /// Defaults to 0.08.
   final double resistance;
 
-  /// The hit test behavior for the internal gesture Listener.
+  /// The hit test behavior for the internal gesture handler.
   ///
   /// Defaults to [HitTestBehavior.opaque].
   final HitTestBehavior hitTestBehavior;

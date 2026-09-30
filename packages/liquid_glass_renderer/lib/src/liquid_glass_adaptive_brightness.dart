@@ -8,7 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
-/// Connects the content an [LiquidGlassAdaptiveBrightness] estimates its
+/// Connects the content a [LiquidGlassAdaptiveBrightness] estimates its
 /// brightness from to the [LiquidGlassBrightnessBackdrop] that paints it.
 ///
 /// Create one per content plane, like a [BackdropKey], and pass it to both

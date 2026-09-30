@@ -1,106 +1,110 @@
-## Unreleased
-
-### Breaking changes
-
-- Replace `precacheLiquidGlassShaders()` with `LiquidGlass.precache()`. The new
-  API also warms the Flutter GPU geometry cache so layers mounted afterwards
-  render real glass from their first frame; call it before `runApp` (on
-  Android the GPU portion completes after the first frame).
-- Remove support for `Opacity`/`FadeTransition` between a `LiquidGlassLayer`
-  and its shapes; it only faded the shapes' children, not the glass. Fade
-  glass with `LiquidGlassVisibility` or `LiquidGlassAppearance.visibility`
-  instead. Opacity above a whole `LiquidGlassLayer` is still supported.
-
 ## 1.0.0-dev.1
 
-This experimental prerelease contains breaking API and rendering changes.
+> Note: This release has breaking changes.
+
+A rewrite of the renderer on Flutter GPU, fitted against iOS 27 Liquid Glass.
+It replaces the `0.2.x` API without deprecations. This is an experimental
+prerelease; APIs and rendering may still change.
 
 ### Breaking changes
 
-- Remove `LiquidGlass.glassContainsChild` from all constructors. Children now
-  always paint above the glass effect (and retain the configured clipping),
-  rather than being blurred, tinted, or refracted as part of its optical input.
-  Remove the argument when migrating; foreground fades with its glass normally.
+- **Requirements.** Full glass needs Impeller and Flutter GPU
+  (`--enable-flutter-gpu`, `FLTEnableFlutterGPU`, or
+  `io.flutter.embedding.android.EnableFlutterGPU`). Everywhere else layers
+  render `FakeGlass`. The minimum Flutter version is 3.47.0.
+- **Settings are split.** `LiquidGlassSettings` keeps the optics and lighting
+  shared by a layer. Color and visibility move to the new per-shape
+  `LiquidGlassAppearance`, set on a `LiquidGlass` or as a layer's
+  `defaultAppearance`.
+- **Renamed and replaced settings:**
+  - `glassColor` becomes `LiquidGlassAppearance.tint`.
+  - `saturation` moves to `LiquidGlassAppearance.saturation`.
+  - `visibility` moves to `LiquidGlassAppearance.visibility` and the new
+    `LiquidGlassVisibility` widget.
+  - `blur` becomes `frost`, a blur sigma in logical pixels.
+  - `thickness` becomes `refractionHeight`, the width of the refracting bevel.
+    `0` now means flat glass instead of no glass.
+  - `refractiveIndex` becomes `refractionAmount`, the displacement in logical
+    pixels at the silhouette, falling off across the bevel as a quarter
+    circle.
+  - `chromaticAberration` becomes `dispersion`, and defaults to `0`.
+  - `lightIntensity` becomes `highlight`. `1` now matches the iOS 27 glint on
+    an iPhone.
+  - `lightAngle` and `ambientStrength` are removed; the light direction is no
+    longer configurable.
+- **Children always paint above the glass.** `glassContainsChild` is removed
+  from every `LiquidGlass` constructor. Children are clipped to the shape but
+  never blurred, tinted or refracted.
+- **No `Opacity` between a layer and its shapes.** It only faded the
+  children, not the glass. Use `LiquidGlassVisibility` or
+  `LiquidGlassAppearance.visibility`. `Opacity` above a whole
+  `LiquidGlassLayer` still works.
+- **New defaults.** Glass renders with a 20 pt bevel, 60 pt edge
+  displacement, 5 pt frost and the iOS 27 toolbar appearance for the platform
+  brightness, so unconfigured glass looks different from `0.2.x`.
 
-- Rebuild the full renderer on Flutter GPU. Full refraction now requires both
-  Impeller and Flutter GPU. Unsupported paths use `FakeGlass` automatically.
-- Replace the old settings model. `glassColor` becomes per-shape `tint`,
-  `blur` becomes `frost`, `lightIntensity` becomes `highlight`, and
-  `refractiveIndex` becomes the observable `edgeRefraction` displacement.
-  Remove `lightAngle` and `ambientStrength`.
-- Remove the experimental `Glassify` API. Supported shapes are
-  `LiquidRoundedSuperellipse`, `LiquidRoundedRectangle`, and `LiquidOval`.
-- Move per-shape color and materialization into `LiquidGlassAppearance`.
-- Remove visibility from `LiquidGlassSettings`. Use
-  `LiquidGlassAppearance.visibility` for one shape or
-  `LiquidGlassVisibility` for a descendant subtree.
+### New features
 
-### Added
-
-- Add fitted regular-material and toolbar appearances for light, dark, and
-  brightness-aware construction.
-- Add a sealed `LiquidGlassColorModel` API. The iOS 27 model derives a
-  backdrop-luminance-conditioned tonal tint from one color and its opacity;
-  the direct model retains unrestricted manual gamma, saturation, vibrancy,
-  and tint control.
-- Add per-shape tint, saturation, transmission gamma, vibrancy, and visibility.
-  Blended shapes interpolate adjacent appearances without another backdrop
-  capture. Uniform layers retain the smaller shader path.
-- Add paired highlights, SDF contours, directional bevel shading, explicit
-  refraction reach, and size-aware shadow controls.
-- Add `backdropKey` and `useBackdropGroup` to supported real and fake paths.
-- Add per-shape shadows below blended glass with a material cutout.
-- Add `LiquidGlassCapture` for glass on glass. It captures the backdrop once
-  for all the glass inside it, so an indicator that refracts its tab bar no
-  longer costs a second full-screen readback. It sizes itself to the glass
-  inside; `bleed` overrides that. See "Glass on glass" in the README.
-- Add `precacheLiquidGlassShaders()` so the first glass on screen renders
-  fully instead of painting its fallback while shaders load.
-
-### Changed
-
-- Consolidate `FakeGlass` at layer level so its foreground order matches full
-  glass. It preserves frost, tint, color response, lighting, contours, bevel
-  shading, visibility, and exterior shadows, but does not refract.
-- Fit light and dark transmission against provenance-checked iOS 27 references.
-  The dark preset no longer overdrives blue, green, and cyan backgrounds.
-- Use one measured chroma-aware transfer in full glass. `FakeGlass` keeps an
-  affine approximation to preserve its portable filter contract.
+- **iOS 27 presets.** `LiquidGlassSettings.ios27Toolbar`, `ios27ToolbarLight`,
+  `ios27ToolbarDark` and `ios27Clear`, and `LiquidGlassAppearance.ios27Regular`,
+  `ios27Toolbar` and `ios27Clear` (with light and dark variants), fitted
+  against captures of Apple's glass in light and dark.
+- **The Liquid Glass slider.** `LiquidGlassSettings.tintAmount` takes the
+  position of the iOS 27 Settings slider, from Clear (`0`) to Tinted (`1`). It
+  moves the iOS 27 wash and border along fitted curves, and the presets derive
+  their blur from it through `LiquidGlassSettings.ios27RegularFrost` and
+  `ios27ClearFrost`.
+- **Color models.** A sealed `LiquidGlassColorModel`: the iOS 27 models turn
+  one tint and its opacity into backdrop-dependent tones, with dark regular
+  glass getting denser on larger shapes. The direct model exposes
+  `saturation`, `transmissionGamma` and `vibrancy` for manual looks.
+- **Bevel refraction.** `refractionFitsShape` (default `true`) shrinks the
+  lens on small shapes like iOS 27 regular glass; clear glass keeps the full
+  lens. `backdropShrink` shrinks the backdrop seen through the face and never
+  enlarges it. `smoothRefraction` (default `true`) samples the backdrop
+  bilinearly so refracted lines don't snap to pixels.
+- **Glint and rim lighting.** A glint that recolors the glass instead of
+  adding white, with HDR headroom on wide-gamut surfaces; a dark border
+  (`contour*`); an inner shadow cast by the rim (`bevelShadow*`); and
+  curvature and size responses.
+- **Per-shape appearance in blend groups.** Each shape can have its own
+  `LiquidGlassAppearance`; blended neighbors cross-fade where they meet
+  without another backdrop capture.
+- **Blending without bulges.** Shapes in a `LiquidGlassBlendGroup` keep shared
+  straight edges straight and round only concave joins and bridges, as in
+  iOS 27's `GlassEffectContainer`.
+- **`LiquidGlassVisibility`** fades glass in a subtree: refraction, lighting,
+  blur and children fade together. Nested scopes multiply, and a layer with
+  no visible shapes stops sampling the backdrop.
+- **`LiquidGlassCapture`** captures the backdrop once, only as large as the
+  glass inside, so glass on glass (an indicator refracting its tab bar) no
+  longer pays a second full-screen readback.
+- **`LiquidGlass.auto`** renders on a parent layer if there is one and
+  creates its own otherwise.
+- **`LiquidGlass.precache()`** loads the shaders and warms the Flutter GPU
+  pipeline before `runApp`, so the first glass on screen renders fully.
+- **`backdropKey`** on `LiquidGlassLayer` shares a backdrop capture between
+  layers explicitly.
+- **Per-shape `shadows`**, cut out behind the translucent glass, also under
+  blended shapes.
+- **Adaptive brightness (experimental).** `LiquidGlassAdaptiveBrightness` and
+  `LiquidGlassBrightnessBackdrop` estimate the brightness of the content
+  behind the glass so glyphs can flip between light and dark.
+- **`FakeGlass` rework.** It renders at layer level with the same foreground
+  order as full glass and keeps frost, tint, color response, glint, border,
+  inner shadow, visibility and exterior shadows. Only refraction is missing.
+  The web build compiles and renders `FakeGlass`.
 
 ### Performance
 
-- In debug mode, warn when a frame submits more than one independent
-  backdrop capture. Share a `BackdropGroup` or `BackdropKey` so Impeller
-  pays the full-screen readback once.
-- Document Pixel 10 Impeller/Vulkan GPU-power costs (120 Hz GPU rail),
-  `BackdropGroup` sharing, frost sigma, shadows, and why FakeGlass is not
-  a low-power tier on Android.
-- Cache geometry mattes, coordinate mappings, native image filters, and static
-  transforms. Clip fragment work to material bounds.
-- Compose FakeGlass blur and color work into one backdrop filter and skip
-  inactive work.
-- In one matched Pixel 10 toolbar workload, FakeGlass reduced raster p95 by
-  20.8%, total-frame p95 by 17.0%, and PSS by 3.9%. Results depend on blur area,
-  overlap, animation, and device hardware.
-- Reject the experimental mixed clear/blur architecture. At 16 shapes it more
-  than doubled Pixel 10 total-frame p95 and increased settled memory.
-
-### Fixed
-
-- Compile on the web. `flutter_gpu` needs `dart:ffi`, so the web build gets a
-  stub geometry renderer and renders `FakeGlass`, which is the only path
-  selected there anyway.
-- Preserve shadow blur tails without expanding the refraction pass.
-- Restore glow behavior and consistent real/fake foreground ordering.
-- Invalidate shader caches when included shader sources change.
-- Make device benchmark output complete and reliably parseable.
-
-### Validation
-
-- Add real/fake constructor-permutation tests, renderer lifecycle tests,
-  platform goldens, provenance checks, Apple comparison captures, bounded SPSA
-  fitting, and compact device benchmarks.
-- Generate README images from executable renderer tests.
+- Geometry mattes, coordinate mappings, image filters and static transforms
+  are cached; geometry textures grow only when needed and are reused after one
+  frame. Fragment work is clipped to the glass.
+- Frost up to 1.25 device pixels runs in the final pass instead of a separate
+  blur pass.
+- Debug builds log a warning when a frame makes more than one independent
+  backdrop capture.
+- The README documents measured Pixel 10 GPU-power costs and best practices.
 
 ## 0.2.0-dev.4
 
