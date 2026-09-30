@@ -362,7 +362,7 @@ Bright and dark rims each have independent RGB color, width, and intensity.
 
 ```bash
 IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python hotloop_staged.py \
-  --baseline settings/preapproved_renderer_baseline.json \
+  --baseline settings/baseline.json \
   --stages blurMtf,tintColor,highlight \
   --out out/approved-renderer
 ```
@@ -585,8 +585,7 @@ The example should magnify the painted backdrop before handing it to the
 ordinary liquid-glass shader; the shader itself must not scale its filtered
 sample, which only magnifies pixels. The old fair-S0+10 comparison is retired
 because it treated Apple's intentional magnification as a renderer defect.
-`refractionSpread` continues to mean SDF profile reach, and the earlier
-shader-level affine experiment remains historical evidence only.
+The earlier shader-level affine experiment remains historical evidence only.
 
 When the pinned simulator is available, run the loupe example-composition
 seed scan with:
@@ -599,32 +598,9 @@ IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python seed_scan.py \
 The scan validates `metadata.json` against the pinned runtime/UDID and emits
 `summary.json`, `reference_metadata.json`, `scan.json`, and
 `best/scorecard.json`. For the loupe it evaluates the only effective material
-axes (`thickness` and `edgeRefraction`); `_MatchLoupe`-forced clear settings
-are recorded as overrides rather than falsely searched. It records the
-`RawMagnifier` composition and never applies shader-level zoom. The historical
-shader-level S0 is retired; this result is composition evidence for the example
-loupe.
-
-To probe the shared profile-reach control across recovered geometries, run the
-focused grid (it freshly renders every toolbar candidate):
-
-```bash
-IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python spread_grid.py \
-  --out out/spread-grid-current --repetitions 2
-```
-
-The grid is diagnostic and should only promote a value if it improves the
-small capsule and preserves toolbar/large scores; the current pinned run is
-recorded as a rejected experiment in `out/spread-grid-current/summary.json`.
-
-For the stronger coupled probe, use `coupled_spread_scan.py`; it scans the
-same shared spread axis while selecting thickness independently per geometry
-and preserves every candidate's A-D capture:
-
-```bash
-IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python coupled_spread_scan.py \
-  --out out/coupled-spread-scan --repetitions 1
-```
+axes (`refractionHeight` and `refractionAmount`); `_MatchLoupe`-forced clear
+settings are recorded as overrides rather than falsely searched. The loupe is
+composed with `LiquidGlassLoupe` and never applies shader-level zoom.
 
 To attribute the remaining capsule residual to an existing shared material
 control, run one bounded axis at a time. Every candidate is freshly rendered
@@ -635,7 +611,7 @@ IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py
   --axis frost --out out/material-attribution-frost
 ```
 
-Supported axes are `frost`, `transmissionGamma`, `edgeRefraction`, `vibrancy`,
+Supported axes are `frost`, `transmissionGamma`, `refractionAmount`, `vibrancy`,
 `tintAlpha`, and `dispersion`. The latter includes `0`, which selects
 the final shader's one-backdrop-sample path, and the authoritative `.005`
 default. The fast path is selected from the requested CA and displacement
@@ -759,14 +735,3 @@ rely on panel order alone when sharing a comparison.
 The current parameter-by-parameter report and annotated iteration index are in
 [`FULL_REPORT.md`](FULL_REPORT.md).
 
-The evidence contract is machine-readable in
-[`settings/evidence_manifest.json`](settings/evidence_manifest.json). Validate
-its field coverage with:
-
-```bash
-python3 validate_evidence_manifest.py
-```
-
-Use `--strict` when auditing a release candidate; it fails while any material
-setting is still pending or rejected, rather than treating missing evidence as
-an implicit pass.

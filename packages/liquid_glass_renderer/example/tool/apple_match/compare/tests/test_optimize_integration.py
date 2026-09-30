@@ -46,8 +46,8 @@ class OnlineLoopSmokeTests(unittest.TestCase):
             "refractionHeight": 0.0,
             "frost": 0.0,
             "highlight": 0.0,
-            "glassAlpha": 0.0,
-            "refractiveIndex": 1.0,
+            "tintAlpha": 0.0,
+            "refractionAmount": 0.0,
             "saturation": 1.0,
             "dispersion": 0.0,
         }
