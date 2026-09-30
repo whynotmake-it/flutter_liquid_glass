@@ -37,37 +37,59 @@ class ControlsScene extends StatelessWidget {
         style: style.value,
         child: controls!,
       ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Column(
-              children: [
-                const AdaptiveGroup(
-                  child: Row(
-                    children: [
-                      CircleButton(icon: CupertinoIcons.chevron_left),
-                      Spacer(),
-                      _ButtonCapsule(
-                        icons: [
-                          CupertinoIcons.square_arrow_up,
-                          CupertinoIcons.ellipsis,
-                        ],
-                      ),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              topControlsSide,
+              topControlsTop,
+              topControlsSide + topControlSize + topControlsSpacing,
+              0,
+            ),
+            child: AdaptiveGroup(
+              child: Row(
+                children: [
+                  CircleButton(icon: CupertinoIcons.chevron_left),
+                  Spacer(),
+                  _ButtonCapsule(
+                    icons: [
+                      CupertinoIcons.square_arrow_up,
+                      CupertinoIcons.ellipsis,
                     ],
                   ),
-                ),
-                const Spacer(),
-                _BottomBar(fake: fake),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+          const Spacer(),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: _BottomBar(fake: fake),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+/// Distance of the row of glass buttons along the top of the stage from the
+/// top of the stage's safe area.
+const topControlsTop = 12.0;
+
+/// Distance of the row of glass buttons along the top of the stage from the
+/// sides of the stage's safe area.
+const topControlsSide = 16.0;
+
+/// Height of the glass buttons along the top of the stage.
+const topControlSize = 48.0;
+
+/// Gap between neighboring glass buttons along the top of the stage.
+const topControlsSpacing = 8.0;
 
 /// The mini player, tab bar and search button, adapting to the backdrop as
 /// one group.
@@ -103,16 +125,32 @@ class _BottomBar extends StatelessWidget {
 }
 
 class CircleButton extends StatelessWidget {
-  const CircleButton({required this.icon, this.size = 48, super.key});
+  const CircleButton({
+    required this.icon,
+    this.size = topControlSize,
+    this.onPressed,
+    this.semanticLabel,
+    super.key,
+  });
 
   final IconData icon;
   final double size;
+  final VoidCallback? onPressed;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return ControlGlass(
+    final glass = ControlGlass(
       shape: const LiquidOval(),
-      child: SizedBox.square(dimension: size, child: Icon(icon)),
+      child: SizedBox.square(
+        dimension: size,
+        child: Icon(icon, semanticLabel: semanticLabel),
+      ),
+    );
+    if (onPressed == null) return glass;
+    return Semantics(
+      button: true,
+      child: GestureDetector(onTap: onPressed, child: glass),
     );
   }
 }
@@ -127,7 +165,7 @@ class _ButtonCapsule extends StatelessWidget {
     return ControlGlass(
       shape: const LiquidRoundedSuperellipse(borderRadius: 24),
       child: SizedBox(
-        height: 48,
+        height: topControlSize,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(

@@ -11,10 +11,14 @@ fvm flutter run -d macos
 Use `fvm flutter devices` to pick an iOS or Android Impeller device instead of
 `macos`.
 
-The stage shows glass over backdrops that page horizontally and scroll
-vertically, so the glass moves over real content: a photo feed, a night page,
-a long article and a grid. The inspector next to it (below it on phones)
-controls:
+The stage fills the window and shows glass over backdrops that page
+horizontally and scroll vertically, so the glass moves over real content: a
+photo feed, a night page, a long article and a grid. The settings button in
+its top trailing corner opens a settings sheet
+([`stupid_simple_sheet`](https://pub.dev/packages/stupid_simple_sheet)) that
+floats beside the stage on wide windows and rises to half height on phones.
+The stage stays interactive while the sheet is open, and scrolling the sheet
+past its top drags it closed. The sheet controls:
 
 - **Scene**: everyday controls, shapes that merge in a `LiquidGlassBlendGroup`,
   light, dark, clear and tinted glass blending in one layer, and
@@ -29,7 +33,9 @@ controls:
   `LiquidGlassSettings` on the clipboard.
 
 Interactive glass shows the package's `GlassGlow` under the pointer. All glass
-on the stage renders in a single `LiquidGlassLayer`; each loupe brings its own.
+on the stage, including the settings button, renders in a single
+`LiquidGlassLayer`; each loupe brings its own. The sheet has no glass and only
+exists while it is open.
 
 For a deterministic grid backdrop and a fixed blur (useful for screenshots):
 

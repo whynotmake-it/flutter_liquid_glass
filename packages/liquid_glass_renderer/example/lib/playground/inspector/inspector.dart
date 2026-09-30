@@ -25,10 +25,14 @@ class Inspector extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: padding.add(
-        const EdgeInsets.fromLTRB(inspectorInset, 22, inspectorInset, 20),
+        const EdgeInsets.fromLTRB(
+          inspectorInset,
+          inspectorInset,
+          inspectorInset,
+          20,
+        ),
       ),
       children: [
-        const _Title(),
         _SceneControl(state: state),
         const SizedBox(height: 20),
         _MaterialControls(state: state),
@@ -38,26 +42,6 @@ class Inspector extends StatelessWidget {
         const SizedBox(height: 24),
         _Actions(material: state.material),
       ],
-    );
-  }
-}
-
-class _Title extends StatelessWidget {
-  const _Title();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Text(
-        'Liquid Glass',
-        style: TextStyle(
-          color: CupertinoColors.label.resolveFrom(context),
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.6,
-        ),
-      ),
     );
   }
 }

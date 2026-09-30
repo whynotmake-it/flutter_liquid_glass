@@ -143,6 +143,71 @@ void main() {
     expect(material.value.edited, isTrue);
   });
 
+  Future<void> openSettings(WidgetTester tester) async {
+    await tester.tap(find.bySemanticsLabel('Settings'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the settings sheet opens on demand and closes again', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1280, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlaygroundApp());
+    await tester.pump();
+
+    expect(find.byType(Inspector), findsNothing);
+    expect(find.byType(LiquidGlassLayer), findsOneWidget);
+
+    await openSettings(tester);
+    expect(find.byType(Inspector), findsOneWidget);
+    expect(find.byType(LiquidGlassLayer), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Inspector), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scrolling the settings past their top drags the sheet away', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlaygroundApp());
+    await tester.pump();
+    await openSettings(tester);
+    final list = find.byType(Inspector);
+    double scrollOffset() => tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)),
+        )
+        .position
+        .pixels;
+
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(scrollOffset(), greaterThan(0));
+
+    // Pump at display frame rate. With pumpAndSettle's default 100 ms steps
+    // the sheet springs back open instead of dismissing.
+    const frame = Duration(milliseconds: 16);
+    await tester.fling(list, const Offset(0, 600), 2000);
+    await tester.pumpAndSettle(frame);
+    expect(scrollOffset(), 0);
+    expect(list, findsOneWidget, reason: 'the gesture began mid-scroll');
+
+    await tester.fling(list, const Offset(0, 600), 2000);
+    await tester.pumpAndSettle(frame);
+    expect(list, findsNothing);
+  });
+
   testWidgets('the playground renders one stage layer and switches scenes', (
     tester,
   ) async {
@@ -153,6 +218,7 @@ void main() {
 
     await tester.pumpWidget(const PlaygroundApp());
     await tester.pump();
+    await openSettings(tester);
 
     expect(find.text('Liquid Glass'), findsWidgets);
     expect(find.byType(LiquidGlassLayer), findsOneWidget);
@@ -180,6 +246,7 @@ void main() {
 
     await tester.pumpWidget(const PlaygroundApp());
     await tester.pump();
+    await openSettings(tester);
     await tester.tap(find.text('Loupe').first);
     await tester.pump();
 
