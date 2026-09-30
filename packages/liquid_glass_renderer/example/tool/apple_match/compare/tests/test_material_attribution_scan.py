@@ -21,12 +21,12 @@ class MaterialAttributionScanTest(unittest.TestCase):
         self.assertIn(7.0, scan.AXES["frost"])
         self.assertIn(0.0, scan.AXES["frost"])
         self.assertIn(0.9, scan.AXES["transmissionGamma"])
-        self.assertIn(18.3, scan.AXES["edgeRefraction"])
+        self.assertIn(18.3, scan.AXES["refractionAmount"])
         self.assertIn(0.15, scan.AXES["vibrancy"])
         self.assertIn(0.53, scan.AXES["tintAlpha"])
-        self.assertIn(0.0, scan.AXES["chromaticAberration"])
-        self.assertIn(0.005, scan.AXES["chromaticAberration"])
-        self.assertIn(0.1, scan.AXES["chromaticAberration"])
+        self.assertIn(0.0, scan.AXES["dispersion"])
+        self.assertIn(0.005, scan.AXES["dispersion"])
+        self.assertIn(0.1, scan.AXES["dispersion"])
 
     def test_candidate_preserves_geometry_and_spread(self) -> None:
         toolbar = {
@@ -36,7 +36,7 @@ class MaterialAttributionScanTest(unittest.TestCase):
             "shapeOffsetY": -0.1667,
             "cornerRadius": 50.5,
             "shapeProfile": "superellipse",
-            "thickness": 12.0,
+            "refractionHeight": 12.0,
             "refractionSpread": 0.0,
             "frost": 7.0,
         }

@@ -539,7 +539,7 @@ harness itself.
 # Renderer redesign status (2026-08-25)
 
 The shipped renderer now uses a unified material vector: `tint`, `thickness`,
-`edgeRefraction`, `refractionSpread`, `frost`, `chromaticAberration`,
+`edgeRefraction`, `refractionSpread`, `frost`, `dispersion`,
 `saturation`, `transmissionGamma`, `vibrancy`, `highlight`, `contourStrength`,
 and `contourWidth`. The geometry pass keeps the existing SDF/refraction field,
 adds a profile-reach scalar for loupe controls, and shares a displacement codec
@@ -636,7 +636,7 @@ IOS_27_UDID="$IOS_27_UDID" compare/.venv/bin/python material_attribution_scan.py
 ```
 
 Supported axes are `frost`, `transmissionGamma`, `edgeRefraction`, `vibrancy`,
-`tintAlpha`, and `chromaticAberration`. The latter includes `0`, which selects
+`tintAlpha`, and `dispersion`. The latter includes `0`, which selects
 the final shader's one-backdrop-sample path, and the authoritative `.005`
 default. The fast path is selected from the requested CA and displacement
 magnitude, not CA alone, so large-refraction surfaces retain three-channel
@@ -701,7 +701,7 @@ selection treatment; shipped callers still provide their own child content.
 | `edgeRefraction` | Peak rim displacement in logical pixels | Toolbar + small/large capsule fits |
 | `refractionSpread` | SDF profile reach, never backdrop zoom | At least two non-loupe scenes |
 | `frost` | Backdrop softening radius | Toolbar + small capsule; size normalization is internal |
-| `chromaticAberration` | Wavelength separation at the rim | Retain only after two-scene improvement |
+| `dispersion` | Wavelength separation at the rim | Retain only after two-scene improvement |
 | `saturation` | Transmitted backdrop saturation | Toolbar + capsule/holdout |
 | `transmissionGamma` | Display-referred transmission curve | Toolbar + capsule/holdout |
 | `vibrancy` | Backdrop-aware chroma lift | Toolbar + capsule/holdout |

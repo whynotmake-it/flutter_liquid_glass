@@ -49,7 +49,7 @@ LOUPE_FORCED_SETTINGS = {
     "transmissionGamma": 1.0,
     "vibrancy": 0.0,
 }
-LOUPE_EFFECTIVE_AXES = ("thickness", "edgeRefraction")
+LOUPE_EFFECTIVE_AXES = ("refractionHeight", "refractionAmount")
 
 
 def load_reference_metadata(
@@ -163,8 +163,8 @@ def search_space(
     axes = axes or (
         "tintAlpha",
         "frost",
-        "thickness",
-        "edgeRefraction",
+        "refractionHeight",
+        "refractionAmount",
         "refractionSpread",
     )
     return {
@@ -213,8 +213,8 @@ def build_seed_candidates(
                 seed.update(LOUPE_FORCED_SETTINGS)
                 seed.update(
                     {
-                        "thickness": thickness,
-                        "edgeRefraction": 8.0
+                        "refractionHeight": thickness,
+                        "refractionAmount": 8.0
                         * thickness
                         * math.sqrt(max(0.0, refractive_index**2 - 1.0)),
                         "contourStrength": 0.35,
@@ -259,8 +259,8 @@ def build_seed_candidates(
             {
                 "tintAlpha": alpha,
                 "frost": frost,
-                "thickness": thickness,
-                "edgeRefraction": edge_refraction,
+                "refractionHeight": thickness,
+                "refractionAmount": edge_refraction,
                 "refractionSpread": candidate_spread,
                 "contourStrength": 0.35,
                 "contourWidth": 1.0,
@@ -271,8 +271,8 @@ def build_seed_candidates(
     return deduplicate_settings(candidates), (
         "tintAlpha",
         "frost",
-        "thickness",
-        "edgeRefraction",
+        "refractionHeight",
+        "refractionAmount",
         "refractionSpread",
     ), {}
 
@@ -495,7 +495,7 @@ def main() -> None:
             print(
                 f"SEED {index:02d} score={score:.4f} "
                 f"alpha={seed['tintAlpha']} frost={seed['frost']} "
-                f"thickness={seed['thickness']} edge={seed['edgeRefraction']:.2f} "
+                f"thickness={seed['refractionHeight']} edge={seed['refractionAmount']:.2f} "
                 f"spread={seed['refractionSpread']}",
                 flush=True,
             )

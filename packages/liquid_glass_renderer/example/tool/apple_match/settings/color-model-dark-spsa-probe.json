@@ -1,7 +1,6 @@
 {
-  "thickness": 12,
-  "edgeRefraction": 27.42,
-  "refractionSpread": 0,
+  "refractionHeight": 12,
+  "refractionAmount": 27.42,
   "frost": 0,
   "tintRed": 57.142857,
   "tintGreen": 57.142857,
@@ -10,7 +9,7 @@
   "saturation": 2.9,
   "transmissionGamma": 0.649,
   "vibrancy": 0.13,
-  "chromaticAberration": 0,
+  "dispersion": 0,
   "highlight": 0,
   "contourStrength": 0,
   "contourWidth": 0,

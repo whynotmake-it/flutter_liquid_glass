@@ -284,7 +284,7 @@ void main() {
     expect(layer, contains('.expandToPixelBuckets(devicePixelRatio)'));
   });
 
-  test('magnification is one uniform lens about the material center', () {
+  test('backdrop shrink is one uniform lens about the material center', () {
     final source = File(
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
