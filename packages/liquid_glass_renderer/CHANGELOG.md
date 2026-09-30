@@ -32,6 +32,20 @@
   the blur fitted across the iOS 27 Liquid Glass slider (0.35 pt at 0).
   Frost up to 1.25 device pixels now runs as a three-texel kernel in the
   final pass instead of a separate blur pass.
+- Deprecate `LiquidGlassSettings.magnification`. It resamples the backdrop
+  the glass already captured, so magnified content pixelates, and a layer
+  with several shapes zooms about their common center. Use
+  `LiquidGlassLoupe` for magnifiers.
+
+### Added
+
+- Add `LiquidGlassLoupe`, a liquid glass magnifier like the iOS 27 text
+  loupe. Wrap the content in a `LiquidGlassLoupeSource` and connect both with
+  a `LiquidGlassLoupeLink`. The loupe re-renders only the content under the
+  lens at the magnified resolution, then refracts and lights it with the
+  glass. Defaults match the iOS 27 loupe: 116 × 86 capsule, 1.25×, 8 / 28
+  bevel; set `focalPointOffset: Offset(0, 75)` to show the touch point below
+  the lens as iOS does.
 
 ### Fixes
 
