@@ -295,10 +295,14 @@ depends on the surface Flutter renders into:
   displays, the surface is `RGBA16Float`, which keeps the full range.
 - **Android and other platforms**: 8-bit surfaces, so the glint is SDR.
 
-On an SDR surface each channel clips at white. This reproduces Apple's own
-SDR screenshots. Whether iOS or macOS shows the values above 1.0 brighter than
-SDR white depends on the platform's extended dynamic range handling; this has
-not been verified on a device yet.
+On an SDR surface each channel clips at white. On iOS, Flutter's layer also
+does not request extended dynamic range, so the values above 1.0 only reach
+the display once the app sets `wantsExtendedDynamicRangeContent` on the
+Flutter view's `CAMetalLayer` (the example does this in its app delegate).
+
+The default glint strength (`highlight` 1) matches iOS 27 on an iPhone, which
+renders the glint 1.8 times as strong as Apple's simulator captures. Those
+correspond to `highlight` 0.56. FakeGlass uses the same scale and stays SDR.
 
 FakeGlass draws a neutral glint. Under Impeller it keeps the same headroom at
 no extra cost. On Skia, or on an 8-bit target, it clips to white, so it cannot
