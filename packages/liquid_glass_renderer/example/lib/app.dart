@@ -129,12 +129,15 @@ class _PlaygroundState extends State<Playground> {
             ),
           ),
           Positioned.fill(
+            // The bottom bar sits inside the home indicator's inset, as on
+            // iOS; see ControlsScene.
             child: SafeArea(
+              bottom: false,
               child: SheetAvoidance(
                 position: _sheetPosition,
                 coverage: SettingsSheetRoute.coverage(
                   MediaQuery.sizeOf(context),
-                  MediaQuery.paddingOf(context),
+                  MediaQuery.paddingOf(context).copyWith(bottom: 0),
                 ),
                 child: RepaintBoundary(
                   child: Stage(state: state, onSettings: _toggleSettings),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -32,6 +34,7 @@ class ControlsScene extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return ListenableBuilder(
       listenable: Listenable.merge([adaptive, style]),
       builder: (context, controls) => AdaptiveScope(
@@ -57,7 +60,12 @@ class ControlsScene extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  padding: EdgeInsets.fromLTRB(
+                    bottomBarSide,
+                    0,
+                    bottomBarSide,
+                    bottomBarGap(bottomInset),
+                  ),
                   child: _BottomBar(fake: fake),
                 ),
               ),
@@ -68,6 +76,16 @@ class ControlsScene extends StatelessWidget {
     );
   }
 }
+
+/// Distance of the bottom bar from the sides of the stage.
+const bottomBarSide = 16.0;
+
+/// Distance of the bottom bar from the bottom of the screen, for a home
+/// indicator inset of [bottomInset].
+///
+/// The iOS 27 tab bar reaches 13 pt into the 34 pt home indicator inset of
+/// an iPhone 17 Pro, ending 21 pt above the screen's edge.
+double bottomBarGap(double bottomInset) => math.max(bottomInset - 13, 20);
 
 /// Distance of the row of glass buttons along the top of the stage from the
 /// top of the stage's safe area.
