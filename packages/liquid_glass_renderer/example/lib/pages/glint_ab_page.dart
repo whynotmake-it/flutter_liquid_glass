@@ -132,11 +132,12 @@ class _GlintAbPageState extends State<GlintAbPage> {
                   onChanged: (clear) => setState(() => _clear = clear),
                 ),
                 const Spacer(),
-                for (final preset in const [1.0, 1.5, 2.0])
+                // 0.56 is the glint of Apple's SDR simulator captures.
+                for (final preset in const [0.56, 1.0, 1.5])
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     onPressed: () => setState(() => _glint = preset),
-                    child: Text(preset.toStringAsFixed(1)),
+                    child: Text(preset.toStringAsFixed(2)),
                   ),
               ],
             ),
