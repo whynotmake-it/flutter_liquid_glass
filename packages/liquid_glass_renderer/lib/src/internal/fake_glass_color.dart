@@ -174,14 +174,13 @@ ImageFilter? fakeGlassBackdropFilter(
     colorTransfer = hasColorTransfer
         ? ColorFilter.matrix(
             fakeGlassColorMatrix(
-              saturation: 1 + (appearance.saturation - 1) * visibility,
+              saturation: appearance.saturation,
               tint: const Color(0x00000000),
-              transmissionGamma:
-                  1 + (appearance.transmissionGamma - 1) * visibility,
+              transmissionGamma: appearance.transmissionGamma,
               // A partially transparent filtered backdrop composites over the
               // untouched backdrop, matching RealGlass's material fade without
-              // another backdrop sample. This filter is only used during the
-              // transition; fully visible shapes retain the original matrix.
+              // another backdrop sample. The opacity alone fades the transfer,
+              // like the face matrix above, so it fades linearly.
               opacity: visibility,
             ),
           )
