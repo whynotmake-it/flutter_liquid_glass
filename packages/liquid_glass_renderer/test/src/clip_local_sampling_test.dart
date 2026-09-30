@@ -84,13 +84,10 @@ void main() {
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
 
-    expect(
-      source,
-      contains(
-        'float oppositeLightFacing = max(-signedLightFacing, 0.0)',
-      ),
-    );
-    expect(source, contains('oppositeEnvelope * clamp('));
+    // Both walls along the light axis share one symmetric lobe; only the
+    // return wall is scaled by the opposite strength.
+    expect(source, contains('1.0 - lightAxisTangency(normalXY)'));
+    expect(source, contains('dot(normalXY, -uLightDirection) >= 0.0'));
     expect(source, contains('uHighlightOppositeStrength'));
     expect(
       source,
@@ -113,7 +110,7 @@ void main() {
       expect(source, contains('sizeEnergy *'));
       expect(
         source,
-        contains('uEdgeWidth * 0.5 + kContourCoverageFeather'),
+        contains('uContourOffset + uEdgeWidth + kContourCoverageFeather'),
       );
       expect(source, contains('bevelBand *'));
       expect(source, contains('bevelDirection *'));
@@ -237,7 +234,7 @@ void main() {
     expect(source, contains('backdropScaleOffset + blueOffset'));
     expect(renderer, contains('_materialCenterInMatte'));
     expect(renderer, contains('matteTransform,\n        bounds,'));
-    expect(renderer, contains('setFloatUniforms(initialIndex: 33'));
+    expect(renderer, contains('setFloatUniforms(initialIndex: 34'));
 
     double boundaryWeight(double distance, double transition) {
       final distanceSquared = distance * distance;
@@ -284,9 +281,9 @@ void main() {
       'lib/assets/shaders/gpu/geometry_fragment.glsl',
     ).readAsStringSync();
 
-    expect(source, contains('signedEdgeDistance + uContourOffset'));
+    expect(source, contains('-signedEdgeDistance - uContourOffset'));
     expect(source, contains('externalContourAlpha'));
-    expect(source, contains('specular light can eclipse it'));
+    expect(source, contains('contourDirection(surfaceNormal)'));
     expect(geometrySource, contains('uContourExtent'));
     expect(geometrySource, contains('effectSupport'));
   });
