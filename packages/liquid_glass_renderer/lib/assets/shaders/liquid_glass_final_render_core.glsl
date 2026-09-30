@@ -637,11 +637,18 @@ void main() {
             // bilinear (whose fixed-point sub-texel weights are never exactly
             // zero at texel centres).
             refractedUV = (floor(fragCoord) + 0.5) * invUSize;
+            #ifdef IMPELLER_TARGET_OPENGLES
+            // The GLES runtime stages also emit GLSL ES 1.00, which has no
+            // texelFetch. The texel centre is exact under nearest sampling;
+            // bilinear can differ by a few LSB at hard edges.
+            refractColor = texture(uBackgroundTexture, refractedUV);
+            #else
             refractColor = texelFetch(
                 uBackgroundTexture,
                 ivec2(floor(fragCoord)),
                 0
             );
+            #endif
         } else {
             refractColor = texture(
                 uBackgroundTexture,
