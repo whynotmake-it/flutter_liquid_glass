@@ -1,3 +1,14 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// sdRoundedBox and sdEllipse follow Inigo Quilez's 2D distance functions
+// (https://iquilezles.org/articles/distfunctions2d/), MIT License,
+// Copyright © 2015 Inigo Quilez; see third_party/inigo_quilez/LICENSE.
+// sdRoundedSuperellipse is adapted from Flutter's Impeller
+// (impeller/entity/shaders/uber_sdf.frag, Flutter 3.47.1):
+//   Copyright 2013 The Flutter Authors. All rights reserved.
+//   Use of this source code is governed by a BSD-style license that can be
+//   found in third_party/flutter/LICENSE.
+
 // Signed distances of FakeGlass shapes, in logical pixels of the shape's
 // centered local space. Shared by the analytic surface and the backdrop edge
 // pass so both put the silhouette in the same place.

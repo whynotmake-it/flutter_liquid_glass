@@ -1,3 +1,15 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// sdfRRect, rseSuperellipse, sdfSquircle and sdfEllipse are adapted from
+// Flutter's Impeller shaders (impeller/entity/shaders/uber_sdf.frag and
+// sdf_functions.glsl, Flutter 3.47.1):
+//   Copyright 2013 The Flutter Authors. All rights reserved.
+//   Use of this source code is governed by a BSD-style license that can be
+//   found in third_party/flutter/LICENSE.
+// rseSuperellipse also derives from Inigo Quilez's superellipse distance
+// (https://iquilezles.org/articles/ellipsedist/), MIT License,
+// Copyright © 2015 Inigo Quilez; see third_party/inigo_quilez/LICENSE.
+
 // Three vec4s per shape: primitive parameters, inverse affine basis, and
 // transformed center/distance/group data. RSE parameters use three vec4s per
 // shape: degrees/(1 - cos span), circle centers, and semi-axes/radii. This is the
@@ -8,10 +20,8 @@
 // `uniform vec4 uShapeData[MAX_SHAPES * 3];`,
 // `uniform vec4 uRseData[MAX_SHAPES * 3];` and
 // `uniform vec4 uShapeBounds[MAX_SHAPES];` *before* the include. The SDF
-// helpers below read that global uniform directly instead of taking it as a
-// function parameter on purpose: passing an array by value makes spirv-cross
-// emit an array copy-initializer (`float param[96] = uShapeData;`) which is
-// rejected by SkSL, so the shaders would fail to compile on the Skia backend.
+// helpers below read these uniforms directly rather than taking them as
+// parameters, so no shape array is ever passed, and copied, by value.
 #ifndef MAX_SHAPES
 #define MAX_SHAPES 16
 #endif
@@ -109,9 +119,9 @@ float sdfSquircle(
 }
 
 float sdfEllipse(vec2 p, vec2 r) {
-    // Flutter's Impeller oval SDF uses a fixed five-step Newton solve. The
-    // former closed-form approximation divided by |p| near the center,
-    // producing a zero/direction-dependent pinhole for non-circular ovals.
+    // Impeller's oval SDF: a fixed five-step Newton solve. Closed-form
+    // approximations divide by |p| near the center, which leaves a pinhole in
+    // non-circular ovals.
     r = max(r, 1e-4);
     p = abs(p);
     vec2 q = r * (p - r);
@@ -171,7 +181,7 @@ struct SceneSample {
 
 // Apple's glass turns its optical normal before a corner starts, as if the
 // corner radius were larger; normals from a 1.5x radius match iOS 27 card
-// corners (see the Refraction notes of PR #174). Capsules are unchanged.
+// corners. Capsules are unchanged.
 const float kOpticalCornerRadiusScale = 1.5;
 
 // Scene-space gradients of a primitive's distance: xy with its true corners

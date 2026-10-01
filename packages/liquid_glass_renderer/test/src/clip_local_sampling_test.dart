@@ -127,13 +127,21 @@ void main() {
 
   test('geometry and runtime shaders share one displacement codec', () {
     final runtimeCodec = File(
-      'lib/assets/shaders/displacement_encoding.glsl',
-    ).readAsStringSync();
-    final geometryCodec = File(
       'lib/assets/shaders/gpu/displacement_encoding.glsl',
     ).readAsStringSync();
 
-    expect(geometryCodec, runtimeCodec);
+    expect(
+      File(
+        'lib/assets/shaders/gpu/geometry_fragment.glsl',
+      ).readAsStringSync(),
+      contains('#include "displacement_encoding.glsl"'),
+    );
+    expect(
+      File(
+        'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+      ).readAsStringSync(),
+      contains('#include "gpu/displacement_encoding.glsl"'),
+    );
     expect(runtimeCodec, contains('0.5 * sqrt(normalizedInward)'));
     expect(runtimeCodec, contains('0.5 * sqrt(normalizedExterior)'));
     expect(
@@ -188,9 +196,9 @@ void main() {
   }
 
   test('packed codec keeps refracted content steps far below a pixel', () {
-    // iOS 27's 60 pt edge displacement at 3x. The former 8-bit compander
-    // stepped by up to 2 / 255 of this (1.4 device pixels) deep in the bevel,
-    // which drew refracted lines as staircases.
+    // iOS 27's 60 pt edge displacement at 3x. An 8-bit compander would step
+    // by up to 2 / 255 of this (1.4 device pixels) deep in the bevel and draw
+    // refracted lines as staircases.
     const maxDisplacement = 180.0;
     var maximumError = 0.0;
     for (var index = 0; index <= 10000; index++) {
@@ -227,7 +235,7 @@ void main() {
 
     // At the deliberately strong 160-pixel diagnostic displacement the
     // 12-bit diamond angle keeps the worst lateral error far below a pixel
-    // (the former two 8-bit components reached about 0.85 pixels).
+    // (two 8-bit components would reach about 0.85 pixels).
     var maximumVectorError = 0.0;
     for (var index = 0; index < 36000; index++) {
       final angle = index * 2 * math.pi / 36000;
