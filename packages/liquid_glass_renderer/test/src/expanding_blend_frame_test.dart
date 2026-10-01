@@ -114,21 +114,12 @@ void main() {
             .whereType<LiquidGlassRenderObject>()
             .firstOrNull;
         final oldCount = renderer?.gpuGeometryRenderer?.debugRenderCount;
-        // Change the origin within a bucket, then grow and shrink. Keep the
-        // old scene beyond any plausible fixed-size texture ring.
-        for (final nextHeight in [
-          76.0,
-          84.0,
-          92.0,
-          100.0,
-          108.0,
-          116.0,
-          140.0,
-          60.0,
-        ]) {
-          update(() => height = nextHeight);
-          await tester.pump(const Duration(milliseconds: 16));
-        }
+        // A submitted frame is rasterized before the frame after next
+        // paints, so its textures are only guaranteed until then
+        // (FlutterGpuGeometryRenderer.reuseAfterFrames). Expand the pill in
+        // the next frame, which renders a new matte, then rasterize.
+        update(() => height = 140);
+        await tester.pump(const Duration(milliseconds: 16));
         if (!fake) {
           expect(
             renderer!.gpuGeometryRenderer!.debugRenderCount,
@@ -152,8 +143,8 @@ void main() {
           changed,
           0,
           reason:
-              'Expanding the left pill must not mutate the stationary '
-              'button in an already submitted frame.',
+              'Expanding the left pill in the next frame must not mutate '
+              'the stationary button in an already submitted frame.',
         );
       }, skip: !fake && skipProperGlassTests);
     }

@@ -101,8 +101,8 @@ void main() {
         height: 16,
         shapeData: unusedShape,
         numShapes: 1,
-        opticalIndex: 1.2,
-        thickness: 4,
+        refractionAmount: 24,
+        refractionHeight: 4,
         offsetX: 0,
         offsetY: 0,
       );
@@ -142,21 +142,28 @@ void main() {
       );
       addTearDown(renderer.dispose);
 
-      ({ui.Image image, int width, int height}) render(int size) =>
-          renderer.render(
-            width: size,
-            height: size,
-            shapeData: const [
-              1, 40, 30, 8, // Rounded rectangle.
-              1, 0, 0, 1, // Identity inverse affine basis.
-              32, 32, 1, -1, // Center, distance scale, new group marker.
-            ],
-            numShapes: 1,
-            opticalIndex: 1.2,
-            thickness: 10,
-            offsetX: 0,
-            offsetY: 0,
-          );
+      ({
+        ui.Image image,
+        int width,
+        int height,
+        int textureWidth,
+        int textureHeight,
+        int serial,
+      })
+      render(int size) => renderer.render(
+        width: size,
+        height: size,
+        shapeData: const [
+          1, 40, 30, 8, // Rounded rectangle.
+          1, 0, 0, 1, // Identity inverse affine basis.
+          32, 32, 1, -1, // Center, distance scale, new group marker.
+        ],
+        numShapes: 1,
+        refractionAmount: 24,
+        refractionHeight: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
 
       final first = render(33);
       final sameBucket = render(63);
@@ -203,8 +210,8 @@ void main() {
           32, 48, 1, -1,
         ],
         numShapes: 2,
-        opticalIndex: 1.2,
-        thickness: 10,
+        refractionAmount: 24,
+        refractionHeight: 10,
         offsetX: 0,
         offsetY: 0,
       );
@@ -266,8 +273,8 @@ void main() {
           height: 16,
           shapeData: shape,
           numShapes: 1,
-          opticalIndex: 1.2,
-          thickness: 4,
+          refractionAmount: 24,
+          refractionHeight: 4,
           offsetX: i.isEven ? 0 : 1,
           offsetY: 0,
         );

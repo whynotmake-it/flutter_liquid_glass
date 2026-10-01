@@ -22,7 +22,15 @@ void runGpuImageOwnershipTests() {
         addTearDown(renderer.dispose);
         final initialCount = FlutterGpuGeometryRenderer.debugTotalRenderCount;
 
-        ({ui.Image image, int width, int height}) render(int index) {
+        ({
+          ui.Image image,
+          int width,
+          int height,
+          int textureWidth,
+          int textureHeight,
+          int serial,
+        })
+        render(int index) {
           final appearances = List<double>.filled(128, 0);
           for (var shape = 0; shape < 16; shape++) {
             appearances[shape * 4 + (index.isEven ? 0 : 1)] = 1;
@@ -34,8 +42,9 @@ void runGpuImageOwnershipTests() {
           return renderer.render(
             width: 64,
             height: 64,
+            // A rounded rectangle: continuous corners need their RSE payload.
             shapeData: [
-              1,
+              3,
               20,
               30,
               4,
@@ -49,8 +58,8 @@ void runGpuImageOwnershipTests() {
               -1,
             ],
             numShapes: 1,
-            opticalIndex: 1.2,
-            thickness: 10,
+            refractionAmount: 24,
+            refractionHeight: 10,
             offsetX: 0,
             offsetY: 0,
             writeMaterials: true,
