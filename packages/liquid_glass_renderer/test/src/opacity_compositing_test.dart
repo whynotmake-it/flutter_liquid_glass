@@ -218,7 +218,15 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         );
         expect(halfError, lessThanOrEqualTo(3));
       },
-      skip: kind == 'real' && skipProperGlassTests,
+      skip:
+          (kind == 'real' && skipProperGlassTests) ||
+          // flutter_tester mis-renders the glass fades; Metal and Vulkan
+          // render them continuously.
+          ((kind == 'real' || kind == 'fake') && binding.isFlutterTester) ||
+          // Control case without package widgets: in Flutter 3.47.1 an
+          // Opacity over a BackdropFilter with a sibling jumps at 254/255,
+          // on Metal as well as in flutter_tester.
+          kind == 'nativeSibling',
     );
   }
 }
