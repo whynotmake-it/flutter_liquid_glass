@@ -7,7 +7,7 @@ import 'scene.dart';
 
 /// Maps a harness settings JSON object onto structural renderer settings.
 ///
-/// Shared by the legacy per-launch capture path and the persistent hot-reload
+/// Shared by the per-launch capture path and the persistent hot-reload
 /// session so both render byte-identical scenes for the same settings.
 LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
   double number(String key, double fallback) =>

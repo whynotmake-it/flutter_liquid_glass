@@ -21,8 +21,9 @@ Future<void> main() async {
       await _configurationChannel.invokeListMethod<String>('arguments') ??
       const [];
   final scene = MatchScene.fromBase64(_sceneBase64);
-  // Mode selection is deterministic: the legacy capture driver always passes
-  // `--probe`, while `flutter run` never forwards custom process arguments.
+  // Mode selection is deterministic: the per-launch capture driver always
+  // passes `--probe`, while `flutter run` never forwards custom process
+  // arguments.
   // A launch without `--probe` therefore starts the persistent hot-reload
   // session, which reads candidates from the sandbox IPC file instead.
   final probe = _argument(arguments, '--probe');
@@ -38,7 +39,7 @@ Future<void> main() async {
           ),
   );
   // iOS can restore the home indicator while the first Flutter view attaches.
-  // Reassert immersive mode after that frame so legacy one-shot captures have
+  // Reassert immersive mode after that frame so per-launch captures have
   // the same uncontaminated control pixels as the persistent hot-loop path.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);

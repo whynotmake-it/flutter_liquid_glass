@@ -155,10 +155,10 @@ def render_probe(scene: dict, probe_id: str) -> tuple[np.ndarray, np.ndarray]:
                 symbols[tile] = symbol
         return image, symbols
 
-    # Legacy RGBW scenes use an algorithmic base layout plus a small marker
+    # RGBW scenes use an algorithmic base layout plus a small marker
     # patch instead of an explicit repeating pattern. Reproduce the Flutter
     # and Swift painters exactly so the size-control scenes can use the same
-    # refraction/color decomposition as the newer material scenes.
+    # refraction/color decomposition as the material scenes.
     palette_symbols = "RGBW"
     palette = spec["colors"]
     if spec["layout"] == "primary":

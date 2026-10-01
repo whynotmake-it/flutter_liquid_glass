@@ -13,7 +13,7 @@ only).
 | `ios_power/` | iPhone Instruments power/Metal traces of an installed build. |
 | `apple_match/` | Visual matching against iOS 27 references ([README](apple_match/README.md)). |
 | `results/` | Committed benchmark and matching write-ups. |
-| `RENDERER_REVIEW_GUIDE.md` | Renderer diagram and review path. |
+| `RENDERER_REVIEW_GUIDE.md` | Renderer invariants and how to run the device suites. |
 
 ## Scenes
 

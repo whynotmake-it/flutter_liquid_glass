@@ -92,14 +92,3 @@ class FlutterGpuGeometryRenderer {
 
   void dispose() {}
 }
-
-/// Web stand-in for the allocation diagnostics; always disabled.
-@internal
-class GpuAllocationDiagnostics {
-  static const enabled = false;
-  static final allocations = <String>[];
-
-  static void observe(String kind, Object value) {}
-
-  static Map<String, Object> snapshot() => const {};
-}

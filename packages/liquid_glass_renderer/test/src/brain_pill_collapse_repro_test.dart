@@ -1,18 +1,15 @@
-// Reproduction tests for glass-rendering bugs seen in the ClickUp bottom
-// bar's collapsing "brain pill". These are expected to FAIL today; each group
-// isolates one hypothesis:
+// Regression tests modeled on a collapsing bottom-bar pill (from ClickUp).
+// Each group guards one behavior:
 //
-//  A. `_maybeFade` (liquid_glass.dart / fake_glass.dart) swaps `child` for
-//     `Opacity(child)` when visibility crosses 1, remounting the glass child
-//     subtree on every crossing of a bouncy animation.
-//  B. A real `LiquidGlassLayer` starts as a fake layer until async Flutter GPU
-//     init finishes, then `_buildLayer` returns a different subtree and the
-//     whole child remounts once after mount.
-//  C. `RenderLiquidGlassCapture` recomputes its clip region only in paint();
-//     paint-only changes inside the layer's RepaintBoundary (visibility,
-//     translation) leave a stale `captureRect` that clips shadows.
-//  D. The combined ClickUp-like collapse scene: probe-state survival and
-//     per-frame capture coverage while the pill overshoots visibility 1.
+//  A. A glass child keeps its state while visibility crosses 1 during a
+//     bouncy animation.
+//  B. A real `LiquidGlassLayer` keeps its child mounted when async Flutter
+//     GPU initialization finishes.
+//  C. `RenderLiquidGlassCapture` updates its capture region for paint-only
+//     changes (visibility, translation) inside the layer's RepaintBoundary,
+//     so shadows are never clipped.
+//  D. The combined collapse scene: child state survives and every frame's
+//     capture covers the pill while it overshoots visibility 1.
 import 'dart:io';
 import 'dart:ui' as ui;
 

@@ -52,10 +52,9 @@ API="SwiftUI PrimitiveButtonStyle.glass"
 [[ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SCENE")" == "merge_pair" ]] && API="SwiftUI GlassEffectContainer + View.glassEffect(_:in:)"
 APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE")"
 ACTUAL_TINT_POSITION=""
-# Slider defaults live inside the simulated device. Boot a cold pinned device
-# before writing or reading them; previously the script only booted after these
-# operations, so a clean capture failed unless another process happened to
-# have launched the simulator first.
+# Slider defaults live inside the simulated device, so a cold pinned device must
+# be booted before they are written or read; otherwise a clean capture fails
+# unless another process happens to have launched the simulator first.
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
 # Accessibility defaults are read by system processes at startup, so a changed

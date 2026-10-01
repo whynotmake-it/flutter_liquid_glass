@@ -1,17 +1,11 @@
-// Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 8: analytic normals, with corner normals taken
-// from a 1.5x corner radius.
-// Geometry encoding revision 5: the shared uniform layout carries the compact
-// appearance lookup table used by the low-resolution material pass.
-// Refraction model 3: quarter-circle bevel, optionally fitted to the shape;
-// 12-bit normal angle and displacement codes.
-// continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
-// shader depfile does not reliably invalidate changes made only in includes.
-// Changes:
-// - Removed #include <flutter/runtime_effect.glsl>
-// - Replaced FlutterFragCoord().xy with gl_FragCoord.xy
-// - Uniforms declared in a named uniform block instead of layout(location=N)
-// - Removed dead screenUV code (Y-flip was unused)
+// Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// Geometry pass, run with Flutter GPU: renders the signed distance field of
+// every shape in a layer into the layer's matte (12-bit surface normal angle,
+// signed edge distance and 12-bit displacement, packed by
+// displacement_encoding.glsl). Normals are analytic; corner normals come from
+// a 1.5x corner radius, and refraction uses a quarter-circle bevel that can
+// fit the shape.
 
 // The matte packs 12-bit integer codes; fp16 cannot represent them exactly.
 precision highp float;
