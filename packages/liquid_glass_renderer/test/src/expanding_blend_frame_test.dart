@@ -101,9 +101,9 @@ void main() {
         final reference = await tester.runAsync(() => binding.captured!);
         final expected = await tester.runAsync(reference!.toByteData);
         if (!fake && !materials) {
-          await expectLater(
+          await expectMacOSGolden(
             reference,
-            matchesGoldenFile('goldens/expanding_blend_submitted.png'),
+            'goldens/expanding_blend_submitted.png',
           );
         }
         reference.dispose();

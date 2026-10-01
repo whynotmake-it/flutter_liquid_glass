@@ -212,7 +212,8 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
           reason: 'Alpha-only animation must not rebuild nested geometry.',
         );
       },
-      skip: !fake && skipProperGlassTests,
+      // flutter_tester mis-renders the fading frames of this scene.
+      skip: (!fake && skipProperGlassTests) || binding.isFlutterTester,
     );
   }
 }
