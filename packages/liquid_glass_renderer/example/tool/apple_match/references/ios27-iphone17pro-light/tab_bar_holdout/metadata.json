@@ -1,0 +1,13 @@
+{
+  "runtime": "iOS 27.0 (24A5408d)",
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "udid": "DB4F41F3-1C36-476D-B775-AFDC3686C75B",
+  "device": "iPhone 17 Pro",
+  "orientation": "portrait",
+  "appearance": "light",
+  "reduceMotion": true,
+  "medianFrameCount": 3,
+  "reduceTransparency": false,
+  "api": "SwiftUI TabView system tab bar",
+  "scene": "tab_bar_holdout"
+}
