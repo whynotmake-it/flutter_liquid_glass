@@ -177,11 +177,11 @@ void main() {
           if (!fake && !ownLayer && destination == 280) {
             const golden = 'goldens/nested_scroll_clipped_real.png';
             await tester.runAsync(
-              () => expectLater(reference.png, matchesGoldenFile(golden)),
+              () => expectMacOSGolden(reference.png, golden),
             );
             if (!autoUpdateGoldenFiles) {
               await tester.runAsync(
-                () => expectLater(scrolled.png, matchesGoldenFile(golden)),
+                () => expectMacOSGolden(scrolled.png, golden),
               );
             }
           }

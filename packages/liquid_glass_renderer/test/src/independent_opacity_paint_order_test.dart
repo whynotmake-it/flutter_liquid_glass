@@ -187,7 +187,9 @@ void runIndependentOpacityPaintOrderTests(SubmittedSceneCapture binding) {
           // optical residual cannot hide a resource-lifetime regression.
           expect(failures, isEmpty, reason: failures.join('\n'));
         },
-        skip: !fake && skipProperGlassTests,
+        // flutter_tester rasterizes the first fractional frame after a fully
+        // transparent one wrong, including content outside the glass.
+        skip: (!fake && skipProperGlassTests) || binding.isFlutterTester,
       );
     }
   }

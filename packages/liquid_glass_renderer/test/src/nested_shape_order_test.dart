@@ -110,11 +110,11 @@ void main() {
           final golden =
               'goldens/nested_shape_order_${fake ? "fake" : "real"}.png';
           await tester.runAsync(
-            () => expectLater(reference.png, matchesGoldenFile(golden)),
+            () => expectMacOSGolden(reference.png, golden),
           );
           if (!autoUpdateGoldenFiles) {
             await tester.runAsync(
-              () => expectLater(nested.png, matchesGoldenFile(golden)),
+              () => expectMacOSGolden(nested.png, golden),
             );
           }
           expect(
