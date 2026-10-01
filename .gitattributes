@@ -1,0 +1,4 @@
+packages/liquid_glass_renderer/example/tool/apple_match/references/**/*.png filter=lfs diff=lfs merge=lfs -text
+packages/liquid_glass_renderer/example/tool/apple_match/references/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+packages/liquid_glass_renderer/example/tool/results/**/*.png filter=lfs diff=lfs merge=lfs -text
+packages/liquid_glass_renderer/example/tool/results/**/*.jpg filter=lfs diff=lfs merge=lfs -text

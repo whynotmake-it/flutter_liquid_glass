@@ -1,0 +1,21 @@
+{
+  "refractionHeight": 12,
+  "refractionAmount": 27.42,
+  "frost": 0,
+  "tintRed": 255,
+  "tintGreen": 149,
+  "tintBlue": 0,
+  "tintAlpha": 1,
+  "colorModel": "ios27Dark",
+  "saturation": 2.6,
+  "transmissionGamma": 0.58,
+  "vibrancy": 0.1,
+  "dispersion": 0,
+  "highlight": 0,
+  "contourStrength": 0,
+  "contourWidth": 0,
+  "contourTransmittance": 1,
+  "bevelShadowStrength": 0,
+  "shadowAlpha": 0,
+  "contactShadowAlpha": 0
+}
