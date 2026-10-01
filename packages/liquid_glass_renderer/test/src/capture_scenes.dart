@@ -18,6 +18,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
+import 'shared.dart';
+
 /// Every scene the capture is locked down for. Names are golden file names.
 const captureScenes = <CaptureScene>[
   CaptureScene('bar', shadow: true),
@@ -82,9 +84,9 @@ Future<void> expectCaptureKeepsTheLook(
         () => image.toByteData(format: ui.ImageByteFormat.png),
       ))!;
       await tester.runAsync(
-        () => expectLater(
+        () => expectMacOSGolden(
           png.buffer.asUint8List(),
-          matchesGoldenFile('goldens/liquid_glass_capture_$name.png'),
+          'goldens/liquid_glass_capture_$name.png',
         ),
       );
     }

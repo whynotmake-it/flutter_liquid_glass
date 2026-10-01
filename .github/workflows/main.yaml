@@ -78,7 +78,9 @@ jobs:
     name: Run Golden Tests
     # Only run on main or if PR is labeled with "goldens"
     if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'goldens')
-    runs-on: macos-15
+    # The macOS goldens are rendered with `flutter test --update-goldens` on
+    # this image; regenerate them on the same macOS version when it changes.
+    runs-on: macos-26
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4

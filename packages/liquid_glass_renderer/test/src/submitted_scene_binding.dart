@@ -9,6 +9,13 @@ class SubmittedSceneBinding extends AutomatedTestWidgetsFlutterBinding
 
 /// Shared submitted-scene capture for host and device integration tests.
 mixin SubmittedSceneCapture on RendererBinding {
+  /// Whether this is `flutter_tester`'s binding rather than a device's.
+  ///
+  /// `flutter_tester` (Linux and macOS alike) rasterizes some fade sequences
+  /// wrong that Metal and Vulkan render correctly. Cases that check those
+  /// sequences skip here and run only on a device.
+  bool get isFlutterTester => this is! LiveTestWidgetsFlutterBinding;
+
   bool captureNextScene = false;
   Future<ui.Image>? captured;
   int captureWidth = 1080;
