@@ -177,8 +177,8 @@ class GlassGlowLayerState extends State<GlassGlowLayer>
 
   void removeTouch() {
     if (!_dragging) return;
-    _radiusController.motion =
-        _alphaController.motion = const Motion.smoothSpring(snapToEnd: true);
+    _radiusController.motion = _alphaController.motion =
+        const Motion.smoothSpring(snapToEnd: true);
     _dragging = false;
     _offsetController.animateTo(Offset.zero);
     _radiusController.animateTo(10);
@@ -243,12 +243,10 @@ class _RenderGlassGlowLayerWidget extends SingleChildRenderObjectWidget {
 
 class _RenderGlassGlowLayer extends RenderProxyBox {
   _RenderGlassGlowLayer({
-    required double glowRadius,
-    required Color glowColor,
-    required Offset glowOffset,
-  })  : _glowRadius = glowRadius,
-        _glowColor = glowColor,
-        _glowOffset = glowOffset;
+    required this._glowRadius,
+    required this._glowColor,
+    required this._glowOffset,
+  });
 
   double _glowRadius;
   double get glowRadius => _glowRadius;
