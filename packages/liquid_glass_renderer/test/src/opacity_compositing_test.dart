@@ -113,7 +113,6 @@ void runOpacityTests(SubmittedSceneCapture binding) {
             settings: const LiquidGlassSettings(
               frost: 8,
               highlight: 0,
-              chromaticAberration: 0,
             ),
             child: shape,
           );
