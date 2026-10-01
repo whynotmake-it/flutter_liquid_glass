@@ -1,6 +1,8 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:meta/meta.dart';
 
 @internal
@@ -154,5 +156,34 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
   }
 
   @override
-  void addToScene(ui.SceneBuilder builder) {}
+  void addToScene(ui.SceneBuilder builder) {
+    // Every scene containing glass is built through this layer, before the
+    // effect that samples its matte and before the scene is rendered.
+    FlutterGpuGeometryRenderer.flushPendingSubmissions();
+  }
+}
+
+/// Remembers whether a glass layer polled its shapes' transforms while the
+/// current frame painted, so its compositing hook can skip a second poll.
+///
+/// Nothing between paint and compositing in one frame moves a render object,
+/// so that poll would only find the transforms paint just recorded.
+@internal
+class FramePollMarker {
+  bool _polled = false;
+
+  /// Whether this frame's paint already polled.
+  bool get polledThisFrame => _polled;
+
+  /// Records a poll made during the current frame's paint. Polls outside a
+  /// frame, such as `toImage` captures, are not recorded.
+  void markPolled() {
+    if (_polled ||
+        SchedulerBinding.instance.schedulerPhase !=
+            SchedulerPhase.persistentCallbacks) {
+      return;
+    }
+    _polled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) => _polled = false);
+  }
 }

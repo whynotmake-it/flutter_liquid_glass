@@ -279,26 +279,12 @@ void main() {
       final renderObject = findLayer(tester);
       final matteBounds = renderObject.debugGeometryMatteBounds;
       expect(matteBounds, isNot(Rect.zero));
-      expect(
-        MatrixUtils.matrixEquals(
-          renderObject.matteTransform,
-          Matrix4.identity(),
-        ),
-        isTrue,
-      );
 
       await tester.pumpWidget(movedGlass(const Offset(40, -18)));
       tester.binding.scheduleFrame();
       await tester.pump();
 
       expect(renderObject.debugGeometryMatteBounds, matteBounds);
-      expect(
-        MatrixUtils.matrixEquals(
-          renderObject.matteTransform,
-          Matrix4.identity(),
-        ),
-        isTrue,
-      );
     },
     skip: skipProperGlassTests,
   );

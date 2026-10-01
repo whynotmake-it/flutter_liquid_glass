@@ -48,7 +48,7 @@ void main() {
 
     testWidgets('generates reusable GPU geometry metadata', (tester) async {
       await tester.pumpWidget(
-        build(const LiquidGlassSettings(thickness: 30), 24),
+        build(const LiquidGlassSettings(refractionHeight: 30), 24),
       );
       await tester.pumpAndSettle();
 
@@ -71,7 +71,7 @@ void main() {
         await tester.pumpWidget(
           CupertinoApp(
             home: LiquidGlassLayer(
-              settings: const LiquidGlassSettings(thickness: 30),
+              settings: const LiquidGlassSettings(refractionHeight: 30),
               child: StatefulBuilder(
                 builder: (context, setState) {
                   update = setState;
@@ -94,7 +94,7 @@ void main() {
             .firstWhere(
               (renderObject) => renderObject.geometry?.shapes.length == 1,
             );
-        final originalPath = renderObject.geometry!.path;
+        final originalRevision = renderObject.geometry!.matteRevision;
         expect(renderObject.geometry!.shapes.single.shadows, isEmpty);
 
         update(() {
@@ -108,7 +108,7 @@ void main() {
         });
         await tester.pump();
 
-        expect(renderObject.geometry!.path, same(originalPath));
+        expect(renderObject.geometry!.matteRevision, originalRevision);
         expect(renderObject.geometry!.shapes.single.shadows, shadows);
       },
       skip: skipProperGlassTests,
@@ -122,7 +122,7 @@ void main() {
         await tester.pumpWidget(
           CupertinoApp(
             home: LiquidGlassLayer(
-              settings: const LiquidGlassSettings(thickness: 30),
+              settings: const LiquidGlassSettings(refractionHeight: 30),
               child: LiquidGlassBlendGroup(
                 key: blendGroupKey,
                 child: Center(

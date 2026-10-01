@@ -74,9 +74,6 @@ typedef LiquidGlassTransformPoll = ({
 /// A render object that contributes one glass shape to a geometry pass.
 @internal
 mixin LiquidGlassShapeRenderObject on RenderBox {
-  /// The shape's path in its own local coordinates.
-  Path shapePath();
-
   /// Shadows painted by the parent layer before grouped glass shading.
   List<BoxShadow> get layerShadows;
 
@@ -265,20 +262,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
   )
   gatherShapeData();
 
-  Path getPath(
-    List<ShapeGeometry> geometries,
-  ) {
-    final path = Path();
-    for (final shape in geometries) {
-      path.addPath(
-        shape.renderObject.shapePath(),
-        Offset.zero,
-        matrix4: shape.shapeToGeometry?.storage,
-      );
-    }
-    return path;
-  }
-
   /// Smooth-union radius for shapes owned by this geometry node.
   double get geometryBlend => 0;
 
@@ -300,13 +283,12 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         !_matteVisibilityChanged(geometry!.shapes, shapes)) {
       logger.finer('$hashCode Skipping geometry rebuild.');
       // Paint-only shape metadata (currently grouped shadows) must still
-      // refresh even when the SDF inputs and cached vector path are reusable.
+      // refresh even when the SDF inputs are reusable.
       // This keeps interactive shadow controls live without re-encoding the
       // Flutter-GPU geometry texture.
       geometry = GeometryCache(
         bounds: geometry!.bounds,
         shapes: shapes,
-        path: geometry!.path,
         blend: geometry!.blend,
         matteRevision: geometry!.matteRevision,
       );
@@ -330,7 +312,6 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     final newGeo = geometry = GeometryCache(
       bounds: snappedBounds,
       shapes: shapes,
-      path: getPath(shapes),
       blend: geometryBlend,
       matteRevision: ++_matteRevision,
     );
@@ -362,14 +343,12 @@ class GeometryCache {
   const GeometryCache({
     required this.bounds,
     required this.shapes,
-    required this.path,
     required this.blend,
     required this.matteRevision,
   });
 
   final Rect bounds;
   final List<ShapeGeometry> shapes;
-  final Path path;
   final double blend;
 
   /// Monotonically identifies the inputs encoded into the SDF matte.
@@ -385,11 +364,10 @@ extension on LiquidGlassSettings {
   bool requiresGeometryRebuild(LiquidGlassSettings? other) {
     if (other == null) return false;
 
-    return effectiveThickness != other.effectiveThickness ||
-        edgeRefraction != other.edgeRefraction ||
-        refractionSpread != other.refractionSpread ||
-        contourWidth != other.contourWidth ||
-        contourOffset != other.contourOffset;
+    return effectiveRefractionHeight != other.effectiveRefractionHeight ||
+        effectiveRefractionAmount != other.effectiveRefractionAmount ||
+        refractionFitsShape != other.refractionFitsShape ||
+        contourWidth != other.contourWidth;
   }
 }
 

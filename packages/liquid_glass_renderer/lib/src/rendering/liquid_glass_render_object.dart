@@ -17,7 +17,10 @@ import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
+import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
+import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
 @internal
@@ -43,10 +46,6 @@ Rect expandForGlassShadows(
     for (final shape in geometryShapes) {
       final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
       if (shapeVisibility <= 0) continue;
-      final shadowScale = liquidGlassShadowScale(
-        shape.renderObject.size,
-        settings.effectiveExteriorShadowSizeResponse,
-      );
       final shapeToLayer = shape.shapeToGeometry == null
           ? geometryToLayer
           : geometryToLayer.multiplied(shape.shapeToGeometry!);
@@ -54,7 +53,7 @@ Rect expandForGlassShadows(
         final extent = max(
           shadow.spreadRadius +
               glassShadowBlurSupport(
-                shadow.blurRadius * shapeVisibility * shadowScale.blur,
+                shadow.blurRadius * shapeVisibility,
               ),
           0,
         ).toDouble();
@@ -90,6 +89,39 @@ Rect expandForGlassShadows(
   }
   if (bounds == null) return null;
   return (bounds, shapes);
+}
+
+bool _debugWarnedOpacityBetweenShapeAndLayer = false;
+
+/// Warns once per app when an [RenderOpacity] or [RenderAnimatedOpacity] sits
+/// between one of [shapes] and its glass [layer], which would fade only the
+/// glass's children. Returns `true` so it can run inside an `assert`.
+@internal
+bool debugCheckOpacityBetweenShapesAndLayer(
+  RenderObject layer,
+  Iterable<RenderObject> shapes,
+) {
+  if (_debugWarnedOpacityBetweenShapeAndLayer) return true;
+  for (final shape in shapes) {
+    for (
+      var ancestor = shape.parent;
+      ancestor != null && !identical(ancestor, layer);
+      ancestor = ancestor.parent
+    ) {
+      if (ancestor is RenderOpacity || ancestor is RenderAnimatedOpacity) {
+        _debugWarnedOpacityBetweenShapeAndLayer = true;
+        debugPrint(
+          'liquid_glass_renderer: an Opacity or FadeTransition between '
+          'a LiquidGlass and its LiquidGlassLayer only fades the '
+          "glass's children, not the glass. Fade glass with "
+          'LiquidGlassVisibility or LiquidGlassAppearance.visibility '
+          'instead.',
+        );
+        return true;
+      }
+    }
+  }
+  return true;
 }
 
 @internal
@@ -135,8 +167,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     (true, false) => materialRenderShader,
   };
 
-  Matrix4 get matteTransform;
-
   Matrix4 get shaderCoordinateTransform => Matrix4.identity();
 
   late GeometryRenderLink _link;
@@ -152,18 +182,15 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     final geometryInputsChanged =
-        _settings?.effectiveThickness != value.effectiveThickness ||
-        _settings?.effectiveEdgeRefraction != value.effectiveEdgeRefraction ||
-        _settings?.effectiveRefractionSpread !=
-            value.effectiveRefractionSpread ||
-        _settings?.effectiveContourWidth != value.effectiveContourWidth ||
-        _settings?.effectiveContourOffset != value.effectiveContourOffset;
-    final wasIdle = (_settings?.effectiveThickness ?? 0) <= 0;
-    final isIdle = value.effectiveThickness <= 0;
+        _settings?.effectiveRefractionHeight !=
+            value.effectiveRefractionHeight ||
+        _settings?.effectiveRefractionAmount !=
+            value.effectiveRefractionAmount ||
+        _settings?.refractionFitsShape != value.refractionFitsShape ||
+        _settings?.contourWidth != value.contourWidth;
     _settings = value;
     _updateShaderSettings();
     if (geometryInputsChanged) needsGeometryUpdate = true;
-    if (wasIdle != isIdle) markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -203,8 +230,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   @override
-  bool get alwaysNeedsCompositing =>
-      _geometryImage != null && settings.effectiveThickness > 0;
+  bool get alwaysNeedsCompositing => _geometryImage != null;
 
   /// Pre-rendered geometry texture in screen space
   ui.Image? _geometryImage;
@@ -215,6 +241,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
+  // The matte and material map fill the top-left of textures that only grow.
+  Size _geometryTextureSize = Size.zero;
+  Size _materialTextureSize = const Size(1, 1);
+
+  /// Shorter side in logical pixels of the smallest shape in this layer.
+  /// Adaptive color models use it to choose the material density; it is
+  /// resolved once per geometry update, never per fragment.
+  double _materialShortSide = 10000;
 
   /// The pre-rendered geometry texture in screen space.
   ///
@@ -222,6 +256,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// specular layer) from the same geometry texture.
   @protected
   ui.Image? get geometryImage => _geometryImage;
+
+  @visibleForTesting
+  ui.Image? get debugGeometryImage => _geometryImage;
 
   /// The bounding box of the geometry matte in screen space.
   ///
@@ -242,7 +279,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     super.detach();
   }
 
-  int _shaderSettingsRevision = 0;
   LiquidGlassAppearance? _uniformAppearance;
   List<LiquidGlassAppearance> _shapeAppearances = const [];
   bool _usesShapeAppearances = false;
@@ -261,7 +297,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ui.Image? get debugMaterialImage => _materialImage;
 
   void _updateShaderSettings() {
-    _shaderSettingsRevision++;
+    _shaderInputsChanged = true;
     final appearance = _uniformAppearance ?? defaultAppearance;
     _writeCommonShaderUniforms(
       defaultRenderShader,
@@ -285,24 +321,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     LiquidGlassAppearance appearance,
     Offset materialCenter,
   ) {
-    final appearanceVisibility = appearance.visibility;
-    final tint = appearance.tint.withValues(
-      alpha: appearance.tint.a * appearanceVisibility,
-    );
-    final saturation = 1 + (appearance.saturation - 1) * appearanceVisibility;
-    final transmissionGamma =
-        1 + (appearance.transmissionGamma - 1) * appearanceVisibility;
-    final vibrancy = appearance.vibrancy * appearanceVisibility;
+    // The final shader fades the whole material with visibility, so the
+    // color factors are written at full strength.
     shader.setFloatUniforms(initialIndex: 6, (value) {
       value
-        ..setColor(tint)
+        ..setColor(appearance.tint)
         ..setFloats([
           settings.effectiveDisplacementScale * devicePixelRatio,
-          settings.effectiveChromaticAberration,
-          settings.effectiveThickness * devicePixelRatio,
-          settings.effectiveHighlight,
-          settings.effectiveBackdropScale,
-          saturation,
+          settings.dispersion,
+          settings.effectiveEdgeDistanceRange * devicePixelRatio,
+          settings.highlight,
+          1 - settings.effectiveBackdropShrink,
+          appearance.saturation,
         ])
         ..setOffset(
           const Offset(0, 1),
@@ -310,48 +340,72 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         ..setColor(const Color.fromARGB(255, 255, 255, 255))
         ..setColor(
           Color.fromARGB(
-            (settings.effectiveContourStrength.clamp(0.0, 1.0) * 255).round(),
+            (settings.contourStrength.clamp(0.0, 1.0) * 255).round(),
             0,
             0,
             0,
           ),
         )
+        // Rim geometry the presets share; see [GlassRim].
         ..setFloats([
-          settings.effectiveBevelShadowDirectionality,
-          settings.effectiveBevelShadowSizeResponse,
-          settings.effectiveHighlightWidth * devicePixelRatio,
-          settings.effectiveHighlightOppositeStrength,
+          GlassRim.bevelShadowDirectionality,
+          0, // bevel shadow size response
+          GlassRim.highlightWidth * devicePixelRatio,
+          GlassRim.highlightOppositeStrength,
         ])
         ..setFloats([
-          settings.effectiveContourWidth * devicePixelRatio,
-          settings.effectiveContourTransmittance,
+          settings.contourWidth * devicePixelRatio,
+          0, // contour transmittance
+          settings.contourDirectionality,
         ])
         ..setFloats([
-          settings.effectiveContourOffset * devicePixelRatio,
+          0, // contour offset
           materialCenter.dx * devicePixelRatio,
           materialCenter.dy * devicePixelRatio,
-          settings.effectiveHighlightWrap,
+          GlassRim.highlightWrap,
         ])
         ..setFloats([
-          transmissionGamma,
-          vibrancy,
+          appearance.transmissionGamma,
+          appearance.vibrancy,
+          settings.effectiveTintAmount,
         ])
         ..setFloats([
-          settings.effectiveBevelShadowStrength,
-          settings.effectiveBevelShadowDepth * devicePixelRatio,
-          settings.effectiveBevelShadowOffset * devicePixelRatio,
+          settings.bevelShadowStrength,
+          GlassRim.bevelShadowDepth * devicePixelRatio,
+          GlassRim.bevelShadowOffset * devicePixelRatio,
         ])
         ..setFloats([
           appearance.colorModel.shaderValue,
-          appearanceVisibility,
+          appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
+          _materialShortSide,
         ]);
     });
-    // Float index 50, after the 44-float common block and the 6-float
-    // filter->matte mapping: frosted glass cross-fades its blur away, while
-    // unfrosted glass stays alpha-1 and matches the backdrop exactly.
-    shader.setFloat(50, settings.effectiveFrost > 0 ? 1 : 0);
+    // Float indices 53 and 54, after the 47-float common block and the
+    // 6-float filter->matte mapping: frosted glass cross-fades its blur away,
+    // while unfrosted glass stays alpha-1 and cross-fades its material in the
+    // shader, so both match the backdrop exactly at visibility 0.
+    shader
+      ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
+      ..setFloat(54, softensInShader ? 1 : 0);
   }
+
+  /// Largest frost, in device pixels, folded into the final pass instead of
+  /// a separate blur pass. Enabling the blur pass costs about four command
+  /// buffers per frame on Metal regardless of its radius.
+  static const double shaderSofteningMaxDeviceSigma = 1.25;
+
+  /// Whether the frost is small enough for the final pass's softening kernel.
+  bool get softensInShader {
+    final frost = _frostSigma;
+    return frost > 0 &&
+        frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
+  }
+
+  /// Sigma of the separate backdrop blur pass; `0` when there is none.
+  double get blurPassSigma => softensInShader ? 0 : _frostSigma;
+
+  double get _frostSigma => settings.effectiveFrost;
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -372,7 +426,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         at(i).saturation / 4,
         at(i).transmissionGamma / 4,
         at(i).vibrancy / 4,
-        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 5,
+        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 7,
       ],
     ];
   }
@@ -418,7 +472,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   final _ancestorClips = RetainedGlassClip();
   final _idleAncestorClips = RetainedGlassClip();
   bool _idleComposition = false;
-  bool _debugWarnedOpacityBetweenShapeAndLayer = false;
   List<Object> _retainedStructure = [];
   Offset _retainedPaintOffset = Offset.zero;
 
@@ -436,8 +489,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ) {
     if ((_geometryImage == null && !_drawableEmpty) ||
         _idleComposition ||
-        debugPaintLiquidGlassGeometry ||
-        settings.effectiveThickness <= 0) {
+        debugPaintLiquidGlassGeometry) {
       return false;
     }
     final candidate = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
@@ -471,6 +523,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       _geometryImage = result.image;
       _materialImage = result.materialImage;
       _geometryMatteBounds = result.matteBounds;
+      _geometryTextureSize = result.textureSize;
+      _materialTextureSize = result.materialTextureSize;
       _materialCenterInMatte = result.materialCenter;
       _setShapeAppearances(result.appearances);
       _rememberEncodedGeometry(bounds);
@@ -503,6 +557,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       ],
   ];
 
+  /// Bounds of the clips between this object and its shapes that are
+  /// re-applied around the glass filter, in local coordinates, or `null`.
+  @protected
+  Rect? get retainedClipBounds =>
+      _idleComposition ? null : _ancestorClips.ownerBounds;
+
   @protected
   void syncAncestorClips() =>
       (_idleComposition ? _idleAncestorClips : _ancestorClips).sync();
@@ -527,6 +587,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   // MARK: Painting
 
   final _compositionProbe = GlassCompositionProbe();
+  final _framePoll = FramePollMarker();
 
   @override
   @nonVirtual
@@ -565,7 +626,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         (shape) => shape.appearance.visibility > 0,
       ),
     );
-    if (settings.effectiveThickness <= 0 || !hasVisibleShape) {
+    if (!hasVisibleShape) {
       _idleComposition = true;
       // Foreground can change while a cached matte is dormant. Poll against
       // its last paint without overwriting that matte's encoded coordinates.
@@ -617,6 +678,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         _geometryImage = gpuResult.image;
         _materialImage = gpuResult.materialImage;
         _geometryMatteBounds = gpuResult.matteBounds;
+        _geometryTextureSize = gpuResult.textureSize;
+        _materialTextureSize = gpuResult.materialTextureSize;
         _materialCenterInMatte = gpuResult.materialCenter;
         _setShapeAppearances(gpuResult.appearances);
         _rememberEncodedGeometry(boundingBox);
@@ -663,6 +726,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ) {
     Rect? boundingBox;
     link.updatePaintOrder(this);
+    _framePoll.markPolled();
     for (final geometryRo in link.shapes) {
       final transformPoll = geometryRo.pollRelativeTransforms(this);
       final geometry = geometryRo.maybeRebuildGeometry();
@@ -674,30 +738,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ? geoBounds
           : boundingBox.expandToInclude(geoBounds);
     }
-    assert(() {
-      for (final shapeRenderObject in link.shapes) {
-        for (
-          var ancestor = shapeRenderObject.parent;
-          ancestor != null && !identical(ancestor, this);
-          ancestor = ancestor.parent
-        ) {
-          if (ancestor is RenderOpacity || ancestor is RenderAnimatedOpacity) {
-            if (!_debugWarnedOpacityBetweenShapeAndLayer) {
-              _debugWarnedOpacityBetweenShapeAndLayer = true;
-              debugPrint(
-                'liquid_glass_renderer: an Opacity or FadeTransition between '
-                'a LiquidGlass and its LiquidGlassLayer only fades the '
-                "glass's children, not the glass. Fade glass with "
-                'LiquidGlassVisibility or LiquidGlassAppearance.visibility '
-                'instead.',
-              );
-            }
-            break;
-          }
-        }
-      }
-      return true;
-    }(), 'Warn about an opacity scope between a shape and its layer.');
+    assert(
+      debugCheckOpacityBetweenShapesAndLayer(this, link.shapes),
+      'Warns about an Opacity between a shape and its layer.',
+    );
     return boundingBox;
   }
 
@@ -757,9 +801,34 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
           ..setSize(_geometryMatteBounds.size * devicePixelRatio);
       })
-      ..setFloatUniforms(initialIndex: 33, (value) {
+      ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
+      // Float index 59, after uBackdropBounds.
+      ..setFloatUniforms(initialIndex: 59, (value) {
+        final matteSize = _geometryMatteBounds.size * devicePixelRatio;
+        value.setFloats([
+          if (_geometryTextureSize.isEmpty) ...[
+            1,
+            1,
+          ] else ...[
+            matteSize.width / _geometryTextureSize.width,
+            matteSize.height / _geometryTextureSize.height,
+          ],
+          _materialTextureSize.width,
+          _materialTextureSize.height,
+        ]);
+      })
+      // Sampler 0 is the image-filter input. The engine replaces its texture
+      // with the backdrop but keeps the sampling set here, so any bound image
+      // selects bilinear or nearest backdrop sampling at no cost.
+      ..setImageSampler(
+        0,
+        geometryImage,
+        filterQuality: FilterQuality.low,
+      )
+      // Nearest: the matte packs 12-bit normal angle and displacement codes
+      // across byte boundaries, which filtering between texels would mix.
       ..setImageSampler(1, geometryImage);
     if (_materialImage case final materialImage?) {
       if (_usesTintOnlyAppearance) {
@@ -774,14 +843,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           ..setImageSampler(3, materialImage, filterQuality: FilterQuality.low);
       }
     }
-    _shaderInputSnapshot = _ShaderInputSnapshot(
-      geometryImage: geometryImage,
-      materialImage: _materialImage,
-      matteBounds: _geometryMatteBounds,
-      devicePixelRatio: devicePixelRatio,
-      settingsRevision: _shaderSettingsRevision,
-    );
+    if (!identical(geometryImage, _boundGeometryImage) ||
+        !identical(_materialImage, _boundMaterialImage) ||
+        _geometryMatteBounds != _boundMatteBounds) {
+      _boundGeometryImage = geometryImage;
+      _boundMaterialImage = _materialImage;
+      _boundMatteBounds = _geometryMatteBounds;
+      _shaderInputsChanged = true;
+    }
   }
+
+  ui.Image? _boundGeometryImage;
+  ui.Image? _boundMaterialImage;
+  Rect? _boundMatteBounds;
 
   /// Reconciles experimental fade composition before scene submission.
   @protected
@@ -827,20 +901,18 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// How far outside the material the composed filter reads the backdrop:
   /// the blur kernel (3 sigma), the peak edge displacement including its
-  /// chromatic split, and, below unit backdrop scale, the extra content
-  /// revealed on the face. A `LiquidGlassCapture` must contain this reach or
-  /// the filter samples its own edge.
+  /// dispersion, and, with [LiquidGlassSettings.backdropShrink], the extra
+  /// content revealed on the face. A `LiquidGlassCapture` must contain this
+  /// reach or the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
-    final blur = settings.effectiveFrost > 0
-        ? settings.effectiveFrost * 3 + 1 / devicePixelRatio
-        : 0.0;
+    final blur = blurPassSigma > 0
+        ? blurPassSigma * 3 + 1 / devicePixelRatio
+        : (softensInShader ? 1 / devicePixelRatio : 0.0);
     final displacement =
         settings.effectiveDisplacementScale *
-        (1 + settings.effectiveChromaticAberration.abs() * 0.5);
-    final scale = settings.effectiveBackdropScale;
-    final revealed = scale < 1
-        ? (1 / scale - 1) * max(material.width, material.height) / 2
-        : 0.0;
+        (1 + settings.dispersion.abs() * 0.5);
+    final scale = 1 - settings.effectiveBackdropShrink;
+    final revealed = (1 / scale - 1) * max(material.width, material.height) / 2;
     return blur + displacement + revealed;
   }
 
@@ -884,18 +956,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           canvas.transform(transform.storage);
         }
         final rect = Offset.zero & shape.renderObject.size;
-        final shadowScale = liquidGlassShadowScale(
-          shape.renderObject.size,
-          settings.effectiveExteriorShadowSizeResponse,
-        );
         for (final shadow in shape.shadows) {
           final paint = shadow
               .copyWith(
                 color: shadow.color.withValues(
-                  alpha: shadow.color.a * shapeVisibility * shadowScale.energy,
+                  alpha: shadow.color.a * shapeVisibility,
                 ),
-                blurRadius:
-                    shadow.blurRadius * shapeVisibility * shadowScale.blur,
+                blurRadius: shadow.blurRadius * shapeVisibility,
                 blurStyle: BlurStyle.normal,
               )
               .toPaint();
@@ -1025,6 +1092,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     final current = link.shapes;
     final inputs =
         _emptyGeometryInputs ?? _idleGeometryInputs ?? _encodedGeometryInputs;
+    if (_framePoll.polledThisFrame && inputs.length == current.length) {
+      return (needsRepaint: false, translation: Offset.zero);
+    }
     if (current.isEmpty && inputs.isEmpty) {
       return (needsRepaint: false, translation: Offset.zero);
     }
@@ -1035,9 +1105,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       return (needsRepaint: true, translation: null);
     }
 
-    Offset? sharedTranslation;
     var canTranslate = true;
     var needsRepaint = false;
+    final transforms = <Matrix4>[];
     final translated = <RenderLiquidGlassGeometry>[];
     for (var index = 0; index < current.length; index++) {
       final geometry = current[index];
@@ -1056,32 +1126,38 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         needsRepaint = true;
         continue;
       }
-
-      final translation = _translationDelta(encoded.transform, transform);
-      if (translation == null) {
-        canTranslate = false;
-        needsRepaint = true;
-        continue;
-      }
-      if (sharedTranslation == null) {
-        sharedTranslation = translation;
-      } else if (!_nearOffset(sharedTranslation, translation)) {
-        canTranslate = false;
-        needsRepaint = true;
-      }
+      transforms.add(transform);
       if (poll.selfChanged) translated.add(geometry);
     }
 
     if (!canTranslate) {
       return (needsRepaint: needsRepaint, translation: null);
     }
+    final translation = _sharedTranslation(inputs, transforms);
+    if (translation == null) return (needsRepaint: true, translation: null);
     for (final geometry in translated) {
       geometry.acceptCompositorTranslation();
     }
-    return (
-      needsRepaint: false,
-      translation: sharedTranslation ?? Offset.zero,
-    );
+    return (needsRepaint: false, translation: translation);
+  }
+
+  /// The one translation that maps every encoded transform in [inputs] to
+  /// the matching transform in [current], or `null` when there is none.
+  static Offset? _sharedTranslation(
+    List<_EncodedGeometryInput> inputs,
+    List<Matrix4> current,
+  ) {
+    Offset? shared;
+    for (var index = 0; index < current.length; index++) {
+      final delta = _translationDelta(inputs[index].transform, current[index]);
+      if (delta == null) return null;
+      if (shared == null) {
+        shared = delta;
+      } else if (!_nearOffset(shared, delta)) {
+        return null;
+      }
+    }
+    return shared ?? Offset.zero;
   }
 
   bool _reuseUniformlyTranslatedGeometry(Rect bounds) {
@@ -1091,7 +1167,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       return false;
     }
 
-    Offset? sharedDelta;
     for (var index = 0; index < _shapesWithGeometry.length; index++) {
       final current = _shapesWithGeometry[index];
       final encoded = _encodedGeometryInputs[index];
@@ -1099,17 +1174,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           current.$2.matteRevision != encoded.matteRevision) {
         return false;
       }
-
-      final delta = _translationDelta(encoded.transform, current.$3);
-      if (delta == null) return false;
-      if (sharedDelta == null) {
-        sharedDelta = delta;
-      } else if (!_nearOffset(sharedDelta, delta)) {
-        return false;
-      }
     }
-
-    final delta = sharedDelta ?? Offset.zero;
+    final delta = _sharedTranslation(_encodedGeometryInputs, [
+      for (final entry in _shapesWithGeometry) entry.$3,
+    ]);
+    if (delta == null) return false;
     if (!_nearRect(bounds, oldBounds.shift(delta))) return false;
 
     _geometryMatteBounds = _geometryMatteBounds.shift(delta);
@@ -1147,13 +1216,28 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   );
 
   (double, double, double, double, double, double)? _coordinateMapping;
+  Rect? _backdropBounds;
+
+  /// Layer-local rect the native filter captures backdrop for, or `null`
+  /// when it is unbounded. Refraction mirrors samples that would leave it:
+  /// outside the clip the filter input is transparent.
+  @protected
+  Rect? get backdropSampleBounds => null;
+
+  /// The [backdropSampleBounds] last written to the shader.
+  @visibleForTesting
+  Rect? get debugBackdropSampleBounds => _backdropBounds;
 
   @protected
   bool syncCoordinateMapping() {
     final mapping = _currentCoordinateMapping();
-    final changed = mapping != _coordinateMapping;
+    final backdropBounds = backdropSampleBounds;
+    final changed =
+        mapping != _coordinateMapping || backdropBounds != _backdropBounds;
     _coordinateMapping = mapping;
-    _writeCoordinateMapping(renderShader, mapping);
+    _backdropBounds = backdropBounds;
+    if (changed) _shaderInputsChanged = true;
+    _writeCoordinateMapping(renderShader, mapping, backdropBounds);
     return changed;
   }
 
@@ -1175,8 +1259,9 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   void _writeCoordinateMapping(
     FragmentShader shader,
     (double, double, double, double, double, double) mapping,
+    Rect? backdropBounds,
   ) {
-    shader.setFloatUniforms(initialIndex: 44, (value) {
+    shader.setFloatUniforms(initialIndex: 47, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,
@@ -1184,6 +1269,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         mapping.$4,
         mapping.$5,
         mapping.$6,
+      ]);
+    });
+    // Float index 55, after the frost flags.
+    final matteBounds = backdropBounds ?? Rect.largest;
+    shader.setFloatUniforms(initialIndex: 55, (value) {
+      value.setFloats([
+        matteBounds.left * devicePixelRatio,
+        matteBounds.top * devicePixelRatio,
+        matteBounds.right * devicePixelRatio,
+        matteBounds.bottom * devicePixelRatio,
       ]);
     });
   }
@@ -1207,33 +1302,36 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   @visibleForTesting
   Rect get debugGeometryMatteBounds => _geometryMatteBounds;
 
-  /// Value identity of everything [renderShader] has captured for the current
-  /// paint: float uniforms and the geometry sampler.
+  bool _shaderInputsChanged = true;
+
+  /// Whether a uniform or sampler of [renderShader] changed since the last
+  /// call, which also resets it.
   ///
   /// The engine copies a shader's uniforms into the native image filter when
   /// that filter is first converted (see
   /// `ReusableFragmentShader::as_image_filter`), so a filter wrapping this
-  /// shader may only be reused across paints while this snapshot compares
-  /// equal.
+  /// shader may only be reused while this stays false.
   @protected
-  Object get shaderInputSnapshot => (_shaderInputSnapshot, _coordinateMapping);
-  late Object _shaderInputSnapshot;
+  bool takeShaderInputsChanged() {
+    final changed = _shaderInputsChanged;
+    _shaderInputsChanged = false;
+    return changed;
+  }
 
   void _debugPaintGeometry(PaintingContext context, Offset offset) {
     if (_geometryImage case final geometryImage?) {
-      final backToThis = Matrix4.inverted(matteTransform).storage;
       final bounds = _geometryMatteBounds;
       context.canvas
         ..save()
-        ..transform(backToThis)
         ..translate(
           bounds.left,
           bounds.top,
         )
         ..scale(1 / devicePixelRatio)
-        ..drawImage(
+        ..drawImageRect(
           geometryImage,
-          offset * devicePixelRatio,
+          Offset.zero & bounds.size * devicePixelRatio,
+          (offset * devicePixelRatio) & bounds.size * devicePixelRatio,
           Paint()..blendMode = BlendMode.src,
         )
         ..restore();
@@ -1260,130 +1358,47 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   final List<double> _shapeData = [];
   final List<double> _rseData = [];
+  final List<double> _boundsData = [];
   static final Matrix4 _identity = Matrix4.identity();
 
   double get _contourOutset {
-    if (settings.effectiveContourWidth <= 0) return 0;
+    if (settings.contourWidth <= 0) return 0;
     return max(
       0.5 / devicePixelRatio,
-      settings.effectiveContourOffset +
-          settings.effectiveContourWidth * 0.5 +
-          1.0 / devicePixelRatio,
+      settings.contourWidth + 1.0 / devicePixelRatio,
     );
   }
 
-  // Flutter 3.47 computes these RSE parameters when its geometry changes and
-  // uploads them to the symmetric RSE shader. Mirror that construction here
-  // so lookup-table interpolation and circle fitting are not repeated per
-  // fragment. The table and construction are adapted from Flutter's
-  // impeller/geometry/round_superellipse_param.cc (Flutter 3.47.1):
-  // Copyright 2013 The Flutter Authors. All rights reserved. Use of this
-  // source code is governed by a BSD-style license that can be found in
-  // third_party/flutter/LICENSE.
-  static (double, double) _rseNAndXj(double ratio) {
-    const table = <(double, double)>[
-      (2.00000000, 1.13276676),
-      (2.18349805, 1.20311921),
-      (2.33888662, 1.28698796),
-      (2.48660575, 1.36351941),
-      (2.62226596, 1.44717976),
-      (2.75148990, 1.53385819),
-      (3.36298265, 1.98288283),
-      (4.08649929, 2.23811846),
-      (4.85481134, 2.47563463),
-      (5.62945551, 2.72948597),
-      (6.43023796, 2.98020421),
-    ];
-    if (ratio > 5.0) {
-      final n = 1.559599389 * (ratio - 5.0) + table.last.$1;
-      final kXj = 0.522807185 * (ratio - 5.0) + table.last.$2;
-      return (n, 1.0 - 1.0 / kXj);
+  /// Half-extents along the matte axes of a shape with local half-size
+  /// [halfSize] mapped by the affine basis ([axisX], [axisY]). The geometry
+  /// shader culls with these boxes instead of mapping every pixel into each
+  /// shape's local space. Ellipses and rounded rectangles are exact;
+  /// continuous corners extend further into the corner than a circular arc of
+  /// the same radius, so they use their box.
+  static Size _matteHalfExtents(
+    RawShapeType type,
+    Size halfSize,
+    double cornerRadius,
+    Offset axisX,
+    Offset axisY,
+  ) {
+    double extent(double x, double y) {
+      switch (type) {
+        case RawShapeType.ellipse:
+          return sqrt(
+            pow(x * halfSize.width, 2) + pow(y * halfSize.height, 2),
+          );
+        case RawShapeType.roundedRectangle:
+          final radius = min(cornerRadius, halfSize.shortestSide);
+          return x.abs() * (halfSize.width - radius) +
+              y.abs() * (halfSize.height - radius) +
+              radius * sqrt(x * x + y * y);
+        case RawShapeType.squircle:
+          return x.abs() * halfSize.width + y.abs() * halfSize.height;
+      }
     }
-    final clampedRatio = ratio.clamp(2.0, 5.0);
-    final steps = clampedRatio < 2.5
-        ? (clampedRatio - 2.0) * 10.0
-        : (clampedRatio - 2.5) * 2.0 + 5.0;
-    final left = steps.floor().clamp(0, table.length - 2);
-    final fraction = steps - left;
-    final a = table[left];
-    final b = table[left + 1];
-    final n = a.$1 + (b.$1 - a.$1) * fraction;
-    final kXj = a.$2 + (b.$2 - a.$2) * fraction;
-    return (n, 1.0 - 1.0 / kXj);
-  }
 
-  static (double, double, Offset, double) _rseOctant(
-    double axis,
-    double radius,
-  ) {
-    if (radius <= 1e-3) return (0.0, 0.0, Offset.zero, 0.0);
-    final (n, xJOverA) = _rseNAndXj(2.0 * axis / radius);
-    final xJ = xJOverA * axis;
-    final yJ =
-        pow(
-          max(1.0 - pow(xJOverA, n).toDouble(), 0.0),
-          1.0 / n,
-        ).toDouble() *
-        axis;
-    final tanPhi = pow(xJ / max(yJ, 1e-6), n - 1.0).toDouble();
-    final d = (xJ - tanPhi * yJ) / (1.0 - tanPhi);
-    final gap = (1.0 - cos(pi / 4.0)) * radius;
-    final circleRadius = (axis - d - gap) * sqrt2;
-    final pointJ = Offset(xJ, yJ);
-    final pointM = Offset(axis - gap, axis - gap);
-    final chord = pointM - pointJ;
-    final midpoint = (pointJ + pointM) / 2.0;
-    final perpendicular = Offset(-chord.dy, chord.dx);
-    final perpendicularLength = perpendicular.distance;
-    final halfChord = chord.distance / 2.0;
-    final centerDistance = sqrt(
-      max(circleRadius * circleRadius - halfChord * halfChord, 0.0),
-    );
-    final circleCenter = perpendicularLength <= 1e-6
-        ? midpoint
-        : midpoint - perpendicular * (centerDistance / perpendicularLength);
-    final fromM = pointM - circleCenter;
-    final fromJ = pointJ - circleCenter;
-    final span = atan2(
-      fromM.dx * fromJ.dy - fromM.dy * fromJ.dx,
-      fromM.dx * fromJ.dx + fromM.dy * fromJ.dy,
-    ).abs();
-    return (n, span, circleCenter, circleRadius);
-  }
-
-  static List<double> _rseParameters(
-    Size size,
-    double rawCornerRadius,
-    double devicePixelRatio,
-  ) {
-    final halfWidth = size.width * devicePixelRatio / 2.0;
-    final halfHeight = size.height * devicePixelRatio / 2.0;
-    final radius = min(
-      rawCornerRadius * devicePixelRatio,
-      min(halfWidth, halfHeight),
-    );
-    final (topN, topSpan, topCenter, topRadius) = _rseOctant(
-      halfWidth,
-      radius,
-    );
-    final (rightN, rightSpan, rightCenter, rightRadius) = _rseOctant(
-      halfHeight,
-      radius,
-    );
-    return <double>[
-      topN,
-      rightN,
-      topSpan,
-      rightSpan,
-      topCenter.dx,
-      topCenter.dy,
-      rightCenter.dx,
-      rightCenter.dy,
-      halfWidth,
-      halfHeight,
-      topRadius,
-      rightRadius,
-    ];
+    return Size(extent(axisX.dx, axisY.dx), extent(axisX.dy, axisY.dy));
   }
 
   // The encoder's drawable-shape decision. Called only while preparing
@@ -1393,11 +1408,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     Matrix4 shapeToGeometry,
   ) {
     Offset toMatte(Offset point) => MatrixUtils.transformPoint(
-      matteTransform,
-      MatrixUtils.transformPoint(
-        geometryToLayer,
-        MatrixUtils.transformPoint(shapeToGeometry, point),
-      ),
+      geometryToLayer,
+      MatrixUtils.transformPoint(shapeToGeometry, point),
     );
     final origin = toMatte(Offset.zero);
     final axisX = toMatte(const Offset(1, 0)) - origin;
@@ -1425,14 +1437,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       // texture so the positive side of the fade is not clipped at the matte
       // edge.
       final aaPadding = max(0.5 / devicePixelRatio, _contourOutset);
-      final boundsInMatteSpace = MatrixUtils.transformRect(
-        matteTransform,
-        bounds.inflate(aaPadding),
-      ).snapToPixels(devicePixelRatio);
-      final materialCenter = MatrixUtils.transformRect(
-        matteTransform,
-        bounds,
-      ).center;
+      // The matte is in this layer's local coordinates. Ancestor transforms
+      // are applied once by the compositor; baking them in would apply scale
+      // and rotation twice.
+      final boundsInMatteSpace = bounds
+          .inflate(aaPadding)
+          .snapToPixels(devicePixelRatio);
+      final materialCenter = bounds.center;
 
       final textureWidth = (boundsInMatteSpace.width * devicePixelRatio).ceil();
       final textureHeight = (boundsInMatteSpace.height * devicePixelRatio)
@@ -1447,8 +1458,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       // unrelated standalone glass widgets together.
       _shapeData.clear();
       _rseData.clear();
+      _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
+      var shortSide = double.infinity;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
@@ -1493,10 +1506,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
             geometryToLayer,
             centerInGeometry,
           );
-          final centerInMatte = MatrixUtils.transformPoint(
-            matteTransform,
-            centerInLayer,
-          );
+          final centerInMatte = centerInLayer;
 
           // The inverse affine basis above already maps matte coordinates back
           // into the shape's local coordinate system. Using the transformed
@@ -1504,9 +1514,29 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
           // oversized primitives), which is especially visible for stretched
           // shapes in a blend group.
           final size = shape.renderObject.size;
-          _rseData.addAll(
-            _rseParameters(size, shape.rawCornerRadius, devicePixelRatio),
+          final rseParameters = roundedSuperellipseParameters(
+            size,
+            shape.rawCornerRadius,
+            scale: devicePixelRatio,
           );
+          // The geometry shader tests each cap's angular span as
+          // 1 - cos(span); FakeGlass reads the spans themselves.
+          rseParameters[2] = 1.0 - cos(rseParameters[2]);
+          rseParameters[3] = 1.0 - cos(rseParameters[3]);
+          _rseData.addAll(rseParameters);
+          final center = centerInMatte * devicePixelRatio;
+          final halfExtents = _matteHalfExtents(
+            shape.rawShapeType,
+            size * devicePixelRatio / 2,
+            shape.rawCornerRadius * devicePixelRatio,
+            axisX,
+            axisY,
+          );
+          _boundsData
+            ..add(center.dx - halfExtents.width)
+            ..add(center.dy - halfExtents.height)
+            ..add(center.dx + halfExtents.width)
+            ..add(center.dy + halfExtents.height);
           final blendMarker = firstInGroup
               ? -(geometry.blend * devicePixelRatio + 1)
               : geometry.blend * devicePixelRatio;
@@ -1532,6 +1562,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
             ..add(distanceScale)
             ..add(blendMarker);
           appearances.add(shape.appearance);
+          shortSide = min(shortSide, size.shortestSide);
           numShapes++;
           firstInGroup = false;
         }
@@ -1539,6 +1570,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
       if (numShapes == 0) {
         throw StateError('No invertible liquid-glass shapes to render.');
+      }
+      if (shortSide != _materialShortSide) {
+        _materialShortSide = shortSide;
+        _updateShaderSettings();
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);
@@ -1548,12 +1583,13 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         height: textureHeight,
         shapeData: _shapeData,
         rseData: _rseData,
+        boundsData: _boundsData,
         numShapes: numShapes,
-        opticalIndex: settings.effectiveOpticalIndex,
-        refractionSpread: settings.effectiveRefractionSpread,
-        displacementScale:
-            settings.effectiveDisplacementScale * devicePixelRatio,
-        thickness: settings.effectiveThickness * devicePixelRatio,
+        refractionHeight: settings.effectiveRefractionHeight * devicePixelRatio,
+        refractionAmount: settings.effectiveRefractionAmount * devicePixelRatio,
+        edgeDistanceRange:
+            settings.effectiveEdgeDistanceRange * devicePixelRatio,
+        refractionFitsShape: settings.refractionFitsShape,
         contourExtent: aaPadding * devicePixelRatio,
         writeMaterials: usesShapeAppearances,
         writeTintOnly: usesTintOnlyAppearance,
@@ -1567,6 +1603,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         image: result.image,
         materialImage: renderer.materialImage,
         materialCenter: materialCenter,
+        textureSize: Size(
+          result.textureWidth.toDouble(),
+          result.textureHeight.toDouble(),
+        ),
+        materialTextureSize: switch (renderer.materialImage) {
+          final image? => Size(image.width.toDouble(), image.height.toDouble()),
+          null => const Size(1, 1),
+        },
         appearances: appearances,
         matteBounds: Rect.fromLTWH(
           boundsInMatteSpace.left,
@@ -1584,6 +1628,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 // Images here borrow the renderer's handles. A retained temporary frame must
 // clone both images before another render can dispose those borrowed handles.
 typedef _GpuGeometryFrame = ({
+  Size textureSize,
+  Size materialTextureSize,
   ui.Image image,
   ui.Image? materialImage,
   Rect matteBounds,
@@ -1629,55 +1675,6 @@ final class _EncodedGeometryInput {
     renderObject = newRenderObject;
     matteRevision = newMatteRevision;
     transform.setFrom(newTransform);
-  }
-}
-
-/// Value key describing the uniform and sampler state a [FragmentShader]
-/// image filter snapshots at creation time.
-///
-/// Geometry images are immutable GPU textures, reused until geometry changes.
-/// The frame's coordinate mapping
-/// is paired with this key by [LiquidGlassRenderObject.shaderInputSnapshot].
-@immutable
-class _ShaderInputSnapshot {
-  const _ShaderInputSnapshot({
-    required this.geometryImage,
-    required this.materialImage,
-    required this.matteBounds,
-    required this.devicePixelRatio,
-    required this.settingsRevision,
-  });
-
-  final ui.Image geometryImage;
-  final ui.Image? materialImage;
-  final Rect matteBounds;
-  final double devicePixelRatio;
-  final int settingsRevision;
-
-  @override
-  bool operator ==(Object other) {
-    return other is _ShaderInputSnapshot &&
-        other.geometryImage == geometryImage &&
-        other.materialImage == materialImage &&
-        other.matteBounds == matteBounds &&
-        other.devicePixelRatio == devicePixelRatio &&
-        other.settingsRevision == settingsRevision;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    geometryImage,
-    materialImage,
-    matteBounds,
-    devicePixelRatio,
-    settingsRevision,
-  );
-
-  @override
-  String toString() {
-    return '_ShaderInputSnapshot(image: ${identityHashCode(geometryImage)}, '
-        'matteBounds: $matteBounds, dpr: $devicePixelRatio, '
-        'settingsRevision: $settingsRevision)';
   }
 }
 

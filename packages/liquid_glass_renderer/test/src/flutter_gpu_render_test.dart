@@ -10,71 +10,6 @@ void main() {
 
   const expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
   test(
-    'flutter_gpu renders geometry and produces a valid image',
-    () async {
-      final library = await gpu.ShaderLibrary.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      expect(library, isNotNull);
-
-      final vertexShader = library!['GeometryVertex'];
-      final fragmentShader = library['GeometryTestFragment'];
-      expect(vertexShader, isNotNull);
-      expect(fragmentShader, isNotNull);
-
-      final pipeline = gpu.gpuContext.createRenderPipeline(
-        vertexShader!,
-        fragmentShader!,
-      );
-
-      const width = 256;
-      const height = 256;
-
-      final texture = gpu.gpuContext.createTexture(
-        gpu.StorageMode.devicePrivate,
-        width,
-        height,
-      );
-      expect(texture.isValid, isTrue);
-
-      final renderTarget = gpu.RenderTarget.singleColor(
-        gpu.ColorAttachment(texture: texture),
-      );
-
-      // Full-screen triangle strip: position.xy, texCoord.xy per vertex.
-      final vertices = Float32List.fromList([
-        -1.0, -1.0, 0.0, 0.0, //
-        1.0, -1.0, 1.0, 0.0, //
-        -1.0, 1.0, 0.0, 1.0, //
-        1.0, 1.0, 1.0, 1.0, //
-      ]);
-
-      final vertexBuffer = gpu.gpuContext.createDeviceBufferWithCopy(
-        ByteData.sublistView(vertices),
-      );
-      expect(vertexBuffer.isValid, isTrue);
-
-      final commandBuffer = gpu.gpuContext.createCommandBuffer();
-      commandBuffer.createRenderPass(renderTarget)
-        ..bindPipeline(pipeline)
-        ..bindVertexBuffer(
-          gpu.BufferView(
-            vertexBuffer,
-            offsetInBytes: 0,
-            lengthInBytes: vertices.lengthInBytes,
-          ),
-        )
-        ..draw(4);
-      commandBuffer.submit();
-
-      final image = texture.asImage();
-      expect(image.width, equals(width));
-      expect(image.height, equals(height));
-    },
-    skip: expectFallback,
-  );
-
-  test(
     'asset renderers share immutable pipeline resources',
     () async {
       final first = await FlutterGpuGeometryRenderer.fromAsset(
@@ -101,8 +36,8 @@ void main() {
         height: 16,
         shapeData: unusedShape,
         numShapes: 1,
-        opticalIndex: 1.2,
-        thickness: 4,
+        refractionAmount: 24,
+        refractionHeight: 4,
         offsetX: 0,
         offsetY: 0,
       );
@@ -133,30 +68,32 @@ void main() {
   test(
     'geometry renderer buckets dimensions without overwriting older images',
     () async {
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
-      final renderer = FlutterGpuGeometryRenderer(
-        vertexShader: library['GeometryVertex']!,
-        fragmentShader: library['GeometryFragment']!,
       );
       addTearDown(renderer.dispose);
 
-      ({ui.Image image, int width, int height}) render(int size) =>
-          renderer.render(
-            width: size,
-            height: size,
-            shapeData: const [
-              1, 40, 30, 8, // Rounded rectangle.
-              1, 0, 0, 1, // Identity inverse affine basis.
-              32, 32, 1, -1, // Center, distance scale, new group marker.
-            ],
-            numShapes: 1,
-            opticalIndex: 1.2,
-            thickness: 10,
-            offsetX: 0,
-            offsetY: 0,
-          );
+      ({
+        ui.Image image,
+        int width,
+        int height,
+        int textureWidth,
+        int textureHeight,
+      })
+      render(int size) => renderer.render(
+        width: size,
+        height: size,
+        shapeData: const [
+          1, 40, 30, 8, // Rounded rectangle.
+          1, 0, 0, 1, // Identity inverse affine basis.
+          32, 32, 1, -1, // Center, distance scale, new group marker.
+        ],
+        numShapes: 1,
+        refractionAmount: 24,
+        refractionHeight: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
 
       final first = render(33);
       final sameBucket = render(63);
@@ -182,12 +119,8 @@ void main() {
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      ))!;
-      final renderer = FlutterGpuGeometryRenderer(
-        vertexShader: library['GeometryVertex']!,
-        fragmentShader: library['GeometryFragment']!,
       );
       addTearDown(renderer.dispose);
 
@@ -203,8 +136,8 @@ void main() {
           32, 48, 1, -1,
         ],
         numShapes: 2,
-        opticalIndex: 1.2,
-        thickness: 10,
+        refractionAmount: 24,
+        refractionHeight: 10,
         offsetX: 0,
         offsetY: 0,
       );
@@ -266,8 +199,8 @@ void main() {
           height: 16,
           shapeData: shape,
           numShapes: 1,
-          opticalIndex: 1.2,
-          thickness: 4,
+          refractionAmount: 24,
+          refractionHeight: 4,
           offsetX: i.isEven ? 0 : 1,
           offsetY: 0,
         );

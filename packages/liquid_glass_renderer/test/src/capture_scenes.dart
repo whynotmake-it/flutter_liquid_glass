@@ -243,9 +243,12 @@ Widget captureSceneWidget(
 }) {
   const settings = LiquidGlassSettings(
     frost: 6,
-    edgeRefraction: 30,
+    refractionAmount: 30,
     highlight: 0.5,
-    chromaticAberration: 0,
+    // The border and inner shadow differ with and without a capture inside a
+    // fractional fade; see docs/TODO.md. Kept off until that is fixed.
+    contourStrength: 0,
+    bevelShadowStrength: 0,
   );
   final shadows = scene.shadow
       ? const [
@@ -298,10 +301,9 @@ Widget captureSceneWidget(
                     fake: fake,
                     settings: const LiquidGlassSettings(
                       frost: 0,
-                      edgeRefraction: 24,
-                      backdropScale: 0.92,
+                      refractionAmount: 24,
+                      backdropShrink: 0.08,
                       highlight: 0.4,
-                      chromaticAberration: 0,
                     ),
                     child: const LiquidGlass(
                       shape: LiquidRoundedRectangle(borderRadius: 14),

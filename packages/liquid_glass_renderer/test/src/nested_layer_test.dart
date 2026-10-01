@@ -383,9 +383,8 @@ Widget _buildScene({required Offset offset, required GlobalKey captureKey}) {
           const Positioned.fill(child: _GridBackground()),
           LiquidGlassLayer(
             settings: settingsWithoutLighting.copyWith(
-              thickness: 24,
-              edgeRefraction: 52,
-              refractionSpread: 1,
+              refractionHeight: 24,
+              refractionAmount: 52,
             ),
             defaultAppearance: const LiquidGlassAppearance(
               tint: Color(0x4020A0FF),
@@ -437,9 +436,8 @@ Widget _buildLayerInLayerScene({
             offset: offset,
             child: LiquidGlassLayer(
               settings: settingsWithoutLighting.copyWith(
-                thickness: 24,
-                edgeRefraction: 52,
-                refractionSpread: 1,
+                refractionHeight: 24,
+                refractionAmount: 52,
               ),
               defaultAppearance: const LiquidGlassAppearance(
                 tint: Color(0x4020A0FF),
@@ -453,8 +451,8 @@ Widget _buildLayerInLayerScene({
                     child: Center(
                       child: LiquidGlassLayer(
                         settings: settingsWithoutLighting.copyWith(
-                          thickness: 18,
-                          edgeRefraction: 36,
+                          refractionHeight: 18,
+                          refractionAmount: 36,
                         ),
                         defaultAppearance: const LiquidGlassAppearance(
                           tint: Color(0xC0FF6048),
@@ -494,7 +492,7 @@ Widget _buildScrollingScene({
           const Positioned.fill(child: _GridBackground()),
           LiquidGlassLayer(
             fake: fake,
-            settings: settingsWithoutLighting.copyWith(thickness: 18),
+            settings: settingsWithoutLighting.copyWith(refractionHeight: 18),
             child: SizedBox.expand(
               child: SingleChildScrollView(
                 controller: controller,
@@ -504,8 +502,8 @@ Widget _buildScrollingScene({
                     LiquidGlass.withOwnLayer(
                       fake: fake,
                       settings: settingsWithoutLighting.copyWith(
-                        thickness: 18,
-                        edgeRefraction: 40,
+                        refractionHeight: 18,
+                        refractionAmount: 40,
                       ),
                       appearance: const LiquidGlassAppearance(
                         tint: Color(0x4020A0FF),
@@ -556,8 +554,8 @@ Widget _buildNestedGlassScrollingScene({
           LiquidGlassLayer(
             fake: fake,
             settings: settingsWithoutLighting.copyWith(
-              thickness: 22,
-              edgeRefraction: 44,
+              refractionHeight: 22,
+              refractionAmount: 44,
             ),
             defaultAppearance: const LiquidGlassAppearance(
               tint: Color(0x4020A0FF),
@@ -581,8 +579,8 @@ Widget _buildNestedGlassScrollingScene({
                               child: LiquidGlass.withOwnLayer(
                                 fake: fake,
                                 settings: settingsWithoutLighting.copyWith(
-                                  thickness: 16,
-                                  edgeRefraction: 32,
+                                  refractionHeight: 16,
+                                  refractionAmount: 32,
                                 ),
                                 appearance: const LiquidGlassAppearance(
                                   tint: Color(0x80FF6048),

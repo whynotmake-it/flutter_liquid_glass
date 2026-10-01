@@ -2,7 +2,8 @@
 
 // Deliberately low-resolution per-shape appearance map. The full-resolution
 // geometry pass remains authoritative for optics and lighting; this pass only
-// supplies a smooth, approximate tint transition between nearby shapes.
+// supplies a smooth, approximate tint transition between nearby shapes. It
+// shares the geometry pass's analytic normals.
 
 #define MAX_SHAPES 16
 
@@ -19,12 +20,14 @@ layout(std140) uniform GeometryUniforms {
     vec4 uRseData[MAX_SHAPES * 3];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
+    vec4 uShapeBounds[MAX_SHAPES];
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
 #define uNumShapes (geometryUniforms.uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
 #define uRseData geometryUniforms.uRseData
+#define uShapeBounds geometryUniforms.uShapeBounds
 #define uMaterialRasterScale (geometryUniforms.uContourProps.y)
 #define uMaterialMapSize (geometryUniforms.uContourProps.zw)
 
@@ -89,11 +92,16 @@ void main() {
         alpha
     );
     #else
+    // b is the nearest shape's weight. a is the same weight expressed for the
+    // lower-indexed shape of the pair: where the nearest shape swaps, both
+    // texels store the same pair in opposite order, and only a interpolates
+    // through the midpoint.
+    float primaryWeight = materialPrimaryWeight(scene);
     fragColor = vec4(
         (scene.primary + 0.5) / float(MAX_SHAPES),
         (scene.secondary + 0.5) / float(MAX_SHAPES),
-        materialPrimaryWeight(scene),
-        1.0
+        primaryWeight,
+        scene.primary <= scene.secondary ? primaryWeight : 1.0 - primaryWeight
     );
     #endif
 }

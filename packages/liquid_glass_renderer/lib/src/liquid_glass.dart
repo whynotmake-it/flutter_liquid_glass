@@ -531,12 +531,9 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
     }
   }
 
-  late Path _lastPath;
-
   @override
   void performLayout() {
     super.performLayout();
-    _lastPath = shape.getOuterPath(Offset.zero & size);
     if (_blendGroupLink != null) {
       _blendGroupLink!.notifyShapeLayoutChanged(this);
     } else {
@@ -545,9 +542,6 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
       markGeometryNeedsUpdate();
     }
   }
-
-  @override
-  Path shapePath() => _lastPath;
 
   @override
   double get geometryBlend => 0;

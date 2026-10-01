@@ -55,7 +55,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
       shape: shape,
       shadows: shadows,
       visibility: appearanceVisibility,
-      sizeResponse: settings.effectiveExteriorShadowSizeResponse,
     );
   }
 
@@ -68,8 +67,7 @@ class GlassShadow extends SingleChildRenderObjectWidget {
     renderObject
       ..shape = shape
       ..shadows = shadows
-      ..visibility = appearanceVisibility
-      ..sizeResponse = settings.effectiveExteriorShadowSizeResponse;
+      ..visibility = appearanceVisibility;
   }
 }
 
@@ -78,9 +76,7 @@ class _RenderGlassShadow extends RenderProxyBox {
     required this._shape,
     required this._shadows,
     required double visibility,
-    required double sizeResponse,
-  }) : _visibility = visibility.clamp(0, 1),
-       _sizeResponse = sizeResponse.clamp(0, 1);
+  }) : _visibility = visibility.clamp(0, 1);
 
   LiquidShape get shape => _shape;
   LiquidShape _shape;
@@ -106,21 +102,12 @@ class _RenderGlassShadow extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  double _sizeResponse = 0;
-  double get sizeResponse => _sizeResponse;
-  set sizeResponse(double value) {
-    if (_sizeResponse == value) return;
-    _sizeResponse = value.clamp(0, 1);
-    markNeedsPaint();
-  }
-
   @override
   Rect get paintBounds {
     var bounds = super.paintBounds;
     if (visibility <= 0 || shadows.isEmpty) return bounds;
 
     final shapeBounds = Offset.zero & size;
-    final scale = liquidGlassShadowScale(size, _sizeResponse);
     for (final shadow in shadows) {
       // Report the same conservative Gaussian support used by paint()'s
       // saveLayer. Without this, Flutter culls the blurred pixels outside the
@@ -129,7 +116,7 @@ class _RenderGlassShadow extends RenderProxyBox {
           .max(
             shadow.spreadRadius +
                 glassShadowBlurSupport(
-                  shadow.blurRadius * visibility * scale.blur,
+                  shadow.blurRadius * visibility,
                 ),
             0,
           )
@@ -151,7 +138,6 @@ class _RenderGlassShadow extends RenderProxyBox {
 
       if (needsCutout) {
         var layerBounds = rect;
-        final scale = liquidGlassShadowScale(size, _sizeResponse);
         for (final shadow in shadows) {
           layerBounds = layerBounds.expandToInclude(
             rect
@@ -159,7 +145,7 @@ class _RenderGlassShadow extends RenderProxyBox {
                 .inflate(
                   shadow.spreadRadius +
                       glassShadowBlurSupport(
-                        shadow.blurRadius * visibility * scale.blur,
+                        shadow.blurRadius * visibility,
                       ),
                 ),
           );
@@ -168,16 +154,15 @@ class _RenderGlassShadow extends RenderProxyBox {
       }
 
       for (final shadow in shadows) {
-        final scale = liquidGlassShadowScale(size, _sizeResponse);
         final shadowRect = rect
             .shift(shadow.offset)
             .inflate(shadow.spreadRadius);
         final paint = shadow
             .copyWith(
-              blurRadius: shadow.blurRadius * visibility * scale.blur,
+              blurRadius: shadow.blurRadius * visibility,
               blurStyle: needsCutout ? BlurStyle.normal : BlurStyle.outer,
               color: shadow.color.withValues(
-                alpha: shadow.color.a * visibility * scale.energy,
+                alpha: shadow.color.a * visibility,
               ),
             )
             .toPaint();
@@ -220,15 +205,4 @@ class _RenderGlassShadow extends RenderProxyBox {
         );
     }
   }
-}
-
-@internal
-({double energy, double blur}) liquidGlassShadowScale(
-  Size size,
-  double response,
-) {
-  final linear = ((size.shortestSide - 94) / 56).clamp(0.0, 1.0);
-  final smooth = linear * linear * (3 - 2 * linear);
-  final amount = smooth * response.clamp(0.0, 1.0);
-  return (energy: 1 + amount, blur: 1 + amount * .5);
 }

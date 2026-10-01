@@ -410,20 +410,21 @@ void main() {
 
     group('LiquidRoundedSuperellipse', () {
       goldenTest(
-        'should render a rounded superellipse with different thickness',
+        'should render a rounded superellipse with different refraction '
+        'heights',
         skip: skipGoldenTests,
         fileName: 'rounded_superellipse_thicknesses',
         pumpBeforeTest: pumpOnce,
         builder: () => GoldenTestGroup(
           scenarioConstraints: testScenarioConstraints,
           children: [
-            for (final thickness in [0.0, 5, 10, 15, 20, 40, 100])
+            for (final height in [0.0, 5, 10, 15, 20, 40, 100])
               GoldenTestScenario(
-                name: 'thickness ${thickness.toStringAsFixed(0)}px',
+                name: 'refraction height ${height.toStringAsFixed(0)}px',
                 child: buildWithGridPaper(
                   LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      thickness: thickness.toDouble(),
+                      refractionHeight: height.toDouble(),
                     ),
                     shape: const LiquidRoundedSuperellipse(
                       borderRadius: 100,
@@ -454,7 +455,7 @@ void main() {
                   child: buildWithGridPaper(
                     LiquidGlass.withOwnLayer(
                       settings: settingsWithoutLighting.copyWith(
-                        thickness: 2,
+                        refractionHeight: 2,
                       ),
                       appearance: LiquidGlassAppearance(
                         tint: Colors.blue.withValues(alpha: 0.5),
@@ -482,7 +483,7 @@ void main() {
                   child: buildWithGridPaper(
                     LiquidGlassLayer(
                       settings: settingsWithoutLighting.copyWith(
-                        thickness: 2,
+                        refractionHeight: 2,
                       ),
                       defaultAppearance: LiquidGlassAppearance(
                         tint: Colors.blue.withValues(alpha: 0.5),
@@ -536,7 +537,7 @@ void main() {
                         width: 340,
                         height: 220,
                         child: LiquidGlassLayer(
-                          settings: const LiquidGlassSettings.ios27ToolbarLight(
+                          settings: LiquidGlassSettings.ios27ToolbarLight(
                             frost: 0,
                           ),
                           child: LiquidGlassBlendGroup(
@@ -607,63 +608,87 @@ void main() {
         builder: () => GoldenTestGroup(
           scenarioConstraints: testScenarioConstraints,
           children: [
-            for (final directionality in [0.0, 1.0])
-              for (final background in [Colors.black, Colors.white])
-                GoldenTestScenario(
-                  name:
-                      'directionality ${directionality.toStringAsFixed(0)} · '
-                      '${background == Colors.black ? 'black' : 'white'}',
-                  child: ColoredBox(
-                    color: background,
-                    child: Center(
-                      child: SizedBox(
-                        width: 340,
-                        height: 220,
-                        child: LiquidGlassLayer(
-                          // Deliberately exaggerated, isolated material so the
-                          // golden proves that the directional bevel follows
-                          // the smooth-union SDF instead of a shape bounds box.
-                          settings:
-                              const LiquidGlassSettings.ios27ToolbarLight(
-                                frost: 0,
-                              ).copyWith(
-                                highlight: 0,
-                                contourStrength: 0,
-                                bevelShadowStrength: .12,
-                                bevelShadowDepth: 12,
-                                bevelShadowDirectionality: directionality,
-                                bevelShadowSizeResponse: 0,
-                              ),
-                          child: const LiquidGlassBlendGroup(
-                            blend: 36,
-                            child: Stack(
-                              children: [
-                                Positioned(
-                                  left: 36,
-                                  top: 72,
-                                  child: LiquidGlass.grouped(
-                                    shape: LiquidOval(),
-                                    child: SizedBox(width: 140, height: 100),
-                                  ),
-                                ),
-                                Positioned(
-                                  left: 138,
-                                  top: 42,
-                                  child: LiquidGlass.grouped(
-                                    shape: LiquidRoundedSuperellipse(
-                                      borderRadius: 38,
-                                    ),
-                                    child: SizedBox(width: 160, height: 130),
-                                  ),
-                                ),
-                              ],
+            for (final background in [Colors.black, Colors.white])
+              GoldenTestScenario(
+                name: background == Colors.black ? 'black' : 'white',
+                child: ColoredBox(
+                  color: background,
+                  child: Center(
+                    child: SizedBox(
+                      width: 340,
+                      height: 220,
+                      child: LiquidGlassLayer(
+                        // Deliberately exaggerated, isolated material so the
+                        // golden proves that the directional bevel follows
+                        // the smooth-union SDF instead of a shape bounds box.
+                        settings:
+                            LiquidGlassSettings.ios27ToolbarLight(
+                              frost: 0,
+                            ).copyWith(
+                              highlight: 0,
+                              contourStrength: 0,
+                              bevelShadowStrength: .12,
                             ),
+                        child: const LiquidGlassBlendGroup(
+                          blend: 36,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                left: 36,
+                                top: 72,
+                                child: LiquidGlass.grouped(
+                                  shape: LiquidOval(),
+                                  child: SizedBox(width: 140, height: 100),
+                                ),
+                              ),
+                              Positioned(
+                                left: 138,
+                                top: 42,
+                                child: LiquidGlass.grouped(
+                                  shape: LiquidRoundedSuperellipse(
+                                    borderRadius: 38,
+                                  ),
+                                  child: SizedBox(width: 160, height: 130),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
+              ),
+          ],
+        ),
+      );
+
+      goldenTest(
+        'blended shapes stay inside the box around each pair',
+        skip: skipGoldenTests,
+        fileName: 'blend_without_bulge',
+        pumpBeforeTest: pumpOnce,
+        builder: () => GoldenTestGroup(
+          scenarioConstraints: BoxConstraints.tight(const Size(360, 200)),
+          children: [
+            for (final gap in [-40.0, -20.0, 0.0, 12.0, 30.0])
+              GoldenTestScenario(
+                name: 'equal rects, gap ${gap.toStringAsFixed(0)}',
+                child: _blendPairScene(
+                  gap: gap,
+                  second: const LiquidRoundedSuperellipse(borderRadius: 18),
+                  secondSize: const Size(120, 80),
+                ),
+              ),
+            for (final gap in [-10.0, 6.0])
+              GoldenTestScenario(
+                name: 'rect and circle, gap ${gap.toStringAsFixed(0)}',
+                child: _blendPairScene(
+                  gap: gap,
+                  second: const LiquidOval(),
+                  secondSize: const Size.square(64),
+                ),
+              ),
           ],
         ),
       );
@@ -780,7 +805,7 @@ void main() {
               child: buildWithGridPaper(
                 LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
-                    thickness: 18,
+                    refractionHeight: 18,
                   ),
                   defaultAppearance: LiquidGlassAppearance(
                     tint: Colors.cyan.withValues(alpha: .25),
@@ -849,7 +874,7 @@ void main() {
                   scale: 1.45,
                   child: LiquidGlass.withOwnLayer(
                     settings: settingsWithoutLighting.copyWith(
-                      thickness: 18,
+                      refractionHeight: 18,
                     ),
                     appearance: LiquidGlassAppearance(
                       tint: Colors.cyan.withValues(alpha: .25),
@@ -1073,7 +1098,7 @@ void main() {
                 valueListenable: offset,
                 builder: (_, value, __) => LiquidGlassLayer(
                   settings: settingsWithoutLighting.copyWith(
-                    thickness: 18,
+                    refractionHeight: 18,
                   ),
                   defaultAppearance: LiquidGlassAppearance(
                     tint: Colors.cyan.withValues(alpha: .25),
@@ -1122,7 +1147,9 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               home: LiquidGlassLayer(
-                settings: settingsWithoutLighting.copyWith(thickness: 18),
+                settings: settingsWithoutLighting.copyWith(
+                  refractionHeight: 18,
+                ),
                 child: Stack(
                   children: [
                     ValueListenableBuilder<Offset>(
@@ -1169,7 +1196,7 @@ void main() {
         'reuses uniform material geometry until optical geometry changes',
         (tester) async {
           final settings = ValueNotifier(
-            settingsWithoutLighting.copyWith(thickness: 18),
+            settingsWithoutLighting.copyWith(refractionHeight: 18),
           );
           final appearance = ValueNotifier(const LiquidGlassAppearance());
           addTearDown(settings.dispose);
@@ -1201,7 +1228,7 @@ void main() {
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount);
 
-          settings.value = settings.value.copyWith(backdropScale: .8);
+          settings.value = settings.value.copyWith(backdropShrink: .2);
           await tester.pump();
           expect(
             renderer.debugRenderCount,
@@ -1209,7 +1236,7 @@ void main() {
             reason: 'backdrop scaling belongs to the final material pass',
           );
 
-          settings.value = settings.value.copyWith(thickness: 24);
+          settings.value = settings.value.copyWith(refractionHeight: 24);
           await tester.pump();
           expect(renderer.debugRenderCount, initialRenderCount + 1);
         },
@@ -1225,7 +1252,9 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               home: LiquidGlassLayer(
-                settings: settingsWithoutLighting.copyWith(thickness: 18),
+                settings: settingsWithoutLighting.copyWith(
+                  refractionHeight: 18,
+                ),
                 child: LiquidGlassBlendGroup(
                   child: Row(
                     children: [
@@ -1284,6 +1313,51 @@ Future<void> _pumpAtDpr2(WidgetTester tester) async {
   await pumpOnce(tester);
 }
 
+/// A 120x80 continuous-corner rect blended with [second], [gap] logical
+/// pixels apart (negative overlaps), on clear glass so blur cannot mask the
+/// seam.
+Widget _blendPairScene({
+  required double gap,
+  required LiquidShape second,
+  required Size secondSize,
+}) {
+  const firstSize = Size(120, 80);
+  const center = Offset(180, 100);
+  final width = firstSize.width + gap + secondSize.width;
+  final left = center.dx - width / 2;
+  return buildWithGridPaper(
+    LiquidGlassLayer(
+      settings: const LiquidGlassSettings(frost: 0),
+      defaultAppearance: LiquidGlassAppearance(
+        tint: Colors.blue.withValues(alpha: 0.25),
+      ),
+      child: LiquidGlassBlendGroup(
+        blend: 40,
+        child: Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: center.dy - firstSize.height / 2,
+              child: LiquidGlass.grouped(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 18),
+                child: SizedBox.fromSize(size: firstSize),
+              ),
+            ),
+            Positioned(
+              left: left + firstSize.width + gap,
+              top: center.dy - secondSize.height / 2,
+              child: LiquidGlass.grouped(
+                shape: second,
+                child: SizedBox.fromSize(size: secondSize),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _appearanceBlendScene({
   bool separated = false,
   bool threeShapes = false,
@@ -1310,7 +1384,7 @@ Widget _appearanceBlendScene({
 
   return buildWithGridPaper(
     LiquidGlassLayer(
-      settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
       defaultAppearance: white,
       child: LiquidGlassBlendGroup(
         blend: 44,
@@ -1360,10 +1434,10 @@ Widget _transparentTintBlendScene() {
     tint: Color(0xA0FF3B30),
   );
   return buildWithGridPaper(
-    const LiquidGlassLayer(
+    LiquidGlassLayer(
       settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
       defaultAppearance: toolbar,
-      child: LiquidGlassBlendGroup(
+      child: const LiquidGlassBlendGroup(
         blend: 44,
         child: Stack(
           children: [
@@ -1393,7 +1467,7 @@ Widget _transparentTintBlendScene() {
 
 Widget _transformGlass() => LiquidGlass.withOwnLayer(
   settings: settingsWithoutLighting.copyWith(
-    thickness: 18,
+    refractionHeight: 18,
   ),
   appearance: LiquidGlassAppearance(
     tint: Colors.cyan.withValues(alpha: .25),
@@ -1421,9 +1495,9 @@ Widget _dprOpticsRegressionScene() => Directionality(
     child: Center(
       child: LiquidGlass.withOwnLayer(
         settings: settingsWithoutLighting.copyWith(
-          thickness: 24,
-          edgeRefraction: 64,
-          chromaticAberration: .5,
+          refractionHeight: 24,
+          refractionAmount: 64,
+          dispersion: .5,
         ),
         appearance: const LiquidGlassAppearance(),
         shape: const LiquidRoundedSuperellipse(borderRadius: 80),
@@ -1465,7 +1539,7 @@ Widget _coordinateRegressionScene() => Stack(
       child: LiquidGlass.withOwnLayer(
         settings: settingsWithoutLighting.copyWith(
           frost: 5,
-          thickness: 60,
+          refractionHeight: 60,
         ),
         appearance: LiquidGlassAppearance(
           tint: Colors.white.withValues(alpha: .08),

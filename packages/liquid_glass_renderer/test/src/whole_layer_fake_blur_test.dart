@@ -38,7 +38,12 @@ void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
       );
       final opacity = AnimationController(vsync: tester, value: 1);
       addTearDown(opacity.dispose);
-      const settings = LiquidGlassSettings(frost: 8, highlight: 0);
+      const settings = LiquidGlassSettings(
+        frost: 8,
+        highlight: 0,
+        contourStrength: 0,
+        bevelShadowStrength: 0,
+      );
       const appearance = LiquidGlassAppearance();
       const shape = LiquidRoundedRectangle(borderRadius: 16);
       const content = SizedBox(

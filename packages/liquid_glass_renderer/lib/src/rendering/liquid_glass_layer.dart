@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
+import 'package:liquid_glass_renderer/src/internal/filter_pass_transform.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
@@ -49,8 +50,8 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///         ),
 ///         const SizedBox(height: 100),
 ///         LiquidGlassBlendGroup(
-///          blend: 20,
-///          child: Row(
+///           blend: 20,
+///           child: Row(
 ///             children: [
 ///               LiquidGlass.grouped(
 ///                 shape: const LiquidOval(),
@@ -73,6 +74,7 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///     ),
 ///   );
 /// }
+/// ```
 class LiquidGlassLayer extends StatefulWidget {
   /// Creates a new [LiquidGlassLayer] with the given [child] and [settings].
   const LiquidGlassLayer({
@@ -102,6 +104,9 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// Whether to replace all liquid glass effects in this layer with
   /// [FakeGlass] effects.
+  ///
+  /// The layer also uses [FakeGlass] when Impeller shader filters or Flutter
+  /// GPU are unavailable, for example on Skia.
   final bool fake;
 
   /// Whether to share a [BackdropGroup] capture for backdrop effects.
@@ -147,10 +152,13 @@ class LiquidGlassLayer extends StatefulWidget {
 
 class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     with SingleTickerProviderStateMixin {
-  static final Map<Element, Set<_LiquidGlassLayerState>> _debugSiblings = {};
-  static final Set<(int, int)> _debugWarnedPairs = {};
   static final List<String> _fakeSurfaceShaderAssets = [
     ShaderKeys.fakeGlassSurface,
+    // Impeller clips backdrop filters without anti-aliasing; the edge pass
+    // gives the fake backdrop an analytic silhouette. Skia's clips are
+    // anti-aliased.
+    if (!kIsWeb && ImageFilter.isShaderFilterSupported)
+      ShaderKeys.fakeGlassBackdropEdge,
   ];
 
   late final GeometryRenderLink _link = GeometryRenderLink();
@@ -162,60 +170,10 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   bool _triedGpuGeometryRenderer = false;
   bool _gpuInitializationScheduled = false;
   bool _loggedFallback = false;
-  Element? _debugParent;
 
   // Fake and real subtrees never coexist, so one key keeps the user's subtree
   // alive across a renderer swap without ever being mounted twice.
   final _childKey = GlobalKey(debugLabel: 'LiquidGlassLayer.child');
-
-  void _registerDebugSiblingCheck() {
-    if (!kDebugMode) return;
-    Element? parent;
-    context.visitAncestorElements((element) {
-      parent = element;
-      return false;
-    });
-    if (identical(parent, _debugParent)) return;
-    if (_debugParent case final oldParent?) {
-      _debugSiblings[oldParent]?.remove(this);
-    }
-    _debugParent = parent;
-    if (parent == null) return;
-    final siblingParent = parent!;
-    (_debugSiblings[siblingParent] ??= {}).add(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _warnForCompatibleDebugSiblings(siblingParent);
-    });
-  }
-
-  void _warnForCompatibleDebugSiblings(Element parent) {
-    final siblings = _debugSiblings[parent];
-    final box = context.findRenderObject();
-    if (siblings == null || box is! RenderBox || !box.hasSize) return;
-    final bounds = box.localToGlobal(Offset.zero) & box.size;
-    for (final sibling in siblings) {
-      if (identical(sibling, this) || !sibling.mounted) continue;
-      if (widget.settings != sibling.widget.settings ||
-          widget.defaultAppearance != sibling.widget.defaultAppearance ||
-          widget.fake != sibling.widget.fake ||
-          widget.useBackdropGroup != sibling.widget.useBackdropGroup ||
-          widget.backdropKey != sibling.widget.backdropKey) {
-        continue;
-      }
-      final siblingBox = sibling.context.findRenderObject();
-      if (siblingBox is! RenderBox || !siblingBox.hasSize) continue;
-      final siblingBounds =
-          siblingBox.localToGlobal(Offset.zero) & siblingBox.size;
-      if (bounds.overlaps(siblingBounds)) continue;
-      final ids = [identityHashCode(this), identityHashCode(sibling)]..sort();
-      if (!_debugWarnedPairs.add((ids[0], ids[1]))) continue;
-      debugPrint(
-        'liquid_glass_renderer: compatible non-overlapping sibling '
-        'LiquidGlassLayers could share one layer and backdrop capture.',
-      );
-    }
-  }
 
   void _logDebugFallback(String message) {
     if (!kDebugMode || _loggedFallback) return;
@@ -296,18 +254,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _registerDebugSiblingCheck();
-  }
-
-  @override
   void dispose() {
-    if (_debugParent case final parent?) {
-      final siblings = _debugSiblings[parent];
-      siblings?.remove(this);
-      if (siblings?.isEmpty ?? false) _debugSiblings.remove(parent);
-    }
     _gpuGeometryRenderer?.dispose();
     for (final renderer in _retiredGpuGeometryRenderers) {
       renderer.dispose();
@@ -409,7 +356,10 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     // several contour-following canvas bands; without this boundary an
     // ancestor/compositor transform can make every band record again even
     // though neither the shape nor material changed.
-    Widget buildFakeSurfaceLayer(FragmentShader? surfaceShader) {
+    Widget buildFakeSurfaceLayer(
+      FragmentShader? surfaceShader,
+      FragmentShader? backdropEdgeShader,
+    ) {
       return RepaintBoundary(
         child: LiquidGlassRenderScope(
           settings: settings,
@@ -425,6 +375,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
               defaultAppearance: defaultAppearance,
               backdropKey: backdropKey,
               surfaceShader: surfaceShader,
+              backdropEdgeShader: backdropEdgeShader,
               child: child,
             ),
           ),
@@ -434,8 +385,11 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
     return MultiShaderBuilder(
       assetKeys: _fakeSurfaceShaderAssets,
-      (_, shaders, _) => buildFakeSurfaceLayer(shaders.single),
-      child: buildFakeSurfaceLayer(null),
+      (_, shaders, _) => buildFakeSurfaceLayer(
+        shaders.first,
+        shaders.length > 1 ? shaders[1] : null,
+      ),
+      child: buildFakeSurfaceLayer(null, null),
     );
   }
 }
@@ -524,43 +478,12 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Offset _filterPaintOffset = Offset.zero;
 
   @override
-  // Geometry is encoded in this layer's local coordinate space. Ancestor
-  // transforms are applied once by Flutter when the completed layer is
-  // composited. Baking getTransformTo(null) into the matte would apply scale
-  // and rotation here and then a second time during compositing.
-  Matrix4 get matteTransform => Matrix4.identity();
-
-  @override
-  Matrix4 get shaderCoordinateTransform {
-    // Filter fragment coordinates are local to the enclosing render pass. At
-    // the root that is the screen; inside a [LiquidGlassCapture] it is the
-    // capture's pixel-snapped clip. Inside a seeded fractional-opacity pass
-    // it is that pass, which the engine bounds by the enclosing clips
-    // (including any capture's). The innermost pass wins.
-    final Matrix4 transform;
-    final capture = RenderLiquidGlassCapture.enclosing(this);
-    if (compositionProbeSeeding) {
-      final origin = GlassCompositionProbe.seededPassOrigin(
-        this,
-        devicePixelRatio,
-      );
-      transform = getTransformTo(null)
-        ..leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
-    } else if (capture != null) {
-      transform = getTransformTo(capture);
-      final origin = capture.passOrigin;
-      transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
-    } else {
-      transform = getTransformTo(null);
-    }
-    final translation = compositorTranslation;
-    if (translation != Offset.zero) {
-      transform.multiply(
-        Matrix4.translationValues(translation.dx, translation.dy, 0),
-      );
-    }
-    return transform;
-  }
+  Matrix4 get shaderCoordinateTransform => filterPassTransform(
+    this,
+    seeding: compositionProbeSeeding,
+    devicePixelRatio: devicePixelRatio,
+    translation: compositorTranslation,
+  );
 
   @override
   void onTransformChanged() {
@@ -576,12 +499,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final motion = pollCompositorTranslation();
     if (motion.translation case final translation?) {
       setCompositorTranslation(translation);
-      final bounds = _filterMaterialBounds;
-      if (bounds != null && _clipRectLayerHandle.layer != null) {
-        final clip = bounds
-            .shift(translation)
-            .expandToPixelBuckets(devicePixelRatio)
-            .shift(-translation);
+      final clip = _filterClip;
+      if (clip != null && _clipRectLayerHandle.layer != null) {
         _clipRectLayerHandle.layer!.clipRect = clip.shift(_filterPaintOffset);
       }
       if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
@@ -613,16 +532,49 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (motion.needsRepaint) markNeedsPaint();
   }
 
+  // The native filter clip, kept on stable pixel buckets in the translated
+  // frame so retained compositor motion does not resize its render target.
+  Rect? get _filterClip {
+    final bounds = _filterMaterialBounds;
+    if (bounds == null) return null;
+    final translation = compositorTranslation;
+    return bounds
+        .shift(translation)
+        .expandToPixelBuckets(devicePixelRatio)
+        .shift(-translation);
+  }
+
+  // Unblurred, the filter input is the backdrop inside the filter's own clip.
+  // With a blur pass, Impeller re-rasterizes the blurred input into the
+  // filter's coverage, which every clip around the filter narrows: the
+  // retained clips between this layer and its shapes, and the clips above
+  // this layer up to its pass. The texture is transparent outside it.
+  @override
+  Rect? get backdropSampleBounds {
+    final clip = _filterClip;
+    if (clip == null || blurPassSigma <= 0) return clip;
+    final translation = compositorTranslation;
+    var captured = clip.shift(translation);
+    final ancestorClips = [
+      retainedClipBounds,
+      localPaintClipAbove(
+        this,
+        stopAt: (ancestor) => ancestor is RenderLiquidGlassCapture,
+      ),
+    ];
+    for (final ancestorClip in ancestorClips) {
+      if (ancestorClip != null) captured = captured.intersect(ancestorClip);
+    }
+    return captured.shift(-translation);
+  }
+
   ImageFilter? _cachedFilter;
-  Object? _cachedFilterSnapshot;
 
   ImageFilter _updateShaderFilter() {
-    final snapshot = shaderInputSnapshot;
-    if (_cachedFilter != null && _cachedFilterSnapshot == snapshot) {
-      return _cachedFilter!;
-    }
+    final inputsChanged = takeShaderInputsChanged();
+    if (_cachedFilter != null && !inputsChanged) return _cachedFilter!;
     final shader = ImageFilter.shader(renderShader);
-    final frostSigma = settings.effectiveFrost;
+    final frostSigma = blurPassSigma;
     final filter = frostSigma > 0
         ? ImageFilter.compose(
             inner: ImageFilter.blur(
@@ -634,7 +586,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           )
         : shader;
     _cachedFilter = filter;
-    _cachedFilterSnapshot = snapshot;
     return filter;
   }
 
@@ -650,8 +601,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _shaderHandle.layer?.remove();
       _shaderHandle.layer = null;
       _cachedFilter = null;
-      _cachedFilterSnapshot = null;
     } else {
+      syncCoordinateMapping();
       final shader = (_shaderHandle.layer ??= BackdropFilterLayer())
         ..filter = _updateShaderFilter()
         ..backdropKey = backdropKey;
@@ -704,7 +655,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _shaderHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     _cachedFilter = null;
-    _cachedFilterSnapshot = null;
   }
 
   @override
@@ -712,7 +662,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _shaderHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     _cachedFilter = null;
-    _cachedFilterSnapshot = null;
     super.dispose();
   }
 }

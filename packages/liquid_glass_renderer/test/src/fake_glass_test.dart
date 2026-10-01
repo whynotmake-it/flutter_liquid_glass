@@ -5,33 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
-import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 
 import 'shared.dart';
 
 void main() {
   group('FakeGlass', () {
-    test('uses the real renderer fallback for highlight width', () {
-      expect(
-        fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarDark(),
-        ),
-        .5,
-      );
-      expect(
-        fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarLight(),
-        ),
-        .75,
-      );
-      expect(
-        fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings(),
-        ),
-        0,
-      );
-    });
-
     for (final shape in <LiquidShape>[
       const LiquidOval(),
       const LiquidRoundedRectangle(borderRadius: 24),
@@ -108,7 +86,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -125,7 +102,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
@@ -142,7 +118,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -173,7 +148,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -239,7 +213,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -301,28 +274,6 @@ void main() {
     );
 
     goldenTest(
-      'matches RealGlass contour offsets without a separate stroke',
-      skip: skipGoldenTests,
-      fileName: _backendGolden('fake_glass_real_contour_offsets'),
-      pumpBeforeTest: pumpOnce,
-      builder: () => GoldenTestGroup(
-        scenarioConstraints: BoxConstraints.tight(const Size(320, 240)),
-        children: [
-          for (final offset in [-1.0, 0.0, 1.0])
-            for (final fake in [false, true])
-              GoldenTestScenario(
-                name:
-                    'OFFSET ${offset.toStringAsFixed(0)} · '
-                    '${fake ? 'FAKE — candidate' : 'REAL — reference'}',
-                child: buildWithGridPaper(
-                  _offsetComparisonSurface(fake: fake, offset: offset),
-                ),
-              ),
-        ],
-      ),
-    );
-
-    goldenTest(
       'keeps the layer-owned surface throughout a visibility fade',
       skip: skipGoldenTests,
       fileName: _backendGolden('fake_glass_layer_visibility'),
@@ -351,24 +302,6 @@ Widget _layerVisibilitySurface(double visibility) => buildWithGridPaper(
         shape: LiquidRoundedSuperellipse(borderRadius: 32),
         child: SizedBox(width: 180, height: 96),
       ),
-    ),
-  ),
-);
-
-Widget _offsetComparisonSurface({
-  required bool fake,
-  required double offset,
-}) => Center(
-  child: LiquidGlassLayer(
-    fake: fake,
-    settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
-      edgeRefraction: 0,
-      chromaticAberration: 0,
-      contourOffset: offset,
-    ),
-    child: const LiquidGlass(
-      shape: LiquidRoundedRectangle(borderRadius: 36),
-      child: SizedBox(width: 220, height: 96),
     ),
   ),
 );
@@ -454,13 +387,8 @@ String _backendGolden(String name) =>
 const _lightingSettings = LiquidGlassSettings(
   frost: 0,
   highlight: 0.25,
-  highlightWidth: 1.5,
-  highlightOppositeStrength: 0.5,
   contourStrength: 0.2,
-  contourWidth: 1,
   bevelShadowStrength: 0.04,
-  bevelShadowOffset: 4,
-  bevelShadowDirectionality: 0.75,
 );
 const _lightingAppearance = LiquidGlassAppearance(
   tint: Color.fromARGB(52, 245, 248, 255),

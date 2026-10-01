@@ -1,8 +1,14 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
 // Geometry pass, run with Flutter GPU: renders the signed distance field of
-// every shape in a layer into the layer's matte (surface normal, signed edge
-// distance and displacement, packed by displacement_encoding.glsl).
+// every shape in a layer into the layer's matte (12-bit surface normal angle,
+// signed edge distance and 12-bit displacement, packed by
+// displacement_encoding.glsl). Normals are analytic; corner normals come from
+// a 1.5x corner radius, and refraction uses a quarter-circle bevel that can
+// fit the shape.
+
+// The matte packs 12-bit integer codes; fp16 cannot represent them exactly.
+precision highp float;
 
 #define MAX_SHAPES 16
 
@@ -15,6 +21,7 @@ layout(std140) uniform GeometryUniforms {
     vec4 uRseData[MAX_SHAPES * 3];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
+    vec4 uShapeBounds[MAX_SHAPES];
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
@@ -24,15 +31,17 @@ layout(std140) uniform GeometryUniforms {
 #define uNumShapes (uOpticalProps.w)
 #define uShapeData geometryUniforms.uShapeData
 #define uRseData geometryUniforms.uRseData
+#define uShapeBounds geometryUniforms.uShapeBounds
 
 #include "displacement_encoding.glsl"
 
 // Included after uShapeData so the SDF helpers can read the uniform directly.
 #include "sdf.glsl"
 
-float uThickness = uOpticalProps.z;
-float uRefractiveIndex = uOpticalProps.x;
-float uRefractionSpread = uTextureSize.x;
+float uRefractionHeight = uOpticalProps.x;
+float uEdgeDistanceRange = uOpticalProps.z;
+float uRefractionAmount = uTextureSize.y;
+float uRefractionFitsShape = uTextureSize.x;
 float uContourExtent = uContourProps.x;
 out vec4 fragColor;
 
@@ -41,22 +50,18 @@ void main() {
     // orientation, including Flutter GPU passes on GLES.
     vec2 fragCoord = gl_FragCoord.xy + uOffset;
 
-    float spread = clamp(uRefractionSpread, 0.0, 1.0);
-    bool hasFaceSpread = spread > 0.0;
     // Most of a shared layer's matte can be empty when spatially separate
-    // groups reuse one backdrop. Reject those pixels before running Flutter's
-    // iterative superellipse/ellipse solvers for every shape.
-    if (uNumShapes > 1.0) {
-        vec2 outsideBounds = sceneBoundsOutsideSquared(
-            fragCoord,
-            int(uNumShapes)
-        );
-        float emptyThreshold =
-            uContourExtent + 2.0 + outsideBounds.y;
-        if (outsideBounds.x > emptyThreshold * emptyThreshold) {
-            fragColor = vec4(0.0);
-            return;
-        }
+    // groups reuse one backdrop, and a single shape's texture is padded to
+    // its size bucket. Reject those pixels with the matte-space boxes before
+    // running Flutter's iterative superellipse/ellipse solvers.
+    vec2 outsideBounds = sceneBoundsOutsideSquared(
+        fragCoord,
+        int(uNumShapes)
+    );
+    float emptyThreshold = uContourExtent + 2.0 + outsideBounds.y;
+    if (outsideBounds.x > emptyThreshold * emptyThreshold) {
+        fragColor = vec4(0.0);
+        return;
     }
     SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
     float sd = scene.distance;
@@ -65,7 +70,11 @@ void main() {
     // coverage transition is half a physical pixel on either side of the
     // mathematical boundary, rather than a fixed two-pixel fade entirely
     // inside the shape. This keeps the contour position independent of scale.
-    float pixelSize = length(vec2(dFdx(sd), dFdy(sd)));
+    // Analytic gradient rather than dFdx/dFdy of the distance, which many
+    // GPUs share across a 2x2 quad (see getShapeGradients).
+    float dx = scene.opticalNormal.x;
+    float dy = scene.opticalNormal.y;
+    float pixelSize = length(scene.opticalNormal);
     float fade = clamp(uOpticalProps.y, 0.0, 1.0) * max(pixelSize, 1e-4);
     float materialAlpha = 1.0 - smoothstep(-fade, fade, sd);
     // Keep geometry alive only as far as the final pass can draw an attached
@@ -82,72 +91,43 @@ void main() {
         return;
     }
 
-    // Keep the centered coverage on both sides of the mathematical edge, but
-    // clamp optical depth to the filled side. The exterior half of the AA
-    // ramp carries zero displacement and only supplies the correct silhouette
-    // coverage; rejecting sd >= 0 here would silently turn centered AA back
-    // into an inside-only fade.
-    if (uThickness <= 0.0) {
-        fragColor = vec4(0.0);
-        return;
-    }
-
-    float surfaceSd = min(sd, 0.0);
-    float dx = dFdx(sd);
-    float dy = dFdy(sd);
-
-    // Spread extends the same circular edge profile toward the shape's
-    // center. Its reach is shape-relative, so thickness cannot accidentally
-    // become a proxy for coverage on large lenses.
-    float reach = hasFaceSpread
-        ? mix(uThickness, max(uThickness, scene.halfMinor), spread)
-        : uThickness;
-    float inwardDistance = max(-surfaceSd, 0.0);
-    float profileX = min(inwardDistance, reach);
-    float normalizedProfile = profileX / max(reach, 0.001);
-    // Circular-cap profile: the height and its normal are derived from the
-    // same surface, so the transmitted displacement remains a coherent lens
-    // rather than an independently-shaped color warp.
-    float profileHeight = sqrt(
-        max(0.0, normalizedProfile * (2.0 - normalizedProfile))
-    );
-    float height = uThickness * profileHeight;
-    // Keep the homogeneous normal form. It is the stable form of the
-    // derivative-derived cap normal: dividing by profileHeight would create a
-    // false finite slope at the exact rim and can reduce the requested peak
-    // displacement for large reaches.
-    float slopeScale = uThickness / max(reach, 0.001);
-    vec3 normal = normalize(vec3(
-        dx * slopeScale * (1.0 - normalizedProfile),
-        dy * slopeScale * (1.0 - normalizedProfile),
-        profileHeight
-    ));
-
-    float baseHeight = uThickness * 8.0;
-    vec3 incident = vec3(0.0, 0.0, -1.0);
-
-    float invRefractiveIndex = 1.0 / uRefractiveIndex;
-    vec3 baseRefract = refract(incident, normal, invRefractiveIndex);
-    float baseRefractLength = (height + baseHeight) / max(0.001, abs(baseRefract.z));
-    vec2 refractedDisplacement = baseRefract.xy * baseRefractLength;
-
-    // Spread is expressed entirely by the generalized SDF/profile field
-    // above. Do not add a center-relative affine scale here: that merely
-    // enlarges the backdrop and reads as a zoomed pill rather than refraction.
-    vec2 displacement = refractedDisplacement;
     vec2 surfaceGradient = vec2(dx, dy);
     float surfaceGradientLength = length(surfaceGradient);
     vec2 surfaceNormal = surfaceGradientLength > 0.0001
         ? surfaceGradient / surfaceGradientLength
         : vec2(0.0);
-    float displacementMagnitude = dot(displacement, surfaceNormal);
-    float signedEdgeDistance = -sd;
+
+    // A flat face with a quarter-circle bevel: only the bevel refracts, and
+    // its displacement joins the undisplaced face with zero slope. The
+    // exterior half of the AA ramp keeps the silhouette's displacement.
+    float bevel;
+    float amount;
+    if (uRefractionFitsShape > 0.5) {
+        // iOS 27 regular glass: the bevel spans at most half of the half
+        // short side and the rim samples no deeper than the center line.
+        bevel = min(uRefractionHeight, 0.5 * scene.halfMinor);
+        amount = min(uRefractionAmount, scene.halfMinor);
+    } else {
+        // Clear glass keeps its lens until the bevel would pass the center
+        // line, then scales the whole lens so displacement never flips there.
+        float lensScale = min(
+            1.0,
+            scene.halfMinor / max(uRefractionHeight, 0.001)
+        );
+        bevel = uRefractionHeight * lensScale;
+        amount = uRefractionAmount * lensScale;
+    }
+    float bevelX = 1.0 - clamp(max(-sd, 0.0) / max(bevel, 0.001), 0.0, 1.0);
+    float displacementMagnitude = bevel > 0.001
+        ? -amount * (1.0 - sqrt(1.0 - bevelX * bevelX))
+        : 0.0;
+
     fragColor = encodeDisplacementData(
         surfaceNormal,
         displacementMagnitude,
-        max(uTextureSize.y, 0.001),
-        signedEdgeDistance,
-        uThickness,
+        max(uRefractionAmount, 0.001),
+        -sd,
+        4.0 * uEdgeDistanceRange,
         uContourExtent
     );
 }

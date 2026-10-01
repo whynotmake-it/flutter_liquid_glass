@@ -75,14 +75,14 @@ class FakeGlass extends StatelessWidget {
   /// The settings for the glass effect.
   ///
   /// This path approximates lighting and blur without refraction.
-  /// [LiquidGlassSettings.edgeRefraction] and
-  /// [LiquidGlassSettings.chromaticAberration] therefore have no effect.
-  /// Refraction-only material controls ([LiquidGlassSettings.refractionSpread],
-  /// [LiquidGlassSettings.backdropScale],
-  /// and [LiquidGlassAppearance.vibrancy]) are likewise ignored. When tint or
+  /// [LiquidGlassSettings.refractionAmount],
+  /// [LiquidGlassSettings.backdropShrink] and
+  /// [LiquidGlassSettings.dispersion] therefore have no effect, and
+  /// [LiquidGlassAppearance.vibrancy] is likewise ignored. When tint or
   /// saturation already requires a native color filter, transmission gamma is
-  /// approximated in that same filter at no additional pass cost. Thickness
-  /// only controls the width of the approximate inner light bleed.
+  /// approximated in that same filter at no additional pass cost.
+  /// [LiquidGlassSettings.refractionHeight] only controls the width of the
+  /// approximate inner light bleed.
   final LiquidGlassSettings? settings;
 
   /// Color and materialization controls for this shape.
@@ -151,6 +151,9 @@ class FakeGlass extends StatelessWidget {
     final allowsSurfaceOutset =
         (renderScope?.consolidatesFakeSurface ?? false) &&
         !backdropHandledByLayer;
+    // The dark border lies outside the silhouette. Standalone glass keeps its
+    // backdrop clipped to the shape and draws the border ring separately.
+    final paintsExteriorBorder = paintsOwnSurface && !allowsSurfaceOutset;
     RawFakeGlass buildRawFake(ui.FragmentShader? surfaceShader) => RawFakeGlass(
       shape: shape,
       settings: settings,
@@ -160,6 +163,7 @@ class FakeGlass extends StatelessWidget {
       surfaceShader: surfaceShader,
       paintSurface: paintsOwnSurface,
       allowSurfaceOutset: allowsSurfaceOutset,
+      paintExteriorBorder: paintsExteriorBorder,
       child: glow,
     );
     final fake = paintsOwnSurface
@@ -171,7 +175,9 @@ class FakeGlass extends StatelessWidget {
         : buildRawFake(null);
     final clipped = OptimizedClip(
       shape: shape,
-      outset: allowsSurfaceOutset ? fakeGlassSurfaceOutset(settings) : 0,
+      outset: allowsSurfaceOutset || paintsExteriorBorder
+          ? fakeGlassSurfaceOutset(settings)
+          : 0,
       child: fake,
     );
     if (shadows.isEmpty) return clipped;
@@ -199,6 +205,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
     this.surfaceShader,
     this.paintSurface = true,
     this.allowSurfaceOutset = false,
+    this.paintExteriorBorder = false,
     this.settings = const LiquidGlassSettings(),
     this.appearance = const LiquidGlassAppearance(),
     super.key,
@@ -220,9 +227,14 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 
   final bool allowSurfaceOutset;
 
+  /// Whether the surface is drawn a second time outside the shape clip to
+  /// show the exterior border of standalone glass.
+  final bool paintExteriorBorder;
+
   @override
   RenderObject createRenderObject(BuildContext context) {
     return RenderFakeGlass(
+      devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1,
       shape: shape,
       settings: settings,
       appearance: appearance,
@@ -231,6 +243,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
       surfaceShader: surfaceShader,
       paintSurface: paintSurface,
       allowSurfaceOutset: allowSurfaceOutset,
+      paintExteriorBorder: paintExteriorBorder,
     );
   }
 
@@ -241,6 +254,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
   ) {
     if (renderObject is RenderFakeGlass) {
       renderObject
+        ..devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1
         ..shape = shape
         ..settings = settings
         ..appearance = appearance
@@ -248,7 +262,8 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
         ..backdropHandledByLayer = backdropHandledByLayer
         ..surfaceShader = surfaceShader
         ..paintSurface = paintSurface
-        ..allowSurfaceOutset = allowSurfaceOutset;
+        ..allowSurfaceOutset = allowSurfaceOutset
+        ..paintExteriorBorder = paintExteriorBorder;
     }
   }
 }
@@ -257,6 +272,7 @@ class RawFakeGlass extends SingleChildRenderObjectWidget {
 @internal
 class RenderFakeGlass extends RenderProxyBox {
   RenderFakeGlass({
+    required this._devicePixelRatio,
     required this._shape,
     required this._settings,
     required this._appearance,
@@ -265,6 +281,7 @@ class RenderFakeGlass extends RenderProxyBox {
     required this._surfaceShader,
     required bool paintSurface,
     required this._allowSurfaceOutset,
+    required this._paintExteriorBorder,
   }) : _shouldPaintSurface = paintSurface;
 
   bool _shouldPaintSurface;
@@ -272,6 +289,22 @@ class RenderFakeGlass extends RenderProxyBox {
   set paintSurface(bool value) {
     if (_shouldPaintSurface == value) return;
     _shouldPaintSurface = value;
+    markNeedsPaint();
+  }
+
+  bool _paintExteriorBorder;
+  bool get paintExteriorBorder => _paintExteriorBorder;
+  set paintExteriorBorder(bool value) {
+    if (_paintExteriorBorder == value) return;
+    _paintExteriorBorder = value;
+    markNeedsPaint();
+  }
+
+  double _devicePixelRatio;
+  double get devicePixelRatio => _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (_devicePixelRatio == value) return;
+    _devicePixelRatio = value;
     markNeedsPaint();
   }
 
@@ -321,7 +354,9 @@ class RenderFakeGlass extends RenderProxyBox {
 
   bool get _hasColorTransfer =>
       appearance.visibility > 0 &&
-      (appearance.saturation != 1 || appearance.transmissionGamma != 1);
+      (appearance.saturation != 1 ||
+          appearance.transmissionGamma != 1 ||
+          appearance.colorModel.faceTransfer(0) != null);
 
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
@@ -366,11 +401,27 @@ class RenderFakeGlass extends RenderProxyBox {
       // and just paint the specular highlights and child directly.
       this.layer = null;
       _paintRecordedSurface(context.canvas, offset);
+      if (_paintsBorderRing) {
+        _paintBorderRing(context.canvas, offset);
+        final localBounds = Offset.zero & size;
+        context.pushClipPath(
+          needsCompositing,
+          offset,
+          localBounds,
+          shape.getOuterPath(localBounds),
+          (context, offset) => super.paint(context, offset),
+        );
+        return;
+      }
       super.paint(context, offset);
       return;
     }
 
-    final backdropFilter = fakeGlassBackdropFilter(settings, appearance)!;
+    final backdropFilter = fakeGlassBackdropFilter(
+      settings,
+      appearance,
+      shortSide: size.shortestSide,
+    )!;
     assert(() {
       debugRegisterBackdropCapture(this, backdropKey);
       return true;
@@ -407,14 +458,60 @@ class RenderFakeGlass extends RenderProxyBox {
       return;
     }
 
-    context.pushLayer(layer, (context, offset) {
-      // If we are on Skia, we need to avoid the raster cache.
-      if (!ui.ImageFilter.isShaderFilterSupported) {
-        context.setWillChangeHint();
-      }
+    void paintBackdropLayer(PaintingContext context, Offset offset) {
+      context.pushLayer(layer, (context, offset) {
+        // If we are on Skia, we need to avoid the raster cache.
+        if (!ui.ImageFilter.isShaderFilterSupported) {
+          context.setWillChangeHint();
+        }
 
-      _paintInnerContent(context, offset);
-    }, offset);
+        _paintInnerContent(context, offset);
+      }, offset);
+    }
+
+    if (_paintsBorderRing) {
+      final localBounds = Offset.zero & size;
+      context.pushClipPath(
+        true,
+        offset,
+        localBounds,
+        shape.getOuterPath(localBounds),
+        paintBackdropLayer,
+      );
+      _paintBorderRing(context.canvas, offset);
+      return;
+    }
+    paintBackdropLayer(context, offset);
+  }
+
+  bool get _paintsBorderRing =>
+      paintExteriorBorder &&
+      paintSurface &&
+      _surfaceShader != null &&
+      settings.contourWidth > 0;
+
+  /// Draws the analytic surface only outside the silhouette, where the
+  /// exterior border lives, without widening the backdrop clip.
+  void _paintBorderRing(Canvas canvas, Offset offset) {
+    final localBounds = Offset.zero & size;
+    final ring = Path.from(shape.getOuterPath(localBounds))
+      ..addRect(localBounds.inflate(fakeGlassSurfaceOutset(settings)))
+      ..fillType = PathFillType.evenOdd;
+    canvas
+      ..save()
+      ..translate(offset.dx, offset.dy)
+      ..clipPath(ring);
+    paintFakeGlassSurface(
+      canvas,
+      shader: _surfaceShader!,
+      size: size,
+      shape: shape,
+      settings: settings,
+      appearance: appearance,
+      devicePixelRatio: devicePixelRatio,
+      exteriorOnly: true,
+    );
+    canvas.restore();
   }
 
   /// Paints content inside the single composed backdrop-filter pass.
@@ -463,6 +560,7 @@ class RenderFakeGlass extends RenderProxyBox {
       shape: shape,
       settings: settings,
       appearance: appearance,
+      devicePixelRatio: devicePixelRatio,
     );
     canvas.restore();
   }
