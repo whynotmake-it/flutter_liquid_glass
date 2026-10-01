@@ -156,7 +156,8 @@ class _LoupeTabBarState extends State<LoupeTabBar>
   );
 
   /// Springs the loupe's shape back to rest, fitted to the iOS 27 loupe
-  /// timeline (`references/bottom-bar-refs`, `loupe-dynamics/`): damping
+  /// timeline in `tool/apple_match/references/ios27-iphone17pro-bottom-bar/`
+  /// (`loupe-dynamics/`): damping
   /// ratio 0.55 with a 0.74 s period (1.35 Hz), so it passes rest once and
   /// comes back with an undershoot 1/7.8 the size of the overshoot.
   static const _recover = Motion.cupertino(

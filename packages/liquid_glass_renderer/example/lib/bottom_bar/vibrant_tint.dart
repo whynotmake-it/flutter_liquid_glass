@@ -9,11 +9,10 @@ import 'dart:ui';
 /// content, so this needs no extra layer or pass, and the tint follows the
 /// backdrop instantly and shows its detail.
 ///
-/// Fitted to the selected item of the iOS 27 system tab bar (the
-/// `references/bottom-bar-refs` branch,
-/// `internal/bottom-bar-match/apple-measurements.md`), whose tint follows
-/// the tone of the platter beneath it in both appearances while keeping its
-/// hue:
+/// Fitted to the selected item of the iOS 27 system tab bar (section 2 of
+/// `tool/apple_match/references/ios27-iphone17pro-bottom-bar/README.md`),
+/// whose tint follows the tone of the platter beneath it in both
+/// appearances while keeping its hue:
 ///
 /// * Light: (0, 130, 248) over the platter on white (lum 231) and
 ///   (0, 93, 199) over the platter on black (lum 97), about
