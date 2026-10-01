@@ -85,23 +85,22 @@ The liquid glass effect works by capturing and distorting background pixels thro
 4. **Geometry Rendering** (`lib/src/internal/render_liquid_glass_geometry.dart`): Renders glass shape geometry into textures for shader processing. Caches geometry to avoid re-rendering on every frame.
 
 5. **Shader Pipeline** (`lib/src/shaders.dart` and `lib/assets/shaders/`):
-   - `liquid_glass_geometry_blended.frag`: Renders blended glass geometry
-   - `liquid_glass_filter.frag`: Applies glass effects (refraction, blur)
-   - `liquid_glass_arbitrary.frag`: Glass effect for arbitrary shapes (Glassify)
-   - `liquid_glass_final_render.frag`: Final composition
+   - `gpu/geometry_fragment.glsl` (Flutter GPU): renders every shape of a layer into the matte
+   - `gpu/material_gradient_fragment.glsl` (Flutter GPU): low-resolution per-shape appearance map
+   - `liquid_glass_final_render{,_material,_tint}.frag`: the backdrop pass (refraction, frost, lighting, color)
+   - `fake_glass_surface.frag`, `fake_glass_backdrop_edge.frag`: FakeGlass
 
 ### Key Components
 
 - **Shapes** (`lib/src/liquid_shape.dart`): Defines glass shape types (RoundedSuperellipse, Oval, RoundedRectangle)
-- **Settings** (`lib/src/liquid_glass_settings.dart`): Configures glass appearance (thickness, blur, color, lighting)
+- **Settings** (`lib/src/liquid_glass_settings.dart`): Configures glass appearance (refraction, frost, lighting)
 - **FakeGlass** (`lib/src/fake_glass.dart`): Lightweight alternative using backdrop filters instead of shaders
 - **GlassGlow** (`lib/src/glass_glow.dart`): Touch-responsive glow effects
 - **LiquidStretch** (`lib/src/stretch.dart`): Squash and stretch animations
-- **Glassify** (`lib/src/glassify.dart`): Experimental glass effect for arbitrary widgets (export from `experimental.dart`)
 
 ### Performance Considerations
 
-The package aggressively caches geometry in textures to minimize GPU work. However, due to [Flutter issue #138627](https://github.com/flutter/flutter/issues/138627), textures cannot be disposed immediately, causing memory spikes during animations.
+The package caches geometry in textures to minimize GPU work. `gpu.Texture` cannot be disposed ([Flutter issue #138627](https://github.com/flutter/flutter/issues/138627)), so each output reuses a ring of geometry textures instead of allocating one per change.
 
 **When working on performance:**
 - Minimize LiquidGlassLayer and LiquidGlassBlendGroup pixel coverage
@@ -121,7 +120,7 @@ The project uses `build_runner` for code generation. Always run `melos run gener
 Golden tests verify visual output and are tagged with `golden` in `dart_test.yaml`. They only run:
 - On main branch
 - On PRs labeled with "goldens"
-- On macOS-15 runners (see `.github/workflows/main.yaml`)
+- On macOS only, against references rendered by `flutter test --update-goldens` on the golden job's `macos-26` runner (see `.github/workflows/main.yaml`); regenerate them on that macOS version
 
 All tests must use the `--enable-impeller` flag since Skia is not supported.
 
@@ -146,6 +145,7 @@ Set `debugPaintLiquidGlassGeometry = true` (exported from `liquid_glass_renderer
 
 Shader source files are in `packages/liquid_glass_renderer/lib/assets/shaders/`:
 - Main shader files: `*.frag`
-- Shared utilities: `*.glsl` (sdf.glsl, shared.glsl, displacement_encoding.glsl, render.glsl)
+- Shared utilities: `*.glsl` (`render.glsl`, `liquid_glass_final_render_core.glsl`, `fake_glass_shape.glsl`; Flutter GPU includes in `gpu/`: `sdf.glsl`, `material_sdf.glsl`, `displacement_encoding.glsl`)
+- Flutter GPU shaders are listed in `liquid_glass_renderer.shaderbundle.json` and built by `hook/build.dart`
 
 Shaders are compiled by Flutter and loaded via `flutter_shaders` package. Edit `.frag` files and run `flutter run` to hot reload changes (though shaders typically require full restart).
