@@ -4,6 +4,7 @@
 
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// A callback used by [MultiShaderBuilder].
@@ -113,14 +114,14 @@ class _MultiShaderBuilderState extends State<MultiShaderBuilder> {
   @override
   void didUpdateWidget(covariant MultiShaderBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.assetKeys != widget.assetKeys) {
+    if (!listEquals(oldWidget.assetKeys, widget.assetKeys)) {
       _loadShaders(widget.assetKeys);
     }
   }
 
   void _loadShaders(List<String> assetKeys) {
     _programs.clear();
-    _shaders.clear();
+    _disposeShaders();
 
     // Check which shaders are already cached
     final uncachedKeys = <String>[];
@@ -158,6 +159,19 @@ class _MultiShaderBuilderState extends State<MultiShaderBuilder> {
         },
       );
     }
+  }
+
+  void _disposeShaders() {
+    for (final shader in _shaders.values) {
+      shader.dispose();
+    }
+    _shaders.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeShaders();
+    super.dispose();
   }
 
   @override
