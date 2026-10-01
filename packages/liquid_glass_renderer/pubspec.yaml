@@ -5,8 +5,8 @@ version: 1.0.0-dev.1
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_renderer
 screenshots:
-  - description: "A title image with three liquid glass elements"
-    path: doc/screenshot.png
+  - description: "A liquid glass button and toolbar blending together"
+    path: doc/readme/blend-light.jpg
 
 topics:
   - liquid-glass
