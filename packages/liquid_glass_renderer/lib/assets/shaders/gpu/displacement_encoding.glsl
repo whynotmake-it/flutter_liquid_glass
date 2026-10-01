@@ -1,6 +1,7 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
-// Shared utilities for encoding and decoding displacement data
+// Encodes the matte in the geometry pass and decodes it in the final pass;
+// both include this one file.
 
 // Encode the reusable SDF surface plus optical displacement into RGBA8.
 // R, G, A: a 12-bit normal direction and a 12-bit displacement magnitude,
@@ -9,9 +10,10 @@
 //    on the |x| + |y| = 1 diamond, which decodes without trigonometry and
 //    represents the four axis directions exactly.
 //    Refracted content is placed by these two values, so their steps must
-//    stay well below a pixel: 8 bits each left magnitude steps of up to 1.4
-//    device pixels at iOS 27's 60 pt edge displacement, which turned smooth
-//    refracted lines into staircases. The texture must be sampled nearest.
+//    stay well below a pixel: 8 bits each would leave magnitude steps of up
+//    to 1.4 device pixels at iOS 27's 60 pt edge displacement and turn
+//    smooth refracted lines into staircases. The texture must be sampled
+//    nearest.
 // B: Signed inward edge distance (positive inside, negative outside).
 // The displacement always points opposite the outward SDF normal, so the
 // magnitude is one-sided.
@@ -42,10 +44,10 @@ vec4 encodeDisplacementData(
     float magnitudeLow = magnitudeCode - magnitudeHigh * 256.0;
 
     // The geometry target is RGBA8. A linear mapping across the complete
-    // optical profile left fewer than two code points per physical pixel at
-    // common thicknesses, which the narrow contour/highlight ramps exposed as
-    // concentric bands. Give each side of the mathematical edge half of the
-    // channel and apply a square-root compander. This concentrates precision
+    // optical profile leaves fewer than two code points per physical pixel at
+    // common thicknesses, which the narrow contour/highlight ramps show as
+    // concentric bands. So each side of the mathematical edge gets half of the
+    // channel with a square-root compander, which concentrates precision
     // where coverage and lighting consume the SDF without changing texture
     // format, bandwidth, sampling, or pass count. The inverse is only a
     // multiply in the final pass.

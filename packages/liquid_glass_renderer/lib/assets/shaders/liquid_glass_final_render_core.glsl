@@ -12,7 +12,7 @@ precision highp float;
 #define DEBUG_GEOMETRY 0
 
 #include <flutter/runtime_effect.glsl>
-#include "displacement_encoding.glsl"
+#include "gpu/displacement_encoding.glsl"
 #include "render.glsl"
 
 uniform vec2 uSize;
@@ -245,7 +245,7 @@ vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
     return tone;
 }
 
-// Legacy, dark and clear shares of a color model code (0 legacy, 1 iOS 27
+// Direct, dark and clear shares of a color model code (0 direct, 1 iOS 27
 // light, 2 iOS 27 dark, 3 iOS 27 clear). Merged shapes blend these shares
 // rather than the codes, so a light-to-clear merge does not pass through
 // dark.
@@ -801,8 +801,8 @@ void main() {
     
     vec3 transmittedColor = vec3(0.0);
     vec3 baseColor = vec3(0.0);
-    float legacyShare = colorModelShares.x;
-    if (legacyShare > 0.0) {
+    float directShare = colorModelShares.x;
+    if (directShare > 0.0) {
         transmittedColor = pow(
             max(refractColor.rgb, vec3(0.0)),
             vec3(max(uTransmissionGamma, 0.01))
@@ -819,14 +819,14 @@ void main() {
             1.0
         );
     }
-    if (legacyShare < 1.0) {
+    if (directShare < 1.0) {
         // Apple's public tint is not a flat source-over wash. Its documented
         // "range of tones" is selected from backdrop brightness, while tint
         // opacity linearly mixes that opaque tonal result with the untinted
         // material. The untinted material itself treats luminance and
         // chroma separately (see ios27FaceTransfer). Saturation and gamma
         // stay available as relative adjustments where 1 is Apple's face.
-        float ios27Share = 1.0 - legacyShare;
+        float ios27Share = 1.0 - directShare;
         float darkWeight = clamp(colorModelShares.y / ios27Share, 0.0, 1.0);
         float clearWeight = clamp(colorModelShares.z / ios27Share, 0.0, 1.0);
         // Share of dark glass within the regular (non-clear) part.
@@ -905,11 +905,11 @@ void main() {
             );
             ios27Base = mix(neutralBase, tintTone, materialTint.a);
         }
-        baseColor = mix(ios27Base, baseColor, legacyShare);
+        baseColor = mix(ios27Base, baseColor, directShare);
         transmittedColor = mix(
             neutralTransmission * (1.0 - materialTint.a),
             transmittedColor,
-            legacyShare
+            directShare
         );
     }
 

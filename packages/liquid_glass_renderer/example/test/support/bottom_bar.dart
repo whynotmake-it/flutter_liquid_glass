@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -39,7 +37,7 @@ Matrix4 buildJellyTransform({
   final scaleY = squashY * stretchY;
 
   // Build the transformation matrix
-  final matrix = Matrix4.identity()..scale(scaleX, scaleY);
+  final matrix = Matrix4.identity()..scaleByDouble(scaleX, scaleY, scaleX, 1);
 
   return matrix;
 }
@@ -225,7 +223,7 @@ class _BottomBarTab extends StatelessWidget {
                           transform: selected
                               ? Matrix4.identity()
                               : (Matrix4.identity()
-                                  ..scale(0.4)
+                                  ..scaleByDouble(0.4, 0.4, 0.4, 1)
                                   ..rotateZ(-math.pi)),
                           child: AnimatedOpacity(
                             duration: const Duration(milliseconds: 300),
@@ -235,8 +233,8 @@ class _BottomBarTab extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: tab.glowColor!.withOpacity(
-                                      selected ? 0.6 : 0,
+                                    color: tab.glowColor!.withValues(
+                                      alpha: selected ? 0.6 : 0,
                                     ),
                                     blurRadius: 32,
                                     spreadRadius: 8,

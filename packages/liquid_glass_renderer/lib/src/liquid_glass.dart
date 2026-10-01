@@ -193,8 +193,8 @@ class LiquidGlass extends StatefulWidget {
   ///
   /// This can be called before `runApp`. On Android it initializes the
   /// widgets binding itself, and the GPU portion then completes after the
-  /// first frame, because the Impeller context is unavailable before the
-  /// first surface frame.
+  /// first frame, so it never blocks the UI thread on the engine's deferred
+  /// Impeller context.
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.
