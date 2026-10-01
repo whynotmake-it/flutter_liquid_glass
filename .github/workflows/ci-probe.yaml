@@ -1,0 +1,57 @@
+name: CI probe (temporary)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ci-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: Probe ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - name: Versions
+        run: flutter --version
+      - name: Package tests (all tags)
+        working-directory: packages/liquid_glass_renderer
+        continue-on-error: true
+        run: |
+          flutter pub get
+          flutter test --enable-impeller --enable-flutter-gpu \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5 \
+            --file-reporter json:${{ runner.temp }}/package.json
+      - name: Example tests
+        working-directory: packages/liquid_glass_renderer/example
+        continue-on-error: true
+        run: |
+          flutter pub get
+          flutter test --enable-impeller --enable-flutter-gpu \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5 \
+            --file-reporter json:${{ runner.temp }}/example.json
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p ${{ runner.temp }}/out
+          cp ${{ runner.temp }}/*.json ${{ runner.temp }}/out/ 2>/dev/null || true
+          find packages -type d -name failures -path '*test*' | while read d; do
+            mkdir -p "${{ runner.temp }}/out/$d"; cp -r "$d"/. "${{ runner.temp }}/out/$d/"; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-${{ matrix.os }}
+          path: ${{ runner.temp }}/out
