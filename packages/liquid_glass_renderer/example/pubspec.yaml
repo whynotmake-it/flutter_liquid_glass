@@ -1,0 +1,30 @@
+name: liquid_glass_renderer_example
+description: "Liquid Glass playground for liquid_glass_renderer."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0 <3.48.0"
+
+dependencies:
+  cupertino_icons: ^1.0.8
+  flutter:
+    sdk: flutter
+  liquid_glass_renderer:
+    path: ../
+  motor: ^1.1.0
+  stupid_simple_sheet: ^1.0.0-dev.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  lintervention: ^0.3.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/backdrops/
