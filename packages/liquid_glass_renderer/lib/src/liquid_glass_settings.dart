@@ -329,7 +329,7 @@ class LiquidGlassSettings with Equatable {
   /// jagged; bilinear sampling moves them smoothly, as on Apple's glass.
   /// Undisplaced glass still reproduces the backdrop exactly. It uses the
   /// same single texture fetch and no extra pass, and measured within noise
-  /// on Metal. Set it to `false` for the previous nearest sampling.
+  /// on Metal. Set it to `false` for nearest sampling.
   final bool smoothRefraction;
 
   /// How much the backdrop seen through the face is shrunk, about the center

@@ -1380,8 +1380,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ),
   );
 
-  // The #183 Colors scene at 2x: light, dark, clear and blue-tinted glass in
-  // one blend group. Motion breathes the swatches apart and back together.
+  // The playground's Colors scene at 2x: light, dark, clear and blue-tinted
+  // glass in one blend group. Motion breathes the swatches apart and back
+  // together.
   Widget _colorsBlend(double t) {
     const swatches = [
       (Offset(-1, -1), LiquidGlassAppearance.ios27RegularLight()),

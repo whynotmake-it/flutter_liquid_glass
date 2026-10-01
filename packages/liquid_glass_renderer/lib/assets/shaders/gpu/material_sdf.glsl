@@ -1,3 +1,5 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+
 // Cheap two-shape appearance interpolation. Geometry remains the exact smooth
 // union, while material ownership is approximated from only the two nearest
 // primitive distances. This keeps colors solid away from a narrow blend seam.

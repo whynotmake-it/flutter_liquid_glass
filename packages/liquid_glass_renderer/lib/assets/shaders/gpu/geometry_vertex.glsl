@@ -1,3 +1,5 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+
 in vec2 position;
 in vec2 texCoord;
 

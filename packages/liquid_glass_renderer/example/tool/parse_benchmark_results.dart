@@ -974,7 +974,7 @@ String _markdown(
       ..writeln('### Memory stability (informational)')
       ..writeln()
       ..writeln(
-        'Pre-measurement and cooldown footprint stability no longer gate '
+        'Pre-measurement and cooldown footprint stability do not gate '
         'runs; unstable runs are listed here for context because their '
         'footprint numbers may carry transient allocation noise.',
       )

@@ -99,8 +99,8 @@ def main() -> None:
 
     # Confirm that the glass itself is present. Sample the declared shape box
     # against the exact source background and require a non-trivial material
-    # residual. This rejects the transient all-background frames that caused
-    # the legacy pill/circle references to be ambiguous.
+    # residual. This rejects transient all-background frames, which make pill
+    # and circle captures ambiguous.
     scale = scene["canvas"]["scale"]
     shape = scene["shape"]
     left = round(shape["x"] * scale)

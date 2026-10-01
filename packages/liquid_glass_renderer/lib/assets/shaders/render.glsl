@@ -1,11 +1,8 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
-// Shared color utilities for the final liquid-glass render pass.
-//
-// The renderer's optical field and lighting are implemented by the dedicated
-// geometry/final shaders. Keep this include limited to code used by that pass;
-// the old standalone refraction/lighting pipeline was an unreferenced second
-// material model and made it too easy for the two paths to drift.
+// Shared color utilities for the final liquid-glass render pass. Optics and
+// lighting live in the geometry and final shaders; keep this include limited
+// to code the final pass uses.
 
 // Use the Rec.709 primaries for the material luminance basis. The host-Metal
 // color-card fit shows lower blue/cyan transfer error than the legacy Rec.601
