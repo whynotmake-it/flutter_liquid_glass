@@ -1,0 +1,45 @@
+name: CI regen goldens (temporary)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ci-regen-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regen:
+    name: Regenerate goldens (macos-26)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter --version && sw_vers
+      - name: Update goldens
+        working-directory: packages/liquid_glass_renderer
+        continue-on-error: true
+        run: |
+          flutter pub get
+          flutter test --update-goldens --enable-impeller --enable-flutter-gpu \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
+            --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5 \
+            --file-reporter json:${{ runner.temp }}/update.json
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p $RUNNER_TEMP/out
+          cp $RUNNER_TEMP/update.json $RUNNER_TEMP/out/ || true
+          cd packages/liquid_glass_renderer
+          git status --porcelain > $RUNNER_TEMP/out/status.txt
+          git ls-files -m -o --exclude-standard -- test doc | grep -E '\.png$' > $RUNNER_TEMP/out/changed.txt || true
+          tar czf $RUNNER_TEMP/out/changed.tgz -T $RUNNER_TEMP/out/changed.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regen
+          path: ${{ runner.temp }}/out
