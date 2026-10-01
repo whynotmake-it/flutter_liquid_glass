@@ -15,19 +15,19 @@ void main() {
     test('uses the real renderer fallback for highlight width', () {
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarDark(),
+          const LiquidGlassSettings(highlightWidth: 0, contourWidth: .5),
         ),
         .5,
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings.ios27ToolbarLight(),
+          LiquidGlassSettings.ios27ToolbarLight(),
         ),
-        .75,
+        1.2,
       );
       expect(
         fakeGlassHighlightBandWidth(
-          const LiquidGlassSettings(),
+          const LiquidGlassSettings(highlightWidth: 0),
         ),
         0,
       );
@@ -109,7 +109,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -126,7 +125,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
@@ -143,7 +141,6 @@ void main() {
               const FakeGlass(
                 settings: LiquidGlassSettings(
                   frost: 0,
-                  chromaticAberration: 0,
                   highlight: 0,
                 ),
                 appearance: LiquidGlassAppearance(
@@ -174,7 +171,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -240,7 +236,6 @@ void main() {
                 FakeGlass(
                   settings: const LiquidGlassSettings(
                     frost: 0,
-                    chromaticAberration: 0,
                     highlight: 0,
                   ),
                   appearance: LiquidGlassAppearance(
@@ -366,9 +361,8 @@ Widget _offsetComparisonSurface({
 }) => Center(
   child: LiquidGlassLayer(
     fake: fake,
-    settings: const LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
-      edgeRefraction: 0,
-      chromaticAberration: 0,
+    settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0).copyWith(
+      refractionAmount: 0,
       contourOffset: offset,
     ),
     child: const LiquidGlass(

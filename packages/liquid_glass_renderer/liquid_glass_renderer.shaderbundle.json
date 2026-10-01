@@ -18,5 +18,9 @@
     "MaterialTintGradientFragment": {
         "type": "fragment",
         "file": "lib/assets/shaders/gpu/material_tint_gradient_fragment.glsl"
+    },
+    "MatteSerialStampFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/matte_serial_stamp_fragment.glsl"
     }
 }

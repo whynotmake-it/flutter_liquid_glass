@@ -7,6 +7,14 @@ export 'src/fake_glass.dart' show FakeGlass;
 export 'src/glass_glow.dart' show GlassGlow, GlassGlowLayer;
 export 'src/internal/glass_drag_builder.dart' show GestureMode;
 export 'src/liquid_glass.dart' show LiquidGlass;
+export 'src/liquid_glass_adaptive_brightness.dart'
+    show
+        LiquidGlassAdaptiveBrightness,
+        LiquidGlassAdaptiveBrightnessBuilder,
+        LiquidGlassAdaptiveBrightnessSettings,
+        LiquidGlassBackdropBrightness,
+        LiquidGlassBrightnessBackdrop,
+        LiquidGlassBrightnessSource;
 export 'src/liquid_glass_appearance.dart' show LiquidGlassAppearance;
 export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
 export 'src/liquid_glass_capture.dart' show LiquidGlassCapture;

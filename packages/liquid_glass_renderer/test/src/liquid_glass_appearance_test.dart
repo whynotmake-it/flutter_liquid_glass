@@ -29,17 +29,19 @@ void main() {
       light.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.light),
     );
-    expect(light.saturation, .9);
-    expect(light.transmissionGamma, .9);
-    expect(light.vibrancy, .15);
+    // The iOS 27 color model carries Apple's face transfer, so the
+    // adjustments are identity.
+    expect(light.saturation, 1);
+    expect(light.transmissionGamma, 1);
+    expect(light.vibrancy, 0);
     expect(dark.tint.a, 0);
     expect(
       dark.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.dark),
     );
-    expect(dark.saturation, 2.6);
-    expect(dark.transmissionGamma, .58);
-    expect(dark.vibrancy, .1);
+    expect(dark.saturation, 1);
+    expect(dark.transmissionGamma, 1);
+    expect(dark.vibrancy, 0);
 
     const blue = Color(0x66007AFF);
     expect(
@@ -48,18 +50,114 @@ void main() {
     );
   });
 
-  test('regular material keeps its separately fitted light transmission', () {
+  test('clear appearance uses the appearance-independent clear model', () {
+    const clear = LiquidGlassAppearance.ios27Clear();
+
+    expect(clear.tint.a, 0);
+    expect(clear.colorModel, const LiquidGlassColorModel.ios27Clear());
+    expect(clear.saturation, 1);
+    expect(clear.transmissionGamma, 1);
+  });
+
+  test('regular material uses the iOS 27 face transfer unadjusted', () {
     const light = LiquidGlassAppearance.ios27RegularLight();
     const dark = LiquidGlassAppearance.ios27RegularDark();
 
-    expect(light.saturation, 1.65);
-    expect(light.transmissionGamma, 1.3);
+    expect(light.saturation, 1);
+    expect(light.transmissionGamma, 1);
     expect(
       light.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.light),
     );
-    expect(dark.saturation, 2.6);
-    expect(dark.transmissionGamma, .58);
+    expect(dark.saturation, 1);
+    expect(dark.transmissionGamma, 1);
+    final lightFace = const LiquidGlassColorModel.ios27(
+      brightness: Brightness.light,
+    ).faceTransfer(94)!;
+    expect(lightFace.lift, .13);
+    expect(lightFace.chromaGain, 1.17);
+    expect(lightFace.transmittance, closeTo(.592, 1e-9));
+    final darkFace = const LiquidGlassColorModel.ios27(
+      brightness: Brightness.dark,
+    ).faceTransfer(94)!;
+    expect(darkFace.lift, 1);
+    expect(darkFace.chromaGain, 1.02);
+    expect(darkFace.emission.r, closeTo(32 / 255, 1e-9));
+  });
+
+  test('dark regular glass becomes denser with its short side', () {
+    const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
+    // Face transmittance of the pinned Reduce Motion off dark captures.
+    const measured = {63: .599, 94: .486, 118: .447, 150: .447};
+    for (final MapEntry(key: shortSide, value: transmittance)
+        in measured.entries) {
+      expect(
+        dark.faceTransfer(shortSide.toDouble())!.transmittance,
+        closeTo(transmittance, .008),
+        reason: '$shortSide pt',
+      );
+    }
+    const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
+    expect(
+      light.faceTransfer(63)!.transmittance,
+      light.faceTransfer(150)!.transmittance,
+    );
+  });
+
+  test('the Liquid Glass slider follows the measured face density', () {
+    const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
+    const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
+    // Face transmittance of the Reduce Motion off slider sweep.
+    const lightToolbar = {
+      0: .592,
+      25: .529,
+      45: .482,
+      50: .470,
+      55: .454,
+      75: .380,
+      100: .290,
+    };
+    for (final MapEntry(key: position, value: transmittance)
+        in lightToolbar.entries) {
+      expect(
+        light.faceTransfer(94, tintAmount: position / 100)!.transmittance,
+        closeTo(transmittance, .006),
+        reason: 'light $position%',
+      );
+    }
+    const darkBySize = {
+      63: {0: .599, 50: .599, 75: .450, 100: .298},
+      94: {0: .486, 50: .411, 75: .306, 100: .215},
+      150: {0: .447, 50: .351, 75: .267, 100: .208},
+    };
+    for (final MapEntry(key: size, value: sweep) in darkBySize.entries) {
+      for (final MapEntry(key: position, value: transmittance)
+          in sweep.entries) {
+        expect(
+          dark
+              .faceTransfer(size.toDouble(), tintAmount: position / 100)!
+              .transmittance,
+          closeTo(transmittance, .02),
+          reason: 'dark $size pt $position%',
+        );
+      }
+    }
+    expect(light.contourScale(94, 1), 1);
+    expect(dark.contourScale(94, 0), closeTo(1, 1e-9));
+    expect(dark.contourScale(94, 1), greaterThan(1.2));
+  });
+
+  test('clear glass is appearance- and size-independent', () {
+    const clear = LiquidGlassColorModel.ios27Clear();
+    final small = clear.faceTransfer(40)!;
+    final large = clear.faceTransfer(400);
+    expect(small, large);
+    expect(small.emission.r, closeTo(.126, 1e-9));
+    expect(small.transmittance, .954);
+    expect(small.lift, 0);
+    expect(small.chromaGain, 1.057);
+    expect(clear.toJson(), 'ios27Clear');
+    expect(LiquidGlassColorModel.fromJson('ios27Clear'), clear);
   });
 
   test('adaptive tint tones match the native solid-palette measurements', () {

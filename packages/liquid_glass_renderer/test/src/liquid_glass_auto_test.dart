@@ -93,7 +93,7 @@ void main() {
 
     testWidgets('uses custom settings when creating own layer', (tester) async {
       const customSettings = LiquidGlassSettings(
-        thickness: 42,
+        refractionHeight: 42,
         frost: 10,
       );
 
@@ -117,10 +117,10 @@ void main() {
 
     testWidgets('ignores own settings when using parent layer', (tester) async {
       const parentSettings = LiquidGlassSettings(
-        thickness: 10,
+        refractionHeight: 10,
       );
       const autoSettings = LiquidGlassSettings(
-        thickness: 42,
+        refractionHeight: 42,
         frost: 10,
       );
 

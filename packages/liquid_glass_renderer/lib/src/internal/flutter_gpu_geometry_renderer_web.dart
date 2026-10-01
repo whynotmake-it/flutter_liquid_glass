@@ -29,6 +29,26 @@ class FlutterGpuGeometryRenderer {
   static int get debugActiveGeometryTextureCount => 0;
   static int get debugActiveMaterialTextureCount => 0;
 
+  /// Matches the native renderer's reuse horizon; nothing is reused here.
+  static const int reuseAfterFrames = 1;
+  static const bool validateMatteOrder = false;
+  static int debugMatteSerialSkew = 0;
+  static int debugReusedTextureCount = 0;
+  static int debugAllocatedTextureCount = 0;
+  static int debugDroppedTextureCount = 0;
+  static int get debugReleasedTextureCount => 0;
+
+  /// Nothing is ever deferred on the web.
+  static void flushPendingSubmissions() {}
+  static bool debugSubmitImmediately = false;
+  static int debugBatchedSubmitCount = 0;
+  static int debugDeferredPassCount = 0;
+  static int debugPostFrameFlushCount = 0;
+  int get debugRetiredTextureCount => 0;
+  int get debugMatteTextureCount => 0;
+  Object? get debugMatteTexture => null;
+  (int, int)? get debugMatteTextureSize => null;
+
   /// Material map texels per matte pixel; shared constant with the native
   /// renderer so uniform math stays identical.
   static const int materialRasterScale = 8;
@@ -41,22 +61,31 @@ class FlutterGpuGeometryRenderer {
   ui.Image? get materialImage => null;
 
   // ignore: avoid_unused_constructor_parameters
-  ({ui.Image image, int width, int height}) render({
+  ({
+    ui.Image image,
+    int width,
+    int height,
+    int textureWidth,
+    int textureHeight,
+    int serial,
+  })
+  render({
     required int width,
     required int height,
     required List<double> shapeData,
     required int numShapes,
-    required double opticalIndex,
-    required double thickness,
+    required double refractionHeight,
+    required double refractionAmount,
     required double offsetX,
     required double offsetY,
-    double refractionSpread = 0.0,
-    double? displacementScale,
+    double? edgeDistanceRange,
+    bool refractionFitsShape = true,
     double contourExtent = 0.5,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> boundsData = const <double>[],
   }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}
