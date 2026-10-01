@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:alchemist/alchemist.dart';
@@ -271,12 +270,8 @@ void main() {
         scenarioConstraints: testScenarioConstraints,
         children: [
           GoldenTestScenario(
-            name: 'before: box-gradient stroke',
-            child: const _FakeLightingMatrix(useLegacyLighting: true),
-          ),
-          GoldenTestScenario(
-            name: 'after: combined contour lighting',
-            child: const _FakeLightingMatrix(useLegacyLighting: false),
+            name: 'combined contour lighting',
+            child: const _FakeLightingMatrix(),
           ),
         ],
       ),
@@ -472,9 +467,7 @@ const _lightingAppearance = LiquidGlassAppearance(
 );
 
 class _FakeLightingMatrix extends StatelessWidget {
-  const _FakeLightingMatrix({required this.useLegacyLighting});
-
-  final bool useLegacyLighting;
+  const _FakeLightingMatrix();
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -523,76 +516,11 @@ class _FakeLightingMatrix extends StatelessWidget {
 
   Widget _glass(LiquidShape shape, Size size) => SizedBox.fromSize(
     size: size,
-    child: useLegacyLighting
-        ? CustomPaint(
-            painter: _LegacyFakeLightingPainter(shape),
-          )
-        : FakeGlass(
-            shape: shape,
-            settings: _lightingSettings,
-            appearance: _lightingAppearance,
-            child: const SizedBox.expand(),
-          ),
+    child: FakeGlass(
+      shape: shape,
+      settings: _lightingSettings,
+      appearance: _lightingAppearance,
+      child: const SizedBox.expand(),
+    ),
   );
-}
-
-/// Test-only reconstruction of the former box-gradient stroke. Keeping it out
-/// of production makes the before/after golden honest without retaining dead
-/// renderer code.
-class _LegacyFakeLightingPainter extends CustomPainter {
-  const _LegacyFakeLightingPainter(this.shape);
-
-  final LiquidShape shape;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bounds = Offset.zero & size;
-    final path = shape.getOuterPath(bounds);
-    canvas
-      ..clipPath(path)
-      ..drawPaint(Paint()..color = _lightingAppearance.tint);
-
-    final squareBounds = Rect.fromCircle(
-      center: bounds.center,
-      radius: bounds.longestSide / 2,
-    );
-    final lightIntensity = _lightingSettings.highlight.clamp(0.0, 1.0);
-    final highlight = Colors.white.withValues(
-      alpha: Curves.easeOut.transform(lightIntensity) * 0.78,
-    );
-    final contour = Colors.black.withValues(
-      alpha: _lightingSettings.contourStrength,
-    );
-    const angle = math.pi / 2;
-    final x = math.cos(angle);
-    final y = math.sin(angle);
-    const coverage = 0.215;
-    final alignment = (size.aspectRatio < 1 ? y : x).abs();
-    final gradientScale = (1 - 1 / size.aspectRatio) * (1 - alignment);
-    final inset = ui.lerpDouble(0, 0.5, gradientScale.clamp(0, 1))!;
-    final secondInset = ui.lerpDouble(
-      coverage,
-      0.5,
-      gradientScale.clamp(0, 1),
-    )!;
-    final edgeStart = ui.lerpDouble(secondInset, 0.5, 0.25)!;
-    final shader = LinearGradient(
-      colors: [highlight, contour, contour, highlight],
-      stops: [inset, edgeStart, 1 - edgeStart, 1 - inset],
-      begin: Alignment(x, y),
-      end: Alignment(-x, -y),
-    ).createShader(squareBounds);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..shader = shader
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = _lightingSettings.contourWidth
-        ..blendMode = BlendMode.hardLight,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_LegacyFakeLightingPainter oldDelegate) =>
-      shape != oldDelegate.shape;
 }

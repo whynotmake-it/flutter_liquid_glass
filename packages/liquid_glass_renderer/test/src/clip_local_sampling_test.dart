@@ -125,13 +125,21 @@ void main() {
 
   test('geometry and runtime shaders share one displacement codec', () {
     final runtimeCodec = File(
-      'lib/assets/shaders/displacement_encoding.glsl',
-    ).readAsStringSync();
-    final geometryCodec = File(
       'lib/assets/shaders/gpu/displacement_encoding.glsl',
     ).readAsStringSync();
 
-    expect(geometryCodec, runtimeCodec);
+    expect(
+      File(
+        'lib/assets/shaders/gpu/geometry_fragment.glsl',
+      ).readAsStringSync(),
+      contains('#include "displacement_encoding.glsl"'),
+    );
+    expect(
+      File(
+        'lib/assets/shaders/liquid_glass_final_render_core.glsl',
+      ).readAsStringSync(),
+      contains('#include "gpu/displacement_encoding.glsl"'),
+    );
     expect(runtimeCodec, contains('0.5 * sqrt(normalizedInward)'));
     expect(runtimeCodec, contains('0.5 * sqrt(normalizedExterior)'));
     expect(
@@ -155,10 +163,10 @@ void main() {
 
   test('displacement compander spends precision at the optical rim', () {
     // Model the RGBA8 quantization performed between the geometry and final
-    // passes. The former signed encoding used only codes 0...127 for the
-    // physically reachable displacement direction, so its normalized step
-    // was approximately 2 / 255 everywhere.
-    const formerSignedStep = 2 / 255;
+    // passes. A signed encoding would spend only codes 0...127 on the
+    // physically reachable direction, a normalized step of about 2 / 255
+    // everywhere; the compander must never be coarser than that.
+    const signedStep = 2 / 255;
 
     double decode(int code) {
       final inverse = 1 - code / 255;
@@ -169,16 +177,16 @@ void main() {
       for (var code = 1; code <= 255; code++) decode(code) - decode(code - 1),
     ];
 
-    // Low displacement is never coarser than the old codec, while precision
+    // Low displacement is never coarser than a signed codec, while precision
     // increases monotonically toward the high-displacement rim where source
     // pixel jumps are most visible.
-    expect(steps.first, lessThanOrEqualTo(formerSignedStep));
+    expect(steps.first, lessThanOrEqualTo(signedStep));
     for (var index = 1; index < steps.length; index++) {
       expect(steps[index], lessThanOrEqualTo(steps[index - 1]));
     }
     expect(
       steps.last,
-      lessThan(formerSignedStep / 500),
+      lessThan(signedStep / 500),
       reason: 'peak refraction should not jump by a visible source pixel',
     );
   });

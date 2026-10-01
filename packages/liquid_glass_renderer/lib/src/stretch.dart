@@ -228,25 +228,27 @@ class RenderRawLiquidStretch extends RenderProxyBox {
     );
 
     // Scale about the center so opposite drag directions produce mirrored
-    // results. Scaling about the local origin (the previous behavior) made
-    // right/down stretches travel further than left/up ones, and anchoring
-    // the edge opposite the drag pins that edge in place and jumps whenever a
-    // stretch component crosses zero while the other axis is still scaled.
+    // results. Scaling about the local origin makes right/down stretches
+    // travel further than left/up ones, and anchoring the edge opposite the
+    // drag pins that edge in place and jumps whenever a stretch component
+    // crosses zero while the other axis is still scaled.
     //
     // The centered scale moves each edge by about half the stretch, so
     // translating by 1.5x the stretch makes the leading edge travel roughly
-    // twice the stretch and the trailing edge roughly once, which matches the
-    // feel of the previous right/down stretch in every direction.
+    // twice the stretch and the trailing edge roughly once, in every
+    // direction.
     final center = size.center(Offset.zero);
     final translation = _stretchPixels * 1.5;
 
     final matrix = Matrix4.identity()
-      // ignore: deprecated_member_use To support older Flutter versions
-      ..translate(center.dx + translation.dx, center.dy + translation.dy)
-      // ignore: deprecated_member_use To support older Flutter versions
-      ..scale(scale.dx, scale.dy, 1)
-      // ignore: deprecated_member_use To support older Flutter versions
-      ..translate(-center.dx, -center.dy);
+      ..translateByDouble(
+        center.dx + translation.dx,
+        center.dy + translation.dy,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale.dx, scale.dy, 1, 1)
+      ..translateByDouble(-center.dx, -center.dy, 0, 1);
 
     return matrix;
   }

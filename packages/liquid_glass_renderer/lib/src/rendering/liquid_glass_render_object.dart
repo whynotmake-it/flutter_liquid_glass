@@ -1275,7 +1275,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   // Flutter 3.47 computes these RSE parameters when its geometry changes and
   // uploads them to the symmetric RSE shader. Mirror that construction here
   // so lookup-table interpolation and circle fitting are not repeated per
-  // fragment.
+  // fragment. The table and construction are adapted from Flutter's
+  // impeller/geometry/round_superellipse_param.cc (Flutter 3.47.1):
+  // Copyright 2013 The Flutter Authors. All rights reserved. Use of this
+  // source code is governed by a BSD-style license that can be found in
+  // third_party/flutter/LICENSE.
   static (double, double) _rseNAndXj(double ratio) {
     const table = <(double, double)>[
       (2.00000000, 1.13276676),

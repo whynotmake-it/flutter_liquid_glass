@@ -5,8 +5,8 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:meta/meta.dart';
 
 /// Affine tint-over-backdrop followed by saturation, expressed as Flutter's
-/// 4x5 color matrix. This is algebraically equivalent to the former runtime
-/// shader but remains a native color filter on both Impeller and Skia.
+/// 4x5 color matrix: the same per-pixel result as a shader, but a native color
+/// filter on both Impeller and Skia.
 @internal
 List<double> fakeGlassColorMatrix({
   required double saturation,

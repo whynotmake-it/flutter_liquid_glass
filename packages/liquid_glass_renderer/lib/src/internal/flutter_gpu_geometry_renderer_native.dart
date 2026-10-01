@@ -75,9 +75,9 @@ class FlutterGpuGeometryRenderer {
     }(), 'Track live geometry renderers in debug builds.');
   }
 
-  // Harness-only rasterization probe. The default exactly matches Flutter's
-  // centered half-pixel coverage; this is deliberately not a public material
-  // parameter.
+  // Tuning knob for the Apple-match harness (`tool/apple_match`), not a
+  // public material parameter. The default matches Flutter's centered
+  // half-pixel coverage.
   static const double _geometryAaHalfWidth =
       int.fromEnvironment(
         'LIQUID_GLASS_GEOMETRY_AA_HALF_WIDTH',
@@ -91,9 +91,8 @@ class FlutterGpuGeometryRenderer {
       try {
         return FlutterGpuGeometryRenderer._fromShared(cachedResources);
       } on Object {
-        // A recreated Android surface can invalidate native resources that
-        // were resolved before the context loss. Let the next layer reload
-        // the immutable bundle instead of retaining a poisoned fast path.
+        // Drop resources that failed to build a renderer so the next layer
+        // reloads the bundle instead of failing the same way.
         if (identical(_resolvedAssetResources[assetKey], cachedResources)) {
           _resolvedAssetResources.remove(assetKey);
         }
@@ -133,8 +132,8 @@ class FlutterGpuGeometryRenderer {
       }
       return renderer;
     } on Object {
-      // A transiently unavailable GPU context must not poison all later layer
-      // initialization attempts with the same cached failed Future.
+      // Forget the failed load so a later layer retries it instead of
+      // awaiting the same failed Future.
       if (identical(_assetResources[assetKey], resourcesFuture)) {
         unawaited(_assetResources.remove(assetKey));
       }
@@ -160,12 +159,17 @@ class FlutterGpuGeometryRenderer {
     }
   }
 
-  /// Completes once a Flutter GPU context can be created.
+  /// Completes once the Flutter GPU context exists without blocking.
   ///
-  /// On Android the Impeller context is unavailable before the first surface
-  /// frame, so this initializes the widgets binding if needed — including
-  /// when called before `runApp` — and waits for the first rasterized frame.
-  /// On every other platform it completes immediately.
+  /// Workaround for Flutter 3.47.1 on Android: the engine creates the
+  /// Impeller context on the raster thread after startup, off the critical
+  /// path (`shell/common/shell.cc`), and reading `gpu.gpuContext` before
+  /// then blocks the UI thread until it exists, which takes 100 ms or more on
+  /// some Vulkan devices. The first rasterized frame needs the context, so
+  /// waiting for it avoids the block. This initializes the widgets binding
+  /// if needed, including before `runApp`. Remove it once the engine creates
+  /// the context before the first frame or offers a non-blocking way to wait
+  /// for it. On every other platform it completes immediately.
   static Future<void> waitUntilGpuContextAvailable() async {
     if (!Platform.isAndroid) return;
     await WidgetsFlutterBinding.ensureInitialized()
@@ -179,14 +183,12 @@ class FlutterGpuGeometryRenderer {
 
   /// One bump allocator for every geometry pass in the current frame.
   ///
-  /// HostBuffer retains four device-buffer blocks. Sizing each renderer to a
-  /// single uniform used to be 1 MB × 4 × N layers; a shared scratch sized for
-  /// a frame of layers keeps that off the native heap.
+  /// A HostBuffer retains four device-buffer blocks, so one per renderer
+  /// would cost four blocks per layer. A single scratch sized for a frame of
+  /// layers keeps that off the native heap.
   static gpu.HostBuffer? _sharedHostBuffer;
   static int _sharedHostBufferBlockLength = 0;
   static Duration? _sharedHostBufferFrame;
-  static int _diagnosticWrites = 0;
-  static int _diagnosticMaxWrites = 0;
 
   static const int _hostBufferSlotsPerFrame = 32;
 
@@ -231,11 +233,6 @@ class FlutterGpuGeometryRenderer {
     if (_sharedHostBufferFrame != timestamp) {
       _sharedHostBuffer!.reset();
       _sharedHostBufferFrame = timestamp;
-      if (GpuAllocationDiagnostics.enabled) _diagnosticWrites = 0;
-    }
-    if (GpuAllocationDiagnostics.enabled) {
-      _diagnosticWrites++;
-      _diagnosticMaxWrites = math.max(_diagnosticMaxWrites, _diagnosticWrites);
     }
     return _sharedHostBuffer!;
   }
@@ -489,40 +486,26 @@ class FlutterGpuGeometryRenderer {
     ).emplace(_uniformData);
 
     final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
-    final geometryPass = geometryCommandBuffer.createRenderPass(_renderTarget!)
+    geometryCommandBuffer.createRenderPass(_renderTarget!)
       ..bindPipeline(_pipeline)
       ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
       ..bindUniform(_uniformSlot, uniformView)
       ..bindVertexBuffer(_vertexBufferView)
       ..draw(4);
     geometryCommandBuffer.submit();
-    if (GpuAllocationDiagnostics.enabled) {
-      GpuAllocationDiagnostics.observe('command', geometryCommandBuffer);
-      GpuAllocationDiagnostics.observe('pass', geometryPass);
-      GpuAllocationDiagnostics.observe('texture', _texture!);
-      GpuAllocationDiagnostics.allocations.add(
-        '$allocatedWidth x $allocatedHeight ${_texture!.format}',
-      );
-    }
     if (writeMaterials) {
       final materialCommandBuffer = gpu.gpuContext.createCommandBuffer();
-      final materialPass =
-          materialCommandBuffer.createRenderPass(_materialRenderTarget!)
-            ..bindPipeline(
-              writeTintOnly
-                  ? _materialTintGradientPipeline!
-                  : _materialGradientPipeline!,
-            )
-            ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
-            ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView)
-            ..draw(4);
+      materialCommandBuffer.createRenderPass(_materialRenderTarget!)
+        ..bindPipeline(
+          writeTintOnly
+              ? _materialTintGradientPipeline!
+              : _materialGradientPipeline!,
+        )
+        ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
+        ..bindUniform(_uniformSlot, uniformView)
+        ..bindVertexBuffer(_vertexBufferView)
+        ..draw(4);
       materialCommandBuffer.submit();
-      if (GpuAllocationDiagnostics.enabled) {
-        GpuAllocationDiagnostics.observe('command', materialCommandBuffer);
-        GpuAllocationDiagnostics.observe('pass', materialPass);
-        GpuAllocationDiagnostics.observe('texture', _materialTexture!);
-      }
     }
 
     return (image: _image!, width: allocatedWidth, height: allocatedHeight);
@@ -556,15 +539,14 @@ class FlutterGpuGeometryRenderer {
     floatData[uOffsetIndex + 1] = offsetY;
 
     final textureSizeIndex = _offsetUTextureSize ~/ 4;
-    // Reuse the existing vec2 slot for profile spread and codec scale.
+    // uTextureSize carries the profile spread and the codec scale.
     floatData[textureSizeIndex] = refractionSpread.clamp(0.0, 1.0);
     floatData[textureSizeIndex + 1] = math.max(1e-3, displacementScale);
 
     final opticalPropsIndex = _offsetOpticalProps ~/ 4;
     floatData[opticalPropsIndex] = opticalIndex;
-    // The Y slot is a harness-only centered-AA half-width. It defaults to
-    // 0.5, matching Flutter's one-pixel transition; keeping it in the
-    // existing reserved slot avoids changing the uniform ABI.
+    // uOpticalProps.y is the centered-AA half-width: 0.5 (Flutter's
+    // one-pixel transition) unless the harness overrides it.
     floatData[opticalPropsIndex + 1] = geometryAaHalfWidth.clamp(0.0, 1.0);
     floatData[opticalPropsIndex + 2] = thickness;
     floatData[opticalPropsIndex + 3] = numShapes;
@@ -648,47 +630,6 @@ class FlutterGpuGeometryRenderer {
       _debugActiveRendererCount--;
       return true;
     }(), 'Track disposed geometry renderers in debug builds.');
-  }
-}
-
-/// Temporary diagnostic bookkeeping; never enabled in published/default builds.
-@internal
-class GpuAllocationDiagnostics {
-  /// Controls all instrumentation at compile time.
-  static const enabled = bool.fromEnvironment('DIAG_GPU_ALLOCATION');
-  static final _objects = <(String, WeakReference<Object>)>[];
-
-  /// Geometry texture descriptors since the previous report.
-  static final allocations = <String>[];
-
-  /// Observe ownership without retaining the observed object.
-  static void observe(String kind, Object value) {
-    if (!enabled) return;
-    if (_objects.length == 256) _objects.removeAt(0);
-    _objects.add((kind, WeakReference(value)));
-  }
-
-  /// Return diagnostics without collecting garbage or waiting for GPU work.
-  static Map<String, Object> snapshot() {
-    final alive = <String, int>{};
-    final seen = <String, int>{};
-    for (final (kind, reference) in _objects) {
-      seen.update(kind, (value) => value + 1, ifAbsent: () => 1);
-      if (reference.target != null) {
-        alive.update(kind, (value) => value + 1, ifAbsent: () => 1);
-      }
-    }
-    final result = <String, Object>{
-      'seen': seen,
-      'alive': alive,
-      'allocations': List<String>.of(allocations),
-      'uniform_block_bytes':
-          FlutterGpuGeometryRenderer._sharedHostBufferBlockLength,
-      'max_uniform_writes_per_timestamp':
-          FlutterGpuGeometryRenderer._diagnosticMaxWrites,
-    };
-    allocations.clear();
-    return result;
   }
 }
 

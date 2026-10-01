@@ -1,3 +1,5 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+
 // Deliberately low-resolution per-shape appearance map. The full-resolution
 // geometry pass remains authoritative for optics and lighting; this pass only
 // supplies a smooth, approximate tint transition between nearby shapes.

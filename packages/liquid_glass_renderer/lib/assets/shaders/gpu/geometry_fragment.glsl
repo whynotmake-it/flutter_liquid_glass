@@ -1,13 +1,8 @@
-// Geometry matte generation implemented directly with Flutter GPU.
-// Geometry encoding revision 5: the shared uniform layout carries the compact
-// appearance lookup table used by the low-resolution material pass.
-// continuous superellipse SDF. Keep this marker in the top-level asset because Flutter's
-// shader depfile does not reliably invalidate changes made only in includes.
-// Changes:
-// - Removed #include <flutter/runtime_effect.glsl>
-// - Replaced FlutterFragCoord().xy with gl_FragCoord.xy
-// - Uniforms declared in a named uniform block instead of layout(location=N)
-// - Removed dead screenUV code (Y-flip was unused)
+// Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// Geometry pass, run with Flutter GPU: renders the signed distance field of
+// every shape in a layer into the layer's matte (surface normal, signed edge
+// distance and displacement, packed by displacement_encoding.glsl).
 
 #define MAX_SHAPES 16
 

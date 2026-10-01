@@ -9,8 +9,8 @@ test/src/failures/
 test/src/goldens/
 **/.snaptest/
 
-# Legacy media is retained in the repository but no longer referenced by the
-# package README. The generated showcase and pub.dev screenshot remain.
+# Repository-only media that the package README does not use. The generated
+# showcase and the pub.dev screenshot are published.
 doc/clock.gif
 doc/showcase.gif
 doc/example.gif

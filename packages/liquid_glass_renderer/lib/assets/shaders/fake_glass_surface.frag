@@ -1,4 +1,8 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
+//
+// sdRoundedBox and sdEllipse follow Inigo Quilez's 2D distance functions
+// (https://iquilezles.org/articles/distfunctions2d/), MIT License,
+// Copyright © 2015 Inigo Quilez; see third_party/inigo_quilez/LICENSE.
 
 #version 460 core
 precision mediump float;

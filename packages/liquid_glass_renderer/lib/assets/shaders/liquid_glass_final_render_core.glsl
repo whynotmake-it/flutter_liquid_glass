@@ -12,7 +12,7 @@ precision highp float;
 #define DEBUG_GEOMETRY 0
 
 #include <flutter/runtime_effect.glsl>
-#include "displacement_encoding.glsl"
+#include "gpu/displacement_encoding.glsl"
 #include "render.glsl"
 
 uniform vec2 uSize;
@@ -261,8 +261,8 @@ vec3 applySpecularHighlights(
 
     // A dielectric rim catches light at both silhouette-facing walls. Use the
     // absolute SDF-normal projection to produce the paired source and return
-    // highlights without a second pass. Keeping one smooth envelope avoids
-    // the old multiplied-threshold ridge at straight-to-corner transitions.
+    // highlights without a second pass. One smooth envelope avoids the ridge
+    // a multiplied threshold forms at straight-to-corner transitions.
     float signedLightFacing = dot(normalXY, -uLightDirection);
     float primaryLightFacing = max(signedLightFacing, 0.0);
     float oppositeLightFacing = max(-signedLightFacing, 0.0);

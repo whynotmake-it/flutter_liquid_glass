@@ -194,9 +194,8 @@ class LiquidGlassSettings with Equatable {
 
   /// Width of the directional highlight band in logical pixels.
   ///
-  /// `0` preserves the legacy behavior of following [contourWidth]. Keeping
-  /// this independent lets a thin dielectric contour coexist with the wider
-  /// optical highlight visible on Apple glass.
+  /// `0` follows [contourWidth]. A separate width lets a thin dielectric
+  /// contour coexist with the wider optical highlight visible on Apple glass.
   final double highlightWidth;
 
   /// Angular spread of directional highlights around the SDF contour.
