@@ -154,11 +154,6 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     with SingleTickerProviderStateMixin {
   static final List<String> _fakeSurfaceShaderAssets = [
     ShaderKeys.fakeGlassSurface,
-    // Impeller clips backdrop filters without anti-aliasing; the edge pass
-    // gives the fake backdrop an analytic silhouette. Skia's clips are
-    // anti-aliased.
-    if (!kIsWeb && ImageFilter.isShaderFilterSupported)
-      ShaderKeys.fakeGlassBackdropEdge,
   ];
 
   late final GeometryRenderLink _link = GeometryRenderLink();
@@ -358,7 +353,6 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     // though neither the shape nor material changed.
     Widget buildFakeSurfaceLayer(
       FragmentShader? surfaceShader,
-      FragmentShader? backdropEdgeShader,
     ) {
       return RepaintBoundary(
         child: LiquidGlassRenderScope(
@@ -375,7 +369,6 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
               defaultAppearance: defaultAppearance,
               backdropKey: backdropKey,
               surfaceShader: surfaceShader,
-              backdropEdgeShader: backdropEdgeShader,
               child: child,
             ),
           ),
@@ -385,11 +378,8 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
     return MultiShaderBuilder(
       assetKeys: _fakeSurfaceShaderAssets,
-      (_, shaders, _) => buildFakeSurfaceLayer(
-        shaders.first,
-        shaders.length > 1 ? shaders[1] : null,
-      ),
-      child: buildFakeSurfaceLayer(null, null),
+      (_, shaders, _) => buildFakeSurfaceLayer(shaders.firstOrNull),
+      child: buildFakeSurfaceLayer(null),
     );
   }
 }

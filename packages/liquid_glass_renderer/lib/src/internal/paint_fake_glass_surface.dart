@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,72 @@ double fakeGlassSurfaceOutset(LiquidGlassSettings settings) {
 }
 
 const _noSuperellipse = <double>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+/// WORKAROUND for an Impeller/Metal coverage bug on macOS, pending an
+/// upstream fix (repro project: `impeller_pixel_aligned_coverage`, kept
+/// outside this repo for the Flutter issue): a
+/// shader-filled draw whose quad edge lands on a half-integer device-pixel
+/// boundary renders its alpha ramp quantized to whole pixels near that
+/// edge — the analytic silhouette stair-steps. Integer-aligned quad edges
+/// render smoothly.
+///
+/// The drawn rect only bounds where the shader runs — the shape is placed
+/// by `FlutterFragCoord`, so growing the quad changes nothing visible.
+/// Expanding each edge out to the nearest whole device pixel keeps the
+/// raster phase off the bad half-pixel grid at any position.
+///
+/// [transform] is the draw's local-to-device transform
+/// (`canvas.getTransform()`); only axis-aligned transforms are snapped —
+/// anything else passes through unchanged.
+///
+/// The snap is computed at paint time. Compositor-only motion (a retained
+/// `OffsetLayer` moving this subtree without a repaint) can land the baked
+/// quad back on the bad phase; such moves are transient and the surface
+/// realigns on the next repaint.
+Rect fakeGlassSurfaceQuad(Rect localQuad, Float64List transform) {
+  final s = transform;
+  // Anything but an axis-aligned scale+translate: nothing sane to snap.
+  if (s[1] != 0 ||
+      s[2] != 0 ||
+      s[3] != 0 ||
+      s[4] != 0 ||
+      s[6] != 0 ||
+      s[7] != 0 ||
+      s[11] != 0 ||
+      s[14] != 0 ||
+      s[0] == 0 ||
+      s[5] == 0) {
+    return localQuad;
+  }
+  double axis(
+    double localMin,
+    double localMax,
+    double scale,
+    double shift,
+  ) {
+    final a = scale * localMin + shift;
+    final b = scale * localMax + shift;
+    return (math.min(a, b).floor() - shift) / scale;
+  }
+
+  double axisMax(
+    double localMin,
+    double localMax,
+    double scale,
+    double shift,
+  ) {
+    final a = scale * localMin + shift;
+    final b = scale * localMax + shift;
+    return (math.max(a, b).ceil() - shift) / scale;
+  }
+
+  return Rect.fromLTRB(
+    axis(localQuad.left, localQuad.right, s[0], s[12]),
+    axis(localQuad.top, localQuad.bottom, s[5], s[13]),
+    axisMax(localQuad.left, localQuad.right, s[0], s[12]),
+    axisMax(localQuad.top, localQuad.bottom, s[5], s[13]),
+  );
+}
 
 /// Paints one analytic FakeGlass surface with the same logical-pixel setting
 /// contract used by RealGlass.
@@ -102,7 +169,10 @@ void paintFakeGlassSurface(
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(
-    (Offset.zero & size).inflate(contourOutset),
+    fakeGlassSurfaceQuad(
+      (Offset.zero & size).inflate(contourOutset),
+      canvas.getTransform(),
+    ),
     Paint()..shader = shader,
   );
 }

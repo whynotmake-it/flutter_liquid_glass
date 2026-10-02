@@ -55,6 +55,5 @@ flutter:
     - lib/assets/shaders/liquid_glass_final_render_material.frag
     - lib/assets/shaders/liquid_glass_final_render_tint.frag
     - lib/assets/shaders/fake_glass_surface.frag
-    - lib/assets/shaders/fake_glass_backdrop_edge.frag
   assets:
     - build/shaderbundles/

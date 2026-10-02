@@ -27,7 +27,6 @@ Future<void> precacheLiquidGlass() {
     MultiShaderBuilder.precacheShaders([ShaderKeys.fakeGlassSurface]),
     if (!kIsWeb && ui.ImageFilter.isShaderFilterSupported)
       MultiShaderBuilder.precacheShaders([
-        ShaderKeys.fakeGlassBackdropEdge,
         ShaderKeys.liquidGlassRender,
         ShaderKeys.liquidGlassMaterialRender,
         ShaderKeys.liquidGlassTintRender,

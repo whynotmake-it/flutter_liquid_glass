@@ -26,9 +26,6 @@ abstract class ShaderKeys {
   static final fakeGlassSurface =
       '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';
 
-  static final fakeGlassBackdropEdge =
-      '${_shadersRoot}lib/assets/shaders/fake_glass_backdrop_edge.frag';
-
   static final String gpuGeometryShaderBundle =
       '${_shadersRoot}build/shaderbundles/liquid_glass_renderer.shaderbundle';
 }
