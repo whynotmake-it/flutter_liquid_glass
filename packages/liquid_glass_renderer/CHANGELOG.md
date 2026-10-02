@@ -42,7 +42,7 @@ prerelease; APIs and rendering may still change.
   `LiquidGlassAppearance.visibility`. `Opacity` above a whole
   `LiquidGlassLayer` still works.
 - **New defaults.** Glass renders with a 20 pt bevel, 60 pt edge
-  displacement, 3.7 pt frost and the rest of the light iOS 27 toolbar
+  displacement, 2 pt frost and the rest of the light iOS 27 toolbar
   settings, plus the iOS 27 toolbar appearance for the platform brightness, so
   unconfigured glass looks different from `0.2.x`.
 

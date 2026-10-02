@@ -231,9 +231,9 @@ The slider changes three things, each along a curve fitted to Apple's glass:
   dark glass denser.
 - **Border.** The dark border gets stronger.
 - **Blur.** The presets derive `frost` from the slider.
-  `LiquidGlassSettings.ios27RegularFrost(tintAmount)` gives 3.7, 6.1 and
+  `LiquidGlassSettings.ios27RegularFrost(tintAmount)` gives 2, 6.1 and
   16.6 pt at 0, 0.5 and 1; `ios27ClearFrost(tintAmount)` gives 0.35, 1.28 and
-  16.4 pt. Both grow at one rate up to the middle tick and at twice that rate
+  16.4 pt, growing at one rate up to the middle tick and at twice that rate
   beyond it. Pass `frost` to override.
 
 The glint doesn't change. The direct color model ignores `tintAmount`, and

@@ -56,7 +56,7 @@ trimming and about half of `_TextureRing`. Validate with
 
 ### Regenerate goldens and README snapshots
 
-The new default settings (light toolbar border and inner shadow, 3.7 pt
+The new default settings (light toolbar border and inner shadow, 2 pt
 frost) and the removed knobs change 27 golden files. Run
 `flutter test --update-goldens` for the package on the golden job's macos-26
 image, and regenerate `doc/generated/` (written by `docs_snapshot_test.dart`).
@@ -167,13 +167,57 @@ hand-counted float indices (47, 53, 55, 59) in
 
 ### Parameterize the color models
 
-- `DirectLiquidGlassColorModel(saturation, transmissionGamma, vibrancy)`
-- `Ios27LiquidGlassColorModel(brightness, tintAmount)`, moving `tintAmount` off
-  `LiquidGlassSettings` (the presets still take it to derive frost)
-- `LiquidGlassAppearance` shrinks to `tint`, `visibility` and `colorModel`
+How the model reaches the shader today: `colorModel.shaderValue` is a
+selector (0 direct, 1 iOS 27 light, 2 dark, 3 clear), sent as
+`uAppearanceConfig.x` or packed into the response row's w as
+`(visibility + code * 2) / 7`. `colorModelSharesOf` decomposes it into
+(direct, dark, clear) shares so merges lerp shares rather than codes.
+Every model constant is baked into `liquid_glass_final_render_core.glsl`
+(`sliderKeyframes`, `ios27DarkTransmittance`, `ios27NeutralTint`,
+`ios27FaceTransfer`, `ios27TintTone`, the clear-glass glint overrides) and
+mirrored a second time in `liquid_glass_color_model.dart` for FakeGlass
+(`faceTransfer`, `tintTone`, `contourScale`, `fakeGlintLuminance`). The
+shader's per-pixel model inputs are only backdrop luminance, `uTintAmount`
+and `uAppearanceConfig.w` (shortSide).
 
-Needs separate slots in the material map's per-shape lookup row so a
-direct-to-iOS-27 merge does not blend unrelated values.
+`saturation`/`transmissionGamma`/`vibrancy` are not dead: both shader
+branches consume them — for iOS 27 as relative adjustments where 1 is the
+platform face — but no preset sets them, so they are API weight that also
+invites the stale direct-model fits in `tool/apple_match/settings/*.json`.
+
+Parameterization looks feasible, which would let the sealed class become a
+plain class of resolved parameters with `direct`/`ios27*` as const presets:
+
+- Direct is a degenerate case of the iOS 27 math: emission alpha 0, lift 0,
+  chromaGain 1, identity tintTone (one difference: the direct branch applies
+  saturation to the blended base *including* tint; the iOS 27 branch applies
+  it to backdrop chroma only, before the tint mix).
+- Everything except the tint-tone ramp is resolvable on Dart per shape —
+  `faceTransfer(shortSide, tintAmount)` already mirrors the GLSL for
+  FakeGlass, which consumes the model as resolved data today. Passing
+  emission/alpha, lift, chromaGain, contourScale and the glint triple
+  (~11 floats) deletes `sliderKeyframes`, `ios27DarkTransmittance`,
+  `ios27NeutralTint`, `ios27FaceTransfer` and `colorModelSharesOf` from the
+  shader, and merging shapes lerps the parameters directly — better than
+  the shares hack it replaces.
+- `tintAmount` moves onto the model (per shape), which the resolved-params
+  form needs anyway; `uTintAmount` leaves the uniform block with them.
+- Per-shape cost: the material map grows from 2 lookup rows per frame to
+  about 5 (the extra ~11 floats over 16 texels).
+- The blocker is `ios27TintTone`, the only per-pixel piece: the light ramp
+  is `scale(Y) * tint^g(Y)` (4 coefficients), the dark ramp is
+  `floor(Y) + (ceil(Y) - floor(Y)) * tint` (6). Either fit both into one
+  generic monotone form (~12 coefficients) or keep the two ramps with a
+  selector/weight — which keeps a vestigial model axis.
+
+Fallback if the ramp does not parameterize cleanly: keep the codes and do
+the smaller version — `DirectLiquidGlassColorModel(saturation,
+transmissionGamma, vibrancy)`, `Ios27LiquidGlassColorModel(brightness,
+tintAmount)`, `LiquidGlassAppearance` shrinks to `tint`, `visibility` and
+`colorModel`. That drops the iOS 27 relative adjustments, so stale
+saturation/gamma/vibrancy on `ios27*` settings files get ignored instead
+of silently applied. Needs separate slots in the material map's per-shape
+lookup row so a direct-to-iOS-27 merge does not blend unrelated values.
 
 ## Tooling
 

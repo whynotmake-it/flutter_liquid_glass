@@ -24,7 +24,7 @@ class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
-    this.frost = 3.7,
+    this.frost = 2.0,
     this.dispersion = 0.0,
     this.highlight = 1.0,
     this.contourStrength = 0.43,
@@ -84,7 +84,7 @@ class LiquidGlassSettings with Equatable {
 
   /// Dark-mode settings fitted to an iOS 27 toolbar capsule.
   ///
-  /// The glint is identical to light mode; the border is stronger and
+  /// The glint is dimmed; the border is stronger and
   /// vanishes entirely where the normal faces the light axis.
   ///
   /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
@@ -93,6 +93,7 @@ class LiquidGlassSettings with Equatable {
     double? frost,
   }) => LiquidGlassSettings(
     frost: frost ?? ios27RegularFrost(tintAmount),
+    highlight: 0.8,
     contourStrength: 0.88,
     contourDirectionality: 1,
     tintAmount: tintAmount,
@@ -122,6 +123,7 @@ class LiquidGlassSettings with Equatable {
     contourDirectionality: 1,
     bevelShadowStrength: 0,
     tintAmount: tintAmount,
+    highlight: .6,
   );
 
   /// Creates fitted iOS 27 toolbar settings for [brightness].
@@ -146,14 +148,16 @@ class LiquidGlassSettings with Equatable {
   /// Apple keeps part of the backdrop with about 1.5 pt of blur and mixes the
   /// rest toward a fully diffused face; the slider only moves that mix. A
   /// single blur cannot mix, so this is the blur whose rendered detail best
-  /// matches Apple's at toolbar size, light and dark: 3.7, 6.1 and 16.6 pt at
-  /// 0, 0.5 and 1, growing at one rate up to the Settings middle tick and at
-  /// twice that rate beyond it. Apple diffuses larger glass more and smaller
-  /// glass less.
+  /// matches Apple's at toolbar size, light and dark: 2, 6.1 and 16.6 pt at
+  /// 0, 0.5 and 1, growing at a slightly faster exponential rate up to the
+  /// Settings middle tick than beyond it. Apple diffuses larger glass more
+  /// and smaller glass less.
   static double ios27RegularFrost(double tintAmount) {
     final amount = tintAmount.clamp(0.0, 1.0);
-    return 3.7 *
-        math.exp(math.min(amount, 0.5) + 2 * math.max(amount - 0.5, 0.0));
+    return 2 *
+        math.exp(
+          2.23 * math.min(amount, 0.5) + 2 * math.max(amount - 0.5, 0.0),
+        );
   }
 
   /// Backdrop blur of iOS 27 `.clear` glass, in logical pixels, for the
@@ -245,8 +249,9 @@ class LiquidGlassSettings with Equatable {
   /// The glint recolors the face instead of adding white: it pulls the lit
   /// material toward a target brighter than SDR white carrying the face's own
   /// chroma amplified, so glass over color glints in that color. `1` is the
-  /// strength an iPhone shows on iOS 27 in both appearances. Apple's
-  /// simulator captures, which are SDR, correspond to about `0.56`.
+  /// strength an iPhone shows on iOS 27 in light mode; the dark toolbar and
+  /// clear presets dim it to `0.8` and `0.6`. Apple's simulator captures,
+  /// which are SDR, correspond to about `0.56`.
   final double highlight;
 
   /// Peak absorption of the dark border just outside the silhouette, which

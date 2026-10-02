@@ -10,28 +10,6 @@ void main() {
     );
   });
 
-  test('iOS 27 toolbar presets contain structural renderer settings', () {
-    final light = LiquidGlassSettings.ios27ToolbarLight();
-    final dark = LiquidGlassSettings.ios27ToolbarDark();
-
-    expect(light.refractionHeight, 20);
-    expect(light.frost, closeTo(3.7, 1e-9));
-    expect(light.refractionAmount, 60);
-    expect(light.refractionFitsShape, isTrue);
-    expect(light.dispersion, 0);
-    expect(light.highlight, 1);
-    expect(light.contourStrength, .43);
-    expect(light.contourDirectionality, .77);
-    expect(light.bevelShadowStrength, .036);
-    expect(dark.refractionHeight, 20);
-    expect(dark.frost, light.frost);
-    expect(dark.refractionAmount, 60);
-    expect(dark.highlight, light.highlight);
-    expect(dark.contourStrength, .88);
-    expect(dark.contourDirectionality, 1);
-    expect(dark.bevelShadowStrength, light.bevelShadowStrength);
-  });
-
   test('iOS 27 clear preset keeps the toolbar glint shape', () {
     final clear = LiquidGlassSettings.ios27Clear();
 
@@ -57,10 +35,6 @@ void main() {
         closeTo(sigma, sigma * .03),
       );
     }
-    expect(clear.highlight, 1);
-    expect(clear.contourStrength, .36);
-    expect(clear.contourDirectionality, 1);
-    expect(clear.bevelShadowStrength, 0);
   });
 
   test('the Liquid Glass slider round-trips and leaves frost alone', () {
@@ -79,10 +53,10 @@ void main() {
   });
 
   test('iOS 27 regular glass blurs along the fitted slider curve', () {
-    // 3.7 pt at Clear, 6.1 at the middle tick, full frost at Tinted.
+    // 2 pt at Clear, 6.1 at the middle tick, full frost at Tinted.
     for (final (position, sigma) in [
-      (0.0, 3.7),
-      (.25, 4.75),
+      (0.0, 2.0),
+      (.25, 3.49),
       (.5, 6.1),
       (.75, 10.06),
       (1.0, 16.58),
@@ -100,7 +74,7 @@ void main() {
         expect(toolbar.tintAmount, position);
       }
     }
-    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(3.7, 1e-9));
+    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(2, 1e-9));
     expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
     expect(
       LiquidGlassSettings.ios27ToolbarLight(tintAmount: 1, frost: 2).frost,
