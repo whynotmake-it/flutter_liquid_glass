@@ -59,9 +59,9 @@ void main() {
 
   setUpAll(() async {
     if (_expectFallback) return;
-    final library = (await gpu.ShaderLibrary.fromAsset(
+    final library = gpu.ShaderLibrary.fromAsset(
       'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-    ))!;
+    )!;
     renderer = FlutterGpuGeometryRenderer(
       vertexShader: library['GeometryVertex']!,
       fragmentShader: library['GeometryFragment']!,
