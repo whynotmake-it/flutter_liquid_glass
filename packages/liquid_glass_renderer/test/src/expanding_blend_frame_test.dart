@@ -146,7 +146,7 @@ void main() {
               'Expanding the left pill in the next frame must not mutate '
               'the stationary button in an already submitted frame.',
         );
-      }, skip: !fake && skipProperGlassTests);
+      }, skip: !fake && skipProperGlassTests, tags: 'golden');
     }
   }
 }

@@ -205,7 +205,7 @@ void main() {
                 'backdrop optics.',
           );
         }
-      }, skip: !fake && skipProperGlassTests);
+      }, skip: !fake && skipProperGlassTests, tags: 'golden');
     }
   }
 }

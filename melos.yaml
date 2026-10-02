@@ -82,11 +82,13 @@ scripts:
     description: Run all tests in this project without golden tests.
 
   update-goldens:select:
+    # Exit 79 means the package has no tests matching the golden tag.
     run: >-
       flutter test --enable-impeller --enable-flutter-gpu --tags=golden
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
       --update-goldens
+      || [ \$? -eq 79 ]
     exec:
       failFast: true
       concurrency: 1

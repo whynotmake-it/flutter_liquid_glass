@@ -52,7 +52,7 @@ void main() {
             Uri.file('${output.path}/colors-$kind-dpr${dpr.round()}.png'),
           ),
         );
-      }, skip: _outputPath.isEmpty);
+      }, skip: _outputPath.isEmpty, tags: 'golden');
     }
   }
 }

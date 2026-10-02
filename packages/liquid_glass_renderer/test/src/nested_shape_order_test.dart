@@ -126,6 +126,7 @@ void main() {
           );
         },
         skip: !fake && skipProperGlassTests,
+        tags: 'golden',
       );
     }
   }

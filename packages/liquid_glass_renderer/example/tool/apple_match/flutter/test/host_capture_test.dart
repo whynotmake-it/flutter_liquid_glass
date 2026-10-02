@@ -103,7 +103,7 @@ void main() {
     }
 
     settingsFile.copySync('${output.path}/settings.json');
-  }, skip: configurationMissing);
+  }, skip: configurationMissing, tags: 'golden');
 }
 
 Future<void> _pumpUntilGlassReady(

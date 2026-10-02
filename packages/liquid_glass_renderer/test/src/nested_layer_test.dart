@@ -55,7 +55,7 @@ void main() {
     final moved = await _capture(captureKey);
     addTearDown(moved.dispose);
     await expectMacOSGolden(moved, 'goldens/nested_layer_moved.png');
-  }, skip: skipProperGlassTests);
+  }, skip: skipProperGlassTests, tags: 'golden');
 
   testWidgets('nested layer static destination matches the moved frame', (
     tester,
@@ -78,7 +78,7 @@ void main() {
     final image = await _capture(captureKey);
     addTearDown(image.dispose);
     await expectMacOSGolden(image, 'goldens/nested_layer_moved.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets('inner layer follows a moving outer layer', (tester) async {
     tester.view
@@ -121,7 +121,7 @@ void main() {
     final moved = await _capture(captureKey);
     addTearDown(moved.dispose);
     await expectMacOSGolden(moved, 'goldens/layer_in_layer_moved.png');
-  }, skip: skipProperGlassTests);
+  }, skip: skipProperGlassTests, tags: 'golden');
 
   testWidgets('layer-in-layer static destination golden', (tester) async {
     tester.view
@@ -142,7 +142,7 @@ void main() {
     final image = await _capture(captureKey);
     addTearDown(image.dispose);
     await expectMacOSGolden(image, 'goldens/layer_in_layer_moved.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets('nested scrolling layer follows its retained ancestor', (
     tester,
@@ -173,7 +173,7 @@ void main() {
     final moved = await _capture(captureKey);
     addTearDown(moved.dispose);
     await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets('nested scrolling layer is correct on the first scroll frame', (
     tester,
@@ -202,7 +202,7 @@ void main() {
     final moved = await _capture(captureKey);
     addTearDown(moved.dispose);
     await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets('nested scrolling layer static destination golden', (
     tester,
@@ -228,7 +228,7 @@ void main() {
     final image = await _capture(captureKey);
     addTearDown(image.dispose);
     await expectMacOSGolden(image, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets('uniform scroll does not repaint consolidated fake layers', (
     tester,
@@ -303,7 +303,7 @@ void main() {
     final image = await _capture(captureKey);
     addTearDown(image.dispose);
     await expectMacOSGolden(image, 'goldens/nested_glass_scrolling_real.png');
-  }, skip: skipGoldenTests);
+  }, skip: skipGoldenTests, tags: 'golden');
 
   testWidgets(
     'nested glass is aligned on the first scroll frame without repainting',
@@ -371,6 +371,7 @@ void main() {
       await expectMacOSGolden(moved, 'goldens/nested_glass_scrolling_real.png');
     },
     skip: skipProperGlassTests,
+    tags: 'golden',
   );
 }
 

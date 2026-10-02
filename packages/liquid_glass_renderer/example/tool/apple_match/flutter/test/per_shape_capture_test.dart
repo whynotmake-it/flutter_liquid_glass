@@ -68,6 +68,7 @@ void main() {
       }
     },
     skip: _outputPath.isEmpty,
+    tags: 'golden',
   );
 }
 

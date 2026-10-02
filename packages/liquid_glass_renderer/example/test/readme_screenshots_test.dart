@@ -135,6 +135,7 @@ void main() {
           await tester.pump();
         },
         skip: _out.isEmpty,
+        tags: 'golden',
       );
     }
   }

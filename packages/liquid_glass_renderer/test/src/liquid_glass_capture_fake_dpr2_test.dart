@@ -13,5 +13,6 @@ void main() {
       fake: true,
     ),
     skip: skipProperGlassTests,
+    tags: 'golden',
   );
 }

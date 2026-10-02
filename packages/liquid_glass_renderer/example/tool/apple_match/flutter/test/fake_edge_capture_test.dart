@@ -49,7 +49,7 @@ void main() {
             image,
             matchesGoldenFile(Uri.file('${output.path}/$name.png')),
           );
-        }, skip: _outputPath.isEmpty);
+        }, skip: _outputPath.isEmpty, tags: 'golden');
       }
     }
   }
