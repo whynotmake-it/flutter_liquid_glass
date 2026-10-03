@@ -256,7 +256,7 @@ void main() {
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
     final renderer = File(
-      'lib/src/rendering/liquid_glass_render_object.dart',
+      'lib/src/rendering/liquid_glass_layer.dart',
     ).readAsStringSync();
 
     // Sampler 0 is the image-filter input; its filter quality makes backdrop
@@ -275,11 +275,9 @@ void main() {
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
     final renderer = File(
-      'lib/src/rendering/liquid_glass_render_object.dart',
-    ).readAsStringSync();
-    final layer = File(
       'lib/src/rendering/liquid_glass_layer.dart',
     ).readAsStringSync();
+    final layer = renderer;
 
     expect(source, contains('uniform vec4 uBackdropBounds'));
     // One definition, the displaced sample, and the three dispersion taps.
@@ -299,7 +297,7 @@ void main() {
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
     final renderer = File(
-      'lib/src/rendering/liquid_glass_render_object.dart',
+      'lib/src/rendering/liquid_glass_layer.dart',
     ).readAsStringSync();
 
     expect(source, contains('abs(uBackdropScale - 1.0) > 0.0001'));
