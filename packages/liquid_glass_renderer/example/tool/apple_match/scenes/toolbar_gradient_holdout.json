@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "toolbar_gradient_holdout",
+  "profile": "toolbar_capsule",
+  "canvas": {"logicalWidth": 402, "logicalHeight": 874, "scale": 3},
+  "shape": {"kind": "capsule", "x": 88.3335, "y": 386.5, "width": 225.333, "height": 101, "cornerRadius": 50.5, "appleContentInsetX": 25.333, "appleContentInsetY": 21},
+  "appearance": "light",
+  "transparency": {"reduceTransparency": false, "appleSliderMapped": false},
+  "probes": [
+    {"id": "A", "background": {"kind": "linearGradient", "startColor": "#101010", "endColor": "#F5F5F5", "axis": "horizontal"}},
+    {"id": "B", "background": {"kind": "linearGradient", "startColor": "#003B5C", "endColor": "#FFB000", "axis": "diagonal"}},
+    {"id": "C", "background": {"kind": "solid", "color": "#000000"}},
+    {"id": "D", "background": {"kind": "solid", "color": "#FFFFFF"}}
+  ]
+}

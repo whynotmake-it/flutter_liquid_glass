@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 2,
+  "status": "validated-ground-truth",
+  "runtime": "iOS 27.0 (24A5408d)",
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "udid": "CB995FE0-3149-46F6-AC6E-A6E82615A896",
+  "device": "iPhone 17 Pro",
+  "orientation": "portrait",
+  "appearance": "light",
+  "captureEncoding": "SDR tone-mapped 8-bit PNG",
+  "pixelWidth": 1206,
+  "pixelHeight": 2622,
+  "reduceMotion": false,
+  "reduceTransparency": false,
+  "increaseContrast": false,
+  "contentSize": "large",
+  "medianFrameCount": 3,
+  "liquidGlassTintPosition": 0.0,
+  "liquidGlassTintPositionReadback": 0.0,
+  "liquidGlassTintControlMethod": "simctl defaults write com.apple.UIKit UIViewGlassTintAmount",
+  "api": "SwiftUI View.glassEffect(_:in:)",
+  "apiConstruction": "Color.clear.frame(scene.shape).glassEffect(.regular,in:ReferenceGlassShape)",
+  "scene": "material_solid_palette",
+  "sceneProfile": "material_shape",
+  "probeIds": [
+    "X",
+    "R",
+    "O",
+    "Y",
+    "G",
+    "C",
+    "B",
+    "P",
+    "N",
+    "L",
+    "M",
+    "H",
+    "K",
+    "W"
+  ],
+  "sceneSha256": "53d1616b3afb7f6d337f6ac63ee4e5b93425c3de3fd7ace3d321f2d52ed73ece",
+  "appleSourceSha256": "337b7dc53cb431dc927395a7d4351826e1e6ce83abd16ff62aaeb75d5280191f",
+  "sceneModelSha256": "246cd3297c03a115655f51018c9d1d6847adc534018246dc71f1ecefcaf86bd0",
+  "infoPlistSha256": "ffb047f66e35358bfc7e7fe96e17f038aef80a0b7c3ca6f8be06aa3b4c5e358c",
+  "captureAppExecutableSha256": "59242660c82d638f43d3f3b5abd8d70aaf35a7c9b6a623f42838fef98f6dfaa5",
+  "captureScriptSha256": "e21d621ca4f465a0614fab9e3f62f98f3f959570c27a3011e5f179f932d4f6d7",
+  "frameValidatorSha256": "3f64de953eef00cd1e6eb3f56b94f6d2c4f050dd8323b7bfb851e1d8ba85889f",
+  "provenanceToolSha256": "6b72a958b08802368f93f9115284291cfb895d55ab79c7eda33990c961566795",
+  "probeAndFrameSha256": {
+    "B.png": "44ca93036b6c46aa7126144018b3e2c72de8311b8fc8ea35388754556700527b",
+    "C.png": "5a124f89ec89c70f4221ff9a19a2a1e9ea053de10cab78c2f4fa208291d970e4",
+    "G.png": "ec2328e5134fa214c14e472478028ba7a6a29293447f50e119fcc8bd83416630",
+    "H.png": "be34034eebe38a589b80fdc3f52c467ddce7926ee9ec9c4de1048a8bac1617c9",
+    "K.png": "8395947c169bf663481033e376b2103c931160b963310fa80d285c8795349a40",
+    "L.png": "0b510bc7b6738f7ca472f7c4d4c1b8d1e75c9afcc9c0e72957bd434c36541001",
+    "M.png": "0e7263565cae0128e93337a3a8e4e94154f571fad5b36ab874eff095c735fe9d",
+    "N.png": "f8082eb58a8fb9f9862f79a12f9628039e04f19557434a865c8d662d8494de4b",
+    "O.png": "55ed0c69a02599940fbf3c13c682864f84f68b004b857b5a15bd6f44249f03b7",
+    "P.png": "b4da8d5b5b4eae2773e7bb34fd6d0e41ef931f445b027269aebcec59c5e05383",
+    "R.png": "e241228492daaeba7b6056f298f9f8e8c223f0f84191302e135c6dcad996e6d7",
+    "W.png": "2c6727b1d715d2df0f34f200f0e17f7809a92ffd90774531df158f73f377aa3f",
+    "X.png": "964bff84f6b9ce0fe293d099bcf6d8f0464b66d074f795f31fc97b1b366b5e10",
+    "Y.png": "d29d611aa37a898bcb6b9f72d0f6a1d045fae9dff0f94883e2d4b9ee2bf9d3ca",
+    "frames/B_1.png": "8f4cc57173e9fc547bd1c28a4512390899e22cf0348bf701d603a1adb2859988",
+    "frames/B_2.png": "8f4cc57173e9fc547bd1c28a4512390899e22cf0348bf701d603a1adb2859988",
+    "frames/B_3.png": "8f4cc57173e9fc547bd1c28a4512390899e22cf0348bf701d603a1adb2859988",
+    "frames/C_1.png": "176cbe09cd111806c921fbf3cc9f2e687d4b4e7054df79ccea6eee4beb363e2f",
+    "frames/C_2.png": "176cbe09cd111806c921fbf3cc9f2e687d4b4e7054df79ccea6eee4beb363e2f",
+    "frames/C_3.png": "176cbe09cd111806c921fbf3cc9f2e687d4b4e7054df79ccea6eee4beb363e2f",
+    "frames/G_1.png": "f5db8cd52358f958e9bb37aa3f5bf162fa2c5faf97c8f40bd88bff9dcbb6d5df",
+    "frames/G_2.png": "f5db8cd52358f958e9bb37aa3f5bf162fa2c5faf97c8f40bd88bff9dcbb6d5df",
+    "frames/G_3.png": "f5db8cd52358f958e9bb37aa3f5bf162fa2c5faf97c8f40bd88bff9dcbb6d5df",
+    "frames/H_1.png": "327358a96c2f4cac23c6d39a1a44749e1878cd4999a75d59db5097d6f900958a",
+    "frames/H_2.png": "327358a96c2f4cac23c6d39a1a44749e1878cd4999a75d59db5097d6f900958a",
+    "frames/H_3.png": "327358a96c2f4cac23c6d39a1a44749e1878cd4999a75d59db5097d6f900958a",
+    "frames/K_1.png": "653a425af15c359b5f4f7b18f0e736a5c58ec144da178a74e4c0cb3199ed456b",
+    "frames/K_2.png": "653a425af15c359b5f4f7b18f0e736a5c58ec144da178a74e4c0cb3199ed456b",
+    "frames/K_3.png": "653a425af15c359b5f4f7b18f0e736a5c58ec144da178a74e4c0cb3199ed456b",
+    "frames/L_1.png": "df1d06d809062d8faae9a8b33b8b72bdab0edc216ff26900af7fd09261991bfa",
+    "frames/L_2.png": "df1d06d809062d8faae9a8b33b8b72bdab0edc216ff26900af7fd09261991bfa",
+    "frames/L_3.png": "df1d06d809062d8faae9a8b33b8b72bdab0edc216ff26900af7fd09261991bfa",
+    "frames/M_1.png": "470ec093db937e1d5a1604c334f20a5076c5331aefef2b9639e6a9f114e4cb9d",
+    "frames/M_2.png": "470ec093db937e1d5a1604c334f20a5076c5331aefef2b9639e6a9f114e4cb9d",
+    "frames/M_3.png": "470ec093db937e1d5a1604c334f20a5076c5331aefef2b9639e6a9f114e4cb9d",
+    "frames/N_1.png": "660269bc034b0beb1250b94058a5ab87473e9fe1818abc3148b58e72a1337596",
+    "frames/N_2.png": "660269bc034b0beb1250b94058a5ab87473e9fe1818abc3148b58e72a1337596",
+    "frames/N_3.png": "660269bc034b0beb1250b94058a5ab87473e9fe1818abc3148b58e72a1337596",
+    "frames/O_1.png": "cc9df3aed24a68e106651eefa29692dabb3adadcaa0780a48fc38c5f0e9460df",
+    "frames/O_2.png": "cc9df3aed24a68e106651eefa29692dabb3adadcaa0780a48fc38c5f0e9460df",
+    "frames/O_3.png": "cc9df3aed24a68e106651eefa29692dabb3adadcaa0780a48fc38c5f0e9460df",
+    "frames/P_1.png": "67874bf5cdd0084ac9ce1a139b6cb49ed7b3781d5ca87760abf47d1cb3885acb",
+    "frames/P_2.png": "67874bf5cdd0084ac9ce1a139b6cb49ed7b3781d5ca87760abf47d1cb3885acb",
+    "frames/P_3.png": "67874bf5cdd0084ac9ce1a139b6cb49ed7b3781d5ca87760abf47d1cb3885acb",
+    "frames/R_1.png": "b38a60c92914643c288517f151a545ec5ed255893882ada6e4ef3abb2bca3f99",
+    "frames/R_2.png": "b38a60c92914643c288517f151a545ec5ed255893882ada6e4ef3abb2bca3f99",
+    "frames/R_3.png": "b38a60c92914643c288517f151a545ec5ed255893882ada6e4ef3abb2bca3f99",
+    "frames/W_1.png": "4528766300a1da5857adefeb73a5a579e8bea4ec01a53535191a47f32dfb6b31",
+    "frames/W_2.png": "4528766300a1da5857adefeb73a5a579e8bea4ec01a53535191a47f32dfb6b31",
+    "frames/W_3.png": "4528766300a1da5857adefeb73a5a579e8bea4ec01a53535191a47f32dfb6b31",
+    "frames/X_1.png": "abde5fa939ecff26cd94d37edc2824c69bd25bdb11b0a3876d7d466ad5f74269",
+    "frames/X_2.png": "abde5fa939ecff26cd94d37edc2824c69bd25bdb11b0a3876d7d466ad5f74269",
+    "frames/X_3.png": "abde5fa939ecff26cd94d37edc2824c69bd25bdb11b0a3876d7d466ad5f74269",
+    "frames/Y_1.png": "9a335db88c87e9d1a07829becaf2dbd9663ab1f924d1922fabfb241fe18e4d03",
+    "frames/Y_2.png": "9a335db88c87e9d1a07829becaf2dbd9663ab1f924d1922fabfb241fe18e4d03",
+    "frames/Y_3.png": "9a335db88c87e9d1a07829becaf2dbd9663ab1f924d1922fabfb241fe18e4d03"
+  },
+  "frameStability": {
+    "X": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "R": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "O": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "Y": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "G": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "C": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "B": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "P": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "N": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "L": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "M": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "H": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "K": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    },
+    "W": {
+      "meanAbsoluteDeviation8Bit": 0.0,
+      "p99AbsoluteDeviation8Bit": 0.0,
+      "maxAbsoluteDeviation8Bit": 0.0
+    }
+  },
+  "captureSettleSeconds": 4.0
+}

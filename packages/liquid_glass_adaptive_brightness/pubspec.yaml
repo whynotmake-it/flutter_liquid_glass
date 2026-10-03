@@ -1,0 +1,21 @@
+name: liquid_glass_adaptive_brightness
+description: Estimates the brightness behind liquid glass so glyphs can flip between light and dark.
+version: 0.1.0-dev.1
+publish_to: none
+
+homepage: https://whynotmake.it
+repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_adaptive_brightness
+
+environment:
+  sdk: ">=3.13.0 <3.14.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  equatable: ^2.1.0
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lintervention: ^0.3.1
