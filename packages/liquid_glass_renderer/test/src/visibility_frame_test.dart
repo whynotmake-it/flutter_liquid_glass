@@ -166,4 +166,65 @@ void main() {
       );
     }
   }
+
+  for (final initiallyHidden in [false, true]) {
+    testWidgets(
+      'a hidden layer settles instead of repainting '
+      '(initiallyHidden: $initiallyHidden)',
+      (tester) async {
+        final visibility = ValueNotifier<double>(initiallyHidden ? 0 : 1);
+        addTearDown(visibility.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Stack(
+              children: [
+                const Positioned.fill(
+                  child: ColoredBox(color: Colors.white),
+                ),
+                LiquidGlassLayer(
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: visibility,
+                    builder: (_, value, __) => Center(
+                      child: LiquidGlassVisibility(
+                        visibility: value,
+                        child: const LiquidGlass(
+                          shape: LiquidOval(),
+                          child: SizedBox.square(dimension: 80),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final layer = tester.allRenderObjects
+            .whereType<RenderLiquidGlassLayer>()
+            .last;
+        if (!initiallyHidden) {
+          visibility.value = 0;
+          await tester.pump();
+          await tester.pump();
+        }
+        final settledPaints = layer.debugPaintCount;
+        // A pump only composites when a frame is scheduled; schedule each
+        // one so every tick runs the compositor-translation poll.
+        for (var frame = 0; frame < 6; frame++) {
+          binding.scheduleFrame();
+          await tester.pump();
+        }
+        expect(
+          layer.debugPaintCount,
+          settledPaints,
+          reason: 'An idle glass layer must not repaint while frames run.',
+        );
+      },
+      skip: skipProperGlassTests,
+    );
+  }
 }

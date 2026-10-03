@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -84,13 +84,13 @@ void main() {
           for (var frame = 0; frame < 60; frame++) {
             await tester.pump(const Duration(milliseconds: 16));
             if (tester.allRenderObjects
-                .whereType<LiquidGlassRenderObject>()
+                .whereType<RenderLiquidGlassLayer>()
                 .isNotEmpty) {
               break;
             }
           }
           expect(
-            tester.allRenderObjects.whereType<LiquidGlassRenderObject>(),
+            tester.allRenderObjects.whereType<RenderLiquidGlassLayer>(),
             isNotEmpty,
           );
         }
@@ -111,7 +111,7 @@ void main() {
           ..addRetained(binding.renderViews.single.debugLayer!.engineLayer!);
         final pending = builder.build();
         final renderer = tester.allRenderObjects
-            .whereType<LiquidGlassRenderObject>()
+            .whereType<RenderLiquidGlassLayer>()
             .firstOrNull;
         final oldCount = renderer?.gpuGeometryRenderer?.debugRenderCount;
         // A submitted frame is rasterized before the frame after next

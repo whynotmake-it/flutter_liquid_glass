@@ -52,16 +52,6 @@ trimming and about half of `_TextureRing`. Validate with
 `test/src/geometry_texture_reuse_test.dart` and a Pixel A/B against the
 #185 numbers in `VALIDATION.md` (sheet `PAINT` 1.71 ms, peak 321 MB).
 
-## Needs macos-26
-
-### Regenerate goldens and README snapshots
-
-The new default settings (light toolbar border and inner shadow, 2 pt
-frost) and the removed knobs change 27 golden files. Run
-`flutter test --update-goldens` for the package on the golden job's macos-26
-image, and regenerate `doc/generated/` (written by `docs_snapshot_test.dart`).
-`fake_glass_real_contour_offsets.png` was deleted with its test.
-
 ## Bugs
 
 ### Border and inner shadow change under `LiquidGlassCapture` in a fade
@@ -79,62 +69,7 @@ opacity pass origin (`GlassCompositionProbe.seededPassOrigin`) or the capture
 region not covering the contour outset. Check on a device too, since some fade
 cases are known flutter_tester mis-renders.
 
-### FakeGlass silhouettes alias at rest on macOS
-
-Some FakeGlass edges showed a fine staircase, visible only when zoomed in:
-the example's tab bar and the circles in the Blend and Colors scenes. Real
-glass was fine, and so were iOS and Android.
-
-Root cause: on Impeller's Metal macOS backend, a runtime-effect
-(`Paint().shader`) `drawRect` whose quad edge lands on a half-integer
-device-pixel boundary renders its alpha ramp quantized to whole pixels
-within a few px of that edge — the analytic silhouette in
-`fake_glass_surface.frag` came out as a staircase. It reproduces with a
-bare `canvas.drawRect` + `Paint().shader` on a plain `CustomPaint`, so
-none of the FakeGlass layer machinery is involved. Skia renders the same
-draws smoothly at every phase, and the artifact is unchanged with
-`impeller-use-sdfs=false`, so it lives in the general contents/entity-pass
-path, not the UberSDF pipeline — the same failure family as
-flutter/engine#52973 (flutter/flutter#146967, nearest sampling straddling
-a half-pixel offset).
-
-The surface quad is `shape.inflate(1.75pt)` — at 2x that is a 3.5px
-outset, so an integer-positioned shape puts the quad edge at x.5px, the
-bad phase. That matches every observation: dragged elements land on
-fractional positions (integer quad edges) and stay smooth after settling,
-the tab bar returns to an integral rest position (half-pixel quad edge),
-and moving the whole layer keeps the shapes' positions relative to it.
-
-Fix: `fakeGlassSurfaceQuad` in `internal/paint_fake_glass_surface.dart`
-expands the drawn quad outward so its edges land on whole device pixels.
-The rect only bounds where the shader runs — the silhouette is placed by
-`FlutterFragCoord` — so growing it is invisible and the shape stays
-exact. This is a workaround for the engine bug; a self-contained minimal
-repro with the issue text (`ISSUE.md`) lives outside this repo at
-`~/Developer/flutter_issues/impeller_pixel_aligned_coverage`. Verified on a real macOS window with an edge-fit
-metric (rms_dev 0.33px -> 0.06px on aligned superellipses; the Colors
-ovals likewise).
-
-Removed with it, because none of them were load-bearing for the artifact:
-`fake_glass_backdrop_edge.frag` and the whole edge band (the shared
-`BackdropKey`, the outset/inset/band clip paths, `_edgeShapes` encoding,
-`backdropEdgeShader` plumbing, `_syncBackdropEdge`), and
-`test/src/fake_glass_edge_test.dart`. The shared backdrop pass is clipped to
-the plain shape path again; its stencil edge sits under the surface's own
-analytic coverage and is not visible.
-
 ## Refactors
-
-### FakeGlass anti-aliasing in one pass on Impeller
-
-Done differently: the edge band turned out to be compensating for the wrong
-bug. The real defect is half-pixel-aligned shader draw quads quantizing
-coverage on macOS (see Bugs), now worked around by `fakeGlassRasterOffset`.
-The edge pass, its shared key and the outset/inset/band paths are removed;
-the shared backdrop is back to a plain path clip. If the blur's stencil
-silhouette ever becomes visible, the remaining option is
-`ImageFilter.compose(inner: blur, outer: coverageShader)` clipped to the
-pixel-snapped bounding rect.
 
 ### Share one base between the real and fake layers
 
