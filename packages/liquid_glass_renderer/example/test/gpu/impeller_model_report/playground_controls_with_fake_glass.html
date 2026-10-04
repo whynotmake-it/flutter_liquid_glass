@@ -17,6 +17,9 @@ th { font-weight: 600; border-top: 0; }
 .num { text-align: right; white-space: nowrap; }
 code { font: 13px ui-monospace, Menlo, monospace; }
 .warn { padding: 8px 12px; border-left: 3px solid #d9480f; margin: 8px 0; }
+details { margin: 6px 0; }
+summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.ended { color: #d9480f; }
 </style>
 </head>
 <body>
@@ -30,6 +33,10 @@ code { font: 13px ui-monospace, Menlo, monospace; }
 <h2>What causes it</h2>
 <p class="muted">Each widget's extra passes and memory traffic, as a multiple of one plain frame.</p>
 <table id="costs"></table>
+
+<h2>Passes in order</h2>
+<p class="muted">Every render pass of one frame, in the order they finish. Hover a pass for what it does.</p>
+<div id="timelines"></div>
 
 <section id="demand" hidden>
 <h2>Frames while idle</h2>
@@ -122,6 +129,27 @@ if (sorted.length) {
       h('td', null, fix(e.label, e.roles))))));
 } else {
   byId('costs').replaceWith(h('p', null, 'Nothing beyond the plain frame.'));
+}
+
+// Passes in order: one collapsed table per device.
+for (const f of frames) {
+  const screen = f.device.physicalSize[0] * f.device.physicalSize[1];
+  const rows = (f.passes || []).map((p, i) => {
+    const role = (f.roles || {})[p.role] || { title: p.role, explanation: '' };
+    const area = screen ? Math.round(p.size[0] * p.size[1] / screen * 100) : 0;
+    const notes = [p.isBlit && 'blit, not a render pass', p.approximate && 'size guessed'].filter(Boolean);
+    return h('tr', null,
+      h('td', { class: 'num' }, i + 1),
+      h('td', { title: role.explanation }, role.title, notes.length ? h('span', { class: 'muted' }, ' (' + notes.join(', ') + ')') : ''),
+      h('td', { class: 'num' }, Math.round(p.size[0]) + '×' + Math.round(p.size[1]) + ' · ' + area + '%'),
+      h('td', null, p.cause ? h('code', null, p.cause) : ''),
+      h('td', null, p.endedBy ? h('span', { class: 'ended' }, 'ended early by ', h('code', null, p.endedBy)) : ''));
+  });
+  byId('timelines').append(h('details', null,
+    h('summary', null, f.device.name + ': ' + f.renderPasses + ' render passes'),
+    h('table', null,
+      h('thead', null, h('tr', null, h('th', { class: 'num' }, '#'), h('th', null, 'Pass'), h('th', { class: 'num' }, 'Size · of screen'), h('th', null, 'Caused by'), h('th', null, ''))),
+      h('tbody', null, rows))));
 }
 
 // Frames while idle
