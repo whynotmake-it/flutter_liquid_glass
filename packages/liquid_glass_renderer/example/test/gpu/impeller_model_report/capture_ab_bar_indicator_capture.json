@@ -1024,7 +1024,7 @@
           "ScrollConfiguration",
           "CupertinoApp"
         ],
-        "ownerLocation": "test/gpu/capture_ab_gpu_test.dart:86",
+        "ownerLocation": "test/gpu/capture_ab_gpu_test.dart:88",
         "active": false,
         "muted": false,
         "type": "_WidgetTicker"
