@@ -17,6 +17,9 @@ dependencies:
   stupid_simple_sheet: ^1.0.0-dev.4
 
 dev_dependencies:
+  # GPU cost estimate (test/gpu/). Not published: path to a local checkout.
+  impeller_model:
+    path: /Users/jesper/Development/talks/packages/impeller_model
   flutter_test:
     sdk: flutter
   integration_test:

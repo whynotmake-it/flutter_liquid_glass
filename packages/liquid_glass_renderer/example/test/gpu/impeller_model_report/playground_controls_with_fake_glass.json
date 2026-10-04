@@ -1,0 +1,1351 @@
+{
+  "name": "playground_controls_with_fake_glass",
+  "flutter": "3.47.1",
+  "engineRevision": "5d531788691ec3404cac0cee66ead4007b177363",
+  "screenshot": "playground_controls_with_fake_glass_iPhone 16.png",
+  "frames": [
+    {
+      "device": {
+        "name": "iPhone 16",
+        "logicalSize": [
+          393.0,
+          852.0
+        ],
+        "pixelRatio": 3.0,
+        "physicalSize": [
+          1179.0,
+          2556.0
+        ],
+        "gpu": {
+          "name": "ios-metal",
+          "backend": "metal",
+          "framebufferFetch": true,
+          "blitToOnscreen": true,
+          "colorFormat": "BGRA10_XR",
+          "bytesPerPixel": 8,
+          "lossyCompressedPassTextures": true
+        }
+      },
+      "renderPasses": 7,
+      "renderPassesByLabel": {
+        "EntityPass Render Pass": 4,
+        "Gaussian Blur Filter": 3
+      },
+      "flips": 1,
+      "traffic": {
+        "bytesPerPixel": 8,
+        "surfaceBytes": 24108192,
+        "storedBytes": 83786448,
+        "readBytes": 104412548,
+        "extraBytes": 188198996,
+        "extraScreenEquivalents": 7.806
+      },
+      "costCenters": [
+        {
+          "label": "BackdropFilter",
+          "renderPasses": 5,
+          "extraBytes": 139982612,
+          "roles": [
+            "offscreenRoot",
+            "blurDownsample",
+            "blurY",
+            "blurX",
+            "saveLayer"
+          ]
+        },
+        {
+          "label": "canvas.saveLayer in a picture",
+          "renderPasses": 1,
+          "extraBytes": 48216384,
+          "roles": [
+            "saveLayer"
+          ]
+        }
+      ],
+      "passes": [
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1179.0,
+            2556.0
+          ],
+          "cause": "canvas.saveLayer in a picture",
+          "drawCount": 14,
+          "parent": 1
+        },
+        {
+          "role": "offscreenRoot",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1179.0,
+            2556.0
+          ],
+          "cause": "backdrop filter (frame drawn offscreen)",
+          "endedBy": "BackdropFilter",
+          "drawCount": 27
+        },
+        {
+          "role": "blurDownsample",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            552.0,
+            1169.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurY",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            552.0,
+            1169.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurX",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            552.0,
+            1169.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1083.0,
+            2318.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 6
+        },
+        {
+          "role": "onscreenAfterFlip",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1179.0,
+            2556.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 45,
+          "writesSurface": true
+        }
+      ],
+      "roles": {
+        "onscreenRoot": {
+          "title": "Frame",
+          "explanation": "Draws the frame straight into the screen surface."
+        },
+        "offscreenRoot": {
+          "title": "Offscreen frame",
+          "explanation": "The frame starts offscreen because something in it must read back what was drawn (a backdrop filter, or an advanced blend without framebuffer fetch). It is copied to the screen at the end."
+        },
+        "onscreenAfterFlip": {
+          "title": "Frame (continued on screen)",
+          "explanation": "After the last backdrop filter, drawing continues directly in the screen surface. It starts by redrawing everything drawn so far."
+        },
+        "restartAfterFlip": {
+          "title": "Restarted pass",
+          "explanation": "A backdrop filter or emulated blend had to read this pass, so the pass was ended and stored. Drawing continues in a new pass that first redraws the stored texture."
+        },
+        "saveLayer": {
+          "title": "Layer",
+          "explanation": "An offscreen layer (saveLayer). Its content is drawn into its own texture, then composited into the parent pass."
+        },
+        "blurDownsample": {
+          "title": "Blur: downsample",
+          "explanation": "First of three Gaussian blur passes: shrinks the input."
+        },
+        "blurY": {
+          "title": "Blur: vertical",
+          "explanation": "Second Gaussian blur pass."
+        },
+        "blurX": {
+          "title": "Blur: horizontal",
+          "explanation": "Third Gaussian blur pass."
+        },
+        "morphology": {
+          "title": "Dilate/erode",
+          "explanation": "One direction of a morphology filter."
+        },
+        "filterInputSnapshot": {
+          "title": "Filter input",
+          "explanation": "Renders a filter input that is not yet a texture (e.g. a color filter feeding a blur) into one."
+        },
+        "blendSourceSnapshot": {
+          "title": "Blend source",
+          "explanation": "An advanced blend mode first renders the drawn shape into a texture, then blends it (in the current pass with framebuffer fetch, in an emulated blend pass without)."
+        },
+        "filter": {
+          "title": "Filter",
+          "explanation": "An image filter the model does not port in detail."
+        },
+        "advancedBlend": {
+          "title": "Emulated blend",
+          "explanation": "An advanced blend mode without framebuffer fetch: blends the stored backdrop with the source into an intermediate texture."
+        },
+        "copyToOnscreen": {
+          "title": "Copy to screen",
+          "explanation": "Copies the offscreen frame to the screen with a render pass (non-Metal backends)."
+        },
+        "blitToOnscreen": {
+          "title": "Blit to screen",
+          "explanation": "Copies the offscreen frame to the screen with a blit (Metal). Not a render pass."
+        }
+      }
+    },
+    {
+      "device": {
+        "name": "Pixel 9",
+        "logicalSize": [
+          411.42857142857144,
+          923.4285714285714
+        ],
+        "pixelRatio": 2.625,
+        "physicalSize": [
+          1080.0,
+          2424.0
+        ],
+        "gpu": {
+          "name": "android-vulkan",
+          "backend": "vulkan",
+          "framebufferFetch": true,
+          "blitToOnscreen": false,
+          "colorFormat": "RGBA8Unorm",
+          "bytesPerPixel": 4
+        }
+      },
+      "renderPasses": 7,
+      "renderPassesByLabel": {
+        "EntityPass Render Pass": 4,
+        "Gaussian Blur Filter": 3
+      },
+      "flips": 1,
+      "traffic": {
+        "bytesPerPixel": 4,
+        "surfaceBytes": 10471680,
+        "storedBytes": 57181344,
+        "readBytes": 66297153,
+        "extraBytes": 123478497,
+        "extraScreenEquivalents": 11.792
+      },
+      "costCenters": [
+        {
+          "label": "BackdropFilter",
+          "renderPasses": 5,
+          "extraBytes": 102535137,
+          "roles": [
+            "offscreenRoot",
+            "blurDownsample",
+            "blurY",
+            "blurX",
+            "saveLayer"
+          ]
+        },
+        {
+          "label": "canvas.saveLayer in a picture",
+          "renderPasses": 1,
+          "extraBytes": 20943360,
+          "roles": [
+            "saveLayer"
+          ]
+        }
+      ],
+      "passes": [
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "canvas.saveLayer in a picture",
+          "drawCount": 14,
+          "parent": 1
+        },
+        {
+          "role": "offscreenRoot",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "backdrop filter (frame drawn offscreen)",
+          "endedBy": "BackdropFilter",
+          "drawCount": 28
+        },
+        {
+          "role": "blurDownsample",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurY",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurX",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            996.0,
+            2230.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 6
+        },
+        {
+          "role": "onscreenAfterFlip",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 45,
+          "writesSurface": true
+        }
+      ],
+      "roles": {
+        "onscreenRoot": {
+          "title": "Frame",
+          "explanation": "Draws the frame straight into the screen surface."
+        },
+        "offscreenRoot": {
+          "title": "Offscreen frame",
+          "explanation": "The frame starts offscreen because something in it must read back what was drawn (a backdrop filter, or an advanced blend without framebuffer fetch). It is copied to the screen at the end."
+        },
+        "onscreenAfterFlip": {
+          "title": "Frame (continued on screen)",
+          "explanation": "After the last backdrop filter, drawing continues directly in the screen surface. It starts by redrawing everything drawn so far."
+        },
+        "restartAfterFlip": {
+          "title": "Restarted pass",
+          "explanation": "A backdrop filter or emulated blend had to read this pass, so the pass was ended and stored. Drawing continues in a new pass that first redraws the stored texture."
+        },
+        "saveLayer": {
+          "title": "Layer",
+          "explanation": "An offscreen layer (saveLayer). Its content is drawn into its own texture, then composited into the parent pass."
+        },
+        "blurDownsample": {
+          "title": "Blur: downsample",
+          "explanation": "First of three Gaussian blur passes: shrinks the input."
+        },
+        "blurY": {
+          "title": "Blur: vertical",
+          "explanation": "Second Gaussian blur pass."
+        },
+        "blurX": {
+          "title": "Blur: horizontal",
+          "explanation": "Third Gaussian blur pass."
+        },
+        "morphology": {
+          "title": "Dilate/erode",
+          "explanation": "One direction of a morphology filter."
+        },
+        "filterInputSnapshot": {
+          "title": "Filter input",
+          "explanation": "Renders a filter input that is not yet a texture (e.g. a color filter feeding a blur) into one."
+        },
+        "blendSourceSnapshot": {
+          "title": "Blend source",
+          "explanation": "An advanced blend mode first renders the drawn shape into a texture, then blends it (in the current pass with framebuffer fetch, in an emulated blend pass without)."
+        },
+        "filter": {
+          "title": "Filter",
+          "explanation": "An image filter the model does not port in detail."
+        },
+        "advancedBlend": {
+          "title": "Emulated blend",
+          "explanation": "An advanced blend mode without framebuffer fetch: blends the stored backdrop with the source into an intermediate texture."
+        },
+        "copyToOnscreen": {
+          "title": "Copy to screen",
+          "explanation": "Copies the offscreen frame to the screen with a render pass (non-Metal backends)."
+        },
+        "blitToOnscreen": {
+          "title": "Blit to screen",
+          "explanation": "Copies the offscreen frame to the screen with a blit (Metal). Not a render pass."
+        }
+      }
+    },
+    {
+      "device": {
+        "name": "Pixel 10",
+        "logicalSize": [
+          411.42857142857144,
+          923.4285714285714
+        ],
+        "pixelRatio": 2.625,
+        "physicalSize": [
+          1080.0,
+          2424.0
+        ],
+        "gpu": {
+          "name": "android-vulkan-no-fbf",
+          "backend": "vulkan",
+          "framebufferFetch": false,
+          "blitToOnscreen": false,
+          "colorFormat": "RGBA8Unorm",
+          "bytesPerPixel": 4
+        }
+      },
+      "renderPasses": 8,
+      "renderPassesByLabel": {
+        "EntityPass Render Pass": 4,
+        "Gaussian Blur Filter": 3,
+        "EntityPass Root Render Pass": 1
+      },
+      "flips": 1,
+      "traffic": {
+        "bytesPerPixel": 4,
+        "surfaceBytes": 10471680,
+        "storedBytes": 67653024,
+        "readBytes": 76768833,
+        "extraBytes": 144421857,
+        "extraScreenEquivalents": 13.792
+      },
+      "costCenters": [
+        {
+          "label": "BackdropFilter",
+          "renderPasses": 6,
+          "extraBytes": 123478497,
+          "roles": [
+            "offscreenRoot",
+            "blurDownsample",
+            "blurY",
+            "blurX",
+            "saveLayer",
+            "restartAfterFlip"
+          ]
+        },
+        {
+          "label": "canvas.saveLayer in a picture",
+          "renderPasses": 1,
+          "extraBytes": 20943360,
+          "roles": [
+            "saveLayer"
+          ]
+        }
+      ],
+      "passes": [
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "canvas.saveLayer in a picture",
+          "drawCount": 14,
+          "parent": 1
+        },
+        {
+          "role": "offscreenRoot",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "backdrop filter (frame drawn offscreen)",
+          "endedBy": "BackdropFilter",
+          "drawCount": 28
+        },
+        {
+          "role": "blurDownsample",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurY",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "blurX",
+          "engineLabel": "Gaussian Blur Filter",
+          "size": [
+            1014.0,
+            2248.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 5
+        },
+        {
+          "role": "saveLayer",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            996.0,
+            2230.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 1,
+          "parent": 6
+        },
+        {
+          "role": "restartAfterFlip",
+          "engineLabel": "EntityPass Render Pass",
+          "commandBuffer": "EntityPass Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "cause": "BackdropFilter",
+          "drawCount": 45
+        },
+        {
+          "role": "copyToOnscreen",
+          "engineLabel": "EntityPass Root Render Pass",
+          "commandBuffer": "EntityPass Root Command Buffer",
+          "size": [
+            1080.0,
+            2424.0
+          ],
+          "drawCount": 1,
+          "writesSurface": true
+        }
+      ],
+      "roles": {
+        "onscreenRoot": {
+          "title": "Frame",
+          "explanation": "Draws the frame straight into the screen surface."
+        },
+        "offscreenRoot": {
+          "title": "Offscreen frame",
+          "explanation": "The frame starts offscreen because something in it must read back what was drawn (a backdrop filter, or an advanced blend without framebuffer fetch). It is copied to the screen at the end."
+        },
+        "onscreenAfterFlip": {
+          "title": "Frame (continued on screen)",
+          "explanation": "After the last backdrop filter, drawing continues directly in the screen surface. It starts by redrawing everything drawn so far."
+        },
+        "restartAfterFlip": {
+          "title": "Restarted pass",
+          "explanation": "A backdrop filter or emulated blend had to read this pass, so the pass was ended and stored. Drawing continues in a new pass that first redraws the stored texture."
+        },
+        "saveLayer": {
+          "title": "Layer",
+          "explanation": "An offscreen layer (saveLayer). Its content is drawn into its own texture, then composited into the parent pass."
+        },
+        "blurDownsample": {
+          "title": "Blur: downsample",
+          "explanation": "First of three Gaussian blur passes: shrinks the input."
+        },
+        "blurY": {
+          "title": "Blur: vertical",
+          "explanation": "Second Gaussian blur pass."
+        },
+        "blurX": {
+          "title": "Blur: horizontal",
+          "explanation": "Third Gaussian blur pass."
+        },
+        "morphology": {
+          "title": "Dilate/erode",
+          "explanation": "One direction of a morphology filter."
+        },
+        "filterInputSnapshot": {
+          "title": "Filter input",
+          "explanation": "Renders a filter input that is not yet a texture (e.g. a color filter feeding a blur) into one."
+        },
+        "blendSourceSnapshot": {
+          "title": "Blend source",
+          "explanation": "An advanced blend mode first renders the drawn shape into a texture, then blends it (in the current pass with framebuffer fetch, in an emulated blend pass without)."
+        },
+        "filter": {
+          "title": "Filter",
+          "explanation": "An image filter the model does not port in detail."
+        },
+        "advancedBlend": {
+          "title": "Emulated blend",
+          "explanation": "An advanced blend mode without framebuffer fetch: blends the stored backdrop with the source into an intermediate texture."
+        },
+        "copyToOnscreen": {
+          "title": "Copy to screen",
+          "explanation": "Copies the offscreen frame to the screen with a render pass (non-Metal backends)."
+        },
+        "blitToOnscreen": {
+          "title": "Blit to screen",
+          "explanation": "Copies the offscreen frame to the screen with a blit (Metal). Not a render pass."
+        }
+      }
+    }
+  ],
+  "frameDemand": {
+    "windowMs": 1000,
+    "settleMs": 500,
+    "refreshRate": 60,
+    "verdict": "idle",
+    "framesDrawn": 0,
+    "unchangedFrames": 0,
+    "framesPerSecond": 0.0,
+    "renderPasses": 0,
+    "stillRequesting": false,
+    "sources": [],
+    "tickers": [
+      {
+        "owner": "Navigator",
+        "ownerPath": [
+          "Navigator",
+          "_FocusInheritedScope",
+          "Semantics",
+          "FocusScope",
+          "DefaultTextStyle",
+          "ValueListenableBuilder<bool>",
+          "Semantics",
+          "_FocusInheritedScope",
+          "Focus",
+          "Title",
+          "Directionality",
+          "_LocalizationsScope",
+          "Semantics",
+          "Localizations",
+          "ListenableBuilder",
+          "Semantics",
+          "_FocusInheritedScope",
+          "Focus",
+          "Shortcuts",
+          "_ShortcutRegistrarScope",
+          "ShortcutRegistrar",
+          "TapRegionSurface",
+          "_FocusInheritedScope",
+          "Focus",
+          "FocusTraversalGroup",
+          "_ActionsScope",
+          "Actions",
+          "Semantics",
+          "_FocusInheritedScope",
+          "Focus",
+          "Shortcuts",
+          "Semantics",
+          "_FocusInheritedScope",
+          "Focus",
+          "Shortcuts",
+          "DefaultTextEditingShortcuts",
+          "Semantics",
+          "_FocusInheritedScope",
+          "Focus",
+          "Shortcuts",
+          "NotificationListener<NavigationNotification>",
+          "_SharedAppModel",
+          "SharedAppData",
+          "UnmanagedRestorationScope",
+          "RestorationScope",
+          "UnmanagedRestorationScope",
+          "RootRestorationScope",
+          "WidgetsApp",
+          "Builder",
+          "HeroControllerScope",
+          "DefaultSelectionStyle",
+          "IconTheme",
+          "InheritedCupertinoTheme",
+          "CupertinoTheme",
+          "CupertinoUserInterfaceLevel",
+          "ScrollConfiguration",
+          "CupertinoApp"
+        ],
+        "ownerLocation": "test/gpu/playground_gpu_test.dart:38",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "BackdropPager",
+        "ownerPath": [
+          "BackdropPager"
+        ],
+        "ownerLocation": "lib/app.dart:124",
+        "active": false,
+        "muted": false,
+        "type": "Ticker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/playground/scenes/control_glass.dart:26",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/playground/scenes/control_glass.dart:26",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/playground/scenes/controls_scene.dart:107",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/playground/scenes/control_glass.dart:26",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:140",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "LoupeTabBar",
+        "ownerPath": [
+          "LoupeTabBar"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:88",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "LoupeTabBar",
+        "ownerPath": [
+          "LoupeTabBar"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:88",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "LoupeTabBar",
+        "ownerPath": [
+          "LoupeTabBar"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:88",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "LoupeTabBar",
+        "ownerPath": [
+          "LoupeTabBar"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:88",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/bottom_bar/loupe_tab_bar.dart:466",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/bottom_bar/ios_bottom_bar.dart:140",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "SingleMotionBuilder",
+        "ownerPath": [
+          "SingleMotionBuilder"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:80",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Offset>",
+        "ownerPath": [
+          "MotionBuilder<Offset>"
+        ],
+        "ownerLocation": "lib/src/stretch.dart:90",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/src/fake_glass.dart:146",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "GlassGlowLayer",
+        "ownerPath": [
+          "GlassGlowLayer"
+        ],
+        "ownerLocation": "lib/playground/scenes/draggable_glass.dart:19",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      },
+      {
+        "owner": "MotionBuilder<Color>",
+        "ownerPath": [
+          "MotionBuilder<Color>"
+        ],
+        "ownerLocation": "lib/playground/scenes/control_glass.dart:26",
+        "active": false,
+        "muted": false,
+        "type": "_WidgetTicker"
+      }
+    ],
+    "frames": []
+  }
+}
