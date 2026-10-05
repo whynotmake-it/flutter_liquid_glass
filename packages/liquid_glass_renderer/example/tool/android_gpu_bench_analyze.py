@@ -691,7 +691,7 @@ def _build_markdown(out_dir: Path, runs: list[dict[str, Any]]) -> str:
         "## Headline",
         "",
     ]
-    grouped = _scenario_groups(runs)
+    grouped = _scenario_groups([run for run in runs if run.get("status") == "ok"])
     headline_rows = []
     for scenario, items in grouped.items():
         headline_rows.append(

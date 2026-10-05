@@ -70,43 +70,15 @@ command -v "$FLUTTER_BIN" >/dev/null || { echo "flutter is required" >&2; exit 1
 command -v "$DART_BIN" >/dev/null || { echo "dart is required" >&2; exit 1; }
 command -v xcrun >/dev/null || { echo "Xcode command-line tools are required" >&2; exit 1; }
 
-RESULT_PARENT="$(dirname "$RESULT_DIR")"
-RESULT_NAME="$(basename "$RESULT_DIR")"
-if [[ "$RESULT_DIR" == "/" || "$RESULT_NAME" == "/" \
-  || "$RESULT_NAME" == "." || "$RESULT_NAME" == ".." ]]; then
-  printf 'Benchmark result path must name a dedicated directory: %s\n' "$RESULT_DIR" >&2
-  exit 1
-fi
-mkdir -p "$RESULT_PARENT"
-RESULT_PARENT="$(cd "$RESULT_PARENT" && pwd)"
-if [[ "$RESULT_PARENT" == "/" ]]; then
-  RESULT_DIR="/$RESULT_NAME"
-else
-  RESULT_DIR="$RESULT_PARENT/$RESULT_NAME"
-fi
-if [[ "$RESULT_DIR" == "/" || "$RESULT_DIR" == "$EXAMPLE_DIR" ]]; then
-  printf 'Benchmark result path is not a dedicated directory: %s\n' "$RESULT_DIR" >&2
-  exit 1
-fi
-if [[ -L "$RESULT_DIR" ]]; then
-  printf 'Benchmark result directory must not be a symlink: %s\n' "$RESULT_DIR" >&2
-  exit 1
-fi
-if [[ -e "$RESULT_DIR" && ! -d "$RESULT_DIR" ]]; then
-  printf 'Benchmark result path is not a directory: %s\n' "$RESULT_DIR" >&2
-  exit 1
-fi
-if [[ -d "$RESULT_DIR" ]] \
-  && [[ -n "$(ls -A "$RESULT_DIR")" ]]; then
-  if [[ "$OVERWRITE_RESULTS" != "1" ]]; then
-    printf 'Benchmark result directory is not empty: %s\n' "$RESULT_DIR" >&2
-    printf 'Set LIQUID_GLASS_BENCHMARK_OVERWRITE=1 to replace it.\n' >&2
+if [[ -d "$RESULT_DIR" ]]; then
+  if [[ -n "$(ls -A "$RESULT_DIR")" && "$OVERWRITE_RESULTS" != "1" ]]; then
+    echo "Benchmark result directory is not empty: $RESULT_DIR" >&2
+    echo "Set LIQUID_GLASS_BENCHMARK_OVERWRITE=1 to replace it." >&2
     exit 1
   fi
   rm -rf "$RESULT_DIR"
 fi
 mkdir -p "$RESULT_DIR/traces" "$RESULT_DIR/logs"
-RESULT_DIR="$(cd "$RESULT_DIR" && pwd)"
 NOTIFICATION_WAITER="$RESULT_DIR/trace_notification_waiter"
 cd "$EXAMPLE_DIR"
 

@@ -23,7 +23,14 @@ void main(List<String> arguments) {
   // this directory instead, so the summary is always emitted — possibly
   // without any successful report at all.
   final failedRuns = _readFailedRuns(input);
-  if (reports.isEmpty && failedRuns.isEmpty) {
+  final expectedScenarios = (options['expected-scenarios'] ?? '')
+      .split(RegExp(r'\s+'))
+      .where((scenario) => scenario.isNotEmpty)
+      .toSet()
+      .toList();
+  if (reports.isEmpty &&
+      failedRuns.isEmpty &&
+      expectedScenarios.isEmpty) {
     throw StateError('No benchmark scenario reports found.');
   }
 
@@ -34,10 +41,15 @@ void main(List<String> arguments) {
       .where((report) => report.scenario == 'fakeStatic')
       .firstOrNull;
   final minimumRepetitions = int.parse(options['minimum-repetitions'] ?? '1');
+  final incompleteScenarios = _incompleteScenarios(
+    reports,
+    expectedScenarios,
+    minimumRepetitions,
+  );
   final violations = _violations(
     reports,
     failedRuns,
-    minimumRepetitions: minimumRepetitions,
+    incompleteScenarios: incompleteScenarios,
   );
   final summary = <String, Object?>{
     'schemaVersion': 1,
@@ -94,9 +106,25 @@ void main(List<String> arguments) {
       mode: FileMode.append,
     );
   }
-  if (options['enforce'] == 'true' && violations.isNotEmpty) {
-    stderr.writeln('Benchmark regression thresholds failed:');
-    for (final violation in violations) {
+  final enforce = options['enforce'] == 'true';
+  final requireComplete = options['require-complete'] == 'true';
+  final completionViolations = <String>[
+    for (final failure in failedRuns)
+      '${failure.scenario} r${failure.repetition} failed: ${failure.reason}',
+    ...incompleteScenarios,
+  ];
+  if ((enforce && violations.isNotEmpty) ||
+      (requireComplete && completionViolations.isNotEmpty)) {
+    stderr.writeln(
+      requireComplete && !enforce
+          ? 'Benchmark completeness check failed:'
+          : 'Benchmark regression thresholds failed:',
+    );
+    final reported = <String>{
+      if (enforce) ...violations,
+      if (requireComplete) ...completionViolations,
+    };
+    for (final violation in reported) {
       stderr.writeln('- $violation');
     }
     exitCode = 1;
@@ -1103,7 +1131,7 @@ const double? _inProcessGpuFrameCvLimit = null;
 List<String> _violations(
   List<_Report> reports,
   List<_FailedRun> failedRuns, {
-  required int minimumRepetitions,
+  required List<String> incompleteScenarios,
 }) {
   final violations = <String>[];
   for (final failure in failedRuns) {
@@ -1112,11 +1140,6 @@ List<String> _violations(
     );
   }
   for (final entry in _groupByScenario(reports).entries) {
-    if (entry.value.length < minimumRepetitions) {
-      violations.add(
-        '${entry.key} has ${entry.value.length} repetitions; $minimumRepetitions are required.',
-      );
-    }
     if (entry.value.length >= 3) {
       final rasterCv = _coefficientOfVariation(
         entry.value.map((report) => report.p95Raster).toList(),
@@ -1144,6 +1167,7 @@ List<String> _violations(
       }
     }
   }
+  violations.addAll(incompleteScenarios);
   for (final report in reports) {
     if (report.frameTotalMs.length < 30) {
       violations.add(
@@ -1174,6 +1198,34 @@ List<String> _violations(
     }
   }
   return violations;
+}
+
+List<String> _incompleteScenarios(
+  List<_Report> reports,
+  List<String> expectedScenarios,
+  int minimumRepetitions,
+) {
+  final counts = <String, int>{};
+  for (final report in reports) {
+    counts.update(report.scenario, (count) => count + 1, ifAbsent: () => 1);
+  }
+  final expected = expectedScenarios.toSet();
+  final incomplete = <String>[
+    for (final scenario in expectedScenarios)
+      if ((counts[scenario] ?? 0) < minimumRepetitions)
+        '$scenario is ${counts[scenario] == null ? 'missing' : 'incomplete'}: '
+            '${counts[scenario] ?? 0} successful reports; '
+            '$minimumRepetitions required.',
+  ];
+  for (final entry in counts.entries) {
+    if (!expected.contains(entry.key) && entry.value < minimumRepetitions) {
+      incomplete.add(
+        '${entry.key} has ${entry.value} repetitions; '
+        '$minimumRepetitions are required.',
+      );
+    }
+  }
+  return incomplete;
 }
 
 String _ms(double value) => '${value.toStringAsFixed(2)} ms';

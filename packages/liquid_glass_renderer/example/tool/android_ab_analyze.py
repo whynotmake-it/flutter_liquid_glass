@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 from perfetto.trace_processor import TraceProcessor
+from android_gpu_bench_analyze import _classify_rail
 
 GC_NAMES = ("CollectNewGeneration", "CollectOldGeneration", "Scavenge", "MarkSweep",
             "MarkCompact", "StartConcurrentMark", "FinalizeMarking", "EvacuateNewGeneration",
@@ -130,9 +131,13 @@ def analyze_run(run_dir: Path):
             where t.name glob 'power.*_uws' group by t.name"""):
         if not r.d:
             continue
-        u, mw_r = r.name.upper(), r.e / (r.d / 1e9) / 1000
-        key = ("gpuMemMw" if "INFRA_MM_GPU" in u else "cpuMw" if "VDD_CPU" in u
-               else "ddrMw" if "GMC" in u else "displayMw" if "DISP" in u else None)
+        mw_r = r.e / (r.d / 1e9) / 1000
+        key = {
+            "gpu_mem": "gpuMemMw",
+            "cpu": "cpuMw",
+            "ddr": "ddrMw",
+            "display": "displayMw",
+        }.get(_classify_rail(r.name))
         if key:
             groups[key] += mw_r
     if res.get("gpuRailMw") is not None:
@@ -207,20 +212,59 @@ METRICS = ["fps", "buildP50", "buildP95", "rasterP50", "rasterP95", "rasterP99",
            "pssMaxRise50msMB", "dumpsysPssMB", "dumpsysGraphicsMB", "skinC"]
 
 
+def _file_fingerprint(path):
+    if not path.is_file():
+        return None
+    stat = path.stat()
+    return {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
+
+
 def main():
     out = Path(sys.argv[1])
     cache = out / "analysis.json"
-    rows = json.loads(cache.read_text()) if cache.exists() else {}
-    for d in sorted(out.iterdir()):
-        if d.is_dir() and (d / "run.json").exists() and d.name not in rows:
-            try:
-                rows[d.name] = analyze_run(d)
-            except Exception as e:  # noqa: BLE001
-                print("fail", d.name, e)
+    cached_rows = json.loads(cache.read_text()) if cache.exists() else {}
+    run_dirs = [
+        d for d in sorted(out.iterdir())
+        if d.is_dir() and (d / "run.json").is_file()
+    ]
+    rows = {}
+    for d in run_dirs:
+        run_path = d / "run.json"
+        trace_path = d / "trace.pftrace"
+        fingerprint = {
+            "run.json": _file_fingerprint(run_path),
+            "trace.pftrace": _file_fingerprint(trace_path),
+        }
+        cached = cached_rows.get(d.name)
+        if cached and cached.get("fingerprint") == fingerprint:
+            rows[d.name] = cached
+            continue
+        try:
+            run = json.loads(run_path.read_text())
+            if run.get("status") == "ok":
+                result = analyze_run(d)
+            else:
+                result = {
+                    key: run.get(key)
+                    for key in ("arm", "scenario", "rep", "status", "skinC", "cooldownS")
+                }
+                result["failureReason"] = run.get("failureReason") or run.get("status")
+            rows[d.name] = {"fingerprint": fingerprint, "result": result}
+        except Exception as error:  # noqa: BLE001
+            print("fail", d.name, error)
+            rows[d.name] = {
+                "fingerprint": fingerprint,
+                "result": {
+                    "scenario": d.name,
+                    "status": "failed:analysis",
+                    "failureReason": str(error),
+                },
+            }
     cache.write_text(json.dumps(rows, indent=1))
     groups = {}
-    for name, r in rows.items():
-        if not str(r.get("status", "")).startswith("ok") or "error" in str(r.get("status")):
+    results = {name: entry["result"] for name, entry in rows.items()}
+    for name, r in results.items():
+        if r.get("status") != "ok":
             continue
         groups.setdefault((r["scenario"], r["arm"]), []).append(r)
     lines = []
@@ -233,10 +277,40 @@ def main():
             med = st.median(vals)
             cv = (st.pstdev(vals) / st.mean(vals) * 100) if len(vals) > 1 and st.mean(vals) else 0
             lines.append(f"| {scen} | {arm} | {len(vals)} | {med:.3f} | {min(vals):.3f} | {max(vals):.3f} | {cv:.1f} |")
+    failures = [
+        {
+            "scenario": result.get("scenario"),
+            "arm": result.get("arm"),
+            "rep": result.get("rep"),
+            "status": result.get("status"),
+            "reason": result.get("failureReason"),
+        }
+        for result in results.values()
+        if result.get("status") != "ok"
+    ]
+    if failures:
+        lines.extend(
+            [
+                "\n### Failures\n",
+                "| scenario | arm | repetition | status | reason |",
+                "|---|---|---:|---|---|",
+            ]
+        )
+        lines.extend(
+            f"| {row['scenario']} | {row['arm']} | {row['rep']} | "
+            f"{row['status']} | {row['reason']} |"
+            for row in failures
+        )
     (out / "summary.md").write_text("\n".join(lines))
-    summary = {f"{scen}|{arm}": {m: st.median([x[m] for x in rs if x.get(m) is not None])
-                                 for m in METRICS if any(x.get(m) is not None for x in rs)}
-               for (scen, arm), rs in groups.items()}
+    summary = {
+        f"{scen}|{arm}": {
+            metric: st.median([row[metric] for row in group if row.get(metric) is not None])
+            for metric in METRICS
+            if any(row.get(metric) is not None for row in group)
+        }
+        for (scen, arm), group in groups.items()
+    }
+    summary["failures"] = failures
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
 
 

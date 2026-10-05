@@ -737,6 +737,75 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
     expect(markdown, contains('Scenario failures'));
   });
 
+  test('expected scenarios report missing and incomplete runs', () async {
+    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+    addTearDown(() => fixture.deleteSync(recursive: true));
+    _writeScenario(fixture, scenario: 'staticSingle');
+
+    final result = await _runParser(
+      fixture,
+      enforce: false,
+      expectedScenarios: 'staticSingle absentScenario',
+      minimumRepetitions: 2,
+    );
+
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final summary = jsonDecode(
+      File('${fixture.path}/summary.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    final violations = (summary['regressionViolations'] as List<dynamic>)
+        .cast<String>();
+    expect(violations, anyElement(contains('staticSingle is incomplete')));
+    expect(violations, anyElement(contains('absentScenario is missing')));
+  });
+
+  test(
+    'require-complete fails failed and missing runs when enforcement is off',
+    () async {
+    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+    addTearDown(() => fixture.deleteSync(recursive: true));
+    final failures = Directory('${fixture.path}/failures')..createSync();
+    File(
+      '${failures.path}/failedScenario.r1.txt',
+    ).writeAsStringSync('thermal gate was not reached');
+
+    final result = await _runParser(
+      fixture,
+      enforce: false,
+      expectedScenarios: 'failedScenario',
+      requireComplete: true,
+    );
+
+    expect(result.exitCode, 1);
+    expect(result.stderr, contains('failedScenario r1 failed'));
+    expect(result.stderr, contains('failedScenario is missing'));
+    expect(
+      File('${fixture.path}/summary.json').existsSync(),
+      isTrue,
+    );
+    },
+  );
+
+  test('writes the summary for the parse-results workflow output', () async {
+    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+    addTearDown(() => fixture.deleteSync(recursive: true));
+    _writeScenario(fixture, scenario: 'staticSingle');
+    final output = File('${fixture.path}/github-output.txt');
+
+    final result = await _runParser(
+      fixture,
+      enforce: false,
+      githubOutput: output.path,
+    );
+
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    expect(
+      output.readAsStringSync(),
+      startsWith('summary<<LIQUID_GLASS_EOF\n'),
+    );
+    expect(output.readAsStringSync(), contains('\nLIQUID_GLASS_EOF\n'));
+  });
+
   test('pairs fake material scenarios with equivalent real controls', () async {
     final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
     addTearDown(() => fixture.deleteSync(recursive: true));
@@ -762,6 +831,10 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
 Future<ProcessResult> _runParser(
   Directory fixture, {
   required bool enforce,
+  String? expectedScenarios,
+  int minimumRepetitions = 1,
+  bool requireComplete = false,
+  String? githubOutput,
 }) => Process.run(
   _dartExecutable,
   [
@@ -775,7 +848,18 @@ Future<ProcessResult> _runParser(
     '${fixture.path}/summary.json',
     '--enforce',
     '$enforce',
+    '--minimum-repetitions',
+    '$minimumRepetitions',
+    '--require-complete',
+    '$requireComplete',
+    if (expectedScenarios != null) ...[
+      '--expected-scenarios',
+      expectedScenarios,
+    ],
   ],
+  environment: githubOutput == null
+      ? null
+      : <String, String>{'GITHUB_OUTPUT': githubOutput},
   workingDirectory: Directory.current.path,
 );
 

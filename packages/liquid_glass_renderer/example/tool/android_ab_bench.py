@@ -87,9 +87,9 @@ def wait_cool(max_skin, min_wait):
     while True:
         status, skin = thermal()
         if status == 0 and (skin is None or max_skin is None or skin <= max_skin):
-            return status, skin, waited
+            return status, skin, waited, True
         if waited > 900:
-            return status, skin, waited
+            return status, skin, waited, False
         time.sleep(10)
         waited += 10
 
@@ -193,7 +193,18 @@ def run_once(out, arm, pkg, activity, scenario, rep, warmup, measure, extra, gat
     if done.exists() and json.loads(done.read_text()).get("status") == "ok":
         return json.loads(done.read_text())
     run_dir.mkdir(parents=True, exist_ok=True)
-    status, skin, waited = wait_cool(*gate)
+    status, skin, waited, gate_reached = wait_cool(*gate)
+    result = {"arm": arm, "pkg": pkg, "scenario": scenario, "rep": rep,
+              "thermalStatus": status, "skinC": skin, "cooldownS": waited,
+              "status": "ok", "startEpoch": time.time()}
+    if not gate_reached:
+        result["status"] = "failed:thermal"
+        result["failureReason"] = "thermal gate was not reached"
+        (run_dir / "run.json").write_text(json.dumps(result))
+        print(f"{time.strftime('%H:%M:%S')} {arm:>6} {scenario:<18} r{rep} "
+              f"{result['status']} skin={skin} cool={waited}s", flush=True)
+        return result
+
     unlock()
     for other in ALL_PKGS:
         sh("am", "force-stop", other)
@@ -204,9 +215,7 @@ def run_once(out, arm, pkg, activity, scenario, rep, warmup, measure, extra, gat
            "--es", "scenario", scenario, "--ei", "warmupSeconds", str(warmup),
            "--ei", "measureSeconds", str(measure), "--ei", "repetition", str(rep)] + extra
     sh(*cmd)
-    result = {"arm": arm, "pkg": pkg, "scenario": scenario, "rep": rep, "uid": uid,
-              "thermalStatus": status, "skinC": skin, "cooldownS": waited, "status": "ok",
-              "startEpoch": time.time()}
+    result["uid"] = uid
     if not log.wait(f"LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:{scenario}", 90):
         result["status"] = "failed:begin"
     else:
@@ -253,6 +262,25 @@ def run_once(out, arm, pkg, activity, scenario, rep, warmup, measure, extra, gat
 ALL_PKGS = []
 
 
+def resolve_scenarios(spec):
+    script = Path(__file__).with_name("bench_scenes.sh")
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; bench_resolve_scenes "$2"',
+            "bench-resolve-scenarios",
+            str(script),
+            spec,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise ValueError(result.stderr.strip())
+    return result.stdout.split()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", required=True, help="name=pkg,name=pkg")
@@ -267,6 +295,10 @@ def main():
     ap.add_argument("--extra", default="")
     ap.add_argument("--start-rep", type=int, default=1)
     a = ap.parse_args()
+    try:
+        scenarios = resolve_scenarios(a.scenarios)
+    except ValueError as error:
+        ap.error(str(error))
     arms = [tuple(x.split("=")) for x in a.arms.split(",")]
     ALL_PKGS.extend(p for _, p in arms)
     out = Path(a.out)
@@ -278,14 +310,14 @@ def main():
         _, skin0 = thermal()
         max_skin = a.max_skin if a.max_skin is not None else (skin0 + 1.5 if skin0 else None)
         print(f"start skin={skin0} gate={max_skin}", flush=True)
-        (out / "meta.json").write_text(json.dumps({"arms": arms, "scenarios": a.scenarios.split(),
+        (out / "meta.json").write_text(json.dumps({"arms": arms, "scenarios": scenarios,
                                                    "reps": a.reps, "warmup": a.warmup,
                                                    "measure": a.measure, "maxSkin": max_skin,
                                                    "fingerprint": sh("getprop", "ro.build.fingerprint").strip()}))
         extra = a.extra.split() if a.extra else []
         for rep in range(a.start_rep, a.reps + 1):
             order = arms if rep % 2 else list(reversed(arms))
-            scen = a.scenarios.split()
+            scen = scenarios
             for scenario in (scen if rep % 2 else list(reversed(scen))):
                 for arm, pkg in order:
                     run_once(out, arm, pkg, a.activity, scenario, rep, a.warmup, a.measure, extra,
