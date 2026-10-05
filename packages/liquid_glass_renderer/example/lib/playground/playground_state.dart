@@ -74,8 +74,9 @@ class GlassMaterial {
 
   /// Moves the Liquid Glass slider while keeping manual edits.
   ///
-  /// Every iOS 27 style derives its blur from the slider, so frost is the one
-  /// setting the slider owns. The loupe ignores the slider.
+  /// Every iOS 27 style keeps its blur sigma fixed and derives its diffusion
+  /// weight from the slider, so frostMix is the one setting the slider owns.
+  /// The loupe ignores the slider.
   GlassMaterial withTintAmount(double value) {
     final preset = GlassMaterial.preset(
       style: style,
@@ -85,7 +86,7 @@ class GlassMaterial {
     if (!edited) return preset;
     if (!style.followsSlider) return preset.withSettings(settings);
     return preset.withSettings(
-      settings.copyWith(tintAmount: value, frost: preset.settings.frost),
+      settings.copyWith(tintAmount: value, frostMix: preset.settings.frostMix),
     );
   }
 

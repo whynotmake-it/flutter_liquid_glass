@@ -329,6 +329,8 @@ class RenderFakeGlass extends RenderProxyBox {
   set settings(LiquidGlassSettings value) {
     if (_settings == value) return;
     _settings = value;
+    // frostMix can remove or reintroduce the backdrop effect entirely.
+    markNeedsCompositingBitsUpdate();
     markNeedsPaint();
   }
 
@@ -350,7 +352,7 @@ class RenderFakeGlass extends RenderProxyBox {
   }
 
   bool get _hasBlur =>
-      settings.effectiveFrost != 0 && appearance.visibility > 0;
+      fakeGlassBlurSigma(settings) != 0 && appearance.visibility > 0;
 
   bool get _hasColorTransfer =>
       appearance.visibility > 0 &&

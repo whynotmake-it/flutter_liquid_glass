@@ -615,7 +615,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // shader, so both match the backdrop exactly at visibility 0.
     shader
       ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
-      ..setFloat(54, softensInShader ? 1 : 0);
+      ..setFloat(54, softensInShader ? 1 : 0)
+      // Float index 63, uPassOpacity: full strength outside the frost-mix
+      // diffused pass, which rewrites it per filter.
+      ..setFloat(63, 1);
   }
 
   /// Largest frost, in device pixels, folded into the final pass instead of
@@ -624,14 +627,25 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   static const double shaderSofteningMaxDeviceSigma = 1.25;
 
   /// Whether the frost is small enough for the final pass's softening kernel.
+  /// The frost mix handles every frost, so it suppresses the kernel.
   bool get softensInShader {
     final frost = _frostSigma;
-    return frost > 0 &&
+    return frostMix == null &&
+        frost > 0 &&
         frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
   }
 
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
   double get blurPassSigma => softensInShader ? 0 : _frostSigma;
+
+  /// Frost-mix weight of the diffused pass, or `null` for the single-pass
+  /// path. The composited result is `(1 - m) * sharp + m * blurred` with
+  /// `m = settings.effectiveFrostMix`.
+  double? get frostMix {
+    final mix = settings.effectiveFrostMix;
+    if (mix >= 1 || _frostSigma <= 0) return null;
+    return mix;
+  }
 
   double get _frostSigma => settings.effectiveFrost;
 
@@ -1072,6 +1086,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   (double, double, double, double, double, double)? _coordinateMapping;
   Rect? _backdropBounds;
+  // The frost-mix sharp pass's captured rect; tracked alongside
+  // [_backdropBounds] so a clip change that leaves the intersected bounds
+  // unchanged still rebuilds pass A's uniforms.
+  Rect? _sharpBackdropBounds;
 
   /// Layer-local rect the native filter captures backdrop for, or `null`
   /// when it is unbounded. Refraction mirrors samples that would leave it:
@@ -1103,10 +1121,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   bool syncCoordinateMapping() {
     final mapping = _currentCoordinateMapping();
     final backdropBounds = backdropSampleBounds;
+    final sharpBounds = frostMix != null ? _filterClip : null;
     final changed =
-        mapping != _coordinateMapping || backdropBounds != _backdropBounds;
+        mapping != _coordinateMapping ||
+        backdropBounds != _backdropBounds ||
+        sharpBounds != _sharpBackdropBounds;
     _coordinateMapping = mapping;
     _backdropBounds = backdropBounds;
+    _sharpBackdropBounds = sharpBounds;
     if (changed) _shaderInputsChanged = true;
     _writeCoordinateMapping(renderShader, mapping, backdropBounds);
     return changed;
@@ -1157,6 +1179,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   // MARK: Native filter
 
   final _shaderHandle = LayerHandle<BackdropFilterLayer>();
+  // Frost mix: the sharp shader pass composited under the diffused one. Both
+  // share one backdrop snapshot through [_frostMixKey].
+  final _sharpShaderHandle = LayerHandle<BackdropFilterLayer>();
+  BackdropKey? _frostMixKey;
   final _clipRectLayerHandle = LayerHandle<ClipRectLayer>();
 
   @visibleForTesting
@@ -1189,12 +1215,61 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   // retained clips between this layer and its shapes, and the clips above
   // this layer up to its pass. The texture is transparent outside it.
   ImageFilter? _cachedFilter;
+  ImageFilter? _cachedSharpFilter;
+  double? _cachedFrostMix;
 
   ImageFilter _updateShaderFilter() {
     final inputsChanged = takeShaderInputsChanged();
-    if (_cachedFilter != null && !inputsChanged) return _cachedFilter!;
-    final shader = ImageFilter.shader(renderShader);
+    final mix = frostMix;
+    if (_cachedFilter != null && !inputsChanged && mix == _cachedFrostMix) {
+      return _cachedFilter!;
+    }
     final frostSigma = blurPassSigma;
+    if (mix != null) {
+      // Two filters over one shared backdrop snapshot: the sharp pass
+      // refracts the unblurred backdrop opaquely, the diffused pass blurs it
+      // at the frost sigma and composites over it at weight `mix`. The
+      // engine copies the shader's uniforms into the native filter lazily on
+      // first use, so the sharp filter's snapshot is forced (below) before
+      // the diffused pass's uniforms are written.
+      final shader = renderShader;
+      final mapping = _coordinateMapping ?? _currentCoordinateMapping();
+      shader
+        ..setFloat(53, 0)
+        ..setFloat(54, 0)
+        ..setFloat(63, 1);
+      _writeCoordinateMapping(shader, mapping, _filterClip);
+      final sharpFilter = ImageFilter.shader(shader);
+      // dart:ui builds the native filter, and copies the uniforms, lazily on
+      // first use; operator == forces it now, before the uniforms change.
+      // ignore: unnecessary_statements, no_self_comparisons
+      sharpFilter == sharpFilter;
+      shader
+        ..setFloat(53, 1)
+        ..setFloat(54, 0)
+        ..setFloat(63, mix);
+      _writeCoordinateMapping(shader, mapping, backdropSampleBounds);
+      _cachedSharpFilter = sharpFilter;
+      _cachedFilter = ImageFilter.compose(
+        inner: ImageFilter.blur(
+          tileMode: TileMode.mirror,
+          sigmaX: frostSigma,
+          sigmaY: frostSigma,
+        ),
+        outer: ImageFilter.shader(shader),
+      );
+      _cachedFrostMix = mix;
+      return _cachedFilter!;
+    }
+    _cachedSharpFilter = null;
+    final activeShader = renderShader;
+    // A previous frost-mix build may have left the shared shader at the
+    // diffused pass's uniforms; normalize before snapshotting.
+    activeShader
+      ..setFloat(53, frostSigma > 0 ? 1 : 0)
+      ..setFloat(54, softensInShader ? 1 : 0)
+      ..setFloat(63, 1);
+    final shader = ImageFilter.shader(activeShader);
     final filter = frostSigma > 0
         ? ImageFilter.compose(
             inner: ImageFilter.blur(
@@ -1206,6 +1281,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           )
         : shader;
     _cachedFilter = filter;
+    _cachedFrostMix = null;
     return filter;
   }
 
@@ -1220,14 +1296,42 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (drawableEmpty) {
       _shaderHandle.layer?.remove();
       _shaderHandle.layer = null;
+      _sharpShaderHandle.layer?.remove();
+      _sharpShaderHandle.layer = null;
       _cachedFilter = null;
+      _cachedSharpFilter = null;
+      _cachedFrostMix = null;
     } else {
       syncCoordinateMapping();
+      final filter = _updateShaderFilter();
+      final sharpFilter = _cachedSharpFilter;
+      // Both frost-mix passes share one backdrop key so Impeller captures
+      // the backdrop once and the diffused pass reads the original backdrop,
+      // not the sharp pass's output.
+      final key = sharpFilter != null
+          ? (backdropKey ?? (_frostMixKey ??= BackdropKey()))
+          : backdropKey;
       final shader = (_shaderHandle.layer ??= BackdropFilterLayer())
-        ..filter = _updateShaderFilter()
-        ..backdropKey = backdropKey;
+        ..filter = filter
+        ..backdropKey = key;
+      BackdropFilterLayer? sharp;
+      if (sharpFilter != null) {
+        sharp = (_sharpShaderHandle.layer ??= BackdropFilterLayer())
+          ..filter = sharpFilter
+          ..backdropKey = key;
+      } else {
+        _sharpShaderHandle.layer?.remove();
+        _sharpShaderHandle.layer = null;
+      }
       if (_clipRectLayerHandle.layer case final clip?) {
-        if (!identical(shader.parent, clip)) {
+        if (sharp != null) {
+          // The sharp pass must stay behind the diffused one.
+          shader.remove();
+          sharp.remove();
+          clip
+            ..append(sharp)
+            ..append(shader);
+        } else if (!identical(shader.parent, clip)) {
           shader.remove();
           clip.append(shader);
         }
@@ -1243,15 +1347,19 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   ) {
     if (!attached) return;
     // The engine snapshots this shader's uniforms into the native image
-    // filter at creation, so the composed filter can only be reused while
-    // every snapshotted input is unchanged. Repaints with identical shader
-    // inputs (for example a static layer invalidated by foreground content)
-    // skip all Dart and native filter allocation.
+    // filter on its first use, so the composed filter can only be reused
+    // while every snapshotted input is unchanged. Repaints with identical
+    // shader inputs (for example a static layer invalidated by foreground
+    // content) skip all Dart and native filter allocation.
     final filterBounds = _syncMaterialFilter(materialBounds, offset);
     final shaderLayer = _shaderHandle.layer;
+    final sharpLayer = _sharpShaderHandle.layer;
     assert(() {
       if (!drawableEmpty && shaderLayer != null) {
-        debugRegisterBackdropCapture(this, backdropKey);
+        debugRegisterBackdropCapture(
+          this,
+          sharpLayer != null ? (backdropKey ?? _frostMixKey) : backdropKey,
+        );
       }
       return true;
     }(), 'Count independent backdrop captures in debug builds.');
@@ -1262,6 +1370,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       filterBounds,
       (context, offset) {
         if (drawableEmpty) return;
+        if (sharpLayer != null) {
+          context.pushLayer(sharpLayer, (context, offset) {}, offset);
+        }
         context.pushLayer(shaderLayer!, (context, offset) {}, offset);
       },
       oldLayer: _clipRectLayerHandle.layer,
@@ -1271,8 +1382,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// Drops native backdrop-filter state while this sample is idle.
   void _releaseCompositorFilter() {
     _shaderHandle.layer = null;
+    _sharpShaderHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     _cachedFilter = null;
+    _cachedSharpFilter = null;
+    _cachedFrostMix = null;
   }
 
   // MARK: Compositing
@@ -1297,6 +1411,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     }
     if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
       _shaderHandle.layer?.filter = _updateShaderFilter();
+      if (_cachedSharpFilter case final sharpFilter?) {
+        _sharpShaderHandle.layer?.filter = sharpFilter;
+      }
     }
   }
 
@@ -1313,6 +1430,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           hasReusableGeometry &&
           _shaderHandle.layer != null) {
         _shaderHandle.layer!.filter = _updateShaderFilter();
+        if (_cachedSharpFilter case final sharpFilter?) {
+          _sharpShaderHandle.layer?.filter = sharpFilter;
+        }
       } else {
         markNeedsPaint();
       }
@@ -1351,8 +1471,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @override
   void dispose() {
     _shaderHandle.layer = null;
+    _sharpShaderHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     _cachedFilter = null;
+    _cachedSharpFilter = null;
+    _cachedFrostMix = null;
     _clearGeometryImage();
     _gpuGeometryRenderer = null;
     super.dispose();

@@ -24,7 +24,8 @@ class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
-    this.frost = 2.0,
+    this.frost = 12.0,
+    this.frostMix = 0.65,
     this.dispersion = 0.0,
     this.highlight = 1.0,
     this.contourStrength = 0.43,
@@ -45,6 +46,7 @@ class LiquidGlassSettings with Equatable {
           json['refractionFitsShape'] as bool? ?? defaults.refractionFitsShape,
       backdropShrink: number('backdropShrink', defaults.backdropShrink),
       frost: number('frost', defaults.frost),
+      frostMix: number('frostMix', defaults.frostMix),
       dispersion: number('dispersion', defaults.dispersion),
       highlight: number('highlight', defaults.highlight),
       contourStrength: number('contourStrength', defaults.contourStrength),
@@ -73,12 +75,14 @@ class LiquidGlassSettings with Equatable {
   /// rim, fitted on the Reduce Motion off references. These are the defaults
   /// of the unnamed constructor.
   ///
-  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  /// [frost] stays `12` at every slider position; [ios27FrostMix] maps the
+  /// slider to the diffusion weight instead. Pass [frost] to override.
   factory LiquidGlassSettings.ios27ToolbarLight({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
     frost: frost ?? ios27RegularFrost(tintAmount),
+    frostMix: ios27FrostMix(tintAmount),
     tintAmount: tintAmount,
   );
 
@@ -87,12 +91,14 @@ class LiquidGlassSettings with Equatable {
   /// The glint is dimmed; the border is stronger and
   /// vanishes entirely where the normal faces the light axis.
   ///
-  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  /// [frost] stays `12` at every slider position; [ios27FrostMix] maps the
+  /// slider to the diffusion weight instead. Pass [frost] to override.
   factory LiquidGlassSettings.ios27ToolbarDark({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
     frost: frost ?? ios27RegularFrost(tintAmount),
+    frostMix: ios27FrostMix(tintAmount),
     highlight: 0.8,
     contourStrength: 0.88,
     contourDirectionality: 1,
@@ -104,21 +110,19 @@ class LiquidGlassSettings with Equatable {
   /// Clear glass has the same glint line and angular falloff as the toolbar;
   /// its brighter glint comes from its color model. The border exists only
   /// where the normal is perpendicular to the light axis, and there is no
-  /// inner shadow. The Liquid Glass slider only blurs clear glass, so [frost]
-  /// defaults to [ios27ClearFrost] for [tintAmount]. Pair it with
-  /// [LiquidGlassAppearance.ios27Clear].
+  /// inner shadow. The Liquid Glass slider only changes clear glass's
+  /// diffusion, so [frostMix] follows [ios27FrostMix] for [tintAmount] while
+  /// [frost] stays `12`. Pair it with [LiquidGlassAppearance.ios27Clear].
   ///
-  /// The lens is the full 20 pt / 60 pt bevel on every shape. At slider 0
-  /// the blur is 0.35 pt, which up to about 3.5x device pixel ratio stays
-  /// within the renderer's 1.25 device-pixel in-pass kernel and so costs no
-  /// blur pass. Pass [frost] to override, for example `frost: 0` for
-  /// unsoftened glass.
+  /// The lens is the full 20 pt / 60 pt bevel on every shape. Pass [frost]
+  /// to override the blur, for example `frost: 0` for unsoftened glass.
   factory LiquidGlassSettings.ios27Clear({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
     refractionFitsShape: false,
     frost: frost ?? ios27ClearFrost(tintAmount),
+    frostMix: ios27FrostMix(tintAmount),
     contourStrength: 0.36,
     contourDirectionality: 1,
     bevelShadowStrength: 0,
@@ -145,36 +149,33 @@ class LiquidGlassSettings with Equatable {
   /// buttons and toolbars built from it), in logical pixels, for the Settings
   /// Liquid Glass slider position [tintAmount] (`0` Clear, `1` Tinted).
   ///
-  /// Apple keeps part of the backdrop with about 1.5 pt of blur and mixes the
-  /// rest toward a fully diffused face; the slider only moves that mix. A
-  /// single blur cannot mix, so this is the blur whose rendered detail best
-  /// matches Apple's at toolbar size, light and dark: 2, 6.1 and 16.6 pt at
-  /// 0, 0.5 and 1, growing at a slightly faster exponential rate up to the
-  /// Settings middle tick than beyond it. Apple diffuses larger glass more
-  /// and smaller glass less.
-  static double ios27RegularFrost(double tintAmount) {
-    final amount = tintAmount.clamp(0.0, 1.0);
-    return 2 *
-        math.exp(
-          2.23 * math.min(amount, 0.5) + 2 * math.max(amount - 0.5, 0.0),
-        );
-  }
+  /// The slider no longer changes sigma: every iOS 27 preset blurs the
+  /// backdrop at the fixed `12` pt constructor default and [ios27FrostMix]
+  /// moves the diffusion weight instead, so this always returns `12`. Kept
+  /// for source compatibility with callers that pass it to [frost].
+  static double ios27RegularFrost(double tintAmount) =>
+      const LiquidGlassSettings().frost;
 
   /// Backdrop blur of iOS 27 `.clear` glass, in logical pixels, for the
   /// Settings Liquid Glass slider position [tintAmount] (`0` Clear, `1`
   /// Tinted).
   ///
-  /// Clear glass has no wash or tint at any position; the slider only
-  /// blurs. The blur grows exponentially at one rate up to the Settings
-  /// middle tick and at twice that rate beyond it: 0.35, 1.28 and 16.4 pt at
-  /// 0, 0.5 and 1.
-  static double ios27ClearFrost(double tintAmount) {
-    final amount = tintAmount.clamp(0.0, 1.0);
-    return 0.35 *
-        math.exp(
-          2.6 * math.min(amount, 0.5) + 5.1 * math.max(amount - 0.5, 0.0),
-        );
-  }
+  /// Like [ios27RegularFrost] this is the fixed `12` pt default at every
+  /// position; [ios27FrostMix] carries the slider instead. Kept for source
+  /// compatibility.
+  static double ios27ClearFrost(double tintAmount) =>
+      const LiquidGlassSettings().frost;
+
+  /// Diffusion weight of iOS 27 glass for the Settings Liquid Glass slider
+  /// position [tintAmount] (`0` Clear, `1` Tinted).
+  ///
+  /// The slider moves [frostMix] linearly from `0.65` at Clear to `1` at
+  /// Tinted while the blur sigma stays fixed: `0.65` composites about two thirds
+  /// of the `12` pt blurred pass over an unblurred, refracted pass so clear
+  /// glass keeps its detail. The mapping is provisional, not fitted to
+  /// Apple's captures.
+  static double ios27FrostMix(double tintAmount) =>
+      0.65 + 0.35 * tintAmount.clamp(0.0, 1.0);
 
   /// Returns the material settings supplied by the nearest glass layer.
   static LiquidGlassSettings of(BuildContext context) {
@@ -231,9 +232,20 @@ class LiquidGlassSettings with Equatable {
 
   /// Backdrop blur sigma in logical pixels.
   ///
-  /// The value is absolute and does not change with the material's size.
-  /// The default is [ios27RegularFrost] at slider position `0`.
+  /// The value is absolute and does not change with the material's size or
+  /// with [tintAmount]: the iOS 27 presets keep it at the fixed `12` default
+  /// and move [frostMix] instead. It is the blur radius of the diffused
+  /// pass, which a [frostMix] below `1` composites over the sharp pass.
   final double frost;
+
+  /// Weight of the blurred backdrop in the glass mix, from `0` to `1`.
+  ///
+  /// `1` is the classic single blurred pass. Lower values composite the
+  /// blurred pass at this weight over an unblurred, refracted pass of the
+  /// same glass, so refraction and material never fade — only the blur
+  /// does. The default `0.65` is the iOS 27 Clear slider position;
+  /// [ios27FrostMix] maps the slider to `1` at Tinted.
+  final double frostMix;
 
   /// Separation of the color channels in the refracted edge.
   ///
@@ -277,9 +289,10 @@ class LiquidGlassSettings with Equatable {
   /// Apps set this themselves; the renderer does not read the system value.
   /// The slider makes the iOS 27 neutral wash more opaque and strengthens the
   /// dark border; the glint is unchanged, and the direct color model ignores
-  /// it. It does not change [frost]: the iOS 27 presets derive their blur
-  /// from the same position ([ios27RegularFrost], [ios27ClearFrost]). It is
-  /// one uniform per layer and adds no per-pixel work.
+  /// it. It does not change [frost]: the iOS 27 presets keep the blur at its
+  /// fixed sigma and derive their diffusion weight [frostMix] from the same
+  /// position ([ios27FrostMix]). It is one uniform per layer and adds no
+  /// per-pixel work.
   final double tintAmount;
 
   /// Effective bevel width; never negative.
@@ -296,6 +309,9 @@ class LiquidGlassSettings with Equatable {
 
   /// Effective blur sigma; never negative.
   double get effectiveFrost => math.max(0, frost);
+
+  /// Effective blur weight, clamped to `0` to `1`.
+  double get effectiveFrostMix => frostMix.clamp(0.0, 1.0);
 
   /// Shared displacement codec scale for the geometry and final passes.
   /// [refractionAmount] is the exact peak of the profile, so the RGBA8 code
@@ -321,6 +337,7 @@ class LiquidGlassSettings with Equatable {
     bool? refractionFitsShape,
     double? backdropShrink,
     double? frost,
+    double? frostMix,
     double? dispersion,
     double? highlight,
     double? contourStrength,
@@ -333,6 +350,7 @@ class LiquidGlassSettings with Equatable {
     refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
     backdropShrink: backdropShrink ?? this.backdropShrink,
     frost: frost ?? this.frost,
+    frostMix: frostMix ?? this.frostMix,
     dispersion: dispersion ?? this.dispersion,
     highlight: highlight ?? this.highlight,
     contourStrength: contourStrength ?? this.contourStrength,
@@ -348,6 +366,7 @@ class LiquidGlassSettings with Equatable {
     'refractionFitsShape': refractionFitsShape,
     'backdropShrink': backdropShrink,
     'frost': frost,
+    'frostMix': frostMix,
     'dispersion': dispersion,
     'highlight': highlight,
     'contourStrength': contourStrength,
@@ -363,6 +382,7 @@ class LiquidGlassSettings with Equatable {
     refractionFitsShape,
     backdropShrink,
     frost,
+    frostMix,
     dispersion,
     highlight,
     contourStrength,

@@ -131,6 +131,15 @@ List<double> fakeGlassFaceMatrix({
   return result..addAll([0, 0, 0, opacity.clamp(0.0, 1.0), 0]);
 }
 
+/// The single blur sigma fake glass uses to approximate the frost mix.
+///
+/// Real glass composites the blurred pass at [LiquidGlassSettings.frostMix]
+/// weight over a sharp pass. Fake glass instead keeps one blur and scales its
+/// sigma by the mix to approximate the detail loss. `0` means no blur at all.
+@internal
+double fakeGlassBlurSigma(LiquidGlassSettings settings) =>
+    settings.effectiveFrost * settings.effectiveFrostMix;
+
 /// Builds the backdrop-only portion shared by standalone and consolidated
 /// fake glass. Tint remains in the analytic surface pass so contour
 /// transmittance can treat tint and backdrop energy independently.
@@ -142,7 +151,7 @@ ImageFilter? fakeGlassBackdropFilter(
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
-  final frost = settings.effectiveFrost;
+  final frost = fakeGlassBlurSigma(settings);
   final blur = frost != 0
       ? ImageFilter.blur(
           sigmaX: frost,

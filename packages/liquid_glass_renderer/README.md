@@ -192,7 +192,7 @@ layer's `defaultAppearance` or per shape.
 
 | Material | Settings | Appearance |
 | --- | --- | --- |
-| Regular (`.regular`, `.glass` buttons) | `LiquidGlassSettings(frost: LiquidGlassSettings.ios27RegularFrost(t), tintAmount: t)` | `ios27Regular(brightness:)` |
+| Regular (`.regular`, `.glass` buttons) | `LiquidGlassSettings(frostMix: LiquidGlassSettings.ios27FrostMix(t), tintAmount: t)` | `ios27Regular(brightness:)` |
 | Toolbar | `ios27Toolbar(brightness:)` | `ios27Toolbar(brightness:)` |
 | Clear (`.clear`) | `ios27Clear()` | `ios27Clear()` |
 
@@ -225,19 +225,23 @@ system setting; your app decides.
 LiquidGlassSettings.ios27Toolbar(brightness: brightness, tintAmount: 0.5)
 ```
 
-The slider changes three things, each along a curve fitted to Apple's glass:
+The slider changes three things:
 
 - **Wash.** The iOS 27 color model makes its neutral wash more opaque, and
   dark glass denser.
 - **Border.** The dark border gets stronger.
-- **Blur.** The presets derive `frost` from the slider.
-  `LiquidGlassSettings.ios27RegularFrost(tintAmount)` gives 2, 6.1 and
-  16.6 pt at 0, 0.5 and 1; `ios27ClearFrost(tintAmount)` gives 0.35, 1.28 and
-  16.4 pt, growing at one rate up to the middle tick and at twice that rate
-  beyond it. Pass `frost` to override.
+- **Diffusion.** Every preset blurs the backdrop at the fixed `12` pt sigma
+  and moves `frostMix` instead:
+  `LiquidGlassSettings.ios27FrostMix(tintAmount)` goes linearly from `0.65`
+  at Clear to `1` at Tinted, compositing the blurred pass at that weight
+  over a sharp, still-refracting pass. This mapping is provisional — it is
+  not fitted to Apple's captures. Pass `frost` to override the sigma, or use
+  `copyWith(frostMix: ...)` to override the mix.
 
-The glint doesn't change. The direct color model ignores `tintAmount`, and
-`tintAmount` never changes an explicit `frost`.
+The glint doesn't change. The direct color model ignores `tintAmount`.
+Changing `tintAmount` alone with `copyWith` does not derive a new mix; the
+preset factories and example's tint slider apply the mapping. The example
+preserves a manually edited sigma when its tint slider changes.
 
 ## Tint and color
 
@@ -397,10 +401,12 @@ to test that path.
 
 It keeps frost, tint, the color model, the glint, the border, the inner
 shadow, visibility and exterior shadows. It leaves out refraction,
-`backdropShrink`, `dispersion` and vibrancy.
+`backdropShrink`, `dispersion` and vibrancy. `frostMix` is approximated by
+scaling the single blur sigma by the mix (`frost * frostMix`) instead of
+compositing two passes.
 
-`FakeGlass` is not a cheaper mode: it pays for the same backdrop readback and
-blur as full glass (see below).
+`FakeGlass` still pays for backdrop readback and blur; do not assume it is
+cheaper without measuring the scene.
 
 ## Glass on glass and `LiquidGlassCapture`
 

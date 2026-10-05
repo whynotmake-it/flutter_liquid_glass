@@ -50,6 +50,9 @@ uniform vec4 uBackdropBounds;
 uniform vec2 uGeometryUVScale;
 // Texel size of the material map's texture; the map fills its top-left.
 uniform vec2 uMaterialTextureSize;
+// Scales the whole premultiplied output; the frost-mix diffused pass
+// composites over the sharp pass at this weight. 1.0 otherwise.
+uniform float uPassOpacity;
 
 float uDisplacementScale = uOpticalProps.x;
 float uDispersion = uOpticalProps.y;
@@ -919,5 +922,5 @@ void main() {
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
         uContourColor.rgb * externalContourAlpha;
 
-    fragColor = vec4(premultipliedColor, alpha);
+    fragColor = vec4(premultipliedColor, alpha) * uPassOpacity;
 }

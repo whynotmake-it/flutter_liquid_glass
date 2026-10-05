@@ -38,28 +38,73 @@ void main() {
       );
     });
 
-    test('the Liquid Glass slider keeps edits and owns the blur', () {
-      for (final (style, frost) in [
-        (GlassStyle.clear, LiquidGlassSettings.ios27ClearFrost(1)),
-        (GlassStyle.toolbar, LiquidGlassSettings.ios27RegularFrost(1)),
-        (GlassStyle.regular, LiquidGlassSettings.ios27RegularFrost(1)),
+    test('the Liquid Glass slider keeps edits and owns the mix', () {
+      for (final style in [
+        GlassStyle.clear,
+        GlassStyle.toolbar,
+        GlassStyle.regular,
       ]) {
         final preset = GlassMaterial.preset(
           style: style,
           brightness: Brightness.light,
         );
-        final tinted = preset
-            .withSettings(preset.settings.copyWith(refractionAmount: 12))
-            .withTintAmount(1);
+        final edited = preset.withSettings(
+          preset.settings.copyWith(
+            frost: 7,
+            refractionAmount: 12,
+            frostMix: .2,
+          ),
+        );
+        final tinted = edited.withTintAmount(1);
 
         expect(tinted.edited, isTrue);
-        expect(tinted.settings.refractionAmount, 12);
-        expect(tinted.settings.tintAmount, 1);
+        expect(tinted.settings.frost, 7, reason: '$style');
+        expect(tinted.settings.refractionAmount, 12, reason: '$style');
+        expect(tinted.settings.tintAmount, 1, reason: '$style');
+        expect(tinted.settings.frostMix, 1, reason: '$style');
+
+        final cleared = edited.withTintAmount(0);
+        expect(cleared.settings.frost, 7, reason: '$style');
         expect(
-          tinted.settings.frost,
-          withTestFrost(LiquidGlassSettings(frost: frost)).frost,
+          cleared.settings.frostMix,
+          closeTo(.65, 1e-12),
           reason: '$style',
         );
+        expect(
+          edited.withTintAmount(.5).settings.frostMix,
+          closeTo(.825, 1e-12),
+          reason: '$style',
+        );
+      }
+    });
+
+    test('an unedited material follows the preset at every position', () {
+      for (final style in [
+        GlassStyle.clear,
+        GlassStyle.toolbar,
+        GlassStyle.regular,
+      ]) {
+        final preset = GlassMaterial.preset(
+          style: style,
+          brightness: Brightness.light,
+        );
+        for (final (position, mix) in [
+          (0.0, .65),
+          (.5, .825),
+          (1.0, 1.0),
+        ]) {
+          final moved = preset.withTintAmount(position);
+          expect(
+            moved.settings.frost,
+            withTestFrost(const LiquidGlassSettings()).frost,
+            reason: '$style $position',
+          );
+          expect(
+            moved.settings.frostMix,
+            closeTo(mix, 1e-12),
+            reason: '$style $position',
+          );
+        }
       }
     });
 

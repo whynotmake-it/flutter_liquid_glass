@@ -69,6 +69,14 @@ class MaterialSections extends StatelessWidget {
                   format: _points,
                   onChanged: (v) => edit(settings.copyWith(frost: v)),
                 ),
+                SliderRow(
+                  title: 'Blur Mix',
+                  value: settings.frostMix,
+                  min: 0,
+                  max: 1,
+                  format: (v) => v.toStringAsFixed(2),
+                  onChanged: (v) => edit(settings.copyWith(frostMix: v)),
+                ),
                 SwitchRow(
                   title: 'Fit Small Shapes',
                   value: settings.refractionFitsShape,

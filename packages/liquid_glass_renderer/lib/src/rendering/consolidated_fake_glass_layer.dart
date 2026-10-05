@@ -111,7 +111,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   List<int> _cachedClipClasses = const [];
   bool _repaintAfterCompositingScheduled = false;
 
-  bool get _hasBlur => settings.effectiveFrost > 0;
+  bool get _hasBlur => fakeGlassBlurSigma(settings) > 0;
   bool get _hasColorTransfer =>
       defaultAppearance.saturation != 1 ||
       defaultAppearance.transmissionGamma != 1 ||
@@ -158,7 +158,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   // One extra logical pixel covers the kernel's rounding at any DPR.
   @override
   double effectSamplingReach(Rect material) =>
-      _hasBlur ? settings.effectiveFrost * 3 + 1 : 0.0;
+      _hasBlur ? fakeGlassBlurSigma(settings) * 3 + 1 : 0.0;
 
   @override
   void onSettingsChanged(LiquidGlassSettings old) {

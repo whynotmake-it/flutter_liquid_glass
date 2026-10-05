@@ -30,7 +30,7 @@ enum GlassStyle {
   }) => switch (this) {
     regular => LiquidGlassSettings(
       tintAmount: tintAmount,
-      frost: LiquidGlassSettings.ios27RegularFrost(tintAmount),
+      frostMix: LiquidGlassSettings.ios27FrostMix(tintAmount),
     ),
     toolbar => LiquidGlassSettings.ios27Toolbar(
       brightness: brightness,
