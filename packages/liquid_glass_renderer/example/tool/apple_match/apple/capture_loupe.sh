@@ -38,10 +38,7 @@ export REDUCE_MOTION CAPTURE_SETTLE_SECONDS LOUPE_CAPTURE_DELAY
 : "${LOUPE_TOUCH_X:=201}"
 : "${LOUPE_TOUCH_Y:=620}"
 : "${LOUPE_HOLD_MS:=4500}"
-: "${DEVELOPER_DIR:=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer}"
-export DEVELOPER_DIR
 : "${SCENE_ID:=loupe}"
-export SCENE_ID
 
 # agent-device keys its session state by process cwd; pin every call to one
 # directory and one named session so open/longpress/close always agree.
@@ -52,19 +49,31 @@ SCENE="$ROOT/scenes/$SCENE_ID.json"
 [[ -f "$SCENE" ]] || { echo "Unknown scene: $SCENE_ID" >&2; exit 2; }
 APPEARANCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["appearance"])' "$SCENE")"
 export APPEARANCE
-OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
-API="iOS 27 system text-selection loupe (UITextView long-press)"
-export APPLE_MATCH_API="$API"
-
-if [[ -d "$OUT" && "${FORCE_REFERENCE:-0}" != "1" ]]; then
-  echo "Pinned reference exists at $OUT; set FORCE_REFERENCE=1 to replace it." >&2
-  exit 3
+FINAL_OUT="$ROOT/references/$REFERENCE_SET/$SCENE_ID"
+if [[ -n "${CAPTURE_PROBES:-}" ]]; then
+  echo "CAPTURE_PROBES subsets are not valid Apple references; capture the full scene." >&2
+  exit 2
 fi
-if [[ -d "$OUT" && "${FORCE_REFERENCE:-0}" == "1" ]]; then
-  rm -rf "$OUT"
+CAPTURE_PROBES="$(python3 - "$SCENE" <<'PY'
+import json
+import sys
+
+scene = json.load(open(sys.argv[1]))
+print(" ".join(probe["id"] for probe in scene["probes"]))
+PY
+)"
+export CAPTURE_PROBES SCENE_ID LOUPE_TOUCH_X LOUPE_TOUCH_Y LOUPE_HOLD_MS
+
+if [[ -d "$FINAL_OUT" && "${FORCE_REFERENCE:-0}" != "1" ]]; then
+  echo "Pinned reference exists at $FINAL_OUT; set FORCE_REFERENCE=1 to replace it." >&2
+  exit 3
 fi
 
 "$ROOT/apple/build.sh"
+STAGING_PARENT="$ROOT/references/.staging"
+mkdir -p "$STAGING_PARENT"
+OUT="$(mktemp -d "$STAGING_PARENT/${SCENE_ID}.XXXXXX")"
+TEMP_OUT="$(mktemp -d "$STAGING_PARENT/${SCENE_ID}.loupe-temp.XXXXXX")"
 mkdir -p "$OUT/frames"
 xcrun simctl boot "$IOS_27_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$IOS_27_UDID" -b
@@ -91,11 +100,37 @@ if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
   exit 4
 fi
 if [[ -n "${LIQUID_GLASS_TINT_POSITION:-}" ]]; then
-  bash "$ROOT/apple/set_transparency_slider.sh" "$LIQUID_GLASS_TINT_POSITION" >/dev/null
+  python3 - "$LIQUID_GLASS_TINT_POSITION" <<'PY'
+import sys
+
+position = float(sys.argv[1])
+if not 0.0 <= position <= 1.0:
+    raise SystemExit("slider position must be between 0 and 1")
+PY
+  xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
+    UIViewGlassTintAmount -float "$LIQUID_GLASS_TINT_POSITION"
+  xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
+    UIViewGlassEverEditedInSettings -bool YES
+  : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
+else
+  : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults read com.apple.UIKit UIViewGlassTintAmount}"
 fi
 LIQUID_GLASS_TINT_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.UIKit UIViewGlassTintAmount 2>/dev/null || true)"
-export LIQUID_GLASS_TINT_READBACK
+  com.apple.UIKit UIViewGlassTintAmount)"
+: "${LIQUID_GLASS_TINT_POSITION:=$LIQUID_GLASS_TINT_READBACK}"
+python3 - "$LIQUID_GLASS_TINT_POSITION" "$LIQUID_GLASS_TINT_READBACK" <<'PY'
+import sys
+
+declared = float(sys.argv[1])
+actual = float(sys.argv[2])
+if abs(declared - actual) > 0.001:
+    raise SystemExit(
+        f"declared Liquid Glass Tint Amount {declared} != readback {actual}"
+    )
+PY
+export LIQUID_GLASS_TINT_POSITION LIQUID_GLASS_TINT_READBACK
+: "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
+export LIQUID_GLASS_TINT_CONTROL_METHOD
 xcrun simctl install "$IOS_27_UDID" "$ROOT/apple/build/AppleMatch.app"
 xcrun simctl ui "$IOS_27_UDID" appearance "$APPEARANCE"
 xcrun simctl ui "$IOS_27_UDID" content_size large
@@ -105,44 +140,11 @@ xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.Accessibility \
 cleanup() {
   agent-device close --platform ios --udid "$IOS_27_UDID" \
     --session "$AD_SESSION" >/dev/null 2>&1 || true
+  if [[ -n "${TEMP_OUT:-}" && -d "$TEMP_OUT" ]]; then
+    rm -rf "$TEMP_OUT"
+  fi
 }
 trap cleanup EXIT
-
-# Screenshot the probe background and verify its corner pixel matches the
-# expected probe before any gesture runs (same contract as capture.sh).
-verify_background() {
-  local probe="$1" destination="$2" attempt
-  for attempt in $(seq 1 12); do
-    xcrun simctl io "$IOS_27_UDID" screenshot "$destination"
-    if python3 - "$probe" "$destination" <<'PY'
-import cv2
-import sys
-
-expected = {
-    "A": (0, 0, 255),
-    "B": (0, 0, 255),
-    "C": (0, 0, 0),
-    "D": (255, 255, 255),
-}[sys.argv[1]]
-image = cv2.imread(sys.argv[2], cv2.IMREAD_COLOR)
-pixel = tuple(int(value) for value in image[5, 5])
-probe = sys.argv[1]
-if probe in "AB":
-    valid = pixel == expected
-elif probe == "C":
-    valid = max(pixel) <= 16
-else:
-    valid = min(pixel) >= 239
-raise SystemExit(0 if valid else 1)
-PY
-    then
-      return
-    fi
-    sleep 1
-  done
-  echo "Apple frame never reached expected $probe background." >&2
-  return 5
-}
 
 # True when the loupe region deviates from the un-pressed reference frame.
 loupe_present() {
@@ -162,11 +164,12 @@ raise SystemExit(0 if mean_abs_diff > 1.5 else 1)
 PY
 }
 
-for probe in A B C D; do
+for probe in $CAPTURE_PROBES; do
   xcrun simctl launch --terminate-running-process "$IOS_27_UDID" \
     dev.liquidglass.applematch --args --scene-id "$SCENE_ID" --probe "$probe"
   sleep "$CAPTURE_SETTLE_SECONDS"
-  verify_background "$probe" "$OUT/bg_$probe.png"
+  background="$TEMP_OUT/bg_$probe.png"
+  xcrun simctl io "$IOS_27_UDID" screenshot "$background"
 
   frame=1
   attempt=1
@@ -176,18 +179,18 @@ for probe in A B C D; do
       --launch-args=--scene-id --launch-args="$SCENE_ID" \
       --launch-args=--probe --launch-args="$probe" >/dev/null 2>&1
     sleep "$CAPTURE_SETTLE_SECONDS"
-    verify_background "$probe" "$OUT/bg_$probe.png"
 
     agent-device longpress "$LOUPE_TOUCH_X" "$LOUPE_TOUCH_Y" "$LOUPE_HOLD_MS" \
       --platform ios --udid "$IOS_27_UDID" --session "$AD_SESSION" \
       >/dev/null 2>&1 &
     local_lp_pid=$!
     sleep "$LOUPE_CAPTURE_DELAY"
-    candidate="$OUT/frames/${probe}_${frame}_try${attempt}.png"
+    candidate="$TEMP_OUT/${probe}_${frame}_try${attempt}.png"
     xcrun simctl io "$IOS_27_UDID" screenshot "$candidate"
     wait "$local_lp_pid" || true
 
-    if loupe_present "$candidate" "$OUT/bg_$probe.png"; then
+    if python3 "$ROOT/validate_probe_frame.py" "$SCENE" "$probe" "$candidate" \
+      && loupe_present "$candidate" "$background"; then
       mv "$candidate" "$OUT/frames/${probe}_${frame}.png"
       frame=$((frame + 1))
       attempt=1
@@ -206,8 +209,46 @@ for probe in A B C D; do
     >/dev/null 2>&1 || true
   sleep 0.5
   python3 "$ROOT/compare/median_frames.py" "$OUT/$probe.png" \
-    "$OUT"/frames/"${probe}"_[0-9].png
+    "$OUT"/frames/"${probe}"_*.png
 done
+
+RUNTIME_IDENTIFIER="$(xcrun simctl list devices -j | python3 -c '
+import json
+import sys
+
+devices = json.load(sys.stdin)["devices"]
+print(next(
+    runtime
+    for runtime, runtime_devices in devices.items()
+    for device in runtime_devices
+    if device["udid"] == sys.argv[1]
+))
+' "$IOS_27_UDID")"
+RUNTIME_LABEL="$(xcrun simctl list runtimes -j | python3 -c '
+import json
+import sys
+
+runtime = next(
+    item for item in json.load(sys.stdin)["runtimes"]
+    if item["identifier"] == sys.argv[1]
+)
+print("{} ({})".format(runtime["name"], runtime["buildversion"]))
+' "$RUNTIME_IDENTIFIER")"
+python3 "$ROOT/reference_provenance.py" "$OUT" "$SCENE" \
+  --source "$ROOT/apple/Sources/AppleMatchApp.swift" \
+  --capture-script "$ROOT/apple/capture_loupe.sh" \
+  --write \
+  --runtime "$RUNTIME_LABEL" \
+  --runtime-identifier "$RUNTIME_IDENTIFIER" \
+  --udid "$IOS_27_UDID" \
+  --device "iPhone 17 Pro" \
+  --appearance "$APPEARANCE" \
+  --slider "$LIQUID_GLASS_TINT_POSITION" \
+  --slider-readback "$LIQUID_GLASS_TINT_READBACK" \
+  --slider-method "$LIQUID_GLASS_TINT_CONTROL_METHOD" \
+  --frames "$CAPTURE_FRAMES" \
+  --reduce-motion "$REDUCE_MOTION" \
+  --settle-seconds "$CAPTURE_SETTLE_SECONDS"
 
 python3 - "$OUT/metadata.json" <<'PY'
 import json
@@ -218,39 +259,25 @@ from pathlib import Path
 Path(sys.argv[1]).write_text(
     json.dumps(
         {
-            "runtime": "iOS 27.0 (24A5408d)",
-            "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
-            "udid": os.environ["IOS_27_UDID"],
-            "device": "iPhone 17 Pro",
-            "orientation": "portrait",
-            "appearance": os.environ["APPEARANCE"],
-            "reduceMotion": os.environ["REDUCE_MOTION"] == "1",
-            "captureSettleSeconds": float(os.environ["CAPTURE_SETTLE_SECONDS"]),
+            **json.loads(Path(sys.argv[1]).read_text()),
             "loupeCaptureDelaySeconds": float(os.environ["LOUPE_CAPTURE_DELAY"]),
-            "medianFrameCount": int(os.environ.get("CAPTURE_FRAMES", "3")),
-            "reduceTransparency": False,
-            "liquidGlassTintPosition": (
-                float(os.environ["LIQUID_GLASS_TINT_POSITION"])
-                if os.environ.get("LIQUID_GLASS_TINT_POSITION")
-                else None
-            ),
-            "liquidGlassTintPositionReadback": (
-                float(os.environ["LIQUID_GLASS_TINT_READBACK"])
-                if os.environ.get("LIQUID_GLASS_TINT_READBACK")
-                else None
-            ),
-            "liquidGlassTintControlMethod":
-                "simctl defaults write com.apple.UIKit UIViewGlassTintAmount",
-            "api": os.environ["APPLE_MATCH_API"],
-            "scene": os.environ["SCENE_ID"],
             "touchPoint": [
-                float(os.environ.get("LOUPE_TOUCH_X", "201")),
-                float(os.environ.get("LOUPE_TOUCH_Y", "620")),
+                float(os.environ["LOUPE_TOUCH_X"]),
+                float(os.environ["LOUPE_TOUCH_Y"]),
             ],
         },
         indent=2,
-    )
-    + "\n"
+    ) + "\n"
 )
 PY
-echo "$OUT"
+
+python3 "$ROOT/reference_provenance.py" "$OUT" "$SCENE" \
+  --source "$ROOT/apple/Sources/AppleMatchApp.swift" \
+  --capture-script "$ROOT/apple/capture_loupe.sh"
+
+mkdir -p "$(dirname "$FINAL_OUT")"
+if [[ -d "$FINAL_OUT" ]]; then
+  mv "$FINAL_OUT" "${FINAL_OUT}.replaced-$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+mv "$OUT" "$FINAL_OUT"
+echo "$FINAL_OUT"

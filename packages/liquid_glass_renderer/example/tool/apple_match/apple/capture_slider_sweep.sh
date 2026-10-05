@@ -21,78 +21,113 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${LOUPE_SCENES=loupe loupe_dark}"
 : "${SWEEP_LOG:=$ROOT/references/.staging/slider-sweep.log}"
 export IOS_27_UDID
-mkdir -p "$(dirname "$SWEEP_LOG")"
+mkdir -p "$(dirname "$SWEEP_LOG")" "$ROOT/references/.staging"
 
 log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$SWEEP_LOG"; }
+
+failed_checkpoints=()
+
+validate_reference_for_slider() {
+  python3 - "$ROOT" "$1" "$2" "$3" <<'PY'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+reference = Path(sys.argv[2])
+scene_id = sys.argv[3]
+slider = float(sys.argv[4])
+sys.path.insert(0, str(root))
+import reference_provenance as provenance
+
+metadata = provenance.validate_reference_for_scene(
+    reference, root / "scenes" / f"{scene_id}.json"
+)
+readback = metadata.get("liquidGlassTintPositionReadback")
+if metadata["reduceMotion"] is not False or readback is None:
+    raise SystemExit(1)
+if abs(float(readback) - slider) > 0.001:
+    raise SystemExit(1)
+PY
+}
 
 for slider in $SLIDERS; do
   percent="$(python3 -c 'import sys; print(f"{round(float(sys.argv[1]) * 100):03d}")' "$slider")"
   reference_set="ios27-iphone17pro-reduce-motion-off/slider-$percent"
-  bash "$ROOT/apple/set_transparency_slider.sh" "$slider" >/dev/null || {
+  if ! bash "$ROOT/apple/set_transparency_slider.sh" "$slider" >/dev/null; then
     log "slider=$slider could not be set; skipping checkpoint"
+    failed_checkpoints+=("slider=$slider (slider setting failed; scenes not attempted)")
     continue
-  }
+  fi
+
   for scene in $SCENES; do
     destination="$ROOT/references/$reference_set/$scene"
-    if [[ -d "$destination" ]] && python3 - "$destination" "$slider" <<'PY'
-import json, sys
-from pathlib import Path
-sys.path.insert(0, str(Path(sys.argv[1]).parents[3]))
-import reference_provenance as provenance
-root = Path(sys.argv[1]).parents[3]
-metadata = provenance.validate_reference_for_scene(
-    Path(sys.argv[1]), root / "scenes" / f"{Path(sys.argv[1]).name}.json"
-)
-ok = metadata["reduceMotion"] is False and abs(
-    float(metadata["liquidGlassTintPositionReadback"]) - float(sys.argv[2])
-) <= 0.001
-raise SystemExit(0 if ok else 1)
-PY
-    then
+    if [[ -d "$destination" ]] \
+      && validate_reference_for_slider "$destination" "$scene" "$slider"; then
       log "slider=$slider scene=$scene existing reference validated"
       continue
     fi
+
     force=0
     [[ -d "$destination" ]] && force=1
     captured=0
+    checkpoint="slider=$slider scene=$scene"
     for attempt in 1 2 3; do
-      if REDUCE_MOTION=0 SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
+      log "slider=$slider scene=$scene attempt=$attempt"
+      if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
         LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
-        bash "$ROOT/apple/capture.sh" >"$ROOT/references/.staging/$scene-$percent.log" 2>&1
-      then
+        bash "$ROOT/apple/capture.sh" "$scene" "$reference_set" \
+          >"$ROOT/references/.staging/$scene-$percent.log" 2>&1 \
+        && validate_reference_for_slider "$destination" "$scene" "$slider"; then
         captured=1
         break
       fi
       force=1
     done
-    log "slider=$slider scene=$scene $([[ $captured == 1 ]] && echo captured || echo FAILED)"
+    if [[ "$captured" == "1" ]]; then
+      log "slider=$slider scene=$scene captured"
+    else
+      log "slider=$slider scene=$scene FAILED"
+      failed_checkpoints+=("$checkpoint")
+    fi
   done
+
   for scene in $LOUPE_SCENES; do
     destination="$ROOT/references/$reference_set/$scene"
-    if [[ -f "$destination/metadata.json" ]] && python3 - "$destination/metadata.json" "$slider" <<'PY'
-import json, sys
-metadata = json.load(open(sys.argv[1]))
-readback = metadata.get("liquidGlassTintPositionReadback")
-ok = metadata["reduceMotion"] is False and readback is not None and abs(
-    float(readback) - float(sys.argv[2])
-) <= 0.001
-raise SystemExit(0 if ok else 1)
-PY
-    then
-      log "slider=$slider scene=$scene existing loupe reference validated"
+    if [[ -d "$destination" ]] \
+      && validate_reference_for_slider "$destination" "$scene" "$slider"; then
+      log "slider=$slider loupe scene=$scene existing reference validated"
       continue
     fi
+
+    force=0
+    [[ -d "$destination" ]] && force=1
     captured=0
-    for attempt in 1 2; do
-      if REDUCE_MOTION=0 SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
-        LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE=1 \
-        bash "$ROOT/apple/capture_loupe.sh" >"$ROOT/references/.staging/$scene-$percent.log" 2>&1
-      then
+    checkpoint="slider=$slider loupe scene=$scene"
+    for attempt in 1 2 3; do
+      log "slider=$slider loupe scene=$scene attempt=$attempt"
+      if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
+        LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
+        bash "$ROOT/apple/capture_loupe.sh" "$scene" "$reference_set" \
+          >"$ROOT/references/.staging/loupe-$scene-$percent.log" 2>&1 \
+        && validate_reference_for_slider "$destination" "$scene" "$slider"; then
         captured=1
         break
       fi
+      force=1
     done
-    log "slider=$slider scene=$scene $([[ $captured == 1 ]] && echo captured || echo FAILED)"
+    if [[ "$captured" == "1" ]]; then
+      log "slider=$slider loupe scene=$scene captured"
+    else
+      log "slider=$slider loupe scene=$scene FAILED"
+      failed_checkpoints+=("$checkpoint")
+    fi
   done
 done
+
+if ((${#failed_checkpoints[@]})); then
+  printf 'Failed checkpoints:\n' >&2
+  printf ' - %s\n' "${failed_checkpoints[@]}" >&2
+  exit 1
+fi
+
 log "sweep done"
