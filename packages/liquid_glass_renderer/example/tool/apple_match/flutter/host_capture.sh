@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${SCENE_FILE:=$ROOT/scenes/toolbar_capsule.json}"
 : "${CANDIDATE_OUT:=$ROOT/out/host-candidates/baseline}"
 : "${FLUTTER_BIN:=$HOME/fvm/versions/3.47.1/bin/flutter}"
-: "${CAPTURE_PROBES:=A B C D}"
+: "${CAPTURE_PROBES:=$(python3 -c 'import json,sys; print(" ".join(p["id"] for p in json.load(open(sys.argv[1]))["probes"]))' "$SCENE_FILE")}"
 : "${CAPTURE_DPR:=}"
 : "${HOST_CAPTURE_FAKE:=false}"
 

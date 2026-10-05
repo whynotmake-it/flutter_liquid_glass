@@ -123,4 +123,78 @@ void main() {
     expect(settings.dispersion, -0.06);
     expect(appearance.saturation, 1.2);
   });
+
+  MatchScene loadScene(String id) => MatchScene.fromJson(
+    jsonDecode(File('../scenes/$id.json').readAsStringSync())!
+        as Map<String, Object?>,
+  );
+
+  test('settings keys match settings/contract.json', () {
+    final contract =
+        jsonDecode(File('../settings/contract.json').readAsStringSync())!
+            as Map<String, Object?>;
+    final keys = {
+      for (final entry in contract.entries)
+        if (entry.key != r'$comment') ...(entry.value! as List).cast<String>(),
+    };
+    expect(matchSettingsKeys, keys);
+  });
+
+  test('rejects settings the renderer does not read', () {
+    expect(
+      () => checkMatchSettings({'frost': 1, 'contourWidth': 1}),
+      throwsArgumentError,
+    );
+    checkMatchSettings({'frost': 1, 'blend': 30});
+  });
+
+  testWidgets('merge scenes blend both shapes in one group', (tester) async {
+    final scene = loadScene('merge_rect_circle');
+    expect(scene.mergeShape!.kind, 'circle');
+    expect(scene.mergeShape!.rect, const Rect.fromLTWH(236, 402, 70, 70));
+    expect(scene.containerSpacing, 40);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: MatchSceneView(scene: scene, probe: 'A', settings: const {}),
+      ),
+    );
+    final group = tester.widget<LiquidGlassBlendGroup>(
+      find.byType(LiquidGlassBlendGroup),
+    );
+    expect(group.blend, 40);
+    final shapes = tester
+        .widgetList<LiquidGlass>(find.byType(LiquidGlass))
+        .map((glass) => glass.shape.runtimeType)
+        .toList();
+    expect(shapes, [LiquidRoundedSuperellipse, LiquidOval]);
+  });
+
+  test('clear and tinted scenes default their appearance from the scene', () {
+    final clear = loadScene('material_card_clear');
+    expect(clear.glassVariant, 'clear');
+    expect(
+      matchGlassAppearance(const {}, clear).colorModel,
+      const LiquidGlassColorModel.ios27Clear(),
+    );
+    expect(
+      () => matchGlassAppearance(const {'colorModel': 'ios27Light'}, clear),
+      throwsArgumentError,
+    );
+
+    final tinted = loadScene('material_tint_blue');
+    expect(tinted.glassTint, const Color(0xFF007AFF));
+    expect(
+      matchGlassAppearance(const {}, tinted).tint,
+      const Color(0xFF007AFF),
+    );
+    expect(
+      matchGlassAppearance(const {'tintAlpha': 0.4}, tinted).tint,
+      const Color(0xFF007AFF).withValues(alpha: 0.4),
+    );
+    expect(
+      () => matchGlassAppearance(const {'tintRed': 255}, tinted),
+      throwsArgumentError,
+    );
+  });
 }

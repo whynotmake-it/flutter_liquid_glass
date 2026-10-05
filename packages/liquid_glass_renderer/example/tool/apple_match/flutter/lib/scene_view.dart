@@ -12,22 +12,87 @@ import 'scene.dart';
 LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) =>
     LiquidGlassSettings.fromJson(settings);
 
+/// Every settings key the harness reads; `settings/contract.json` mirrors it.
+const matchSettingsKeys = {
+  // LiquidGlassSettings.fromJson
+  'refractionHeight', 'refractionAmount', 'refractionFitsShape',
+  'backdropShrink', 'frost', 'dispersion', 'highlight', 'contourStrength',
+  'contourDirectionality', 'bevelShadowStrength', 'tintAmount',
+  // matchGlassAppearance
+  'tint', 'tintRed', 'tintGreen', 'tintBlue', 'tintAlpha', 'saturation',
+  'transmissionGamma', 'vibrancy', 'colorModel',
+  // matchGlassShadows
+  'contactShadowAlpha', 'contactShadowLuminance', 'contactShadowOffsetX',
+  'contactShadowOffsetY', 'contactShadowBlur', 'contactShadowSpread',
+  'shadowAlpha', 'shadowLuminance', 'shadowOffsetX', 'shadowOffsetY',
+  'shadowBlur', 'shadowSpread',
+  // MatchSceneView geometry
+  'shapeWidth', 'shapeHeight', 'shapeOffsetX', 'shapeOffsetY', 'cornerRadius',
+  'shapeProfile',
+  // merge_pair scenes
+  'blend',
+};
+
+/// Rejects settings keys the harness would silently ignore.
+void checkMatchSettings(Map<String, Object?> settings) {
+  final unknown = settings.keys.toSet().difference(matchSettingsKeys);
+  if (unknown.isNotEmpty) {
+    throw ArgumentError.value(
+      (unknown.toList()..sort()).join(', '),
+      'settings',
+      'not read by the renderer',
+    );
+  }
+}
+
 /// Maps color-adjacent harness controls onto per-shape appearance.
-LiquidGlassAppearance matchGlassAppearance(Map<String, Object?> settings) {
+///
+/// The [scene]'s `glassTint` and `glassVariant` supply the defaults, so a
+/// tinted or clear scene renders as tinted or clear glass unless the settings
+/// fit them. Settings that contradict the scene (another tint hue, or a
+/// regular-material color model on a clear scene) throw instead of silently
+/// rendering a different look than the Apple reference.
+LiquidGlassAppearance matchGlassAppearance(
+  Map<String, Object?> settings, [
+  MatchScene? scene,
+]) {
   double number(String key, double fallback) =>
       (settings[key] as num?)?.toDouble() ?? fallback;
-  Color color(String prefix, Color fallback) => Color.fromRGBO(
-    number('${prefix}Red', fallback.r * 255).round(),
-    number('${prefix}Green', fallback.g * 255).round(),
-    number('${prefix}Blue', fallback.b * 255).round(),
-    number('${prefix}Alpha', fallback.a),
-  );
   const defaults = LiquidGlassAppearance();
+  final sceneTint = scene?.glassTint;
+  final fallbackTint = sceneTint ?? defaults.tint;
   final tint = settings['tint'] is num
       ? Color((settings['tint']! as num).toInt())
-      : color('tint', defaults.tint);
+      : Color.fromRGBO(
+          number('tintRed', fallbackTint.r * 255).round(),
+          number('tintGreen', fallbackTint.g * 255).round(),
+          number('tintBlue', fallbackTint.b * 255).round(),
+          number('tintAlpha', fallbackTint.a),
+        );
+  if (sceneTint != null &&
+      tint.withValues(alpha: 1) != sceneTint.withValues(alpha: 1)) {
+    throw ArgumentError.value(
+      tint,
+      'settings tint',
+      'disagrees with the scene glassTint $sceneTint',
+    );
+  }
+  final clear = scene?.glassVariant == 'clear';
+  final modelName = settings['colorModel'];
+  if (scene != null &&
+      (clear
+          ? modelName == 'ios27Light' || modelName == 'ios27Dark'
+          : modelName == 'ios27Clear')) {
+    throw ArgumentError.value(
+      modelName,
+      'settings colorModel',
+      'disagrees with the scene glassVariant ${scene.glassVariant}',
+    );
+  }
   final colorModel = settings.containsKey('colorModel')
-      ? LiquidGlassColorModel.fromJson(settings['colorModel'])
+      ? LiquidGlassColorModel.fromJson(modelName)
+      : clear
+      ? const LiquidGlassColorModel.ios27Clear()
       : defaults.colorModel;
   return LiquidGlassAppearance(
     tint: tint,
@@ -100,6 +165,7 @@ class MatchSceneView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    checkMatchSettings(settings);
     final background = scene.probes[probe]!;
     final shapeWidth = _number('shapeWidth', scene.shapeRect.width);
     final shapeHeight = _number('shapeHeight', scene.shapeRect.height);
@@ -147,7 +213,7 @@ class MatchSceneView extends StatelessWidget {
               rect: shapeRect,
               cornerRadius: cornerRadius,
               settings: matchGlassSettings(settings),
-              appearance: matchGlassAppearance(settings),
+              appearance: matchGlassAppearance(settings, scene),
               shadows: matchGlassShadows(settings),
             )
           else if (scene.profile == 'tab_bar_holdout')
@@ -155,9 +221,35 @@ class MatchSceneView extends StatelessWidget {
               rect: shapeRect,
               cornerRadius: cornerRadius,
               settings: matchGlassSettings(settings),
-              appearance: matchGlassAppearance(settings),
+              appearance: matchGlassAppearance(settings, scene),
               shadows: matchGlassShadows(settings),
               probe: probe,
+            )
+          else if (scene.mergeShape case final mergeShape?)
+            Positioned.fill(
+              child: _MatchMergePair(
+                fake: fake,
+                settings: matchGlassSettings(settings),
+                appearance: matchGlassAppearance(settings, scene),
+                shadows: matchGlassShadows(settings),
+                // SwiftUI's container spacing and the blend group's blend are
+                // both the distance at which shapes start to merge.
+                blend: _number('blend', scene.containerSpacing ?? 20),
+                shapes: [
+                  (
+                    shapeRect,
+                    matchGlassShape(settings, scene.shapeKind, cornerRadius),
+                  ),
+                  (
+                    mergeShape.rect,
+                    matchGlassShape(
+                      settings,
+                      mergeShape.kind,
+                      mergeShape.cornerRadius,
+                    ),
+                  ),
+                ],
+              ),
             )
           else
             Positioned.fromRect(
@@ -165,7 +257,7 @@ class MatchSceneView extends StatelessWidget {
               child: _MatchGlassSurface(
                 fake: fake,
                 settings: matchGlassSettings(settings),
-                appearance: matchGlassAppearance(settings),
+                appearance: matchGlassAppearance(settings, scene),
                 shape: matchGlassShape(settings, scene.shapeKind, cornerRadius),
                 shadows: matchGlassShadows(settings),
               ),
@@ -210,6 +302,51 @@ class _MatchGlassSurface extends StatelessWidget {
           shadows: shadows,
           child: const SizedBox.expand(),
         );
+}
+
+/// A `GlassEffectContainer` pair: both shapes blend in one group.
+///
+/// Settings geometry overrides move only the primary shape; the merge shape
+/// stays at its scene rect.
+class _MatchMergePair extends StatelessWidget {
+  const _MatchMergePair({
+    required this.fake,
+    required this.settings,
+    required this.appearance,
+    required this.shadows,
+    required this.blend,
+    required this.shapes,
+  });
+
+  final bool fake;
+  final LiquidGlassSettings settings;
+  final LiquidGlassAppearance appearance;
+  final List<BoxShadow> shadows;
+  final double blend;
+  final List<(Rect, LiquidShape)> shapes;
+
+  @override
+  Widget build(BuildContext context) => LiquidGlassLayer(
+    settings: settings,
+    fake: fake,
+    child: LiquidGlassBlendGroup(
+      blend: blend,
+      child: Stack(
+        children: [
+          for (final (rect, shape) in shapes)
+            Positioned.fromRect(
+              rect: rect,
+              child: LiquidGlass.grouped(
+                shape: shape,
+                appearance: appearance,
+                shadows: shadows,
+                child: const SizedBox.expand(),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Reproduces the small foreground that the system TabView places inside its
