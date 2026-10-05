@@ -1,0 +1,22 @@
+{
+  "runtime": "iOS 27.0 (24A5408d)",
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "udid": "CB995FE0-3149-46F6-AC6E-A6E82615A896",
+  "device": "iPhone 17 Pro",
+  "orientation": "portrait",
+  "appearance": "dark",
+  "reduceMotion": false,
+  "captureSettleSeconds": 4.0,
+  "loupeCaptureDelaySeconds": 2.5,
+  "medianFrameCount": 3,
+  "reduceTransparency": false,
+  "liquidGlassTintPosition": 0.0,
+  "liquidGlassTintPositionReadback": 0.0,
+  "liquidGlassTintControlMethod": "simctl defaults write com.apple.UIKit UIViewGlassTintAmount",
+  "api": "iOS 27 system text-selection loupe (UITextView long-press)",
+  "scene": "loupe_dark",
+  "touchPoint": [
+    201.0,
+    620.0
+  ]
+}

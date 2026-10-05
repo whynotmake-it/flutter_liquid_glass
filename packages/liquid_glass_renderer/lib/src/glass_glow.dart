@@ -33,7 +33,7 @@ class GlassGlow extends StatelessWidget {
   /// to fully transparent at the edge of the glow.
   final Color glowColor;
 
-  /// The hit test behavior of this gesture listener.
+  /// The hit test behavior of the internal gesture handler.
   ///
   /// Defaults to [HitTestBehavior.opaque].
   final HitTestBehavior hitTestBehavior;
@@ -89,7 +89,7 @@ class GlassGlow extends StatelessWidget {
   }
 }
 
-/// {@template glass_glow}
+/// {@template glass_glow_layer}
 /// Represents a layer that can paint a glowing effect below its child.
 ///
 /// Any child [GlassGlow] will send touch updates to this layer to
@@ -98,7 +98,7 @@ class GlassGlow extends StatelessWidget {
 /// This is similar to how an `InkWell` works with a `Material` widget.
 /// {@endtemplate}
 class GlassGlowLayer extends StatefulWidget {
-  /// {@macro glass_glow}
+  /// {@macro glass_glow_layer}
   const GlassGlowLayer({
     required this.child,
     super.key,
@@ -177,8 +177,8 @@ class GlassGlowLayerState extends State<GlassGlowLayer>
 
   void removeTouch() {
     if (!_dragging) return;
-    _radiusController.motion =
-        _alphaController.motion = const Motion.smoothSpring(snapToEnd: true);
+    _radiusController.motion = _alphaController.motion =
+        const Motion.smoothSpring(snapToEnd: true);
     _dragging = false;
     _offsetController.animateTo(Offset.zero);
     _radiusController.animateTo(10);
@@ -243,12 +243,10 @@ class _RenderGlassGlowLayerWidget extends SingleChildRenderObjectWidget {
 
 class _RenderGlassGlowLayer extends RenderProxyBox {
   _RenderGlassGlowLayer({
-    required double glowRadius,
-    required Color glowColor,
-    required Offset glowOffset,
-  })  : _glowRadius = glowRadius,
-        _glowColor = glowColor,
-        _glowOffset = glowOffset;
+    required this._glowRadius,
+    required this._glowColor,
+    required this._glowOffset,
+  });
 
   double _glowRadius;
   double get glowRadius => _glowRadius;

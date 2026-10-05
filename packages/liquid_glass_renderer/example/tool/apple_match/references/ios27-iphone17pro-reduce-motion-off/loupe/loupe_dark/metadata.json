@@ -1,0 +1,19 @@
+{
+  "runtime": "iOS 27.0 (24A5408d)",
+  "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "udid": "AF1E2F44-34B6-4E7D-BAA6-352DF8F5B173",
+  "device": "iPhone 17 Pro",
+  "orientation": "portrait",
+  "appearance": "dark",
+  "reduceMotion": false,
+  "captureSettleSeconds": 4.0,
+  "loupeCaptureDelaySeconds": 2.5,
+  "medianFrameCount": 3,
+  "reduceTransparency": false,
+  "api": "iOS 27 system text-selection loupe (UITextView long-press)",
+  "scene": "loupe_dark",
+  "touchPoint": [
+    201.0,
+    620.0
+  ]
+}

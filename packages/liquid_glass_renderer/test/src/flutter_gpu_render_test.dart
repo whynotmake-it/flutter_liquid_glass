@@ -1,0 +1,216 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_gpu/gpu.dart' as gpu;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
+  test(
+    'asset renderers share immutable pipeline resources',
+    () async {
+      final first = await FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      final second = await FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      addTearDown(first.dispose);
+      addTearDown(second.dispose);
+
+      expect(
+        identical(first.debugPipelineIdentity, second.debugPipelineIdentity),
+        isTrue,
+      );
+
+      const unusedShape = <double>[
+        1, 8, 8, 0, //
+        1, 0, 0, 1, //
+        8, 8, 1, -1, //
+      ];
+      first.render(
+        width: 16,
+        height: 16,
+        shapeData: unusedShape,
+        numShapes: 1,
+        refractionAmount: 24,
+        refractionHeight: 4,
+        offsetX: 0,
+        offsetY: 0,
+      );
+
+      expect(
+        identical(
+          first.debugHostBufferIdentity,
+          second.debugHostBufferIdentity,
+        ),
+        isTrue,
+      );
+      expect(first.debugHostBufferBlockLength, greaterThan(0));
+      final library = (await gpu.ShaderLibrary.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      ))!;
+      final size = library['GeometryFragment']!
+          .getUniformSlot('GeometryUniforms')
+          .sizeInBytes!;
+      final alignment = gpu.gpuContext.minimumUniformByteAlignment;
+      expect(
+        first.debugHostBufferBlockLength,
+        ((size + alignment - 1) ~/ alignment) * alignment * 32,
+      );
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'geometry renderer buckets dimensions without overwriting older images',
+    () async {
+      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      addTearDown(renderer.dispose);
+
+      ({
+        ui.Image image,
+        int width,
+        int height,
+        int textureWidth,
+        int textureHeight,
+      })
+      render(int size) => renderer.render(
+        width: size,
+        height: size,
+        shapeData: const [
+          1, 40, 30, 8, // Rounded rectangle.
+          1, 0, 0, 1, // Identity inverse affine basis.
+          32, 32, 1, -1, // Center, distance scale, new group marker.
+        ],
+        numShapes: 1,
+        refractionAmount: 24,
+        refractionHeight: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
+
+      final first = render(33);
+      final sameBucket = render(63);
+      final larger = render(65);
+      final smallerAgain = render(32);
+
+      expect((first.width, first.height), (64, 64));
+      expect(identical(first.image, sameBucket.image), isFalse);
+      expect(first.image.debugDisposed, isTrue);
+      expect(sameBucket.image.debugDisposed, isTrue);
+      expect((larger.width, larger.height), (128, 128));
+      expect(identical(first.image, larger.image), isFalse);
+      expect((smallerAgain.width, smallerAgain.height), (64, 64));
+      expect(identical(larger.image, smallerAgain.image), isFalse);
+      expect(larger.image.debugDisposed, isTrue);
+      expect(smallerAgain.image.debugDisposed, isFalse);
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'geometry image keeps asymmetric rows in top-down order',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
+        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+      );
+      addTearDown(renderer.dispose);
+
+      final result = renderer.render(
+        width: 64,
+        height: 64,
+        shapeData: const [
+          1, 20, 20, 0, // Narrow rectangle on the top row.
+          1, 0, 0, 1,
+          32, 16, 1, -1,
+          1, 50, 20, 0, // Wide rectangle on the bottom row.
+          1, 0, 0, 1,
+          32, 48, 1, -1,
+        ],
+        numShapes: 2,
+        refractionAmount: 24,
+        refractionHeight: 10,
+        offsetX: 0,
+        offsetY: 0,
+      );
+      final bytes = await result.image.toByteData();
+      expect(bytes, isNotNull);
+
+      int signedDistanceAt(int x, int y) =>
+          bytes!.getUint8((y * result.width + x) * 4 + 2);
+
+      expect(
+        signedDistanceAt(10, 16),
+        0,
+        reason: 'top row must stay narrow',
+      );
+      expect(
+        signedDistanceAt(10, 48),
+        greaterThan(0),
+        reason: 'bottom row must be wide',
+      );
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'shared host buffer handles more than 32 layer submissions per frame',
+    () async {
+      const shape = <double>[
+        1,
+        12,
+        8,
+        0,
+        1,
+        0,
+        0,
+        1,
+        8,
+        8,
+        1,
+        -1,
+      ];
+      final renderers = await Future.wait(
+        List.generate(
+          40,
+          (_) => FlutterGpuGeometryRenderer.fromAsset(
+            'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+          ),
+        ),
+      );
+      addTearDown(() {
+        for (final renderer in renderers) {
+          renderer.dispose();
+        }
+      });
+
+      ui.Image? finalImage;
+      for (var i = 0; i < renderers.length; i++) {
+        final result = renderers[i].render(
+          width: 16,
+          height: 16,
+          shapeData: shape,
+          numShapes: 1,
+          refractionAmount: 24,
+          refractionHeight: 4,
+          offsetX: i.isEven ? 0 : 1,
+          offsetY: 0,
+        );
+        finalImage = result.image;
+      }
+
+      final bytes = await finalImage!.toByteData();
+      expect(bytes, isNotNull);
+      expect(bytes!.lengthInBytes, greaterThan(0));
+    },
+    skip: expectFallback,
+  );
+}

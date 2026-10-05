@@ -9,8 +9,8 @@ import 'package:motor/motor.dart';
 /// A widget that provides a squash and stretch effect to its child based on
 /// user interaction.
 ///
-/// Will listen to drag gestures from the user without interfering with other
-/// gestures.
+/// By default, listens to drag gestures from the user without interfering
+/// with other gestures. See [gestureMode].
 class LiquidStretch extends StatelessWidget {
   /// Creates a new [LiquidStretch] widget with the given [child],
   /// [interactionScale], and [stretch].
@@ -28,8 +28,7 @@ class LiquidStretch extends StatelessWidget {
   ///
   /// A value of 1.0 means no scaling.
   ///
-  /// A value greater than 2.0 means the widget will grow to double its
-  /// original size.
+  /// A value of 2.0 means the widget will grow to double its original size.
   ///
   /// A value less than 1.0 means the widget will scale down.
   ///
@@ -47,14 +46,14 @@ class LiquidStretch extends StatelessWidget {
 
   /// The resistance factor to apply to the drag offset.
   ///
-  /// The higher the resisance, the more sticky the drag will feel.
+  /// The higher the resistance, the more sticky the drag will feel.
   /// See [OffsetResistanceExtension.withResistance] for details on how this
   /// works.
   ///
   /// Defaults to 0.08.
   final double resistance;
 
-  /// The hit test behavior for the internal gesture Listener.
+  /// The hit test behavior for the internal gesture handler.
   ///
   /// Defaults to [HitTestBehavior.opaque].
   final HitTestBehavior hitTestBehavior;
@@ -145,8 +144,8 @@ class RawLiquidStretch extends SingleChildRenderObjectWidget {
 @internal
 class RenderRawLiquidStretch extends RenderProxyBox {
   RenderRawLiquidStretch({
-    required Offset stretchPixels,
-  }) : _stretchPixels = stretchPixels;
+    required this._stretchPixels,
+  });
 
   Offset _stretchPixels;
 
@@ -227,11 +226,28 @@ class RenderRawLiquidStretch extends RenderProxyBox {
       size: size,
     );
 
+    // Scale about the center so opposite drag directions produce mirrored
+    // results. Scaling about the local origin makes right/down stretches
+    // travel further than left/up ones, and anchoring the edge opposite the
+    // drag pins that edge in place and jumps whenever a stretch component
+    // crosses zero while the other axis is still scaled.
+    //
+    // The centered scale moves each edge by about half the stretch, so
+    // translating by 1.5x the stretch makes the leading edge travel roughly
+    // twice the stretch and the trailing edge roughly once, in every
+    // direction.
+    final center = size.center(Offset.zero);
+    final translation = _stretchPixels * 1.5;
+
     final matrix = Matrix4.identity()
-      // ignore: deprecated_member_use To support older Flutter versions
-      ..scale(scale.dx, scale.dy, 1)
-      // ignore: deprecated_member_use To support older Flutter versions
-      ..translate(_stretchPixels.dx, _stretchPixels.dy);
+      ..translateByDouble(
+        center.dx + translation.dx,
+        center.dy + translation.dy,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale.dx, scale.dy, 1, 1)
+      ..translateByDouble(-center.dx, -center.dy, 0, 1);
 
     return matrix;
   }

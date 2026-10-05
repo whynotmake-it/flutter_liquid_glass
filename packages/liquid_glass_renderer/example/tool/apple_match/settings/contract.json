@@ -1,0 +1,52 @@
+{
+  "$comment": "Every settings key the Flutter match harness reads. Python (hotloop/evaluate.py) and Dart (flutter/lib/scene_view.dart) both enforce this list; their tests keep them in sync with this file.",
+  "material": [
+    "refractionHeight",
+    "refractionAmount",
+    "refractionFitsShape",
+    "backdropShrink",
+    "frost",
+    "dispersion",
+    "highlight",
+    "contourStrength",
+    "contourDirectionality",
+    "bevelShadowStrength",
+    "tintAmount"
+  ],
+  "appearance": [
+    "tint",
+    "tintRed",
+    "tintGreen",
+    "tintBlue",
+    "tintAlpha",
+    "saturation",
+    "transmissionGamma",
+    "vibrancy",
+    "colorModel"
+  ],
+  "shadow": [
+    "contactShadowAlpha",
+    "contactShadowLuminance",
+    "contactShadowOffsetX",
+    "contactShadowOffsetY",
+    "contactShadowBlur",
+    "contactShadowSpread",
+    "shadowAlpha",
+    "shadowLuminance",
+    "shadowOffsetX",
+    "shadowOffsetY",
+    "shadowBlur",
+    "shadowSpread"
+  ],
+  "geometry": [
+    "shapeWidth",
+    "shapeHeight",
+    "shapeOffsetX",
+    "shapeOffsetY",
+    "cornerRadius",
+    "shapeProfile"
+  ],
+  "merge": [
+    "blend"
+  ]
+}

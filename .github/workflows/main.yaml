@@ -29,12 +29,13 @@ jobs:
       - name: 📚 Checkout
         uses: actions/checkout@v4
         with:
+          lfs: true
           fetch-depth: 0
       
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
       
       - name: Ⓜ️ Set up Melos
@@ -51,15 +52,17 @@ jobs:
   check_generation:
     name: Check Code Generation
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos
@@ -78,15 +81,19 @@ jobs:
     name: Run Golden Tests
     # Only run on main or if PR is labeled with "goldens"
     if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'goldens')
-    runs-on: macos-15
+    # The macOS goldens are rendered with `flutter test --update-goldens` on
+    # this image; regenerate them on the same macOS version when it changes.
+    runs-on: macos-26
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Ⓜ️ Set up Melos
