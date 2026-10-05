@@ -13,6 +13,7 @@ on:
     paths:
       - 'packages/liquid_glass_renderer/**'
 
+# CI covers Metal only; Pixel/Android benchmark runs are manual.
 jobs:
   benchmark-smoke:
     if: >-
@@ -57,16 +58,6 @@ jobs:
         run: |
           chmod +x tool/benchmark.sh
           ./tool/benchmark.sh
-
-      - name: 📊 Validate benchmark results
-        working-directory: packages/liquid_glass_renderer/example
-        run: |
-          dart run tool/parse_benchmark_results.dart \
-            --input build/benchmark \
-            --markdown build/benchmark/summary.md \
-            --json build/benchmark/summary.json \
-            --minimum-repetitions 1 \
-            --enforce false
 
       - name: 📤 Upload benchmark artifacts
         uses: actions/upload-artifact@v4
@@ -116,23 +107,13 @@ jobs:
           test/src/flutter_gpu_fallback_test.dart
 
       - name: 🏃‍♂️ Run benchmark tests
+        id: parse-results
         working-directory: packages/liquid_glass_renderer/example
         env:
           LIQUID_GLASS_BENCHMARK_ENFORCE: 'true'
         run: |
           chmod +x tool/benchmark.sh
           ./tool/benchmark.sh
-
-      - name: 📊 Parse benchmark results
-        id: parse-results
-        working-directory: packages/liquid_glass_renderer/example
-        run: |
-          dart run tool/parse_benchmark_results.dart \
-            --input build/benchmark \
-            --markdown build/benchmark/summary.md \
-            --json build/benchmark/summary.json \
-            --minimum-repetitions 3 \
-            --enforce true
 
       - name: 📝 Find existing comment
         if: github.event_name == 'pull_request'

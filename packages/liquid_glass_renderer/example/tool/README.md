@@ -6,7 +6,7 @@ only).
 | Path | What it is |
 | --- | --- |
 | `bench_scenes.sh` | The benchmark scene registry: suites shared by both runners. |
-| `benchmark.sh` | Metal runner (macOS profile build). |
+| `benchmark.sh` | Metal runner (macOS profile build); refuses to replace existing results unless explicitly enabled. |
 | `android_gpu_bench.sh` | Android runner (Pixel 10, power rails in mW). |
 | `android_ab_bench.py` | Android A/B runner: installed arms interleaved, analyzed by `android_ab_analyze.py`. |
 | `bench_analyze.sh` | One analyzer entry point for either runner's result directory. |
@@ -52,8 +52,9 @@ repetition and records Flutter frame timings, Mach task memory
 command-buffer GPU time per frame. Keep the display awake: the embedder stops
 delivering vsync when it sleeps. Results go to `build/benchmark/`. Other
 knobs (`..._WARMUP_SECONDS`, `..._MEASURE_SECONDS`, `..._SKIP_BUILD`,
-`..._ENFORCE`, opt-in xctrace via `..._TRACE_SCENARIOS`) are documented at the
-top of `benchmark.sh`.
+`..._ENFORCE`, `LIQUID_GLASS_BENCHMARK_OVERWRITE=1` (clear an existing
+non-empty result directory), and opt-in xctrace via `..._TRACE_SCENARIOS` are
+documented at the top of `benchmark.sh`.
 
 ## Android (Pixel 10)
 
