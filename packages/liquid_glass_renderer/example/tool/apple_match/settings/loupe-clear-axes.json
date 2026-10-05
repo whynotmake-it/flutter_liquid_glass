@@ -7,6 +7,5 @@
   "transmissionGamma": [1],
   "vibrancy": [0],
   "highlight": [0.5],
-  "contourStrength": [0.1],
-  "contourWidth": [1]
+  "contourStrength": [0.1]
 }

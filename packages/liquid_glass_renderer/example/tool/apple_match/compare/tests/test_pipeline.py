@@ -28,8 +28,8 @@ def synthetic(
     highlight=0.35,
     tint=(0.0, 0.0, 0.0),
     shape_scale=1.0,
+    size=128,
 ):
-    size = 128
     yy, xx = np.mgrid[:size, :size]
     grid = (((xx // 8 + yy // 8) % 2) * 0.6 + 0.2).astype(np.float32)
     mask = (
@@ -121,7 +121,18 @@ class MetricTests(unittest.TestCase):
             output_dir = root / "output"
             reference_dir.mkdir()
             candidate_dir.mkdir()
-            for probe, image in synthetic(blur=1.5).items():
+            scene = json.loads((ROOT / "scenes/material_capsule.json").read_text())
+            scene["canvas"] = {
+                "logicalWidth": 100,
+                "logicalHeight": 100,
+                "scale": 2,
+            }
+            scene["shape"].update(
+                {"x": 40, "y": 40, "width": 20, "height": 20, "cornerRadius": 10}
+            )
+            scene_path = root / "scene.json"
+            scene_path.write_text(json.dumps(scene))
+            for probe, image in synthetic(blur=1.5, size=200).items():
                 encoded = cv2.cvtColor(
                     (image * 255).astype(np.uint8), cv2.COLOR_RGB2BGR
                 )
@@ -134,6 +145,8 @@ class MetricTests(unittest.TestCase):
                     sys.executable,
                     "-m",
                     "apple_match.cli",
+                    "--scene",
+                    str(scene_path),
                     "--reference",
                     str(reference_dir),
                     "--candidate",
@@ -141,12 +154,12 @@ class MetricTests(unittest.TestCase):
                     "--output",
                     str(output_dir),
                 ],
-                cwd=ROOT / "compare",
-                env=environment,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+                    cwd=ROOT / "compare",
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn('"score"', completed.stdout)
             scorecard = json.loads((output_dir / "scorecard.json").read_text())
             self.assertAlmostEqual(scorecard["score"], 100.0, places=4)

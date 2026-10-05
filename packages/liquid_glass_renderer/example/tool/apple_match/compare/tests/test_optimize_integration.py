@@ -21,6 +21,7 @@ from apple_match.hotloop import (
     load_reference_probes,
     scene_crop,
 )
+from apple_match.scene import load_scene, probe_ids
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,7 +35,8 @@ class OnlineLoopSmokeTests(unittest.TestCase):
     def test_two_candidates_one_session_distinct_losses(self):
         udid = os.environ["IOS_27_UDID"]
         scene_path = ROOT / "scenes/toolbar_capsule.json"
-        scene = json.loads(scene_path.read_text())
+        scene = load_scene(scene_path)
+        probes = probe_ids(scene)
         reference_dir = (
             ROOT / "references" / "ios27-iphone17pro-light" / scene["id"]
         )
@@ -68,8 +70,10 @@ class OnlineLoopSmokeTests(unittest.TestCase):
         ) as session:
             evaluator = Evaluator(
                 session=session,
-                reference=load_reference_probes(reference_dir, crop),
+                reference=load_reference_probes(reference_dir, crop, probes),
                 crop=crop,
+                scene=scene,
+                probes=probes,
                 capture_dir=out / "last",
             )
             first = evaluator.evaluate(baseline)

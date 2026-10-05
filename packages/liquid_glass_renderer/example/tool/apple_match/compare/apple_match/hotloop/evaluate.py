@@ -16,72 +16,24 @@ import time
 from pathlib import Path
 
 from ..metrics import read_rgb, score_images
+from ..scene import metric_family, probe_ids, scene_crop
 from .session import FlutterRunSession, SessionError, SignalReloadTrigger
 
 BUNDLE_ID = "dev.liquidglass.appleMatchFlutter"
 PINNED_DEVICE_NAME = "AppleMatch-iPhone17Pro-iOS27"
 PINNED_DEVICE_UDID = "DB4F41F3-1C36-476D-B775-AFDC3686C75B"
-PROBES = ("A", "B", "C", "D")
 CANDIDATE_FILE_NAME = "apple_match_candidate.json"
 STATUS_FILE_NAME = "apple_match_status.json"
 
-# Keep this list in lock-step with matchGlassSettings/matchGlassShape and the
-# geometry overrides in flutter/lib/scene_view.dart. An optimizer parameter
-# that never reaches the renderer makes a flat search axis look like evidence.
+SETTINGS_CONTRACT = (
+    Path(__file__).resolve().parents[3] / "settings" / "contract.json"
+)
+_settings_contract = json.loads(SETTINGS_CONTRACT.read_text())
 SUPPORTED_SETTINGS = frozenset(
-    {
-        "backdropShrink",
-        "bevelShadowDepth",
-        "bevelShadowDirectionality",
-        "bevelShadowOffset",
-        "bevelShadowSizeResponse",
-        "bevelShadowStrength",
-        "colorModel",
-        "contactShadowAlpha",
-        "contactShadowBlur",
-        "contactShadowLuminance",
-        "contactShadowOffsetX",
-        "contactShadowOffsetY",
-        "contactShadowSpread",
-        "contourDirectionality",
-        "contourOffset",
-        "contourStrength",
-        "contourTransmittance",
-        "contourWidth",
-        "cornerRadius",
-        "curvatureLighting",
-        "dispersion",
-        "exteriorShadowSizeResponse",
-        "frost",
-        "highlight",
-        "highlightOppositeStrength",
-        "highlightWidth",
-        "highlightWrap",
-        "refractionAmount",
-        "refractionFitsShape",
-        "refractionHeight",
-        "saturation",
-        "shadowAlpha",
-        "shadowBlur",
-        "shadowLuminance",
-        "shadowOffsetX",
-        "shadowOffsetY",
-        "shadowSpread",
-        "shapeHeight",
-        "shapeOffsetX",
-        "shapeOffsetY",
-        "shapeProfile",
-        "shapeWidth",
-        "smoothRefraction",
-        "tint",
-        "tintAlpha",
-        "tintAmount",
-        "tintBlue",
-        "tintGreen",
-        "tintRed",
-        "transmissionGamma",
-        "vibrancy",
-    }
+    key
+    for group, keys in _settings_contract.items()
+    if group != "$comment"
+    for key in keys
 )
 
 
@@ -188,26 +140,15 @@ def prepare_simulator(udid: str, appearance: str = "light") -> None:
     )
 
 
-def scene_crop(scene: dict) -> tuple:
-    """The same shape-plus-margin crop the CLI comparator scores."""
-    shape = scene["shape"]
-    scale = scene["canvas"]["scale"]
-    margin = 30
-    return (
-        round((shape["x"] - margin) * scale),
-        round((shape["y"] - margin) * scale),
-        round((shape["width"] + 2 * margin) * scale),
-        round((shape["height"] + 2 * margin) * scale),
-    )
-
-
-def load_reference_probes(reference_dir: Path, crop: tuple) -> dict:
+def load_reference_probes(
+    reference_dir: Path, crop: tuple, probes: tuple[str, ...]
+) -> dict:
     x, y, width, height = crop
     return {
         probe: read_rgb(reference_dir / f"{probe}.png")[
             y : y + height, x : x + width
         ]
-        for probe in PROBES
+        for probe in probes
     }
 
 
@@ -345,6 +286,8 @@ class Evaluator:
         session: CaptureSession,
         reference: dict,
         crop: tuple,
+        scene: dict,
+        probes: tuple[str, ...],
         capture_dir: Path,
         settle_frames: int = 4,
         settle_timeout: float = 30.0,
@@ -352,6 +295,15 @@ class Evaluator:
         screenshot=None,
     ):
         self.session = session
+        family = metric_family(scene)
+        if family != "scorecard":
+            raise ValueError(
+                f"Evaluator supports only scorecard scenes; "
+                f"{scene.get('id', '<unknown>')!r} is {family!r}"
+            )
+        if tuple(probes) != probe_ids(scene):
+            raise ValueError("Evaluator probes must match the scene's declared order")
+        self.probes = tuple(probes)
         self.reference = reference
         self.crop = crop
         self.capture_dir = capture_dir
@@ -372,7 +324,7 @@ class Evaluator:
         self.capture_dir.mkdir(parents=True, exist_ok=True)
         images = {}
         modes = {}
-        for probe in PROBES:
+        for probe in self.probes:
             self._serial += 1
             serial = self._serial
             candidate_id = f"eval-{serial:05d}"

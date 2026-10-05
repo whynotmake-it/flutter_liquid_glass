@@ -22,15 +22,19 @@ from apple_match.hotloop import (  # noqa: E402
     load_reference_probes,
     scene_crop,
 )
+from apple_match.hotloop.evaluate import (  # noqa: E402
+    SUPPORTED_SETTINGS,
+    validate_settings,
+)
 from apple_match.metrics import (  # noqa: E402
     WEIGHTS,
     read_rgb,
     verify_background_registration,
     write_diagnostics,
 )
+from apple_match.scene import load_scene, probe_ids  # noqa: E402
 
-REFERENCE_SET = "ios27-iphone17pro-ground-truth-v2/slider-000"
-RECORDED_BASELINE = ROOT / "out/stages/refinement/candidates/003"
+REFERENCE_SET = "ios27-iphone17pro-reduce-motion-off/slider-000"
 
 STAGES = {
     "shape": {
@@ -68,7 +72,6 @@ STAGES = {
         "dispersion": [-0.1, -0.06, -0.03, 0.0],
         "highlight": [0.0, 0.1, 0.2, 0.3, 0.5],
         "contourStrength": [0.0, 0.05, 0.1, 0.2, 0.35],
-        "contourWidth": [0.5, 1.0, 1.5],
     },
     "blurMtf": {
         "frost": [5.0, 6.0, 7.0, 8.0, 9.0],
@@ -89,25 +92,20 @@ STAGES = {
     "highlight": {
         "highlight": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
         "contourStrength": [0.1, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8],
-        "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5],
     },
     "outline": {
-        "contourWidth": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0],
         "contourStrength": [0.0, 0.1, 0.2, 0.35, 0.5],
     },
     "transmissionContour": {
         "contourStrength": [0.075, 0.1, 0.15, 0.2],
     },
     "darkOutline": {
-        "contourWidth": [0.5, 1.0, 1.5, 2.0],
         "contourStrength": [0.2, 0.35, 0.5, 0.65, 0.8],
     },
     "innerShadow": {
         "bevelShadowStrength": [
             0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.06, 0.08, 0.12
         ],
-        "bevelShadowDepth": [4.0, 6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 24.0],
-        "bevelShadowDirectionality": [0.0, 0.15, 0.3, 0.5, 0.75, 1.0],
     },
     "exteriorShadow": {
         "shadowLuminance": [0, 32, 64, 96],
@@ -153,25 +151,36 @@ STAGES = {
     },
     "silhouetteLine": {
         "contourStrength": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8],
-        "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5],
     },
     "layeredContour": {
-        "contourWidth": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
         "contourStrength": [0.2, 0.35, 0.5, 0.65, 0.8],
         "highlight": [0.2, 0.3, 0.4, 0.5, 0.6, 0.8],
-        "highlightWrap": [0.05, 0.15, 0.25, 0.35],
     },
     "layeredBevel": {
         "bevelShadowStrength": [0.0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04],
-        "bevelShadowDepth": [6.0, 8.0, 12.0, 16.0, 20.0, 24.0],
     },
     "coupledRim": {
-        "contourWidth": [0.25, 0.5, 0.75, 1.0, 1.25],
         "contourStrength": [0.05, 0.1, 0.15, 0.2, 0.3],
         "highlight": [0.4, 0.5, 0.6, 0.7, 0.8],
-        "highlightWrap": [0.15, 0.25, 0.35, 0.45, 0.55],
     },
 }
+
+def validate_stages(stages):
+    invalid = {
+        name: sorted(set(axes) - SUPPORTED_SETTINGS)
+        for name, axes in stages.items()
+        if set(axes) - SUPPORTED_SETTINGS
+    }
+    if invalid:
+        raise ValueError(f"Fit stage axes are not in the settings contract: {invalid}")
+
+
+validate_stages(STAGES)
+STAGES = {
+    name: {axis: values for axis, values in axes.items() if axis in SUPPORTED_SETTINGS}
+    for name, axes in STAGES.items()
+}
+STAGES = {name: axes for name, axes in STAGES.items() if axes}
 
 WALL_EXIT_CODE = 42
 
@@ -449,7 +458,7 @@ def main() -> None:
     parser.add_argument(
         "--baseline",
         type=Path,
-        default=RECORDED_BASELINE / "settings.json",
+        default=ROOT / "settings/baseline.json",
     )
     parser.add_argument(
         "--stages",
@@ -458,38 +467,63 @@ def main() -> None:
         ),
         help="Comma-separated ordered stage names.",
     )
-    parser.add_argument("--out", type=Path, default=ROOT / "out/hotloop")
     parser.add_argument(
-        "--scene-id",
-        default="toolbar_capsule",
-        help="Scene id under scenes/ (default toolbar_capsule).",
+        "--out",
+        type=Path,
+        default=ROOT / "out/hotloop",
     )
+    parser.add_argument(
+        "--scene",
+        default="toolbar_capsule",
+        help="Scene id under scenes/.",
+    )
+    parser.add_argument("--reference", type=Path)
+    parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--wall-threshold", type=float, default=0.05)
     parser.add_argument("--wall-consecutive", type=int, default=2)
     args = parser.parse_args()
     if not args.udid:
         parser.error("--udid or IOS_27_UDID is required")
 
-    scene_path = ROOT / "scenes" / f"{args.scene_id}.json"
-    scene = json.loads(scene_path.read_text())
+    scene_path = ROOT / "scenes" / f"{args.scene}.json"
+    if not scene_path.is_file():
+        parser.error(f"Missing scene file: {scene_path}")
+    scene = load_scene(scene_path)
+    probes = probe_ids(scene)
     crop = scene_crop(scene)
-    reference_dir = ROOT / "references" / REFERENCE_SET / scene["id"]
-    reference = load_reference_probes(reference_dir, crop)
-    baseline = json.loads(args.baseline.resolve().read_text())
+    reference_dir = (
+        args.reference.resolve()
+        if args.reference
+        else ROOT / "references" / REFERENCE_SET / scene["id"]
+    )
+    if not reference_dir.is_dir():
+        parser.error(f"Missing reference directory: {reference_dir}")
+    reference = load_reference_probes(reference_dir, crop, probes)
+    baseline_path = args.baseline.resolve()
+    if not baseline_path.is_file():
+        parser.error(f"Missing baseline settings: {baseline_path}")
+    baseline = json.loads(baseline_path.read_text())
+    try:
+        validate_settings(baseline)
+    except ValueError as error:
+        parser.error(str(error))
     selected_stages = [stage for stage in args.stages.split(",") if stage]
     unknown = set(selected_stages) - set(STAGES)
     if unknown:
         parser.error(f"unknown stages: {sorted(unknown)}")
     out = args.out.resolve()
-    shutil.rmtree(out, ignore_errors=True)
-    if RECORDED_BASELINE.exists():
-        shutil.copytree(RECORDED_BASELINE, out / "baseline")
-    else:
-        (out / "baseline").mkdir(parents=True, exist_ok=True)
+    if out.is_dir() and any(out.iterdir()):
+        if not args.overwrite:
+            parser.error(
+                f"Output directory is not empty: {out}; pass --overwrite to replace it"
+            )
+        shutil.rmtree(out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "baseline").mkdir(parents=True, exist_ok=True)
     (out / "baseline/refinement-baseline.json").write_text(
         json.dumps(
             {
-                "source": str(args.baseline.resolve()),
+                "source": str(baseline_path),
                 "settings": baseline,
             },
             indent=2,
@@ -513,6 +547,8 @@ def main() -> None:
             session=session,
             reference=reference,
             crop=crop,
+            scene=scene,
+            probes=probes,
             capture_dir=out / "live",
         )
         print(
@@ -578,14 +614,9 @@ def main() -> None:
                 transparent = dict(initial)
                 transparent_loss = evaluate(transparent)
                 seeded = []
-                for edge_width in (0.5, 1.0, 1.5):
-                    for edge_alpha in (0.1, 0.2):
-                        candidate = {
-                            **initial,
-                            "contourWidth": edge_width,
-                            "contourStrength": edge_alpha,
-                        }
-                        seeded.append((evaluate(candidate), candidate))
+                for edge_alpha in (0.1, 0.2):
+                    candidate = {**initial, "contourStrength": edge_alpha}
+                    seeded.append((evaluate(candidate), candidate))
                 seed_loss, initial = min(seeded, key=lambda item: item[0])
                 # Preserve the transparent treatment when every coupled edge
                 # candidate is worse than the input image.
@@ -734,7 +765,7 @@ def main() -> None:
                 ),
                 (0, 0, 5, 5),
             )
-            if args.scene_id == "loupe"
+            if args.scene == "loupe"
             else (),
         )
         final_card = result_json(evaluator.last_result, current, evaluator)

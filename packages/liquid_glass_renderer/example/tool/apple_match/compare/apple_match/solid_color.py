@@ -15,7 +15,9 @@ from pathlib import Path
 
 import numpy as np
 
-from stage_metrics import apply_settings_geometry, read_rgb, region_masks, luminance
+from .geometry import apply_settings_geometry, region_masks
+from .metrics import luminance, read_rgb
+from .scene import load_scene
 
 
 def _rgb(value: str) -> np.ndarray:
@@ -34,7 +36,11 @@ def measure_solid_palette(
     scene: dict, reference_dir: Path, candidate_dir: Path
 ) -> dict:
     roles = scene.get("roles", {})
-    palette = roles.get("palette", [])
+    palette = (
+        roles["palette"]
+        if "palette" in roles
+        else [roles[key] for key in ("sameHue", "complement") if key in roles]
+    )
     if not palette:
         raise ValueError("scene roles.palette must contain at least one probe id")
     probes = {probe["id"]: probe["background"] for probe in scene["probes"]}
@@ -131,7 +137,7 @@ def main() -> None:
     parser.add_argument("--settings", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    scene = json.loads(args.scene.read_text())
+    scene = load_scene(args.scene)
     if args.settings is not None:
         scene = apply_settings_geometry(scene, json.loads(args.settings.read_text()))
     result = measure_solid_palette(scene, args.reference, args.candidate)

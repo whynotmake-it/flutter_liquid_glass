@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .geometry import apply_settings_geometry
 from .metrics import (
     WEIGHTS,
     read_rgb,
@@ -16,12 +17,14 @@ from .metrics import (
     verify_background_registration,
     write_diagnostics,
 )
+from .scene import load_scene, metric_family, probe_ids, scene_crop
+from .solid_color import measure_solid_palette
 
 
-def load_probes(directory: Path, crop=None):
+def load_probes(directory: Path, probes, crop=None):
     images = {
         probe: read_rgb(directory / f"{probe}.png")
-        for probe in ("A", "B", "C", "D")
+        for probe in probes
     }
     if crop is None:
         return images
@@ -32,11 +35,11 @@ def load_probes(directory: Path, crop=None):
     }
 
 
-def load_frame_probes(directory: Path, index: str, crop=None):
+def load_frame_probes(directory: Path, index: str, probes, crop=None):
     frame_dir = directory / "frames"
     images = {
         probe: read_rgb(frame_dir / f"{probe}_{index}.png")
-        for probe in ("A", "B", "C", "D")
+        for probe in probes
     }
     if crop is None:
         return images
@@ -53,7 +56,7 @@ def main() -> None:
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--settings", type=Path)
-    parser.add_argument("--scene", type=Path)
+    parser.add_argument("--scene", type=Path, required=True)
     parser.add_argument(
         "--host-capture",
         action="store_true",
@@ -61,39 +64,49 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    crop = None
+    scene = load_scene(args.scene)
+    probes = probe_ids(scene)
+    family = metric_family(scene)
+    if family == "solidColor":
+        settings = json.loads(args.settings.read_text()) if args.settings else {}
+        adjusted_scene = apply_settings_geometry(scene, settings)
+        result = measure_solid_palette(
+            adjusted_scene,
+            args.reference,
+            args.candidate,
+        )
+        args.output.mkdir(parents=True, exist_ok=True)
+        (args.output / "solid_color.json").write_text(
+            json.dumps(result, indent=2) + "\n"
+        )
+        print(json.dumps(result, indent=2))
+        return
+    if family != "scorecard":
+        raise ValueError(f"Unsupported metric family {family!r}")
+
+    crop = scene_crop(scene)
     registration_rect = None
     registration_exclusions = ()
-    if args.scene:
-        scene = json.loads(args.scene.read_text())
-        shape = scene["shape"]
-        scale = scene["canvas"]["scale"]
-        margin = 30
-        crop = (
-            round((shape["x"] - margin) * scale),
-            round((shape["y"] - margin) * scale),
-            round((shape["width"] + 2 * margin) * scale),
-            round((shape["height"] + 2 * margin) * scale),
+    registration_rect = crop
+    canvas = scene["canvas"]
+    scale = canvas["scale"]
+    system_ui_height = round(40 * scale)
+    registration_exclusions = (
+        (
+            0,
+            round(canvas["logicalHeight"] * scale) - system_ui_height,
+            round(canvas["logicalWidth"] * scale),
+            system_ui_height,
+        ),
+    )
+    if args.host_capture:
+        width = round(canvas["logicalWidth"] * scale)
+        registration_exclusions += (
+            (0, 0, 4, 4),
+            (width - 4, 0, 4, 4),
         )
-        registration_rect = crop
-        canvas = scene["canvas"]
-        system_ui_height = round(40 * scale)
-        registration_exclusions = (
-            (
-                0,
-                round(canvas["logicalHeight"] * scale) - system_ui_height,
-                round(canvas["logicalWidth"] * scale),
-                system_ui_height,
-            ),
-        )
-        if args.host_capture:
-            width = round(canvas["logicalWidth"] * scale)
-            registration_exclusions += (
-                (0, 0, 4, 4),
-                (width - 4, 0, 4, 4),
-            )
     gradient_registration_tolerance = 2.0 / 255.0
-    if args.scene and any(
+    if any(
         probe["background"].get("kind") == "linearGradient"
         for probe in scene["probes"]
     ):
@@ -101,8 +114,8 @@ def main() -> None:
         # gradients. Keep solid/grid registration exact, but allow the known
         # few-level gradient transfer difference so the shape is still scored.
         gradient_registration_tolerance = 16.0 / 255.0
-    full_reference = load_probes(args.reference)
-    full_candidate = load_probes(args.candidate)
+    full_reference = load_probes(args.reference, probes)
+    full_candidate = load_probes(args.candidate, probes)
     registration = verify_background_registration(
         full_reference["A"],
         full_candidate["A"],
@@ -110,8 +123,8 @@ def main() -> None:
         registration_exclusions,
         maximum_residual=gradient_registration_tolerance,
     )
-    reference = load_probes(args.reference, crop)
-    candidate = load_probes(args.candidate, crop)
+    reference = load_probes(args.reference, probes, crop)
+    candidate = load_probes(args.candidate, probes, crop)
     result = score_images(reference, candidate)
     reference_indices = {
         path.stem.split("_")[-1]
@@ -123,8 +136,8 @@ def main() -> None:
     }
     temporal_scores = [
         score_images(
-            load_frame_probes(args.reference, index, crop),
-            load_frame_probes(args.candidate, index, crop),
+            load_frame_probes(args.reference, index, probes, crop),
+            load_frame_probes(args.candidate, index, probes, crop),
         ).score
         for index in sorted(reference_indices & candidate_indices)
     ]

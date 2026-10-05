@@ -76,6 +76,15 @@ class StageMetricsTests(unittest.TestCase):
                 )
             )
 
+    def test_measure_rejects_non_scorecard_scene(self) -> None:
+        scene = {
+            "id": "solid",
+            "probes": [{"id": "K"}],
+            "roles": {"palette": ["R"]},
+        }
+        with self.assertRaisesRegex(ValueError, "solid.*solidColor"):
+            stage_metrics.measure(Path(), Path(), scene)
+
 
 if __name__ == "__main__":
     unittest.main()
