@@ -100,34 +100,26 @@ if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
   exit 4
 fi
 if [[ -n "${LIQUID_GLASS_TINT_POSITION:-}" ]]; then
-  python3 - "$LIQUID_GLASS_TINT_POSITION" <<'PY'
-import sys
-
-position = float(sys.argv[1])
-if not 0.0 <= position <= 1.0:
-    raise SystemExit("slider position must be between 0 and 1")
-PY
-  xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
-    UIViewGlassTintAmount -float "$LIQUID_GLASS_TINT_POSITION"
-  xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
-    UIViewGlassEverEditedInSettings -bool YES
-  : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
+  SLIDER_OUTPUT="$(bash "$ROOT/apple/set_transparency_slider.sh" \
+    "$LIQUID_GLASS_TINT_POSITION")"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      LIQUID_GLASS_TINT_POSITION) LIQUID_GLASS_TINT_POSITION="$value" ;;
+      LIQUID_GLASS_TINT_READBACK) LIQUID_GLASS_TINT_READBACK="$value" ;;
+      LIQUID_GLASS_TINT_CONTROL_METHOD) LIQUID_GLASS_TINT_CONTROL_METHOD="$value" ;;
+    esac
+  done <<<"$SLIDER_OUTPUT"
 else
-  : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults read com.apple.UIKit UIViewGlassTintAmount}"
+  SLIDER_OUTPUT="$(bash "$ROOT/apple/set_transparency_slider.sh" --read)"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      LIQUID_GLASS_TINT_POSITION) LIQUID_GLASS_TINT_POSITION="$value" ;;
+      LIQUID_GLASS_TINT_READBACK) LIQUID_GLASS_TINT_READBACK="$value" ;;
+      LIQUID_GLASS_TINT_CONTROL_METHOD) LIQUID_GLASS_TINT_CONTROL_METHOD="$value" ;;
+    esac
+  done <<<"$SLIDER_OUTPUT"
 fi
-LIQUID_GLASS_TINT_READBACK="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.UIKit UIViewGlassTintAmount)"
-: "${LIQUID_GLASS_TINT_POSITION:=$LIQUID_GLASS_TINT_READBACK}"
-python3 - "$LIQUID_GLASS_TINT_POSITION" "$LIQUID_GLASS_TINT_READBACK" <<'PY'
-import sys
-
-declared = float(sys.argv[1])
-actual = float(sys.argv[2])
-if abs(declared - actual) > 0.001:
-    raise SystemExit(
-        f"declared Liquid Glass Tint Amount {declared} != readback {actual}"
-    )
-PY
+: "${LIQUID_GLASS_TINT_READBACK:?Slider helper did not report a readback}"
 export LIQUID_GLASS_TINT_POSITION LIQUID_GLASS_TINT_READBACK
 : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
 export LIQUID_GLASS_TINT_CONTROL_METHOD

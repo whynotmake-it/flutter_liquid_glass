@@ -75,7 +75,8 @@ for slider in $SLIDERS; do
       log "slider=$slider scene=$scene attempt=$attempt"
       if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
         LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
-        bash "$ROOT/apple/capture.sh" "$scene" "$reference_set" \
+        SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
+        bash "$ROOT/apple/capture.sh" \
           >"$ROOT/references/.staging/$scene-$percent.log" 2>&1 \
         && validate_reference_for_slider "$destination" "$scene" "$slider"; then
         captured=1
@@ -107,7 +108,8 @@ for slider in $SLIDERS; do
       log "slider=$slider loupe scene=$scene attempt=$attempt"
       if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
         LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
-        bash "$ROOT/apple/capture_loupe.sh" "$scene" "$reference_set" \
+        SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
+        bash "$ROOT/apple/capture_loupe.sh" \
           >"$ROOT/references/.staging/loupe-$scene-$percent.log" 2>&1 \
         && validate_reference_for_slider "$destination" "$scene" "$slider"; then
         captured=1

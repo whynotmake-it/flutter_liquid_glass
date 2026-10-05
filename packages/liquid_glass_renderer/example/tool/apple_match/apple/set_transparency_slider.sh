@@ -3,10 +3,21 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to the pinned iOS 27 simulator UDID}"
-: "${DEVELOPER_DIR:=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer}"
-export DEVELOPER_DIR
+POSITION="${1:?Usage: set_transparency_slider.sh <0...1|--read>}"
+if [[ "$POSITION" == "--read" ]]; then
+  ACTUAL="$(xcrun simctl spawn "$IOS_27_UDID" defaults read com.apple.UIKit UIViewGlassTintAmount)"
+  python3 - "$ACTUAL" <<'PY'
+import sys
 
-POSITION="${1:?Usage: set_transparency_slider.sh <0...1>}"
+actual = float(sys.argv[1])
+if not 0.0 <= actual <= 1.0:
+    raise SystemExit(f"slider readback must be between 0 and 1, got {actual}")
+PY
+  echo "LIQUID_GLASS_TINT_POSITION=$ACTUAL"
+  echo "LIQUID_GLASS_TINT_READBACK=$ACTUAL"
+  echo "LIQUID_GLASS_TINT_CONTROL_METHOD=simctl defaults read com.apple.UIKit UIViewGlassTintAmount"
+  exit 0
+fi
 python3 - "$POSITION" <<'PY'
 import sys
 
@@ -38,4 +49,5 @@ PY
 xcrun simctl terminate "$IOS_27_UDID" dev.liquidglass.applematch >/dev/null 2>&1 || true
 
 echo "LIQUID_GLASS_TINT_POSITION=$POSITION"
+echo "LIQUID_GLASS_TINT_READBACK=$ACTUAL"
 echo "LIQUID_GLASS_TINT_CONTROL_METHOD=simctl defaults write com.apple.UIKit UIViewGlassTintAmount"

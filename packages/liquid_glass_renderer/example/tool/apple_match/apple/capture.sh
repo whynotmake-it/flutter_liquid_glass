@@ -22,8 +22,6 @@ esac
 : "${SCENE_ID:=toolbar_capsule}"
 : "${LIQUID_GLASS_TINT_POSITION:?Set the exact Liquid Glass slider position (0...1)}"
 : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
-: "${DEVELOPER_DIR:=/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer}"
-export DEVELOPER_DIR
 export SCENE_ID CAPTURE_FRAMES IOS_27_UDID
 export LIQUID_GLASS_TINT_POSITION LIQUID_GLASS_TINT_CONTROL_METHOD
 SCENE="$ROOT/scenes/$SCENE_ID.json"
@@ -82,22 +80,17 @@ if [[ "$REDUCE_MOTION_READBACK" != "$REDUCE_MOTION" ]]; then
   exit 4
 fi
 export REDUCE_MOTION
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
-  UIViewGlassTintAmount -float "$LIQUID_GLASS_TINT_POSITION"
-xcrun simctl spawn "$IOS_27_UDID" defaults write com.apple.UIKit \
-  UIViewGlassEverEditedInSettings -bool YES
-ACTUAL_TINT_POSITION="$(xcrun simctl spawn "$IOS_27_UDID" defaults read \
-  com.apple.UIKit UIViewGlassTintAmount)"
-python3 - "$LIQUID_GLASS_TINT_POSITION" "$ACTUAL_TINT_POSITION" <<'PY'
-import sys
-
-declared = float(sys.argv[1])
-actual = float(sys.argv[2])
-if abs(declared - actual) > 0.001:
-    raise SystemExit(
-        f"declared Liquid Glass Tint Amount {declared} != readback {actual}"
-    )
-PY
+SLIDER_OUTPUT="$(bash "$ROOT/apple/set_transparency_slider.sh" \
+  "$LIQUID_GLASS_TINT_POSITION")"
+while IFS='=' read -r key value; do
+  case "$key" in
+    LIQUID_GLASS_TINT_POSITION) ACTUAL_TINT_POSITION="$value" ;;
+    LIQUID_GLASS_TINT_READBACK) ACTUAL_TINT_READBACK="$value" ;;
+    LIQUID_GLASS_TINT_CONTROL_METHOD) LIQUID_GLASS_TINT_CONTROL_METHOD="$value" ;;
+  esac
+done <<<"$SLIDER_OUTPUT"
+: "${ACTUAL_TINT_READBACK:?Slider helper did not report a readback}"
+ACTUAL_TINT_POSITION="$ACTUAL_TINT_READBACK"
 export APPLE_MATCH_API="$API" APPEARANCE ACTUAL_TINT_POSITION
 
 if [[ -d "$FINAL_OUT" && "${FORCE_REFERENCE:-0}" != "1" ]]; then
@@ -146,13 +139,34 @@ for probe in $CAPTURE_PROBES; do
     "$OUT"/frames/"${probe}"_*.png
 done
 
-RUNTIME_LABEL="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=next(x for x in json.load(sys.stdin)["runtimes"] if x["identifier"]=="com.apple.CoreSimulator.SimRuntime.iOS-27-0"); print("{} ({})".format(r["name"], r["buildversion"]))')"
+RUNTIME_IDENTIFIER="$(xcrun simctl list devices -j | python3 -c '
+import json
+import sys
+
+devices = json.load(sys.stdin)["devices"]
+print(next(
+    runtime
+    for runtime, runtime_devices in devices.items()
+    for device in runtime_devices
+    if device["udid"] == sys.argv[1]
+))
+' "$IOS_27_UDID")"
+RUNTIME_LABEL="$(xcrun simctl list runtimes -j | python3 -c '
+import json
+import sys
+
+runtime = next(
+    item for item in json.load(sys.stdin)["runtimes"]
+    if item["identifier"] == sys.argv[1]
+)
+print("{} ({})".format(runtime["name"], runtime["buildversion"]))
+' "$RUNTIME_IDENTIFIER")"
 python3 "$ROOT/reference_provenance.py" "$OUT" "$SCENE" \
   --source "$ROOT/apple/Sources/AppleMatchApp.swift" \
   --capture-script "$ROOT/apple/capture.sh" \
   --write \
   --runtime "$RUNTIME_LABEL" \
-  --runtime-identifier "com.apple.CoreSimulator.SimRuntime.iOS-27-0" \
+  --runtime-identifier "$RUNTIME_IDENTIFIER" \
   --udid "$IOS_27_UDID" \
   --device "iPhone 17 Pro" \
   --appearance "$APPEARANCE" \
