@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from apple_match.hotloop.evaluate import SUPPORTED_SETTINGS, validate_settings
+from apple_match.hotloop.evaluate import validate_settings
 from apple_match.scene import load_scene, metric_family, probe_ids, scene_crop
 
 
@@ -10,16 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SceneTests(unittest.TestCase):
-    def test_supported_settings_match_contract_union(self):
-        contract = json.loads((ROOT / "settings/contract.json").read_text())
-        expected = {
-            key
-            for group, keys in contract.items()
-            if group != "$comment"
-            for key in keys
-        }
-        self.assertEqual(SUPPORTED_SETTINGS, expected)
-
     def test_checked_in_baselines_use_contract_settings(self):
         for name in (
             "baseline.json",

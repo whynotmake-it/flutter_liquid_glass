@@ -50,6 +50,51 @@ if abs(float(readback) - slider) > 0.001:
 PY
 }
 
+# Captures one scene list with the shared retry/validation contract. The
+# outer slider loop's $slider/$percent/$reference_set globals provide the
+# checkpoint; a loupe script name switches the log label and log-file prefix.
+capture_scenes() {
+  local script="$1" scene_list="$2"
+  local label='' log_prefix=''
+  if [[ "$script" == capture_loupe.sh ]]; then
+    label='loupe '
+    log_prefix='loupe-'
+  fi
+  local scene destination force captured checkpoint attempt
+  for scene in $scene_list; do
+    destination="$ROOT/references/$reference_set/$scene"
+    if [[ -d "$destination" ]] \
+      && validate_reference_for_slider "$destination" "$scene" "$slider"; then
+      log "slider=$slider ${label}scene=$scene existing reference validated"
+      continue
+    fi
+
+    force=0
+    [[ -d "$destination" ]] && force=1
+    captured=0
+    checkpoint="slider=$slider ${label}scene=$scene"
+    for attempt in 1 2 3; do
+      log "slider=$slider ${label}scene=$scene attempt=$attempt"
+      if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
+        LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
+        SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
+        bash "$ROOT/apple/$script" \
+          >"$ROOT/references/.staging/$log_prefix$scene-$percent.log" 2>&1 \
+        && validate_reference_for_slider "$destination" "$scene" "$slider"; then
+        captured=1
+        break
+      fi
+      force=1
+    done
+    if [[ "$captured" == "1" ]]; then
+      log "slider=$slider ${label}scene=$scene captured"
+    else
+      log "slider=$slider ${label}scene=$scene FAILED"
+      failed_checkpoints+=("$checkpoint")
+    fi
+  done
+}
+
 for slider in $SLIDERS; do
   percent="$(python3 -c 'import sys; print(f"{round(float(sys.argv[1]) * 100):03d}")' "$slider")"
   reference_set="ios27-iphone17pro-reduce-motion-off/slider-$percent"
@@ -59,71 +104,8 @@ for slider in $SLIDERS; do
     continue
   fi
 
-  for scene in $SCENES; do
-    destination="$ROOT/references/$reference_set/$scene"
-    if [[ -d "$destination" ]] \
-      && validate_reference_for_slider "$destination" "$scene" "$slider"; then
-      log "slider=$slider scene=$scene existing reference validated"
-      continue
-    fi
-
-    force=0
-    [[ -d "$destination" ]] && force=1
-    captured=0
-    checkpoint="slider=$slider scene=$scene"
-    for attempt in 1 2 3; do
-      log "slider=$slider scene=$scene attempt=$attempt"
-      if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
-        LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
-        SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
-        bash "$ROOT/apple/capture.sh" \
-          >"$ROOT/references/.staging/$scene-$percent.log" 2>&1 \
-        && validate_reference_for_slider "$destination" "$scene" "$slider"; then
-        captured=1
-        break
-      fi
-      force=1
-    done
-    if [[ "$captured" == "1" ]]; then
-      log "slider=$slider scene=$scene captured"
-    else
-      log "slider=$slider scene=$scene FAILED"
-      failed_checkpoints+=("$checkpoint")
-    fi
-  done
-
-  for scene in $LOUPE_SCENES; do
-    destination="$ROOT/references/$reference_set/$scene"
-    if [[ -d "$destination" ]] \
-      && validate_reference_for_slider "$destination" "$scene" "$slider"; then
-      log "slider=$slider loupe scene=$scene existing reference validated"
-      continue
-    fi
-
-    force=0
-    [[ -d "$destination" ]] && force=1
-    captured=0
-    checkpoint="slider=$slider loupe scene=$scene"
-    for attempt in 1 2 3; do
-      log "slider=$slider loupe scene=$scene attempt=$attempt"
-      if REDUCE_MOTION=0 CAPTURE_SETTLE_SECONDS=3.0 \
-        LIQUID_GLASS_TINT_POSITION="$slider" FORCE_REFERENCE="$force" \
-        SCENE_ID="$scene" REFERENCE_SET="$reference_set" \
-        bash "$ROOT/apple/capture_loupe.sh" \
-          >"$ROOT/references/.staging/loupe-$scene-$percent.log" 2>&1 \
-        && validate_reference_for_slider "$destination" "$scene" "$slider"; then
-        captured=1
-        break
-      fi
-      force=1
-    done
-    if [[ "$captured" == "1" ]]; then
-      log "slider=$slider loupe scene=$scene captured"
-    else
-      log "slider=$slider loupe scene=$scene FAILED"
-      failed_checkpoints+=("$checkpoint")
-    fi
-  done
+  capture_scenes capture.sh "$SCENES"
+  capture_scenes capture_loupe.sh "$LOUPE_SCENES"
 done
 
 if ((${#failed_checkpoints[@]})); then

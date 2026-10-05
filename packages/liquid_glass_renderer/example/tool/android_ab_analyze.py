@@ -14,6 +14,7 @@ Perfetto trace:
 - PSS+GPU: in-app smaps_rollup PSS every 50 ms plus the process GPU memory.
 """
 import bisect
+import hashlib
 import json
 import re
 import statistics as st
@@ -215,14 +216,34 @@ METRICS = ["fps", "buildP50", "buildP95", "rasterP50", "rasterP95", "rasterP99",
 def _file_fingerprint(path):
     if not path.is_file():
         return None
-    stat = path.stat()
-    return {"mtime_ns": stat.st_mtime_ns, "size": stat.st_size}
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _analysis_fingerprint(run_dir):
+    analyzer = Path(__file__).resolve()
+    return {
+        "run.json": _file_fingerprint(run_dir / "run.json"),
+        "trace.pftrace": _file_fingerprint(run_dir / "trace.pftrace"),
+        "meminfo.txt": _file_fingerprint(run_dir / "meminfo.txt"),
+        "meta.json": _file_fingerprint(run_dir.parent / "meta.json"),
+        "analyzer": _file_fingerprint(analyzer),
+        "sharedAnalyzer": _file_fingerprint(analyzer.with_name("android_gpu_bench_analyze.py")),
+    }
 
 
 def main():
     out = Path(sys.argv[1])
     cache = out / "analysis.json"
-    cached_rows = json.loads(cache.read_text()) if cache.exists() else {}
+    try:
+        cached_rows = json.loads(cache.read_text()) if cache.exists() else {}
+    except (OSError, ValueError):
+        cached_rows = {}
+    if not isinstance(cached_rows, dict):
+        cached_rows = {}
     run_dirs = [
         d for d in sorted(out.iterdir())
         if d.is_dir() and (d / "run.json").is_file()
@@ -230,13 +251,15 @@ def main():
     rows = {}
     for d in run_dirs:
         run_path = d / "run.json"
-        trace_path = d / "trace.pftrace"
-        fingerprint = {
-            "run.json": _file_fingerprint(run_path),
-            "trace.pftrace": _file_fingerprint(trace_path),
-        }
+        # Hash every input analyze_run reads (run.json, trace, meminfo, the
+        # parent meta.json) plus both analyzer sources, so edits to any of
+        # them invalidate the cached row.
+        fingerprint = _analysis_fingerprint(d)
         cached = cached_rows.get(d.name)
-        if cached and cached.get("fingerprint") == fingerprint:
+        if (isinstance(cached, dict)
+                and cached.get("fingerprint") == fingerprint
+                and isinstance(cached.get("result"), dict)
+                and cached["result"].get("status") != "failed:analysis"):
             rows[d.name] = cached
             continue
         try:

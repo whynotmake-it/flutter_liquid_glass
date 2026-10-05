@@ -140,6 +140,22 @@ void main() {
     expect(matchSettingsKeys, keys);
   });
 
+  test('checked-in baselines are complete material vectors', () {
+    final contract =
+        jsonDecode(File('../settings/contract.json').readAsStringSync())!
+            as Map<String, Object?>;
+    final materialKeys = (contract['material']! as List).cast<String>();
+    for (final name in ['baseline.json', 'fake_glass_baseline.json']) {
+      final baseline =
+          jsonDecode(File('../settings/$name').readAsStringSync())!
+              as Map<String, Object?>;
+      final material = matchGlassSettings(baseline).toJson();
+      for (final key in materialKeys) {
+        expect(material[key], baseline[key], reason: '$name:$key');
+      }
+    }
+  });
+
   test('rejects settings the renderer does not read', () {
     expect(
       () => checkMatchSettings({'frost': 1, 'contourWidth': 1}),

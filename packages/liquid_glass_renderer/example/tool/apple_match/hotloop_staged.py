@@ -32,7 +32,8 @@ from apple_match.metrics import (  # noqa: E402
     verify_background_registration,
     write_diagnostics,
 )
-from apple_match.scene import load_scene, probe_ids  # noqa: E402
+from apple_match.scene import load_scene, metric_family, probe_ids  # noqa: E402
+from reference_provenance import validate_reference_for_scene  # noqa: E402
 
 REFERENCE_SET = "ios27-iphone17pro-reduce-motion-off/slider-000"
 
@@ -176,11 +177,6 @@ def validate_stages(stages):
 
 
 validate_stages(STAGES)
-STAGES = {
-    name: {axis: values for axis, values in axes.items() if axis in SUPPORTED_SETTINGS}
-    for name, axes in STAGES.items()
-}
-STAGES = {name: axes for name, axes in STAGES.items() if axes}
 
 WALL_EXIT_CODE = 42
 
@@ -445,6 +441,26 @@ def save_best(directory, settings, evaluator, reference):
     )
 
 
+def validate_fit_inputs(scene_path, scene, reference_dir, selected_stages):
+    family = metric_family(scene)
+    if family != "scorecard":
+        raise ValueError(
+            f"The staged fitter supports only scorecard scenes; "
+            f"{scene['id']!r} is {family!r}. Use apple_match.cli for color metrics."
+        )
+    metadata = validate_reference_for_scene(reference_dir, scene_path)
+    refraction_axes = {"refractionHeight", "refractionAmount", "dispersion"}
+    fits_refraction = any(
+        refraction_axes.intersection(STAGES[stage]) for stage in selected_stages
+    )
+    if fits_refraction and metadata["reduceMotion"]:
+        raise ValueError(
+            "Refraction fitting requires a validated Reduce Motion-off reference "
+            "(metadata.reduceMotion=false)."
+        )
+    return metadata
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--udid", default=os.environ.get("IOS_27_UDID"))
@@ -498,7 +514,6 @@ def main() -> None:
     )
     if not reference_dir.is_dir():
         parser.error(f"Missing reference directory: {reference_dir}")
-    reference = load_reference_probes(reference_dir, crop, probes)
     baseline_path = args.baseline.resolve()
     if not baseline_path.is_file():
         parser.error(f"Missing baseline settings: {baseline_path}")
@@ -511,6 +526,11 @@ def main() -> None:
     unknown = set(selected_stages) - set(STAGES)
     if unknown:
         parser.error(f"unknown stages: {sorted(unknown)}")
+    try:
+        validate_fit_inputs(scene_path, scene, reference_dir, selected_stages)
+    except ValueError as error:
+        parser.error(str(error))
+    reference = load_reference_probes(reference_dir, crop, probes)
     out = args.out.resolve()
     if out.is_dir() and any(out.iterdir()):
         if not args.overwrite:

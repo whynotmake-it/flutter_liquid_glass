@@ -98,6 +98,21 @@ memory) and rail groups in mW (GPU, GPU-mem, CPU, DDR, SoC = their sum). Use
 `--scenarios pixel` to expand the Pixel suite, or pass explicit scene names;
 unknown names are rejected. `ANDROID_SERIAL` and `UNLOCK_PIN` come from the
 environment.
+
+## Offline tests
+
+From `example/`:
+
+```sh
+python3 -m unittest discover -s tool/tests
+```
+
+These are software-contract tests that run without a device, adb or a
+Perfetto binary: they cover the A/B analysis cache (content fingerprints of
+every input and both analyzer sources), failure exclusion and retry, the
+thermal gate in `android_ab_bench.py` and the scene registry. They do not
+validate device metrics.
+
 ## Results
 
 Both runners write `summary.md` and `summary.json` into their result
@@ -108,6 +123,13 @@ machine, with:
 ./tool/bench_analyze.sh build/benchmark
 ./tool/bench_analyze.sh build/android_gpu_bench/20260930_120000   # mW columns
 ```
+
+The A/B analyzer caches each run's result in `analysis.json`, keyed by
+content hashes of the run's raw inputs (`run.json`, `trace.pftrace`,
+`meminfo.txt`), the run set's `meta.json` and both analyzer sources.
+Caches written by the earlier mtime/size fingerprinting are invalidated
+once, and runs whose analysis failed are retried on the next invocation.
+The summaries themselves are unchanged.
 
 Write-ups worth keeping go to `results/`. Some older write-ups there name
 probe scenes that have since been removed (`appScrollRealTopOnly`,

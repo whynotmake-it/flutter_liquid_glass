@@ -2,6 +2,10 @@
 
 Audited at `5e82cdb88`, 2026-10-03.
 
+This is the pre-convergence snapshot. See the
+[current disposition](tooling-audit-disposition.md) for per-finding verdicts,
+implemented changes and remaining verification/evidence limits.
+
 Paths in this document are relative to
 `packages/liquid_glass_renderer/example/`, unless explicitly prefixed with
 `repo:`. "Used" means a checked-in caller or documented manual command exists;

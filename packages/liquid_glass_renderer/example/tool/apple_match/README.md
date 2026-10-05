@@ -22,7 +22,21 @@ crop.
 
 ## Setup
 
-Xcode with the iOS 27 SDK, Flutter 3.47.1, `agent-device >= 0.14.0`, Python 3:
+Xcode with the iOS 27 SDK, Flutter 3.47.1, `agent-device >= 0.14.0`, Python 3.
+
+The `references/` PNG/JPEG assets are stored in Git LFS: a checkout without
+downloaded LFS objects holds only pointer files, and provenance checksum
+validation fails on pointers, so materialize them before comparing or
+fitting. From the repository root:
+
+```sh
+git lfs pull --include='packages/liquid_glass_renderer/example/tool/apple_match/references/**'
+```
+
+This fetches only the committed Apple captures; it does not recover
+historical ignored evidence under `out/`, traces or build directories.
+
+Then enter the matching tool directory and run the remaining setup:
 
 ```sh
 cd packages/liquid_glass_renderer/example/tool/apple_match
@@ -47,6 +61,11 @@ reboots the target simulator so system processes pick it up.
 `apple/capture_slider_sweep.sh` repeats those captures across the Liquid Glass
 slider (Settings → Appearance → Liquid Glass) into `slider-000` … `slider-100`;
 every `metadata.json` records the declared and read-back slider value.
+
+`apple/capture.sh` owns the shared capture lifecycle (build, boot, Reduce
+Motion, slider control, probe frames, provenance, publish) for both drivers;
+its `--loupe` mode holds the text-selection long press with agent-device.
+`apple/capture_loupe.sh` remains as a compatibility wrapper for that mode.
 
 Material scenes may set `"glassVariant": "clear"` for `.glassEffect(.clear)`.
 `material_capsule_toolbar_size_dark` is a `.regular` material capsule at the
@@ -118,6 +137,17 @@ and baseline is `settings/baseline.json`. Use `--reference` or `--baseline` to
 override those inputs. A non-empty `--out` is preserved unless `--overwrite`
 is passed.
 
+The fitter only searches scorecard scenes (probes A–D); palette and
+hue/complement scenes are evaluated with `apple_match.cli` /
+`apple_match.solid_color`, not fitted. Before anything is removed or a
+session starts, it validates the reference's provenance
+(`reference_provenance.py`) and rejects any stage that changes a refraction
+axis (`refractionHeight`, `refractionAmount`, `dispersion`) when the
+reference metadata says Reduce Motion was on — lensing is disabled there,
+so such a fit would chase a disabled feature. Stage-specific diagnostics
+stay in the dedicated tools (`rim_report.py`, `zoom_atlas.py`,
+`stage_metrics.py`) rather than being duplicated by the fitter.
+
 ## 4. Crops
 
 ```sh
@@ -134,8 +164,14 @@ corner, rim, face and highlight.
 
 - `contract.json` is the settings-key contract used by the harness, validator,
   and fitter.
-- `baseline.json` and `fake_glass_baseline.json` are current search inputs.
-- `loupe-clear-axes.json`: the loupe search space.
+- `baseline.json` and `fake_glass_baseline.json` are current search inputs:
+  explicit, complete material vectors for the legacy toolbar search — every
+  `contract.json` `material` key is spelled out, alongside the geometry and
+  shadow axes the search also fits. They are not shipped presets and not
+  geometry-neutral scene inputs; `colorModel` deliberately stays out so the
+  appearance model can remain scene-dependent (regular vs `clear`).
+- `loupe-clear-axes.json`: the loupe search space — a partial axis
+  dictionary, not a full baseline.
 - Archived fits are in `settings/historical/`; they contain removed keys, and
   their direct-model saturation/gamma/vibrancy values paired with adaptive
   iOS 27 color models do not reproduce shipped presets.
