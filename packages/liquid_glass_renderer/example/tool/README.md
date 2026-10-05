@@ -26,6 +26,7 @@ unknown names:
   plus `baselineMotion`, `realToolbarMaterial` and `fakeToolbarMaterial`.
 - `app`: only the app-like scenes.
 - `micro`: renderer microbenchmarks, one cost axis per scene.
+- `pixel`: Pixel 10 A/B scenes.
 - `all`: every scene in the enum.
 
 Each scene logs `LIQUID_GLASS_BENCHMARK_MEASURE_BEGIN:<scene>` and `..._END`
@@ -52,9 +53,11 @@ repetition and records Flutter frame timings, Mach task memory
 command-buffer GPU time per frame. Keep the display awake: the embedder stops
 delivering vsync when it sleeps. Results go to `build/benchmark/`. Other
 knobs (`..._WARMUP_SECONDS`, `..._MEASURE_SECONDS`, `..._SKIP_BUILD`,
-`..._ENFORCE`, `LIQUID_GLASS_BENCHMARK_OVERWRITE=1` (clear an existing
-non-empty result directory), and opt-in xctrace via `..._TRACE_SCENARIOS` are
-documented at the top of `benchmark.sh`.
+`..._ENFORCE`, `LIQUID_GLASS_BENCHMARK_OVERWRITE=1` (replace a non-empty
+result directory), and opt-in xctrace via `..._TRACE_SCENARIOS` are documented
+at the top of `benchmark.sh`. The parser requires every resolved scenario to
+meet the minimum successful repetitions; failed or incomplete runs fail the
+benchmark even when performance thresholds are informational.
 
 ## Android (Pixel 10)
 
@@ -91,9 +94,10 @@ tool/bench_analyze.sh build/android-ab/reuse
 Arms run interleaved, reversed every other repetition, behind a thermal gate. The
 summary adds GPU Mcycles/frame and mJ/frame, the UI `PAINT` slice, UI GC ms/s,
 peak and median PSS+GPU (in-app `smaps_rollup` every 50 ms plus the process GPU
-memory) and rail groups in mW (GPU, GPU-mem, CPU, DDR, SoC = their sum). The
-`pixel` suite in `bench_scenes.sh` lists the scenes. `ANDROID_SERIAL` and
-`UNLOCK_PIN` come from the environment.
+memory) and rail groups in mW (GPU, GPU-mem, CPU, DDR, SoC = their sum). Use
+`--scenarios pixel` to expand the Pixel suite, or pass explicit scene names;
+unknown names are rejected. `ANDROID_SERIAL` and `UNLOCK_PIN` come from the
+environment.
 ## Results
 
 Both runners write `summary.md` and `summary.json` into their result
@@ -109,6 +113,9 @@ Write-ups worth keeping go to `results/`. Some older write-ups there name
 probe scenes that have since been removed (`appScrollRealTopOnly`,
 `appScrollRealPillOnly`, the passthrough and sigma arms); they are in git
 history.
+
+The benchmark workflow runs on Metal only; Pixel runs are manual on Android
+hardware.
 
 ## iOS power (iPhone)
 

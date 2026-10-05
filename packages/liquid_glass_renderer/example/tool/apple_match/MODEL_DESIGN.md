@@ -1,5 +1,10 @@
 # Model design — deconstructing Apple's Liquid Glass into our pipeline
 
+Historical design note: this parameter table records an obsolete proposal;
+`thickness`, `edgeRefraction`, and `contourWidth` are not current settings.
+See [`lib/src/liquid_glass_settings.dart`](../../../lib/src/liquid_glass_settings.dart)
+for the current settings surface.
+
 Working notes for the renderer model redesign. Becomes the README mapping
 table once the model lands and scores are in.
 

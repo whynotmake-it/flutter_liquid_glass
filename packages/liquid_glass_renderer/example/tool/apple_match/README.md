@@ -9,7 +9,7 @@ crop.
 
 | Path | Step |
 | --- | --- |
-| `scenes/` | Scene JSON (geometry, canvas, probes A–D) shared by both sides; `schema.json` validates them. |
+| `scenes/` | Scene JSON (geometry, canvas and ordered probe roles) shared by both sides; `schema.json` validates them. |
 | `apple/` | SwiftUI capture app and the pinned-simulator capture scripts. |
 | `references/` | Immutable Apple capture sets. Replacing one needs `FORCE_REFERENCE=1`. |
 | `flutter/` | Standalone Flutter capture target for the same scenes (its own package). |
@@ -27,10 +27,10 @@ Xcode with the iOS 27 SDK, Flutter 3.47.1, `agent-device >= 0.14.0`, Python 3:
 ```sh
 cd packages/liquid_glass_renderer/example/tool/apple_match
 python3 -m venv compare/.venv
-compare/.venv/bin/pip install -r compare/requirements.txt pillow
+compare/.venv/bin/pip install -r compare/requirements.txt
 export IOS_27_UDID="$(compare/.venv/bin/python pin_simulator.py)"
 PYTHONPATH=compare compare/.venv/bin/python -m unittest discover -s compare/tests
-(cd flutter && flutter pub get && flutter analyze && flutter test)
+(cd flutter && flutter pub get && flutter analyze && flutter test --enable-impeller)
 ```
 
 The simulator is pinned to `AppleMatch-iPhone17Pro-iOS27`: portrait,
@@ -98,23 +98,30 @@ flutter test --enable-impeller --enable-flutter-gpu \
 
 ```sh
 PYTHONPATH=compare compare/.venv/bin/python -m apple_match.cli --host-capture \
-  --reference references/ios27-iphone17pro-light/toolbar_capsule \
+  --reference references/ios27-iphone17pro-reduce-motion-off/slider-000/toolbar_capsule \
   --candidate out/candidates/baseline --output out/score \
   --settings out/candidates/baseline/settings.json \
   --scene scenes/toolbar_capsule.json
-compare/.venv/bin/python solid_color_metrics.py --help   # color transfer
-compare/.venv/bin/python rim_report.py --help            # rim, glint, face
+PYTHONPATH=compare compare/.venv/bin/python -m apple_match.solid_color \
+  --help                                                # per-probe color transfer
+PYTHONPATH=compare compare/.venv/bin/python rim_report.py --help # rim, glint, face
 ```
 
-`run.py` does capture, render and compare in one go on the simulator.
-`hotloop_staged.py` searches settings stage by stage (`settings/stages.json`:
-shape, refraction, tint, highlight, outline, blur) with one persistent
-Flutter session.
+The required `--scene` selects declared probes and metric family: A–D scenes
+use the scorecard; palette or hue/complement scenes produce `solid_color.json`.
+Geometry, probe order, crops and metric family come from the shared scene
+contract.
+
+`hotloop_staged.py` is the fitter. Its default scene is `toolbar_capsule`,
+reference is `references/ios27-iphone17pro-reduce-motion-off/slider-000/<scene>`,
+and baseline is `settings/baseline.json`. Use `--reference` or `--baseline` to
+override those inputs. A non-empty `--out` is preserved unless `--overwrite`
+is passed.
 
 ## 4. Crops
 
 ```sh
-compare/.venv/bin/python zoom_atlas.py --zoom 5 --stage lighting \
+PYTHONPATH=compare compare/.venv/bin/python zoom_atlas.py --zoom 5 --stage lighting \
   --reference references/ios27-iphone17pro-light/toolbar_capsule \
   --candidate out/candidates/baseline --scene scenes/toolbar_capsule.json \
   --output out/atlas-lighting.png --title "toolbar, lighting"
@@ -125,14 +132,16 @@ corner, rim, face and highlight.
 
 ## Settings
 
-- `baseline.json`, `fake_glass_baseline.json`, `stages.json`: search inputs.
-- `fit-lighting-v2-*.json`: the lighting fits (toolbar, material, dark).
-- `color-model-{light,dark}.json`, `tint-model-*.json`: the color and tint
-  fits.
+- `contract.json` is the settings-key contract used by the harness, validator,
+  and fitter.
+- `baseline.json` and `fake_glass_baseline.json` are current search inputs.
 - `loupe-clear-axes.json`: the loupe search space.
+- Archived fits are in `settings/historical/`; they contain removed keys, and
+  their direct-model saturation/gamma/vibrancy values paired with adaptive
+  iOS 27 color models do not reproduce shipped presets.
 
-The shipped values live in the renderer's presets; these files reproduce the
-fits that produced them.
+The shipped values live in the renderer's presets; archived fits are retained
+for history only.
 
 ## On-device A/B
 
