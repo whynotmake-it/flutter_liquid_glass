@@ -69,6 +69,9 @@ void main() {
       home: LiquidGlassLayer(
         fake: true,
         settings: settings,
+        // A shape whose only override is visibility shares the layer's
+        // backdrop transfer once it is fully visible again.
+        defaultAppearance: const LiquidGlassAppearance(),
         child: LiquidGlassBlendGroup(
           child: Row(
             children: [
@@ -304,6 +307,238 @@ void main() {
     expect(layer.debugClipBounds, isNull);
     expect(layer.debugBackdropFilterLayer, isNull);
   });
+
+  testWidgets(
+    'a shape appearance the shared transfer cannot serve gets its own pass',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: LiquidGlassLayer(
+            fake: true,
+            settings: settings,
+            defaultAppearance: LiquidGlassAppearance(),
+            child: Row(
+              children: [
+                LiquidGlass(
+                  appearance: LiquidGlassAppearance(saturation: 2),
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 80, height: 60),
+                ),
+                LiquidGlass(
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 80, height: 60),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+      // The shared filter keeps serving the matching shape, while the
+      // diverging shape gets its own clipped backdrop pass.
+      expect(layer.debugBackdropFilterLayer, isNotNull);
+      expect(layer.debugSeparateBackdropLayers, hasLength(1));
+
+      // The diverging shape is excluded from the shared union clip so the
+      // layer's transfer is not applied to it twice.
+      final divergingCenter = tester.getCenter(
+        find.byWidgetPredicate(
+          (widget) => widget is LiquidGlass && widget.appearance != null,
+        ),
+      );
+      final matchingCenter = tester.getCenter(
+        find.byWidgetPredicate(
+          (widget) => widget is LiquidGlass && widget.appearance == null,
+        ),
+      );
+      expect(
+        layer.debugClipPath!.contains(
+          layer.globalToLocal(divergingCenter),
+        ),
+        isFalse,
+      );
+      expect(
+        layer.debugClipPath!.contains(layer.globalToLocal(matchingCenter)),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets(
+    'a shape appearance can need a backdrop pass the layer default does not',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: LiquidGlassLayer(
+            fake: true,
+            settings: LiquidGlassSettings(frost: 0),
+            defaultAppearance: LiquidGlassAppearance(),
+            child: LiquidGlass(
+              appearance: LiquidGlassAppearance(saturation: 2),
+              shape: LiquidOval(),
+              child: SizedBox(width: 80, height: 60),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+      expect(
+        layer.debugBackdropFilterLayer,
+        isNull,
+        reason: 'The layer default has no backdrop effect to share.',
+      );
+      expect(layer.debugSeparateBackdropLayers, hasLength(1));
+    },
+  );
+
+  testWidgets('a fading shape keeps its own backdrop transfer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LiquidGlassLayer(
+          fake: true,
+          settings: LiquidGlassSettings(frost: 0),
+          defaultAppearance: LiquidGlassAppearance(),
+          child: LiquidGlass(
+            appearance: LiquidGlassAppearance(
+              saturation: 2,
+              visibility: 0.5,
+            ),
+            shape: LiquidOval(),
+            child: SizedBox(width: 80, height: 60),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+      find.byType(ConsolidatedFakeGlassLayer).last,
+    );
+    // Without the shape's own saturation the filter would be identity and
+    // no pass would exist.
+    expect(layer.debugSeparateBackdropLayers, hasLength(1));
+  });
+
+  for (final grouped in [false, true]) {
+    testWidgets(
+      'an overlapping diverging shape applies its own transfer once '
+      '(useBackdropGroup: $grouped)',
+      (tester) async {
+        // Shared shapes desaturate the red background to gray; the
+        // diverging shape over-saturates it. If it sampled the shared
+        // filter's output, the overlap would stay gray instead of red.
+        final boundaryKey = GlobalKey();
+        Widget buildLayer() => LiquidGlassLayer(
+          fake: true,
+          settings: const LiquidGlassSettings(
+            frost: 0,
+            contourStrength: 0,
+          ),
+          defaultAppearance: const LiquidGlassAppearance(saturation: 0),
+          useBackdropGroup: grouped,
+          child: const Stack(
+            children: [
+              Align(
+                alignment: Alignment(-0.4, 0),
+                child: LiquidGlass(
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 200, height: 200),
+                ),
+              ),
+              Align(
+                alignment: Alignment(0.4, 0),
+                child: LiquidGlass(
+                  appearance: LiquidGlassAppearance(saturation: 2),
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 200, height: 200),
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: RepaintBoundary(
+              key: boundaryKey,
+              child: Stack(
+                children: [
+                  const Positioned.fill(
+                    child: ColoredBox(color: Colors.red),
+                  ),
+                  Center(
+                    child: SizedBox(
+                      width: 500,
+                      height: 400,
+                      child: grouped
+                          ? BackdropGroup(child: buildLayer())
+                          : buildLayer(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+          find.byType(ConsolidatedFakeGlassLayer).last,
+        );
+        // Both filters share one capture, whether the key came from the
+        // group or from the layer itself.
+        final sharedKey = layer.debugBackdropFilterLayer!.backdropKey;
+        expect(sharedKey, isNotNull);
+        expect(
+          layer.debugSeparateBackdropLayers.single.backdropKey,
+          same(sharedKey),
+        );
+
+        final image =
+            await (boundaryKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary)
+                .toImage();
+        final data = await tester.runAsync(image.toByteData);
+        (int, int, int) pixel(double x, double y) {
+          final i = (y.round() * image.width + x.round()) * 4;
+          return (
+            data!.getUint8(i),
+            data.getUint8(i + 1),
+            data.getUint8(i + 2),
+          );
+        }
+
+        final sharedOnly = pixel(290, 300);
+        final separateOnly = pixel(510, 300);
+        final overlap = pixel(400, 300);
+        image.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+
+        // The shared transfer desaturates the red background to gray.
+        expect((sharedOnly.$1 - sharedOnly.$2).abs(), lessThan(12));
+        // The diverging shape's own transfer keeps it red.
+        expect(separateOnly.$1, greaterThan(200));
+        // Overlapping pixels get the diverging shape's transfer applied to
+        // the unmodified backdrop — not the shared filter's gray output.
+        expect(
+          overlap.$1,
+          closeTo(separateOnly.$1, 12),
+          reason: 'Compounded transfers would show gray, not red.',
+        );
+        expect(overlap.$2, closeTo(separateOnly.$2, 12));
+        expect(overlap.$3, closeTo(separateOnly.$3, 12));
+      },
+    );
+  }
 
   testWidgets('fake parent updates and releases its backdrop filter', (
     tester,
