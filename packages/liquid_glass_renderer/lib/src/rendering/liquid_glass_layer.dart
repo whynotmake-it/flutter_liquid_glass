@@ -526,27 +526,66 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   void _updateShaderSettings() {
     _shaderInputsChanged = true;
     final appearance = _uniformAppearance ?? defaultAppearance;
+    final colorModels = _colorModelSlots(_shapeAppearances);
     _writeCommonShaderUniforms(
       defaultRenderShader,
       appearance,
       _materialCenterInMatte,
+      colorModels,
     );
     _writeCommonShaderUniforms(
       materialRenderShader,
       appearance,
       _materialCenterInMatte,
+      colorModels,
     );
     _writeCommonShaderUniforms(
       tintRenderShader,
       appearance,
       _materialCenterInMatte,
+      colorModels,
     );
+  }
+
+  /// The layer's adaptive color models in shader slot order.
+  ///
+  /// `uColorModelParams` holds at most three distinct models; extra models
+  /// fold onto the first slot. The direct model needs no slot — it always
+  /// takes code 0.
+  List<GlassColorParameters> _colorModelSlots(
+    List<LiquidGlassAppearance> appearances,
+  ) {
+    final slots = <GlassColorParameters>[];
+    void add(LiquidGlassAppearance appearance) {
+      final parameters = appearance.colorModel.parameters;
+      if (parameters != null &&
+          !slots.contains(parameters) &&
+          slots.length < 3) {
+        slots.add(parameters);
+      }
+    }
+
+    add(defaultAppearance);
+    appearances.forEach(add);
+    return List.unmodifiable(slots);
+  }
+
+  /// The shader's model code for [model]: 0 direct, 1..3 slot index.
+  double _colorModelCode(
+    LiquidGlassColorModel model,
+    List<GlassColorParameters> slots,
+  ) {
+    final parameters = model.parameters;
+    if (parameters == null) return 0;
+    // Models beyond the third fold onto the first slot.
+    return (slots.indexOf(parameters).clamp(0, 2) + 1).toDouble();
   }
 
   void _writeCommonShaderUniforms(
     FragmentShader shader,
     LiquidGlassAppearance appearance,
     Offset materialCenter,
+    List<GlassColorParameters> colorModels,
   ) {
     // The final shader fades the whole material with visibility, so the
     // color factors are written at full strength.
@@ -602,7 +641,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           GlassRim.bevelShadowOffset * devicePixelRatio,
         ])
         ..setFloats([
-          appearance.colorModel.shaderValue,
+          _colorModelCode(appearance.colorModel, colorModels),
           appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
           _materialShortSide,
@@ -615,6 +654,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     shader
       ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
       ..setFloat(54, softensInShader ? 1 : 0);
+    // Float index 63, after the geometry/material texture sizes: the three
+    // adaptive color-model slots (nine vec4 each), zero-filled when fewer
+    // than three distinct models are in use.
+    shader.setFloatUniforms(initialIndex: 63, (value) {
+      value.setFloats([
+        for (var i = 0; i < 3; i++)
+          ...i < colorModels.length
+              ? colorModels[i].toShaderParameters()
+              : GlassColorParameters.ios27Light.toShaderParameters(),
+      ]);
+    });
   }
 
   /// Largest frost, in device pixels, folded into the final pass instead of
@@ -640,6 +690,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // This is used only for mixed frames; unused lookup rows must not depend
     // on the owner's active (possibly different) uniform frame.
     final fallback = defaultAppearance;
+    final colorModels = _colorModelSlots(appearances);
     LiquidGlassAppearance at(int index) =>
         index < appearances.length ? appearances[index] : fallback;
     return <double>[
@@ -653,7 +704,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         at(i).saturation / 4,
         at(i).transmissionGamma / 4,
         at(i).vibrancy / 4,
-        (at(i).visibility + at(i).colorModel.shaderValue * 2) / 7,
+        (at(i).visibility +
+                _colorModelCode(at(i).colorModel, colorModels) * 2) /
+            7,
       ],
     ];
   }

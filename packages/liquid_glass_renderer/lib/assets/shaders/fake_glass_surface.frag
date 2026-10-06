@@ -40,6 +40,14 @@ uniform vec3 uFaceEmission;
 uniform vec4 uRseDegreeAndSpans;
 uniform vec4 uRseCircleCenters;
 uniform vec4 uRseSemiAxisAndRadii;
+// Face contribution to the glint target (see the color model's
+// glintFaceGain and glintVibrancy). FakeGlass approximates the face with
+// the surface tint plus emission; clear glass brightens that proxy
+// strongly while regular glass brightens mostly the transmitted chroma.
+uniform float uGlintFaceGain;
+uniform float uGlintVibrancy;
+
+const vec3 LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
 
 layout(location = 0) out vec4 fragColor;
 
@@ -171,10 +179,11 @@ void main() {
   );
 
   float tintAlpha = uTint.a;
-  // The glint pulls the lit face toward a target 1.6x SDR white. Without
-  // backdrop access FakeGlass pulls toward it with source-over of an
-  // emissive target; only RealGlass also amplifies the face chroma under the
-  // glint and keeps the headroom above white.
+  // The glint pulls the lit face toward a bright target. Without backdrop
+  // access FakeGlass approximates the face with the surface tint plus
+  // emission and pulls toward it with source-over of an emissive target;
+  // only RealGlass amplifies the true backdrop chroma under the glint and
+  // keeps the headroom above white.
   float materialCoverage = uExteriorOnly > 0.5
       ? 0.0
       : clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
@@ -191,8 +200,12 @@ void main() {
       uFaceEmission * bevelShadow * (1.0 - tintAlpha) *
           (1.0 - backdropContourAbsorption);
   float litAlpha = materialAlpha;
+  vec3 faceProxy = uTint.rgb * tintAlpha + uFaceEmission;
+  vec3 glintTarget = vec3(uGlintLuminance) +
+      uGlintFaceGain * faceProxy +
+      uGlintVibrancy * (faceProxy - vec3(dot(faceProxy, LUMA_WEIGHTS)));
   litPremultiplied =
-      litPremultiplied * (1.0 - glint) + vec3(uGlintLuminance * glint);
+      litPremultiplied * (1.0 - glint) + glintTarget * glint;
   litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
   // FakeGlass stays SDR, as Skia needs: premultiplied color never exceeds
   // alpha. Where the glint's emission would, the glass covers that much more
