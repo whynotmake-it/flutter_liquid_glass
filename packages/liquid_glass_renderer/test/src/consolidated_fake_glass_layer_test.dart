@@ -69,6 +69,9 @@ void main() {
       home: LiquidGlassLayer(
         fake: true,
         settings: settings,
+        // A shape whose only override is visibility shares the layer's
+        // backdrop transfer once it is fully visible again.
+        defaultAppearance: const LiquidGlassAppearance(),
         child: LiquidGlassBlendGroup(
           child: Row(
             children: [
@@ -303,6 +306,127 @@ void main() {
     );
     expect(layer.debugClipBounds, isNull);
     expect(layer.debugBackdropFilterLayer, isNull);
+  });
+
+  testWidgets(
+    'a shape appearance the shared transfer cannot serve gets its own pass',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: LiquidGlassLayer(
+            fake: true,
+            settings: settings,
+            defaultAppearance: LiquidGlassAppearance(),
+            child: Row(
+              children: [
+                LiquidGlass(
+                  appearance: LiquidGlassAppearance(saturation: 2),
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 80, height: 60),
+                ),
+                LiquidGlass(
+                  shape: LiquidOval(),
+                  child: SizedBox(width: 80, height: 60),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+      // The shared filter keeps serving the matching shape, while the
+      // diverging shape gets its own clipped backdrop pass.
+      expect(layer.debugBackdropFilterLayer, isNotNull);
+      expect(layer.debugSeparateBackdropLayers, hasLength(1));
+
+      // The diverging shape is excluded from the shared union clip so the
+      // layer's transfer is not applied to it twice.
+      final divergingCenter = tester.getCenter(
+        find.byWidgetPredicate(
+          (widget) => widget is LiquidGlass && widget.appearance != null,
+        ),
+      );
+      final matchingCenter = tester.getCenter(
+        find.byWidgetPredicate(
+          (widget) => widget is LiquidGlass && widget.appearance == null,
+        ),
+      );
+      expect(
+        layer.debugClipPath!.contains(
+          layer.globalToLocal(divergingCenter),
+        ),
+        isFalse,
+      );
+      expect(
+        layer.debugClipPath!.contains(layer.globalToLocal(matchingCenter)),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets(
+    'a shape appearance can need a backdrop pass the layer default does not',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: LiquidGlassLayer(
+            fake: true,
+            settings: LiquidGlassSettings(frost: 0),
+            defaultAppearance: LiquidGlassAppearance(),
+            child: LiquidGlass(
+              appearance: LiquidGlassAppearance(saturation: 2),
+              shape: LiquidOval(),
+              child: SizedBox(width: 80, height: 60),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+      expect(
+        layer.debugBackdropFilterLayer,
+        isNull,
+        reason: 'The layer default has no backdrop effect to share.',
+      );
+      expect(layer.debugSeparateBackdropLayers, hasLength(1));
+    },
+  );
+
+  testWidgets('a fading shape keeps its own backdrop transfer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LiquidGlassLayer(
+          fake: true,
+          settings: LiquidGlassSettings(frost: 0),
+          defaultAppearance: LiquidGlassAppearance(),
+          child: LiquidGlass(
+            appearance: LiquidGlassAppearance(
+              saturation: 2,
+              visibility: 0.5,
+            ),
+            shape: LiquidOval(),
+            child: SizedBox(width: 80, height: 60),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+      find.byType(ConsolidatedFakeGlassLayer).last,
+    );
+    // Without the shape's own saturation the filter would be identity and
+    // no pass would exist.
+    expect(layer.debugSeparateBackdropLayers, hasLength(1));
   });
 
   testWidgets('fake parent updates and releases its backdrop filter', (
