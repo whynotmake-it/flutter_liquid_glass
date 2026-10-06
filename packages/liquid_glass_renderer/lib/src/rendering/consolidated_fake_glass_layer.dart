@@ -95,6 +95,15 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   final _backdropLayer = LayerHandle<BackdropFilterLayer>();
   final _clipLayer = LayerHandle<ClipPathLayer>();
 
+  /// Capture shared by this layer's own backdrop filters when the user did
+  /// not provide a [backdropKey] or [BackdropGroup]. Without it, a
+  /// separately served shape would sample the shared filter's output in
+  /// overlapping pixels and compound both transfers; sharing one capture
+  /// also collapses their backdrop readbacks into one.
+  final _ownBackdropKey = BackdropKey();
+
+  BackdropKey get _effectiveBackdropKey => backdropKey ?? _ownBackdropKey;
+
   /// Per-shape backdrop passes for shapes the shared union clip cannot
   /// serve: shapes that are fading (0 < visibility < 1) or whose appearance
   /// needs a different backdrop transfer than the layer's. They sit between
@@ -281,9 +290,9 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         final backdropLayer = (_backdropLayer.layer ??= BackdropFilterLayer())
           ..filter = _cachedFilter ??= _buildBackdropFilter()
           ..blendMode = BlendMode.srcOver
-          ..backdropKey = backdropKey;
+          ..backdropKey = _effectiveBackdropKey;
         assert(() {
-          debugRegisterBackdropCapture(this, backdropKey);
+          debugRegisterBackdropCapture(this, _effectiveBackdropKey);
           return true;
         }(), 'Count independent backdrop captures in debug builds.');
         _clipLayer.layer = effectContext.pushClipPath(
@@ -388,9 +397,9 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         final backdropLayer = (layers.backdrop.layer ??= BackdropFilterLayer())
           ..filter = filter
           ..blendMode = BlendMode.srcOver
-          ..backdropKey = backdropKey;
+          ..backdropKey = _effectiveBackdropKey;
         assert(() {
-          debugRegisterBackdropCapture(this, backdropKey);
+          debugRegisterBackdropCapture(this, _effectiveBackdropKey);
           return true;
         }(), 'Count independent backdrop captures in debug builds.');
         final shapeToLayer = shape.shapeToGeometry == null
