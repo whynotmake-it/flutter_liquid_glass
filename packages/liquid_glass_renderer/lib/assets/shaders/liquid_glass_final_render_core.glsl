@@ -53,21 +53,20 @@ uniform vec2 uMaterialTextureSize;
 
 // Per-model parameter blocks for the three adaptive color-model slots the
 // layer assigned this frame: slot code 1..3 selects
-// uColorModelParams[(code - 1) * 9 .. code * 9 - 1]. Packing, mirrored from
+// uColorModelParams[(code - 1) * 8 .. code * 8 - 1]. Packing, mirrored from
 // GlassColorParameters.toShaderParameters:
-//   +0: emissionColor.rgb,          emissionAlpha.clear
-//   +1: emissionAlpha.middle/tinted, transmittanceSizeStart/End
-//   +2: transmittanceSmall c/m/t,    transmittanceLarge.clear
-//   +3: transmittanceLarge m/t,      luminanceLift.clear/middle
-//   +4: luminanceLift.tinted,        chromaGain.clear/middle/tinted
-//   +5: toneLow   (base, amplitude, pivot, exponent)
-//   +6: toneHigh  (base, amplitude, pivot, exponent)
-//   +7: toneGamma, toneGammaLuminance, glintLuminance, glintFaceGain
-//   +8: glintVibrancy, contourResponse
-uniform vec4 uColorModelParams[27];
+//   +0: emissionColor.rgb,           emissionAlpha.clear
+//   +1: emissionAlpha.tinted, -,     transmittanceSizeStart/End
+//   +2: transmittanceSmall c/t,      transmittanceLarge c/t
+//   +3: luminanceLift c/t,           chromaGain c/t
+//   +4: toneLow   (base, amplitude, pivot, exponent)
+//   +5: toneHigh  (base, amplitude, pivot, exponent)
+//   +6: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
+//   +7: contourResponse
+uniform vec4 uColorModelParams[24];
 
 vec4 colorModelSlot(int slot, int field) {
-    return uColorModelParams[slot * 9 + field];
+    return uColorModelParams[slot * 8 + field];
 }
 
 float uDisplacementScale = uOpticalProps.x;
@@ -154,20 +153,12 @@ vec4 shapeLookup(
 }
 #endif
 
-// The Liquid Glass slider moves every adaptive material parameter linearly
-// between three keyframes: Clear (0), the Settings middle tick (0.5) and
-// Tinted (1).
-float sliderKeyframes(float s, float clearValue, float middle, float tinted) {
-    return s <= 0.5
-        ? mix(clearValue, middle, s * 2.0)
-        : mix(middle, tinted, s * 2.0 - 1.0);
-}
-
-// Transmittance of one model's face. The small-side and large-side keyframe
-// curves blend over a smoothstep of the shape's short side; an empty size
-// range makes the model size-independent. Dark iOS 27 glass keeps its
-// emission but becomes denser with size: controls up to 75 pt transmit like
-// light glass and surfaces from 105 pt are denser from the start.
+// Transmittance of one model's face. The small-side and large-side
+// clear/tinted endpoints blend over a smoothstep of the shape's short side;
+// an empty size range makes the model size-independent. Dark iOS 27 glass
+// keeps its emission but becomes denser with size: controls up to 75 pt
+// transmit like light glass and surfaces from 105 pt are denser from the
+// start.
 float parametricTransmittance(
     int slot,
     float shortSide,
@@ -178,12 +169,10 @@ float parametricTransmittance(
         ? smoothstep(sizeRange.z, sizeRange.w, shortSide)
         : 0.0;
     vec4 transmittance = colorModelSlot(slot, 2);
-    vec4 largeLift = colorModelSlot(slot, 3);
-    return sliderKeyframes(
-        tintAmount,
-        mix(transmittance.x, transmittance.w, sizeMix),
-        mix(transmittance.y, largeLift.x, sizeMix),
-        mix(transmittance.z, largeLift.y, sizeMix)
+    return mix(
+        mix(transmittance.x, transmittance.z, sizeMix),
+        mix(transmittance.y, transmittance.w, sizeMix),
+        tintAmount
     );
 }
 
@@ -195,12 +184,7 @@ vec4 parametricNeutralTint(int slot, float shortSide, float tintAmount) {
     vec4 emission = colorModelSlot(slot, 0);
     vec4 sizeRange = colorModelSlot(slot, 1);
     float alpha = 1.0 - transmittance;
-    float emissionAlpha = sliderKeyframes(
-        tintAmount,
-        emission.w,
-        sizeRange.x,
-        sizeRange.y
-    );
+    float emissionAlpha = mix(emission.w, sizeRange.x, tintAmount);
     return vec4(
         emission.rgb * emissionAlpha / max(alpha, 1e-4),
         alpha
@@ -209,23 +193,22 @@ vec4 parametricNeutralTint(int slot, float shortSide, float tintAmount) {
 
 // Luminance lift and chroma gain of one model's untinted face.
 vec2 parametricFaceTransfer(int slot, float tintAmount) {
-    vec4 largeLift = colorModelSlot(slot, 3);
-    vec4 liftChroma = colorModelSlot(slot, 4);
+    vec4 liftChroma = colorModelSlot(slot, 3);
     return vec2(
-        sliderKeyframes(tintAmount, largeLift.z, largeLift.w, liftChroma.x),
-        sliderKeyframes(tintAmount, liftChroma.y, liftChroma.z, liftChroma.w)
+        mix(liftChroma.x, liftChroma.y, tintAmount),
+        mix(liftChroma.z, liftChroma.w, tintAmount)
     );
 }
 
 // The brightness-mapped range of tint tones of one model, evaluated per
 // channel as clamp(lo + (hi - lo) * tint^gamma) where lo and hi are
 // luminance ramps base + amplitude * (min(1, Y / pivot))^exponent and the
-// gamma is toneGamma + toneGammaLuminance * (1 - Y).
+// gamma is 1 + toneGammaLuminance * (1 - Y).
 vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
     float luminance = clamp(backdropLuminance, 0.0, 1.0);
-    vec4 low = colorModelSlot(slot, 5);
-    vec4 high = colorModelSlot(slot, 6);
-    vec4 gamma = colorModelSlot(slot, 7);
+    vec4 low = colorModelSlot(slot, 4);
+    vec4 high = colorModelSlot(slot, 5);
+    vec4 misc = colorModelSlot(slot, 6);
     float floor_ = low.x + low.y * pow(
         min(1.0, luminance / max(low.z, 1e-6)),
         low.w
@@ -237,7 +220,7 @@ vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
     return clamp(
         vec3(floor_) + (vec3(ceiling) - floor_) * pow(
             max(tint, vec3(0.0)),
-            vec3(gamma.x + gamma.y * (1.0 - luminance))
+            vec3(1.0 + misc.x * (1.0 - luminance))
         ),
         0.0,
         1.0
@@ -246,14 +229,12 @@ vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
 
 // Glint target parameters of one model: luminance, face gain, vibrancy.
 vec3 parametricGlint(int slot) {
-    vec4 gamma = colorModelSlot(slot, 7);
-    vec4 misc = colorModelSlot(slot, 8);
-    return vec3(gamma.z, gamma.w, misc.x);
+    return colorModelSlot(slot, 6).yzw;
 }
 
 // How strongly a model's border follows the opacity the slider adds.
 float parametricContourResponse(int slot) {
-    return colorModelSlot(slot, 8).y;
+    return colorModelSlot(slot, 7).x;
 }
 
 // Shares of a color model code: direct (0) plus the layer's three model

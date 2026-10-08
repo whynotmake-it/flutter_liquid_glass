@@ -4,52 +4,38 @@ import 'dart:ui';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
-/// Interpolates linearly between the Liquid Glass slider keyframes: Clear
-/// (`0`), the Settings middle tick (`0.5`) and Tinted (`1`).
+/// Interpolates linearly between the Liquid Glass slider endpoints: Clear
+/// (`0`) and Tinted (`1`).
 @internal
-double sliderKeyframes(
-  double tintAmount,
-  double clear,
-  double middle,
-  double tinted,
-) {
-  final s = tintAmount.clamp(0.0, 1.0);
-  return s <= 0.5
-      ? clear + (middle - clear) * s * 2
-      : middle + (tinted - middle) * (s * 2 - 1);
-}
+double sliderKeyframes(double tintAmount, double clear, double tinted) =>
+    clear + (tinted - clear) * tintAmount.clamp(0.0, 1.0);
 
-/// A three-keyframe curve over the Liquid Glass slider position.
+/// A linear curve over the Liquid Glass slider position.
 ///
-/// The knots sit at Clear (`0`), the Settings middle tick (`0.5`) and Tinted
-/// (`1`), interpolated piecewise-linearly. This mirrors `sliderKeyframes` in
-/// the final render shader.
+/// The endpoints sit at Clear (`0`) and Tinted (`1`). This mirrors the
+/// endpoint interpolation in the final render shader.
 @immutable
 class GlassColorCurve with Equatable {
-  /// A curve through [clear], [middle] and [tinted].
-  const GlassColorCurve(this.clear, this.middle, this.tinted);
+  /// A curve through [clear] and [tinted].
+  const GlassColorCurve(this.clear, this.tinted);
 
   /// A curve that holds [value] at every slider position.
   const GlassColorCurve.constant(double value)
     : clear = value,
-      middle = value,
       tinted = value;
 
   /// Value at the Clear slider position (`0`).
   final double clear;
 
-  /// Value at the Settings middle tick (`0.5`).
-  final double middle;
-
   /// Value at the Tinted slider position (`1`).
   final double tinted;
 
-  /// The piecewise-linear value at [tintAmount].
+  /// The value at [tintAmount].
   double evaluate(double tintAmount) =>
-      sliderKeyframes(tintAmount, clear, middle, tinted);
+      sliderKeyframes(tintAmount, clear, tinted);
 
   @override
-  List<Object?> get props => [clear, middle, tinted];
+  List<Object?> get props => [clear, tinted];
 }
 
 /// One boundary of the tint-tone ramp, `base + amplitude *
@@ -105,7 +91,7 @@ class GlassToneRamp with Equatable {
 /// `lum(Y) = Y + lift * Y * (1 - Y)`; `emission` is premultiplied. The tint
 /// response maps each tint channel `c` to
 /// `clamp(lo + (hi - lo) * c^gamma)` where `lo`/`hi` are [GlassToneRamp]s of
-/// backdrop luminance and `gamma = toneGamma + toneGammaLuminance * (1 - Y)`.
+/// backdrop luminance and `gamma = 1 + toneGammaLuminance * (1 - Y)`.
 ///
 /// The fitted iOS 27 parameter sets ship as [GlassColorParameters.ios27Light],
 /// [GlassColorParameters.ios27Dark] and [GlassColorParameters.ios27Clear];
@@ -118,14 +104,13 @@ class GlassColorParameters with Equatable {
     required this.emissionColor,
     required this.emissionAlpha,
     required this.transmittanceSmall,
-    required this.transmittanceLarge,
     required this.luminanceLift,
     required this.chromaGain,
+    this.transmittanceLarge,
     this.transmittanceSizeStart = 0,
     this.transmittanceSizeEnd = -1,
     this.toneLow = const GlassToneRamp.constant(0),
     this.toneHigh = const GlassToneRamp.constant(1),
-    this.toneGamma = 1,
     this.toneGammaLuminance = 0,
     this.glintLuminance = 1.6,
     this.glintFaceGain = 0,
@@ -149,7 +134,7 @@ class GlassColorParameters with Equatable {
         (json[key] as List?)?.map((v) => (v as num).toDouble()).toList();
     GlassColorCurve? curve(String key) => switch (list(key)) {
       null => null,
-      [final a, final b, final c] => GlassColorCurve(a, b, c),
+      [final a, final b] => GlassColorCurve(a, b),
       _ => throw ArgumentError.value(json[key], key),
     };
     GlassToneRamp? ramp(String key) => switch (list(key)) {
@@ -188,8 +173,7 @@ class GlassColorParameters with Equatable {
       chromaGain: curve('chromaGain'),
       toneLow: ramp('toneLow'),
       toneHigh: ramp('toneHigh'),
-      toneGamma: at('toneGamma', 0),
-      toneGammaLuminance: at('toneGamma', 1),
+      toneGammaLuminance: number('toneGammaLuminance'),
       glintLuminance: at('glint', 0),
       glintFaceGain: at('glint', 1),
       glintVibrancy: at('glint', 2),
@@ -210,8 +194,9 @@ class GlassColorParameters with Equatable {
   final GlassColorCurve transmittanceSmall;
 
   /// Transmittance over the slider for shapes from
-  /// [transmittanceSizeEnd] logical pixels on the short side.
-  final GlassColorCurve transmittanceLarge;
+  /// [transmittanceSizeEnd] logical pixels on the short side, or `null` to
+  /// use [transmittanceSmall] at every size.
+  final GlassColorCurve? transmittanceLarge;
 
   /// Short side where [transmittanceSmall] applies in full. When
   /// `transmittanceSizeEnd <= transmittanceSizeStart` the transmittance is
@@ -233,10 +218,8 @@ class GlassColorParameters with Equatable {
   /// Luminance ramp of the tint tone's upper bound.
   final GlassToneRamp toneHigh;
 
-  /// Tint-channel exponent at black backdrop.
-  final double toneGamma;
-
-  /// Change of the tint-channel exponent with `1 - luminance`.
+  /// Change of the tint-channel exponent `1 + toneGammaLuminance * (1 - Y)`
+  /// with backdrop luminance `Y`.
   final double toneGammaLuminance;
 
   /// Luminance of the glint's bright target (real glass: HDR-capable).
@@ -262,11 +245,10 @@ class GlassColorParameters with Equatable {
   /// wash that becomes more opaque and desaturating along the slider.
   static const ios27Light = GlassColorParameters(
     emissionColor: Color.fromRGBO(253, 252, 253, 1),
-    emissionAlpha: GlassColorCurve(1 - 0.592, 1 - 0.468, 1 - 0.286),
-    transmittanceSmall: GlassColorCurve(0.592, 0.468, 0.286),
-    transmittanceLarge: GlassColorCurve(0.592, 0.468, 0.286),
+    emissionAlpha: GlassColorCurve(1 - 0.592, 1 - 0.286),
+    transmittanceSmall: GlassColorCurve(0.592, 0.286),
     luminanceLift: GlassColorCurve.constant(0.13),
-    chromaGain: GlassColorCurve(1.17, 0.982, 0.751),
+    chromaGain: GlassColorCurve(1.17, 0.751),
     toneHigh: _lightToneHigh,
     toneGammaLuminance: .07044432,
     fakeGlintLuminance: 2.9,
@@ -280,18 +262,17 @@ class GlassColorParameters with Equatable {
   );
 
   /// The fitted iOS 27 regular material in dark appearance: constant
-  /// `32/255` emission, density rising with size and slider, highlights
-  /// compressed up to the middle tick, and a border that strengthens with
-  /// the opacity the slider adds.
+  /// `32/255` emission, density rising linearly with size and slider, and a
+  /// border that strengthens with the opacity the slider adds.
   static const ios27Dark = GlassColorParameters(
     emissionColor: Color.fromRGBO(32, 32, 32, 1),
     emissionAlpha: GlassColorCurve.constant(1),
-    transmittanceSmall: GlassColorCurve(0.597, 0.596, 0.295),
-    transmittanceLarge: GlassColorCurve(0.447, 0.346, 0.195),
+    transmittanceSmall: GlassColorCurve(0.597, 0.295),
+    transmittanceLarge: GlassColorCurve(0.447, 0.195),
     transmittanceSizeStart: 75,
     transmittanceSizeEnd: 105,
-    luminanceLift: GlassColorCurve(1, 1.58, 1.13),
-    chromaGain: GlassColorCurve(1.02, 0.955, 0.572),
+    luminanceLift: GlassColorCurve(1, 1.13),
+    chromaGain: GlassColorCurve(1.02, 0.572),
     toneLow: GlassToneRamp(
       base: 0,
       amplitude: .08611765,
@@ -318,7 +299,6 @@ class GlassColorParameters with Equatable {
     emissionColor: Color.fromRGBO(255, 255, 255, 1),
     emissionAlpha: GlassColorCurve.constant(.126),
     transmittanceSmall: GlassColorCurve.constant(.954),
-    transmittanceLarge: GlassColorCurve.constant(.954),
     luminanceLift: GlassColorCurve.constant(0),
     chromaGain: GlassColorCurve.constant(1.057),
     toneHigh: _lightToneHigh,
@@ -334,20 +314,21 @@ class GlassColorParameters with Equatable {
     'emissionColor': [emissionColor.r, emissionColor.g, emissionColor.b],
     'emissionAlpha': _curveToJson(emissionAlpha),
     'transmittanceSmall': _curveToJson(transmittanceSmall),
-    'transmittanceLarge': _curveToJson(transmittanceLarge),
+    if (transmittanceLarge case final large?)
+      'transmittanceLarge': _curveToJson(large),
     'transmittanceSize': [transmittanceSizeStart, transmittanceSizeEnd],
     'luminanceLift': _curveToJson(luminanceLift),
     'chromaGain': _curveToJson(chromaGain),
     'toneLow': _rampToJson(toneLow),
     'toneHigh': _rampToJson(toneHigh),
-    'toneGamma': [toneGamma, toneGammaLuminance],
+    'toneGammaLuminance': toneGammaLuminance,
     'glint': [glintLuminance, glintFaceGain, glintVibrancy],
     'contourResponse': contourResponse,
     'fakeGlintLuminance': fakeGlintLuminance,
   };
 
   static List<double> _curveToJson(GlassColorCurve curve) =>
-      [curve.clear, curve.middle, curve.tinted];
+      [curve.clear, curve.tinted];
 
   static List<double> _rampToJson(GlassToneRamp ramp) =>
       [ramp.base, ramp.amplitude, ramp.pivot, ramp.exponent];
@@ -364,7 +345,6 @@ class GlassColorParameters with Equatable {
     GlassColorCurve? chromaGain,
     GlassToneRamp? toneLow,
     GlassToneRamp? toneHigh,
-    double? toneGamma,
     double? toneGammaLuminance,
     double? glintLuminance,
     double? glintFaceGain,
@@ -383,7 +363,6 @@ class GlassColorParameters with Equatable {
     chromaGain: chromaGain ?? this.chromaGain,
     toneLow: toneLow ?? this.toneLow,
     toneHigh: toneHigh ?? this.toneHigh,
-    toneGamma: toneGamma ?? this.toneGamma,
     toneGammaLuminance: toneGammaLuminance ?? this.toneGammaLuminance,
     glintLuminance: glintLuminance ?? this.glintLuminance,
     glintFaceGain: glintFaceGain ?? this.glintFaceGain,
@@ -407,7 +386,9 @@ class GlassColorParameters with Equatable {
       sizeMix = t * t * (3 - 2 * t);
     }
     final small = transmittanceSmall.evaluate(tintAmount);
-    final large = transmittanceLarge.evaluate(tintAmount);
+    final large = (transmittanceLarge ?? transmittanceSmall).evaluate(
+      tintAmount,
+    );
     return small + (large - small) * sizeMix;
   }
 
@@ -447,7 +428,7 @@ class GlassColorParameters with Equatable {
   Color tintTone(Color tint, double luminance) {
     final lo = toneLow.evaluate(luminance);
     final hi = toneHigh.evaluate(luminance);
-    final gamma = toneGamma + toneGammaLuminance * (1 - luminance);
+    final gamma = 1 + toneGammaLuminance * (1 - luminance);
     double channel(double c) =>
         (lo + (hi - lo) * math.pow(math.max(c, 0.0), gamma)).clamp(0.0, 1.0);
     return Color.from(
@@ -459,27 +440,28 @@ class GlassColorParameters with Equatable {
   }
 
   /// Floats of one slot of `uColorModelParams` in the final render shader.
-  /// Nine vec4 slots per model; keep the packing mirrored with
+  /// Eight vec4 slots per model; keep the packing mirrored with
   /// liquid_glass_final_render_core.glsl.
   @internal
-  List<double> toShaderParameters() => [
-    emissionColor.r, emissionColor.g, emissionColor.b, emissionAlpha.clear,
-    emissionAlpha.middle, emissionAlpha.tinted, //
-    transmittanceSizeStart, transmittanceSizeEnd,
-    transmittanceSmall.clear, transmittanceSmall.middle,
-    transmittanceSmall.tinted, transmittanceLarge.clear,
-    transmittanceLarge.middle, transmittanceLarge.tinted,
-    luminanceLift.clear, luminanceLift.middle,
-    luminanceLift.tinted, chromaGain.clear, chromaGain.middle,
-    chromaGain.tinted,
-    toneLow.base, toneLow.amplitude, toneLow.pivot, toneLow.exponent,
-    toneHigh.base, toneHigh.amplitude, toneHigh.pivot, toneHigh.exponent,
-    toneGamma, toneGammaLuminance, glintLuminance, glintFaceGain,
-    glintVibrancy, contourResponse, 0, 0,
-  ];
+  List<double> toShaderParameters() {
+    final large = transmittanceLarge ?? transmittanceSmall;
+    return [
+      emissionColor.r, emissionColor.g, emissionColor.b, emissionAlpha.clear,
+      emissionAlpha.tinted, 0, //
+      transmittanceSizeStart, transmittanceSizeEnd,
+      transmittanceSmall.clear, transmittanceSmall.tinted,
+      large.clear, large.tinted,
+      luminanceLift.clear, luminanceLift.tinted,
+      chromaGain.clear, chromaGain.tinted,
+      toneLow.base, toneLow.amplitude, toneLow.pivot, toneLow.exponent,
+      toneHigh.base, toneHigh.amplitude, toneHigh.pivot, toneHigh.exponent,
+      toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy,
+      contourResponse, 0, 0, 0,
+    ];
+  }
 
-  /// Floats per model slot in `uColorModelParams` (nine vec4).
-  static const int shaderParameterFloatCount = 36;
+  /// Floats per model slot in `uColorModelParams` (eight vec4).
+  static const int shaderParameterFloatCount = 32;
 
   @override
   List<Object?> get props => [
@@ -493,7 +475,6 @@ class GlassColorParameters with Equatable {
     chromaGain,
     toneLow,
     toneHigh,
-    toneGamma,
     toneGammaLuminance,
     glintLuminance,
     glintFaceGain,

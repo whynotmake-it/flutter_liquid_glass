@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart'
+    show sliderKeyframes;
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 void main() {
@@ -104,41 +106,47 @@ void main() {
     );
   });
 
-  test('the Liquid Glass slider follows the measured face density', () {
+  test('the Liquid Glass slider interpolates face density linearly', () {
     const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
     const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
-    // Face transmittance of the Reduce Motion off slider sweep.
-    const lightToolbar = {
-      0: .592,
-      25: .529,
-      45: .482,
-      50: .470,
-      55: .454,
-      75: .380,
-      100: .290,
-    };
-    for (final MapEntry(key: position, value: transmittance)
-        in lightToolbar.entries) {
+    // Measured Reduce Motion off sweeps bow above a linear ramp (light
+    // .529 at 25% vs .516 linear), but the mid knots reproducing that bow fit
+    // the composite captures worse; the model pins the measured endpoints
+    // and interpolates linearly instead.
+    double lightDensity(double position) =>
+        light.faceTransfer(94, tintAmount: position)!.transmittance;
+    expect(lightDensity(0), closeTo(.592, .006));
+    expect(lightDensity(1), closeTo(.290, .006));
+    for (final position in const [.25, .45, .5, .55, .75]) {
       expect(
-        light.faceTransfer(94, tintAmount: position / 100)!.transmittance,
-        closeTo(transmittance, .006),
-        reason: 'light $position%',
+        lightDensity(position),
+        closeTo(
+          sliderKeyframes(position, lightDensity(0), lightDensity(1)),
+          1e-9,
+        ),
+        reason: 'light ${position * 100}%',
       );
     }
     const darkBySize = {
-      63: {0: .599, 50: .599, 75: .450, 100: .298},
-      94: {0: .486, 50: .411, 75: .306, 100: .215},
-      150: {0: .447, 50: .351, 75: .267, 100: .208},
+      63: {0: .599, 100: .298},
+      94: {0: .486, 100: .215},
+      150: {0: .447, 100: .208},
     };
     for (final MapEntry(key: size, value: sweep) in darkBySize.entries) {
-      for (final MapEntry(key: position, value: transmittance)
-          in sweep.entries) {
-        expect(
+      double darkDensity(double position) =>
           dark
-              .faceTransfer(size.toDouble(), tintAmount: position / 100)!
-              .transmittance,
-          closeTo(transmittance, .02),
-          reason: 'dark $size pt $position%',
+              .faceTransfer(size.toDouble(), tintAmount: position)!
+              .transmittance;
+      expect(darkDensity(0), closeTo(sweep[0]!, .02));
+      expect(darkDensity(1), closeTo(sweep[100]!, .02));
+      for (final position in const [.25, .5, .75]) {
+        expect(
+          darkDensity(position),
+          closeTo(
+            sliderKeyframes(position, darkDensity(0), darkDensity(1)),
+            1e-9,
+          ),
+          reason: 'dark $size pt ${position * 100}%',
         );
       }
     }

@@ -655,7 +655,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
       ..setFloat(54, softensInShader ? 1 : 0);
     // Float index 63, after the geometry/material texture sizes: the three
-    // adaptive color-model slots (nine vec4 each), zero-filled when fewer
+    // adaptive color-model slots (eight vec4 each), zero-filled when fewer
     // than three distinct models are in use.
     shader.setFloatUniforms(initialIndex: 63, (value) {
       value.setFloats([
