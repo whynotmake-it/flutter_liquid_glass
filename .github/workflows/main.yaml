@@ -47,8 +47,36 @@ jobs:
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens
-      
-  
+
+
+  skia_build:
+    name: Skia Build Check
+    # Web is a Skia-only target: its build fails if a pubspec shader cannot
+    # compile to SkSL, so this guards the Skia compile path for consumers.
+    # The liquid glass shaders are bundled by the build hook as .iplr instead.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+
+      - name: 🌐 Build example for web
+        working-directory: packages/liquid_glass_renderer/example
+        run: |
+          flutter create --platforms web .
+          flutter build web
+
   check_generation:
     name: Check Code Generation
     timeout-minutes: 10
