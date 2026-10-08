@@ -70,8 +70,8 @@ void main() {
       'lib/assets/shaders/liquid_glass_final_render_core.glsl',
     ).readAsStringSync();
 
-    expect(source, contains('vec3 ios27TintTone('));
-    expect(source, contains('ios27Base = mix(neutralBase, tintTone'));
+    expect(source, contains('vec3 parametricTintTone('));
+    expect(source, contains('toneSum / vec3(adaptiveShare)'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
       6,

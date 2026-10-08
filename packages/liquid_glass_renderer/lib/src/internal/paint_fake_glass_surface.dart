@@ -165,7 +165,9 @@ void paintFakeGlassSurface(
         shape is LiquidRoundedSuperellipse
             ? roundedSuperellipseParameters(size, cornerRadius)
             : _noSuperellipse,
-      );
+      )
+      ..setFloat(appearance.colorModel.fakeGlintFaceGain)
+      ..setFloat(appearance.colorModel.fakeGlintVibrancy);
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
   canvas.drawRect(

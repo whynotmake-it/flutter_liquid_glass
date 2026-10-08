@@ -51,6 +51,24 @@ uniform vec2 uGeometryUVScale;
 // Texel size of the material map's texture; the map fills its top-left.
 uniform vec2 uMaterialTextureSize;
 
+// Per-model parameter blocks for the three adaptive color-model slots the
+// layer assigned this frame: slot code 1..3 selects
+// uColorModelParams[(code - 1) * 8 .. code * 8 - 1]. Packing, mirrored from
+// GlassColorParameters.toShaderParameters:
+//   +0: emissionColor.rgb,           emissionAlpha.clear
+//   +1: emissionAlpha.tinted, -,     transmittanceSizeStart/End
+//   +2: transmittanceSmall c/t,      transmittanceLarge c/t
+//   +3: luminanceLift c/t,           chromaGain c/t
+//   +4: toneLow   (base, amplitude, pivot, exponent)
+//   +5: toneHigh  (base, amplitude, pivot, exponent)
+//   +6: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
+//   +7: contourResponse
+uniform vec4 uColorModelParams[24];
+
+vec4 colorModelSlot(int slot, int field) {
+    return uColorModelParams[slot * 8 + field];
+}
+
 float uDisplacementScale = uOpticalProps.x;
 float uDispersion = uOpticalProps.y;
 // Rim lighting depth; the matte encodes edge distance up to 4x this.
@@ -135,119 +153,97 @@ vec4 shapeLookup(
 }
 #endif
 
-// Neutral wash of the untinted face. Light glass transmits 0.592 at every
-// size. Dark glass keeps its 32/255 emission but becomes denser with size:
-// controls up to 75 pt transmit like light glass and surfaces from 105 pt
-// transmit 0.447. Clear glass is appearance-independent.
-// The Liquid Glass slider moves every iOS 27 material parameter linearly
-// between three keyframes: Clear (0), the Settings middle tick (0.5) and
-// Tinted (1).
-float sliderKeyframes(float s, float clearValue, float middle, float tinted) {
-    return s <= 0.5
-        ? mix(clearValue, middle, s * 2.0)
-        : mix(middle, tinted, s * 2.0 - 1.0);
-}
-
-// Transmittance of the dark regular face. Controls up to 75 pt keep the
-// light-mode density until the middle tick; surfaces from 105 pt are denser
-// from the start. Both roughly halve by Tinted.
-float ios27DarkTransmittance(float shortSide, float tintAmount) {
-    float large = smoothstep(75.0, 105.0, shortSide);
-    return sliderKeyframes(
-        tintAmount,
-        mix(0.597, 0.447, large),
-        mix(0.596, 0.346, large),
-        mix(0.295, 0.195, large)
-    );
-}
-
-// Mixes two washes by their emission (premultiplied color) and opacity.
-vec4 mixWash(vec4 a, vec4 b, float t) {
-    float alpha = mix(a.a, b.a, t);
-    vec3 emission = mix(a.rgb * a.a, b.rgb * b.a, t);
-    return vec4(emission / max(alpha, 1e-4), alpha);
-}
-
-// Neutral wash of the untinted face. Light glass keeps its near-white
-// color and becomes more opaque; dark glass keeps its 32/255 emission, so
-// its wash darkens as it becomes opaque. Clear glass has no slider response.
-vec4 ios27NeutralTint(
-    float darkWeight,
+// Transmittance of one model's face. The small-side and large-side
+// clear/tinted endpoints blend over a smoothstep of the shape's short side;
+// an empty size range makes the model size-independent. Dark iOS 27 glass
+// keeps its emission but becomes denser with size: controls up to 75 pt
+// transmit like light glass and surfaces from 105 pt are denser from the
+// start.
+float parametricTransmittance(
+    int slot,
     float shortSide,
-    bool clearGlass,
     float tintAmount
 ) {
-    if (clearGlass) {
-        return vec4(vec3(0.126 / 0.046), 0.046);
-    }
-    float lightAlpha =
-        1.0 - sliderKeyframes(tintAmount, 0.592, 0.468, 0.286);
-    float darkTransmittance = ios27DarkTransmittance(shortSide, tintAmount);
-    vec4 dark = vec4(
-        vec3((32.0 / 255.0) / (1.0 - darkTransmittance)),
-        1.0 - darkTransmittance
+    vec4 sizeRange = colorModelSlot(slot, 1);
+    float sizeMix = sizeRange.w > sizeRange.z
+        ? smoothstep(sizeRange.z, sizeRange.w, shortSide)
+        : 0.0;
+    vec4 transmittance = colorModelSlot(slot, 2);
+    return mix(
+        mix(transmittance.x, transmittance.z, sizeMix),
+        mix(transmittance.y, transmittance.w, sizeMix),
+        tintAmount
     );
-    vec4 light = vec4(vec3(253.0, 252.0, 253.0) / 255.0, lightAlpha);
-    return mixWash(light, dark, darkWeight);
 }
 
-// Luminance lift and chroma gain of the untinted face. The slider
-// desaturates both appearances and compresses dark highlights up to the
-// middle tick.
-vec2 ios27FaceTransfer(float darkWeight, bool clearGlass, float tintAmount) {
-    if (clearGlass) {
-        return vec2(0.0, 1.057);
-    }
-    vec2 light = vec2(0.13, sliderKeyframes(tintAmount, 1.17, 0.982, 0.751));
-    vec2 dark = vec2(
-        sliderKeyframes(tintAmount, 1.0, 1.58, 1.13),
-        sliderKeyframes(tintAmount, 1.02, 0.955, 0.572)
+// Neutral wash of one model's untinted face: premultiplied emission over
+// the wash's opacity, the complement of its transmittance.
+vec4 parametricNeutralTint(int slot, float shortSide, float tintAmount) {
+    float transmittance =
+        parametricTransmittance(slot, shortSide, tintAmount);
+    vec4 emission = colorModelSlot(slot, 0);
+    vec4 sizeRange = colorModelSlot(slot, 1);
+    float alpha = 1.0 - transmittance;
+    float emissionAlpha = mix(emission.w, sizeRange.x, tintAmount);
+    return vec4(
+        emission.rgb * emissionAlpha / max(alpha, 1e-4),
+        alpha
     );
-    return mix(light, dark, darkWeight);
 }
 
-// Light and dark glass select tint tones differently; merged light and dark
-// shapes mix the two by darkWeight.
-vec3 ios27TintTone(vec3 tint, float backdropLuminance, float darkWeight) {
+// Luminance lift and chroma gain of one model's untinted face.
+vec2 parametricFaceTransfer(int slot, float tintAmount) {
+    vec4 liftChroma = colorModelSlot(slot, 3);
+    return vec2(
+        mix(liftChroma.x, liftChroma.y, tintAmount),
+        mix(liftChroma.z, liftChroma.w, tintAmount)
+    );
+}
+
+// The brightness-mapped range of tint tones of one model, evaluated per
+// channel as clamp(lo + (hi - lo) * tint^gamma) where lo and hi are
+// luminance ramps base + amplitude * (min(1, Y / pivot))^exponent and the
+// gamma is 1 + toneGammaLuminance * (1 - Y).
+vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
     float luminance = clamp(backdropLuminance, 0.0, 1.0);
-    vec3 tone = vec3(0.0);
-    if (darkWeight < 1.0) {
-        float lightScale = 0.76059211 +
-            (1.0 - 0.76059211) * pow(luminance, 0.90667748);
-        tone = clamp(
-            lightScale * pow(
-                max(tint, vec3(0.0)),
-                vec3(1.0 + 0.07044432 * (1.0 - luminance))
-            ),
-            0.0,
-            1.0
-        );
-    }
-    if (darkWeight > 0.0) {
-        float darkFloor = 0.08611765 * pow(
-            min(1.0, luminance / 0.62019473),
-            1.01150514
-        );
-        float darkCeiling = 1.0 - 0.01560784 * pow(
-            min(1.0, luminance / 0.46837318),
-            1.85642966
-        );
-        tone = mix(
-            tone,
-            clamp(mix(vec3(darkFloor), vec3(darkCeiling), tint), 0.0, 1.0),
-            darkWeight
-        );
-    }
-    return tone;
+    vec4 low = colorModelSlot(slot, 4);
+    vec4 high = colorModelSlot(slot, 5);
+    vec4 misc = colorModelSlot(slot, 6);
+    float floor_ = low.x + low.y * pow(
+        min(1.0, luminance / max(low.z, 1e-6)),
+        low.w
+    );
+    float ceiling = high.x + high.y * pow(
+        min(1.0, luminance / max(high.z, 1e-6)),
+        high.w
+    );
+    return clamp(
+        vec3(floor_) + (vec3(ceiling) - floor_) * pow(
+            max(tint, vec3(0.0)),
+            vec3(1.0 + misc.x * (1.0 - luminance))
+        ),
+        0.0,
+        1.0
+    );
 }
 
-// Direct, dark and clear shares of a color model code (0 direct, 1 iOS 27
-// light, 2 iOS 27 dark, 3 iOS 27 clear). Merged shapes blend these shares
-// rather than the codes, so a light-to-clear merge does not pass through
-// dark.
-vec3 colorModelSharesOf(float code) {
-    return vec3(
+// Glint target parameters of one model: luminance, face gain, vibrancy.
+vec3 parametricGlint(int slot) {
+    return colorModelSlot(slot, 6).yzw;
+}
+
+// How strongly a model's border follows the opacity the slider adds.
+float parametricContourResponse(int slot) {
+    return colorModelSlot(slot, 7).x;
+}
+
+// Shares of a color model code: direct (0) plus the layer's three model
+// slots (1..3). Merged shapes blend these shares rather than the codes, so
+// a merge between two adaptive models does not pass through direct.
+vec4 colorModelSharesOf(float code) {
+    return vec4(
         code < 0.5 ? 1.0 : 0.0,
+        abs(code - 1.0) < 0.5 ? 1.0 : 0.0,
         abs(code - 2.0) < 0.5 ? 1.0 : 0.0,
         code > 2.5 ? 1.0 : 0.0
     );
@@ -537,7 +533,7 @@ void main() {
     // opaque unfrosted glass fades it here. Either way it fades linearly,
     // never twice.
     float materialVisibility = mix(appearanceVisibility, 1.0, uBlurFade);
-    vec3 colorModelShares = colorModelSharesOf(uAppearanceConfig.x);
+    vec4 colorModelShares = colorModelSharesOf(uAppearanceConfig.x);
     #if SHAPE_TINT
     {
         float materialRasterScale = max(uAppearanceConfig.z, 1.0);
@@ -800,52 +796,64 @@ void main() {
         // "range of tones" is selected from backdrop brightness, while tint
         // opacity linearly mixes that opaque tonal result with the untinted
         // material. The untinted material itself treats luminance and
-        // chroma separately (see ios27FaceTransfer). Saturation and gamma
-        // stay available as relative adjustments where 1 is Apple's face.
-        float ios27Share = 1.0 - directShare;
-        float darkWeight = clamp(colorModelShares.y / ios27Share, 0.0, 1.0);
-        float clearWeight = clamp(colorModelShares.z / ios27Share, 0.0, 1.0);
-        // Share of dark glass within the regular (non-clear) part.
-        float regularDarkWeight = clearWeight < 1.0
-            ? clamp(darkWeight / (1.0 - clearWeight), 0.0, 1.0)
-            : 0.0;
-        vec4 neutralTint = ios27NeutralTint(
-            0.0,
-            uAppearanceConfig.w,
-            true,
-            uTintAmount
-        );
-        vec2 faceTransfer = ios27FaceTransfer(0.0, true, uTintAmount);
-        if (clearWeight < 1.0) {
-            neutralTint = mixWash(
-                ios27NeutralTint(
-                    regularDarkWeight,
-                    uAppearanceConfig.w,
-                    false,
-                    uTintAmount
-                ),
-                neutralTint,
-                clearWeight
-            );
-            faceTransfer = mix(
-                ios27FaceTransfer(regularDarkWeight, false, uTintAmount),
-                faceTransfer,
-                clearWeight
-            );
-        }
-        if (colorModelShares.y > 0.0) {
-            // The dark border strengthens with the opacity the slider adds.
-            float addedOpacity =
-                ios27DarkTransmittance(uAppearanceConfig.w, 0.0) -
-                ios27DarkTransmittance(uAppearanceConfig.w, uTintAmount);
-            gContourAlpha *= 1.0 + 0.95 * addedOpacity * colorModelShares.y;
-        }
-        if (colorModelShares.z > 0.0) {
-            gGlintLuminance = mix(gGlintLuminance, 2.34, colorModelShares.z);
-            gGlintFaceGain = mix(gGlintFaceGain, 3.58, colorModelShares.z);
-            gGlintVibrancy = mix(gGlintVibrancy, 0.78, colorModelShares.z);
-        }
+        // chroma separately (see parametricFaceTransfer). Saturation and
+        // gamma stay available as relative adjustments where 1 is Apple's
+        // face.
+        float adaptiveShare = 1.0 - directShare;
         float backdropLuminance = dot(refractColor.rgb, LUMA_WEIGHTS);
+        // Slot-weighted blend of each model's outputs. Wash, face transfer,
+        // tint tone, border response and glint target all mix linearly, so
+        // merged models cross-fade without passing through a third. The
+        // direct share contributes the shared default glint target.
+        vec4 washSum = vec4(0.0);
+        vec2 transferSum = vec2(0.0);
+        vec3 toneSum = vec3(0.0);
+        float contourBoost = 0.0;
+        vec3 glintSum = vec3(
+            directShare * kGlintLuminance,
+            0.0,
+            directShare * kGlintVibrancy
+        );
+        for (int slot = 0; slot < 3; slot++) {
+            float share = colorModelShares[slot + 1];
+            if (share <= 0.0) {
+                continue;
+            }
+            vec4 wash = parametricNeutralTint(
+                slot,
+                uAppearanceConfig.w,
+                uTintAmount
+            );
+            washSum += share * vec4(wash.rgb * wash.a, wash.a);
+            transferSum +=
+                share * parametricFaceTransfer(slot, uTintAmount);
+            // A model's border strengthens with the opacity the slider adds.
+            contourBoost += share * parametricContourResponse(slot) * (
+                parametricTransmittance(slot, uAppearanceConfig.w, 0.0) -
+                parametricTransmittance(
+                    slot,
+                    uAppearanceConfig.w,
+                    uTintAmount
+                )
+            );
+            if (materialTint.a >= 0.001) {
+                toneSum += share * parametricTintTone(
+                    slot,
+                    materialTint.rgb,
+                    backdropLuminance
+                );
+            }
+            glintSum += share * parametricGlint(slot);
+        }
+        gContourAlpha *= 1.0 + contourBoost;
+        gGlintLuminance = glintSum.x;
+        gGlintFaceGain = glintSum.y;
+        gGlintVibrancy = glintSum.z;
+        vec4 neutralTint = vec4(
+            washSum.rgb / max(washSum.a, 1e-4),
+            washSum.a / adaptiveShare
+        );
+        vec2 faceTransfer = transferSum / adaptiveShare;
         float transmittedLuminance = pow(
             clamp(
                 backdropLuminance *
@@ -874,12 +882,11 @@ void main() {
         );
         vec3 ios27Base = neutralBase;
         if (materialTint.a >= 0.001) {
-            vec3 tintTone = ios27TintTone(
-                materialTint.rgb,
-                backdropLuminance,
-                darkWeight
+            ios27Base = mix(
+                neutralBase,
+                toneSum / vec3(adaptiveShare),
+                materialTint.a
             );
-            ios27Base = mix(neutralBase, tintTone, materialTint.a);
         }
         baseColor = mix(ios27Base, baseColor, directShare);
         transmittedColor = mix(

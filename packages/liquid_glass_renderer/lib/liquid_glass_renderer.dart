@@ -10,11 +10,7 @@ export 'src/liquid_glass.dart' show LiquidGlass;
 export 'src/liquid_glass_appearance.dart' show LiquidGlassAppearance;
 export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
 export 'src/liquid_glass_capture.dart' show LiquidGlassCapture;
-export 'src/liquid_glass_color_model.dart'
-    show
-        DirectLiquidGlassColorModel,
-        Ios27LiquidGlassColorModel,
-        LiquidGlassColorModel;
+export 'src/liquid_glass_color_model.dart' show LiquidGlassColorModel;
 export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
 export 'src/liquid_shape.dart';
