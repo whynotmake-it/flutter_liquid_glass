@@ -490,11 +490,11 @@ class GlassColorParameters with Equatable {
 /// the direct model, which applies tint, gamma, saturation and vibrancy per
 /// channel with no backdrop conditioning. The fitted iOS 27 models ship as
 /// presets: [LiquidGlassColorModel.ios27] and
-/// [LiquidGlassColorModel.ios27Clear]. Compose [GlassColorParameters] for
-/// custom materials — for example
-/// `LiquidGlassColorModel(GlassColorParameters.ios27Dark.copyWith(...))`.
+/// [LiquidGlassColorModel.ios27Clear]. The parameter sets themselves are
+/// internal — custom values enter through [LiquidGlassColorModel.fromJson].
 final class LiquidGlassColorModel with Equatable {
   /// A backdrop-adaptive model driven entirely by [parameters].
+  @internal
   const LiquidGlassColorModel(this.parameters);
 
   /// Applies tint, gamma, saturation, and vibrancy directly.
@@ -528,6 +528,7 @@ final class LiquidGlassColorModel with Equatable {
   };
 
   /// The model's constants, or `null` for [LiquidGlassColorModel.direct].
+  @internal
   final GlassColorParameters? parameters;
 
   /// Stable identifier (or parameter map) used by appearance preset JSON.
