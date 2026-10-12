@@ -15,13 +15,13 @@ abstract class ShaderKeys {
   const ShaderKeys._();
 
   static final liquidGlassRender =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render.frag';
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render.iplr';
 
   static final liquidGlassMaterialRender =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render_material.frag';
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_material.iplr';
 
   static final liquidGlassTintRender =
-      '${_shadersRoot}lib/assets/shaders/liquid_glass_final_render_tint.frag';
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_tint.iplr';
 
   static final fakeGlassSurface =
       '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';

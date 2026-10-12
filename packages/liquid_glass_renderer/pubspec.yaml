@@ -50,10 +50,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # The liquid_glass_final_render* shaders are not listed here on purpose:
+  # pubspec shaders are compiled to SkSL for Skia-capable targets, which they
+  # cannot express (warning on desktop builds, hard failure on web). The build
+  # hook compiles them to build/shaderbundles/*.iplr instead.
   shaders:
-    - lib/assets/shaders/liquid_glass_final_render.frag
-    - lib/assets/shaders/liquid_glass_final_render_material.frag
-    - lib/assets/shaders/liquid_glass_final_render_tint.frag
     - lib/assets/shaders/fake_glass_surface.frag
   assets:
     - build/shaderbundles/
