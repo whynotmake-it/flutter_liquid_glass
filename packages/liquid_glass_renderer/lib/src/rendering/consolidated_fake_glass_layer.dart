@@ -279,7 +279,9 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
       return true;
     }(), 'Record shadow composition order.');
     paintRetainedEffect(context, offset, (effectContext, effectOffset) {
-      drawGlassShadows(effectContext.canvas, effectOffset);
+      if (recordGlassShadows(effectOffset) case final shadows?) {
+        effectContext.addLayer(shadows);
+      }
 
       // The shared filter only exists while a fully visible shape shares
       // the layer's backdrop transfer.

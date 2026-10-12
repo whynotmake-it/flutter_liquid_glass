@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -7,6 +6,7 @@ import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -23,6 +23,12 @@ const _sideShadow = BoxShadow(
   color: Color(0x99000000),
   offset: Offset(8, 0),
   blurRadius: 8,
+);
+
+const _negativeSpreadShadow = BoxShadow(
+  color: Color(0xFF000000),
+  blurRadius: 16,
+  spreadRadius: -8,
 );
 
 enum _Reveal {
@@ -74,6 +80,127 @@ Widget _scene({
   );
 }
 
+Widget _twoShapeScene({
+  required bool fake,
+  required List<BoxShadow> shadows,
+  required bool curvedClip,
+  GlobalKey? clipKey,
+}) {
+  final first = LiquidGlass(
+    shape: const LiquidRoundedRectangle(borderRadius: 12),
+    shadows: shadows,
+    child: const SizedBox(width: 64, height: 64),
+  );
+  final clipped = curvedClip
+      ? Transform.rotate(
+          angle: .35,
+          child: ClipRRect(
+            key: clipKey,
+            borderRadius: BorderRadius.circular(20),
+            child: first,
+          ),
+        )
+      : ClipRect(key: clipKey, child: first);
+  return MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: ColoredBox(
+      color: Colors.white,
+      child: SizedBox.expand(
+        child: LiquidGlassLayer(
+          fake: fake,
+          settings: settingsWithoutLighting,
+          child: Stack(
+            children: [
+              Positioned(left: 32, top: 48, child: clipped),
+              Positioned(
+                left: 160,
+                top: 48,
+                child: LiquidGlass(
+                  shape: const LiquidRoundedRectangle(borderRadius: 12),
+                  shadows: shadows,
+                  child: const SizedBox(width: 64, height: 64),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _retainedMotionScene({
+  required bool fake,
+  required ValueListenable<Offset> offset,
+}) {
+  Widget shape() => const LiquidGlass(
+    shape: LiquidRoundedRectangle(borderRadius: 12),
+    shadows: [_shadow],
+    child: SizedBox(width: 64, height: 64),
+  );
+  Widget movingGlass() => ValueListenableBuilder<Offset>(
+    valueListenable: offset,
+    builder: (_, value, child) => Transform.translate(
+      offset: value,
+      child: child,
+    ),
+    child: shape(),
+  );
+  return MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: ColoredBox(
+      color: Colors.white,
+      child: SizedBox.expand(
+        child: LiquidGlassLayer(
+          fake: fake,
+          settings: settingsWithoutLighting,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 32,
+                top: 48,
+                child: ClipRect(
+                  child: SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: RepaintBoundary(child: movingGlass()),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 160,
+                top: 48,
+                child: RepaintBoundary(child: movingGlass()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Uint8List _pixel(Uint8List image, int x, int y, int width) {
+  final index = (y * width + x) * 4;
+  return image.sublist(index, index + 4);
+}
+
+void _expectPixelEqual(
+  Uint8List actual,
+  Uint8List expected,
+  int x,
+  int y,
+  int width,
+) {
+  expect(
+    _pixel(actual, x, y, width),
+    orderedEquals(_pixel(expected, x, y, width)),
+  );
+}
+
 Future<Uint8List> _capture(WidgetTester tester, [Widget? scene]) async {
   _binding.captureNextScene = true;
   if (scene != null) {
@@ -88,11 +215,20 @@ Future<Uint8List> _capture(WidgetTester tester, [Widget? scene]) async {
   return Uint8List.fromList(data!.buffer.asUint8List());
 }
 
-Future<void> _warm(WidgetTester tester, Widget scene) async {
+Future<void> _warm(
+  WidgetTester tester,
+  Widget scene, {
+  Size viewport = const Size(160, 160),
+}) async {
   tester.view
-    ..physicalSize = const Size(160, 160)
+    ..physicalSize = viewport
     ..devicePixelRatio = 1;
+  _binding
+    ..captureWidth = viewport.width.toInt()
+    ..captureHeight = viewport.height.toInt();
   addTearDown(tester.view.reset);
+  await _binding.setSurfaceSize(viewport);
+  addTearDown(() => _binding.setSurfaceSize(null));
   await tester.pumpWidget(scene);
   for (var frame = 0; frame < 4; frame++) {
     await tester.pump(const Duration(milliseconds: 16));
@@ -192,6 +328,136 @@ void main() {
           previousBytes = bytes;
         }
         expect(previousBytes, orderedEquals(initialBytes));
+      },
+      skip: skipProperGlassTests,
+    );
+  }
+
+  for (final fake in [true, false]) {
+    testWidgets(
+      'negative spread zero-offset shadow stays outside the glass '
+      '(fake=$fake)',
+      (tester) async {
+        await _warm(
+          tester,
+          _scene(
+            grouped: false,
+            fake: fake,
+            shadows: const [_negativeSpreadShadow],
+          ),
+        );
+        final shadow = await _capture(tester);
+        final groupedShadow = await _capture(
+          tester,
+          _scene(
+            grouped: true,
+            fake: fake,
+            shadows: const [_negativeSpreadShadow],
+          ),
+        );
+        final noShadow = await _capture(
+          tester,
+          _scene(
+            grouped: false,
+            fake: fake,
+            shadows: const [],
+          ),
+        );
+        expect(shadow, isNot(equals(noShadow)));
+        for (var y = 72; y < 88; y++) {
+          for (var x = 50; x < 56; x++) {
+            final index = (y * 160 + x) * 4;
+            expect(
+              shadow.sublist(index, index + 4),
+              orderedEquals(groupedShadow.sublist(index, index + 4)),
+            );
+          }
+        }
+      },
+      skip: skipProperGlassTests,
+    );
+
+    for (final curvedClip in [false, true]) {
+      testWidgets(
+        'individual ${curvedClip ? 'curved' : 'rect'} shadow clip '
+        '(fake=$fake)',
+        (tester) async {
+          final clipKey = curvedClip ? GlobalKey() : null;
+          await _warm(
+            tester,
+            _twoShapeScene(
+              fake: fake,
+              shadows: const [_shadow],
+              curvedClip: curvedClip,
+              clipKey: clipKey,
+            ),
+            viewport: const Size(240, 160),
+          );
+          final shadow = await _capture(tester);
+          final noShadow = await _capture(
+            tester,
+            _twoShapeScene(
+              fake: fake,
+              shadows: const [],
+              curvedClip: curvedClip,
+              clipKey: clipKey,
+            ),
+          );
+          _expectPixelEqual(shadow, noShadow, 104, 80, 240);
+          expect(
+            _pixel(shadow, 228, 80, 240),
+            isNot(equals(_pixel(noShadow, 228, 80, 240))),
+          );
+          if (curvedClip) {
+            final clip =
+                clipKey!.currentContext!.findRenderObject()! as RenderBox;
+            final point = MatrixUtils.transformPoint(
+              clip.getTransformTo(null),
+              const Offset(2, 2),
+            );
+            _expectPixelEqual(
+              shadow,
+              noShadow,
+              point.dx.round(),
+              point.dy.round(),
+              240,
+            );
+          }
+        },
+        skip: skipProperGlassTests,
+      );
+    }
+
+    testWidgets(
+      'individual shadow clips refresh during retained motion (fake=$fake)',
+      (tester) async {
+        final offset = ValueNotifier(Offset.zero);
+        addTearDown(offset.dispose);
+        await _warm(
+          tester,
+          _retainedMotionScene(fake: fake, offset: offset),
+          viewport: const Size(240, 160),
+        );
+        final initial = await _capture(tester);
+        final owner = tester.allRenderObjects
+            .whereType<LiquidGlassRenderObject>()
+            .last;
+        final layer = owner is RenderLiquidGlassLayer ? owner : null;
+        final paintCount = layer?.debugPaintCount;
+        final renderer = layer?.gpuGeometryRenderer;
+        final renderCount = renderer?.debugRenderCount;
+
+        offset.value = const Offset(16, 0);
+        final moved = await _capture(tester);
+        _expectPixelEqual(moved, initial, 116, 108, 240);
+        expect(
+          _pixel(moved, 228, 80, 240),
+          isNot(equals(_pixel(initial, 228, 80, 240))),
+        );
+        if (!fake) {
+          expect(layer!.debugPaintCount, paintCount);
+          expect(renderer!.debugRenderCount, renderCount);
+        }
       },
       skip: skipProperGlassTests,
     );

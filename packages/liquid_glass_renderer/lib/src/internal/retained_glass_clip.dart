@@ -12,26 +12,17 @@ class RetainedGlassClip {
   RenderBox? _owner;
   Offset _paintOffset = Offset.zero;
   final List<_ClipEntry> _entries = [];
+  bool _hasIndividualClips = false;
+
+  bool get hasIndividualClips => _hasIndividualClips;
 
   void update(RenderBox owner, Iterable<RenderBox> shapes) {
     _owner = owner;
     List<RenderBox>? common;
+    final all = <RenderBox>{};
     for (final shape in shapes) {
-      final ancestors = <RenderBox>[];
-      for (
-        var node = shape.parent;
-        node != null && node != owner;
-        node = node.parent
-      ) {
-        if (node is RenderClipRect ||
-            node is RenderClipRRect ||
-            node is RenderClipRSuperellipse ||
-            node is RenderClipOval ||
-            node is RenderClipPath ||
-            node is RenderViewportBase) {
-          ancestors.add(node as RenderBox);
-        }
-      }
+      final ancestors = _clipAncestors(shape, owner).toList();
+      all.addAll(ancestors);
       if (common == null) {
         common = ancestors.reversed.toList();
       } else {
@@ -39,6 +30,7 @@ class RetainedGlassClip {
       }
     }
     final nodes = common ?? const <RenderBox>[];
+    _hasIndividualClips = all.length != nodes.length;
     if (nodes.length == _entries.length) {
       var sameNodes = true;
       for (var i = 0; i < nodes.length; i++) {
@@ -96,6 +88,86 @@ class RetainedGlassClip {
     push(context, offset, 0);
   }
 
+  void paintWithIndividualClips(
+    Canvas canvas,
+    RenderBox shape,
+    Offset effectTranslation,
+    VoidCallback painter,
+  ) {
+    final owner = _owner;
+    if (owner == null || !hasIndividualClips) {
+      painter();
+      return;
+    }
+    final clips = _clipAncestors(shape, owner)
+        .where((source) => !_entries.any((entry) => entry.source == source))
+        .toList()
+        .reversed
+        .toList();
+    final clipContext = _CanvasClipContext(canvas);
+
+    void paint(int index) {
+      if (index == clips.length) {
+        painter();
+        return;
+      }
+      final source = clips[index];
+      final (geometry, behavior) = _clipGeometry(source);
+      final transform = Matrix4.translationValues(
+        -effectTranslation.dx,
+        -effectTranslation.dy,
+        0,
+      )..multiply(source.getTransformTo(owner));
+      final inverse = Matrix4.tryInvert(transform);
+      if (inverse == null) return;
+
+      canvas
+        ..save()
+        ..transform(transform.storage);
+      void descend() {
+        canvas.transform(inverse.storage);
+        paint(index + 1);
+      }
+
+      final paintGeometry = source is RenderClipOval
+          ? (Path()..addOval(geometry as Rect))
+          : geometry;
+      switch (paintGeometry) {
+        case Rect rect:
+          clipContext.clipRectAndPaint(
+            rect,
+            behavior,
+            rect,
+            descend,
+          );
+        case RRect rrect:
+          clipContext.clipRRectAndPaint(
+            rrect,
+            behavior,
+            rrect.outerRect,
+            descend,
+          );
+        case RSuperellipse rse:
+          clipContext.clipRSuperellipseAndPaint(
+            rse,
+            behavior,
+            rse.outerRect,
+            descend,
+          );
+        case Path path:
+          clipContext.clipPathAndPaint(
+            path,
+            behavior,
+            path.getBounds(),
+            descend,
+          );
+      }
+      canvas.restore();
+    }
+
+    paint(0);
+  }
+
   void dispose() {
     _clearClips();
   }
@@ -106,6 +178,67 @@ class RetainedGlassClip {
     }
     _entries.clear();
   }
+}
+
+Iterable<RenderBox> _clipAncestors(RenderBox shape, RenderBox owner) sync* {
+  for (
+    var node = shape.parent;
+    node != null && node != owner;
+    node = node.parent
+  ) {
+    if (node is RenderClipRect ||
+        node is RenderClipRRect ||
+        node is RenderClipRSuperellipse ||
+        node is RenderClipOval ||
+        node is RenderClipPath ||
+        node is RenderViewportBase) {
+      yield node as RenderBox;
+    }
+  }
+}
+
+(Object, Clip) _clipGeometry(RenderBox source) => switch (source) {
+  final RenderClipRect clip => (
+    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
+    clip.clipBehavior,
+  ),
+  final RenderClipRRect clip => (
+    clip.clipper?.getClip(clip.size) ??
+        clip.borderRadius
+            .resolve(clip.textDirection)
+            .toRRect(Offset.zero & clip.size),
+    clip.clipBehavior,
+  ),
+  final RenderClipRSuperellipse clip => (
+    clip.clipper?.getClip(clip.size) ??
+        clip.borderRadius
+            .resolve(clip.textDirection)
+            .toRSuperellipse(Offset.zero & clip.size),
+    clip.clipBehavior,
+  ),
+  final RenderClipOval clip => (
+    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
+    clip.clipBehavior,
+  ),
+  final RenderClipPath clip => (
+    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
+    clip.clipBehavior,
+  ),
+  final RenderViewportBase viewport => (
+    Offset.zero & viewport.size,
+    // Mirror RenderViewportBase.paint exactly. Its approximate clip API
+    // describes per-sliver semantics, not the actual paint clip.
+    // ignore: invalid_use_of_protected_member
+    viewport.hasVisualOverflow ? viewport.clipBehavior : Clip.none,
+  ),
+  _ => throw StateError('Unsupported retained clip'),
+};
+
+class _CanvasClipContext extends ClipContext {
+  _CanvasClipContext(this.canvas);
+
+  @override
+  final Canvas canvas;
 }
 
 class _ClipEntry {
@@ -129,42 +262,7 @@ class _ClipEntry {
       layer.enabled = false;
       return;
     }
-    final (geometry, behavior) = switch (source) {
-      final RenderClipRect clip => (
-        clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-        clip.clipBehavior,
-      ),
-      final RenderClipRRect clip => (
-        clip.clipper?.getClip(clip.size) ??
-            clip.borderRadius
-                .resolve(clip.textDirection)
-                .toRRect(Offset.zero & clip.size),
-        clip.clipBehavior,
-      ),
-      final RenderClipRSuperellipse clip => (
-        clip.clipper?.getClip(clip.size) ??
-            clip.borderRadius
-                .resolve(clip.textDirection)
-                .toRSuperellipse(Offset.zero & clip.size),
-        clip.clipBehavior,
-      ),
-      final RenderClipOval clip => (
-        clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-        clip.clipBehavior,
-      ),
-      final RenderClipPath clip => (
-        clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-        clip.clipBehavior,
-      ),
-      final RenderViewportBase viewport => (
-        Offset.zero & viewport.size,
-        // Mirror RenderViewportBase.paint exactly. Its approximate clip API
-        // describes per-sliver semantics, not the actual paint clip.
-        // ignore: invalid_use_of_protected_member
-        viewport.hasVisualOverflow ? viewport.clipBehavior : Clip.none,
-      ),
-      _ => throw StateError('Unsupported retained clip'),
-    };
+    final (geometry, behavior) = _clipGeometry(source);
     layer.enabled = behavior != Clip.none;
     if (!layer.enabled) return;
     layer.clipBehavior = behavior;

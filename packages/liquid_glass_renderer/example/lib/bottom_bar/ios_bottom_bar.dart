@@ -35,7 +35,7 @@ class IosBottomBar extends StatelessWidget {
 
   static const barHeight = 62.0;
   static const accessoryHeight = 48.0;
-  static const spacing = 14.0;
+  static const spacing = 8.0;
   static const accessorySpacing = 8.0;
 
   /// Below both gaps even while the tab bar swells under the finger, so
@@ -102,7 +102,7 @@ class IosBottomBar extends StatelessWidget {
                 onTap: onTrailingTap,
                 child: SizedBox.square(
                   dimension: barHeight,
-                  child: Icon(trailingIcon, size: 24),
+                  child: Icon(trailingIcon, size: 28),
                 ),
               ),
             ],

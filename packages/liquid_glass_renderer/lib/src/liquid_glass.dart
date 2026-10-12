@@ -182,7 +182,8 @@ class LiquidGlass extends StatefulWidget {
   /// A containing [LiquidGlassLayer] composes shadows from its real shapes
   /// together and cuts every glass silhouette out of the combined stack.
   /// [BoxShadow.blurStyle] is ignored. A singleton standalone shape with only
-  /// zero-offset shadows keeps the native outer-blur behavior.
+  /// zero-offset, nonnegative-spread shadows keeps the native outer-blur
+  /// behavior.
   final List<BoxShadow> shadows;
 
   /// Color and materialization override for this shape.
