@@ -37,6 +37,16 @@ import 'package:meta/meta.dart';
 /// chrome (tab bars, toolbars) so sibling `auto` widgets share that sample.
 ///
 /// See the [LiquidGlassLayer] documentation for more information.
+///
+/// ## Transforms
+///
+/// The glass follows the shape's layout position and transforms applied by
+/// widgets like [Transform] or [RotatedBox]. Transforms applied only to the
+/// paint canvas — e.g. by a [Flow] delegate or a
+/// `PaintingContext.pushTransform` call that does not push a composited
+/// layer — are invisible to the glass: the [child] will transform but the
+/// glass stays behind. In those cases, apply the transform with a widget
+/// like [Transform] instead.
 class LiquidGlass extends StatefulWidget {
   /// Creates a new [LiquidGlass] with the given [child] and [shape].
   ///
