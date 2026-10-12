@@ -160,15 +160,25 @@ class _CaptureClipLayer extends ContainerLayer {
 
   CapturePass? _pass;
 
-  /// Re-adding every frame lets [CapturePass.syncRegion] change the rect or
-  /// the enabled state during compositing without marking anything dirty.
-  bool enabled = false;
-  Rect? rect;
+  /// The compositor refresh in [updateSubtreeNeedsAddToScene] writes these
+  /// directly; real changes mark this branch dirty for the same scene.
+  bool get enabled => _enabled;
+  bool _enabled = false;
+  set enabled(bool value) {
+    if (value == _enabled) return;
+    _enabled = value;
+    markNeedsAddToScene();
+  }
+
+  Rect? get rect => _rect;
+  Rect? _rect;
+  set rect(Rect? value) {
+    if (value == _rect) return;
+    _rect = value;
+    markNeedsAddToScene();
+  }
 
   ui.BackdropFilterEngineLayer? _backdropEngineLayer;
-
-  @override
-  bool get alwaysNeedsAddToScene => true;
 
   @override
   void updateSubtreeNeedsAddToScene() {

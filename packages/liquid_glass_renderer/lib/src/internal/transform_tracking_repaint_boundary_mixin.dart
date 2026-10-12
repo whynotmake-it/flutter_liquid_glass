@@ -6,57 +6,6 @@ import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer
 import 'package:meta/meta.dart';
 
 @internal
-mixin TransformTrackingRepaintBoundaryMixin on RenderProxyBox {
-  @override
-  GeometryTransformTrackingLayer? get layer =>
-      super.layer as GeometryTransformTrackingLayer?;
-
-  @override
-  bool get isRepaintBoundary => true;
-
-  /// Transform compared across frames to decide whether [onTransformChanged]
-  /// should fire. Defaults to the world transform.
-  Matrix4 trackedTransform() => getTransformTo(null);
-
-  @override
-  OffsetLayer updateCompositedLayer({
-    covariant GeometryTransformTrackingLayer? oldLayer,
-  }) {
-    final layer = oldLayer ??= GeometryTransformTrackingLayer();
-
-    // ignore: cascade_invocations
-    layer
-      ..renderObject = this
-      ..trackedTransform = trackedTransform
-      ..onTransformChanged = () {
-        if (attached) {
-          onTransformChanged();
-        }
-      }
-      ..onCompositing = () {
-        if (attached) {
-          onCompositing();
-        }
-      };
-
-    return layer;
-  }
-
-  @mustCallSuper
-  @override
-  void paint(PaintingContext context, ui.Offset offset) {
-    layer!.offset = offset;
-    super.paint(context, offset);
-  }
-
-  void onTransformChanged();
-
-  /// Runs every time this tracking layer is composited, including frames where
-  /// the tracked transform is unchanged.
-  void onCompositing() {}
-}
-
-@internal
 mixin TransformTrackingRenderObjectMixin on RenderProxyBox {
   @override
   GeometryTransformTrackingLayer? get layer =>
@@ -134,9 +83,6 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
   }
 
   @override
-  bool get alwaysNeedsAddToScene => true;
-
-  @override
   void updateSubtreeNeedsAddToScene() {
     // Resolve retained transforms after layout and paint, but before Flutter
     // propagates retained-rendering dirtiness and submits any engine layers.
@@ -153,12 +99,9 @@ class GeometryTransformTrackingLayer extends OffsetLayer {
       onCompositing?.call();
     }
     super.updateSubtreeNeedsAddToScene();
-  }
-
-  @override
-  void addToScene(ui.SceneBuilder builder) {
-    // Every scene containing glass is built through this layer, before the
-    // effect that samples its matte and before the scene is rendered.
+    // Runs for every attached tracking layer on every built scene, including
+    // when ancestors keep it retained — so GPU work recorded during paint or
+    // retained refresh is always submitted before the scene reaches raster.
     FlutterGpuGeometryRenderer.flushPendingSubmissions();
   }
 }
