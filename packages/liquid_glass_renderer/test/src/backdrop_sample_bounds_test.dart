@@ -9,7 +9,7 @@ import 'shared.dart';
 void main() {
   // 6 device px of frost at 3x: past the in-shader kernel, so the filter
   // composes a blur pass.
-  const blurred = LiquidGlassSettings(highlight: 0, frost: 2);
+  const blurred = LiquidGlassSettings(highlight: 0);
 
   const glass = LiquidGlass(
     shape: LiquidRoundedSuperellipse(borderRadius: 40),
