@@ -53,7 +53,6 @@ enum GlassFrameState {
 Rect expandForGlassShadows(
   Rect bounds,
   Iterable<(List<ShapeGeometry>, Matrix4)> shapes,
-  LiquidGlassSettings settings,
 ) {
   var result = bounds;
   for (final (geometryShapes, geometryToLayer) in shapes) {
@@ -764,7 +763,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect expandEffectBounds(Rect bounds) => expandForGlassShadows(
     bounds.inflate(materialOutset),
     _shadowSources(),
-    settings,
   );
 
   /// Grows [bounds] by the committed shapes' exterior shadows only.
@@ -772,7 +770,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect expandBoundsForShadows(Rect bounds) => expandForGlassShadows(
     bounds,
     _shadowSources(),
-    settings,
   );
 
   Iterable<(List<ShapeGeometry>, Matrix4)> _shadowSources() =>
@@ -787,7 +784,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return expandForGlassShadows(
       material.inflate(effectSamplingReach(material)),
       shapes,
-      settings,
     );
   }
 
@@ -802,9 +798,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
     );
     if (!hasShadows) return;
+    final entry = shapesWithGeometry.singleOrNull;
+    final shape = entry?.$2.shapes.singleOrNull;
+    final useNativeOuterBlur =
+        shape != null &&
+        identical(entry!.$1, shape.renderObject) &&
+        shape.shadows.every(
+          (shadow) => shadow.offset == Offset.zero,
+        );
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
-    canvas.saveLayer(effectPaintBounds, Paint());
+    if (!useNativeOuterBlur) {
+      canvas.saveLayer(effectPaintBounds, Paint());
+    }
 
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
       for (final shape in geometry.shapes) {
@@ -823,10 +829,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
                   alpha: shadow.color.a * shapeVisibility,
                 ),
                 blurRadius: shadow.blurRadius * shapeVisibility,
-                blurStyle: BlurStyle.normal,
+                blurStyle: useNativeOuterBlur
+                    ? BlurStyle.outer
+                    : BlurStyle.normal,
               )
               .toPaint();
-          _drawGlassShape(
+          drawGlassShape(
             canvas,
             shape.shape,
             rect.shift(shadow.offset).inflate(shadow.spreadRadius),
@@ -837,53 +845,30 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       }
     }
 
-    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
-      for (final shape in geometry.shapes) {
-        final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
-        if (shapeVisibility <= 0) continue;
-        canvas.save();
-        canvas.transform(geometryToLayer.storage);
-        if (shape.shapeToGeometry case final transform?) {
-          canvas.transform(transform.storage);
+    if (!useNativeOuterBlur) {
+      for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+        for (final shape in geometry.shapes) {
+          final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
+          if (shapeVisibility <= 0) continue;
+          canvas.save();
+          canvas.transform(geometryToLayer.storage);
+          if (shape.shapeToGeometry case final transform?) {
+            canvas.transform(transform.storage);
+          }
+          drawGlassShape(
+            canvas,
+            shape.shape,
+            (Offset.zero & shape.renderObject.size).deflate(.5),
+            Paint()
+              ..color = Color.fromRGBO(0, 0, 0, shapeVisibility)
+              ..blendMode = BlendMode.dstOut,
+          );
+          canvas.restore();
         }
-        _drawGlassShape(
-          canvas,
-          shape.shape,
-          (Offset.zero & shape.renderObject.size).deflate(.5),
-          Paint()
-            ..color = Color.fromRGBO(0, 0, 0, shapeVisibility)
-            ..blendMode = BlendMode.dstOut,
-        );
-        canvas.restore();
       }
+      canvas.restore();
     }
     canvas.restore();
-    canvas.restore();
-  }
-
-  void _drawGlassShape(
-    Canvas canvas,
-    LiquidShape shape,
-    Rect rect,
-    Paint paint,
-  ) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse(:final borderRadius):
-        canvas.drawRSuperellipse(
-          RSuperellipse.fromRectAndRadius(
-            rect,
-            Radius.circular(borderRadius),
-          ),
-          paint,
-        );
-      case LiquidOval():
-        canvas.drawOval(rect, paint);
-      case LiquidRoundedRectangle(:final borderRadius):
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
-          paint,
-        );
-    }
   }
 
   @override

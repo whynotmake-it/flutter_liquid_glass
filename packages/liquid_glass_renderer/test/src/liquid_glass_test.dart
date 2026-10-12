@@ -949,54 +949,69 @@ void main() {
         ),
       );
 
-      testWidgets(
-        'layer-owned shadow paint bounds retain the Gaussian tail',
-        (tester) async {
-          await tester.pumpWidget(
-            const MaterialApp(
-              home: Center(
-                child: LiquidGlassLayer(
-                  settings: settingsWithoutLighting,
-                  child: LiquidGlassBlendGroup(
-                    blend: 0,
-                    child: LiquidGlass.grouped(
-                      shadows: [
-                        BoxShadow(
-                          offset: Offset(0, 4),
-                          blurRadius: 12,
-                          spreadRadius: -1,
-                        ),
-                      ],
-                      shape: LiquidOval(),
-                      child: SizedBox.square(dimension: 100),
-                    ),
+      for (final grouped in [false, true]) {
+        testWidgets(
+          'layer-owned shadow paint bounds retain the Gaussian tail '
+          '(grouped=$grouped)',
+          (tester) async {
+            final buildGlass = grouped ? LiquidGlass.grouped : LiquidGlass.new;
+            final glass = buildGlass(
+              shadows: const [
+                BoxShadow(
+                  offset: Offset(0, 4),
+                  blurRadius: 12,
+                  spreadRadius: -1,
+                ),
+              ],
+              shape: const LiquidOval(),
+              child: const SizedBox.square(dimension: 100),
+            );
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Center(
+                  child: LiquidGlassLayer(
+                    settings: settingsWithoutLighting,
+                    child: grouped
+                        ? LiquidGlassBlendGroup(blend: 0, child: glass)
+                        : glass,
                   ),
                 ),
               ),
-            ),
-          );
-          await tester.pump();
+            );
+            await tester.pump();
 
-          final renderObject = tester.allRenderObjects
-              .whereType<RenderLiquidGlassLayer>()
-              .where((renderObject) => renderObject.paintBounds != Rect.zero)
-              .last;
-          final support = Shadow.convertRadiusToSigma(12) * 3 - 1;
-          expect(
-            renderObject.paintBounds,
-            Rect.fromLTRB(-support, 4 - support, 100 + support, 104 + support),
-          );
-          final filterBounds = renderObject.debugFilterBounds!;
-          expect(filterBounds.left, greaterThan(renderObject.paintBounds.left));
-          expect(filterBounds.top, greaterThan(renderObject.paintBounds.top));
-          expect(filterBounds.right, lessThan(renderObject.paintBounds.right));
-          expect(
-            filterBounds.bottom,
-            lessThan(renderObject.paintBounds.bottom),
-          );
-        },
-        skip: skipProperGlassTests,
-      );
+            final renderObject = tester.allRenderObjects
+                .whereType<RenderLiquidGlassLayer>()
+                .where((renderObject) => renderObject.paintBounds != Rect.zero)
+                .last;
+            final support = Shadow.convertRadiusToSigma(12) * 3 - 1;
+            expect(
+              renderObject.paintBounds,
+              Rect.fromLTRB(
+                -support,
+                4 - support,
+                100 + support,
+                104 + support,
+              ),
+            );
+            final filterBounds = renderObject.debugFilterBounds!;
+            expect(
+              filterBounds.left,
+              greaterThan(renderObject.paintBounds.left),
+            );
+            expect(filterBounds.top, greaterThan(renderObject.paintBounds.top));
+            expect(
+              filterBounds.right,
+              lessThan(renderObject.paintBounds.right),
+            );
+            expect(
+              filterBounds.bottom,
+              lessThan(renderObject.paintBounds.bottom),
+            );
+          },
+          skip: skipProperGlassTests,
+        );
+      }
 
       testWidgets(
         'updates layer paint bounds when an ancestor moves',

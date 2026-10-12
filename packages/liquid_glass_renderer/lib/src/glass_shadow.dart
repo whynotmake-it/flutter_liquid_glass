@@ -27,7 +27,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
   const GlassShadow({
     required this.shape,
     required this.shadows,
-    required this.settings,
     this.appearanceVisibility = 1,
     super.child,
     super.key,
@@ -35,8 +34,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
 
   /// The shape to paint shadows for.
   final LiquidShape shape;
-
-  final LiquidGlassSettings settings;
 
   /// Per-shape materialization progress.
   final double appearanceVisibility;
@@ -167,12 +164,13 @@ class _RenderGlassShadow extends RenderProxyBox {
             )
             .toPaint();
 
-        _drawShape(canvas, shadowRect, paint);
+        drawGlassShape(canvas, shape, shadowRect, paint);
       }
 
       if (needsCutout) {
-        _drawShape(
+        drawGlassShape(
           canvas,
+          shape,
           rect.deflate(.5),
           Paint()..blendMode = BlendMode.dstOut,
         );
@@ -182,27 +180,25 @@ class _RenderGlassShadow extends RenderProxyBox {
 
     super.paint(context, offset);
   }
+}
 
-  void _drawShape(Canvas canvas, Rect rect, Paint paint) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse(:final borderRadius):
-        canvas.drawRSuperellipse(
-          RSuperellipse.fromRectAndRadius(
-            rect,
-            Radius.circular(borderRadius),
-          ),
-          paint,
-        );
-      case LiquidOval():
-        canvas.drawOval(rect, paint);
-      case LiquidRoundedRectangle(:final borderRadius):
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            rect,
-            Radius.circular(borderRadius),
-          ),
-          paint,
-        );
-    }
+@internal
+void drawGlassShape(Canvas canvas, LiquidShape shape, Rect rect, Paint paint) {
+  switch (shape) {
+    case LiquidRoundedSuperellipse(:final borderRadius):
+      canvas.drawRSuperellipse(
+        RSuperellipse.fromRectAndRadius(
+          rect,
+          Radius.circular(borderRadius),
+        ),
+        paint,
+      );
+    case LiquidOval():
+      canvas.drawOval(rect, paint);
+    case LiquidRoundedRectangle(:final borderRadius):
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
+        paint,
+      );
   }
 }

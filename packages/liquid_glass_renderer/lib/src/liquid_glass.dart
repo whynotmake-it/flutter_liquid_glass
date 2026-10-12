@@ -5,7 +5,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
@@ -180,10 +179,10 @@ class LiquidGlass extends StatefulWidget {
 
   /// The list of shadows to paint.
   ///
-  /// Only outer-equivalent shadows are supported; [BoxShadow.blurStyle] is
-  /// ignored. When any shadow has a non-zero [BoxShadow.offset], the glass
-  /// shape is cut out of the composed shadow stack so the shadow does not
-  /// bleed through the translucent glass body.
+  /// A containing [LiquidGlassLayer] composes shadows from its real shapes
+  /// together and cuts every glass silhouette out of the combined stack.
+  /// [BoxShadow.blurStyle] is ignored. A singleton standalone shape with only
+  /// zero-offset shadows keeps the native outer-blur behavior.
   final List<BoxShadow> shadows;
 
   /// Color and materialization override for this shape.
@@ -345,29 +344,15 @@ class _LiquidGlassState extends State<LiquidGlass> {
               ),
             ),
           );
-    final content = _RawLiquidGlass(
+    return _RawLiquidGlass(
       blendGroupLink: blendGroupLink,
       renderLink: renderLink,
       settings: settings,
       appearance: appearance,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       shape: widget.shape,
-      layerShadows: scope.consolidatesFakeBackdrop || blendGroupLink != null
-          ? widget.shadows
-          : const [],
+      layerShadows: widget.shadows,
       child: registeredChild,
-    );
-    if (widget.shadows.isEmpty ||
-        blendGroupLink != null ||
-        scope.consolidatesFakeBackdrop) {
-      return content;
-    }
-    return GlassShadow(
-      settings: settings,
-      appearanceVisibility: appearance.visibility,
-      shape: widget.shape,
-      shadows: widget.shadows,
-      child: content,
     );
   }
 
@@ -477,6 +462,7 @@ class RenderLiquidGlass extends RenderLiquidGlassGeometry
   set layerShadows(List<BoxShadow> value) {
     if (_layerShadows == value) return;
     _layerShadows = value;
+    markGeometryNeedsUpdate();
     _blendGroupLink?.notifyShapeLayoutChanged(this);
     markNeedsPaint();
   }
