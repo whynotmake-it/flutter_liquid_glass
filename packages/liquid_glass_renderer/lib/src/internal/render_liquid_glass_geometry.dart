@@ -177,6 +177,11 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
 
   /// Detects motion of this geometry relative to [layer].
   ///
+  /// Uses [getTransformTo], which only composes layout offsets and
+  /// [RenderObject.applyPaintTransform] overrides — ancestor transforms
+  /// applied inside paint() (e.g. PaintingContext.pushTransform) are
+  /// invisible here, so the glass will not follow those. Known limitation.
+  ///
   /// Called from the layer's paint and compositing hooks so descendant glass
   /// does not need its own always-composite tracking layers. The two change
   /// flags let the layer distinguish a uniformly translated geometry node
