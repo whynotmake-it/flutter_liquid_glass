@@ -9,7 +9,10 @@ import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 
+import 'submitted_scene_binding.dart';
+
 void main() {
+  final binding = SubmittedSceneBinding();
   const settings = LiquidGlassSettings(frost: 4);
   const appearance = LiquidGlassAppearance(saturation: 1.1);
 
@@ -834,10 +837,10 @@ void main() {
 
     offset.value = const Offset(48, 27);
     await tester.pump();
-    await tester.pump();
 
     expect(
-      layer.debugClipBounds!.topLeft - initialBounds.topLeft,
+      layer.debugClipBounds!.shift(layer.debugCompositorTranslation).topLeft -
+          initialBounds.topLeft,
       const Offset(48, 27),
     );
     expect(layer.debugClipBounds!.size, initialBounds.size);
@@ -896,4 +899,180 @@ void main() {
       const Offset(35, 21),
     );
   });
+
+  testWidgets(
+    'one moving grouped shape refreshes the fake effect in the same frame',
+    (tester) async {
+      final offset = ValueNotifier(Offset.zero);
+      final scale = ValueNotifier<double>(1);
+      final hidden = ValueNotifier(false);
+      addTearDown(offset.dispose);
+      addTearDown(scale.dispose);
+      addTearDown(hidden.dispose);
+
+      const movingKey = Key('moving');
+      const stationaryKey = Key('stationary');
+
+      Widget build() => MaterialApp(
+        home: ColoredBox(
+          color: Colors.black,
+          child: LiquidGlassLayer(
+            fake: true,
+            settings: settings,
+            defaultAppearance: const LiquidGlassAppearance(
+              tint: Color.fromARGB(255, 255, 255, 255),
+            ),
+            child: LiquidGlassBlendGroup(
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: hidden,
+                      builder: (_, value, __) => RepaintBoundary(
+                        child: LiquidGlass.grouped(
+                          key: stationaryKey,
+                          appearance: value
+                              ? const LiquidGlassAppearance(visibility: 0)
+                              : null,
+                          shape: const LiquidOval(),
+                          child: const SizedBox(width: 80, height: 60),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 300),
+                      child: ValueListenableBuilder<Offset>(
+                        valueListenable: offset,
+                        builder: (_, value, __) => RepaintBoundary(
+                          child: Transform.translate(
+                            offset: value,
+                            child: ValueListenableBuilder<double>(
+                              valueListenable: scale,
+                              builder: (_, scaleValue, __) => Transform.scale(
+                                scale: scaleValue,
+                                child: const LiquidGlass.grouped(
+                                  key: movingKey,
+                                  shape: LiquidOval(),
+                                  child: SizedBox(
+                                    width: 80,
+                                    height: 60,
+                                    child: Center(
+                                      child: ColoredBox(
+                                        color: Colors.red,
+                                        child: SizedBox.square(dimension: 10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      tester.view
+        ..physicalSize = const Size(800, 600)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      binding
+        ..captureWidth = 800
+        ..captureHeight = 600;
+
+      await tester.pumpWidget(build());
+      await tester.pumpAndSettle();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+
+      Offset localCenter(Key key) =>
+          layer.globalToLocal(tester.getCenter(find.byKey(key)));
+
+      bool clipContains(Offset local) => layer.debugClipPath!.contains(local);
+
+      final stationary = localCenter(stationaryKey);
+      expect(clipContains(stationary), isTrue);
+      expect(clipContains(localCenter(movingKey)), isTrue);
+
+      final paintCount = layer.debugPaintCount;
+      var previous = localCenter(movingKey);
+      final previousGlobal = tester.getCenter(find.byKey(movingKey));
+      binding
+        ..captured = null
+        ..captureNextScene = true;
+      offset.value = const Offset(48, 27);
+      await tester.pump();
+      var moved = localCenter(movingKey);
+      final movedGlobal = tester.getCenter(find.byKey(movingKey));
+
+      expect(binding.captured, isNotNull);
+      final image = (await tester.runAsync(() => binding.captured!))!;
+      final bytes = (await tester.runAsync(image.toByteData))!;
+      int channel(Offset at, int channel) => bytes.getUint8(
+        (at.dy.round() * image.width + at.dx.round()) * 4 + channel,
+      );
+      void expectPixel(Offset at, int r, int g, int b) {
+        expect(channel(at, 0), closeTo(r, 3));
+        expect(channel(at, 1), closeTo(g, 3));
+        expect(channel(at, 2), closeTo(b, 3));
+      }
+
+      expectPixel(movedGlobal, 244, 67, 54);
+      expectPixel(movedGlobal + const Offset(0, -17), 255, 255, 255);
+      expectPixel(previousGlobal, 0, 0, 0);
+      expectPixel(tester.getCenter(find.byKey(stationaryKey)), 255, 255, 255);
+      image.dispose();
+
+      expect(clipContains(moved), isTrue);
+      expect(clipContains(previous), isFalse);
+      expect(clipContains(stationary), isTrue);
+      expect(layer.debugPaintCount, paintCount);
+      expect(
+        layer.debugLastPaintStages,
+        containsAll(const ['backdrop', 'surfaces']),
+      );
+
+      previous = moved;
+      offset.value = const Offset(96, 54);
+      await tester.pump();
+      moved = localCenter(movingKey);
+      expect(clipContains(moved), isTrue);
+      expect(clipContains(previous), isFalse);
+      expect(layer.debugPaintCount, paintCount);
+
+      final settledClip = layer.debugClipPath;
+      await tester.pump();
+      expect(layer.debugPaintCount, paintCount);
+      expect(layer.debugClipPath, same(settledClip));
+
+      scale.value = 1.5;
+      final preScaleBounds = layer.debugClipBounds!;
+      await tester.pump();
+      expect(layer.debugPaintCount, paintCount);
+      expect(layer.debugClipBounds!.size, isNot(preScaleBounds.size));
+      expect(clipContains(localCenter(movingKey)), isTrue);
+      expect(clipContains(stationary), isTrue);
+
+      hidden.value = true;
+      await tester.pump();
+      expect(clipContains(stationary), isFalse);
+      expect(clipContains(localCenter(movingKey)), isTrue);
+
+      hidden.value = false;
+      await tester.pump();
+      expect(clipContains(stationary), isTrue);
+    },
+  );
 }

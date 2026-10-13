@@ -345,13 +345,19 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     logger.finest(
       '$hashCode Painting glass with ${link._shapeGeometries.length} shapes.',
     );
+    final bounds = prepareFrameGeometry();
+    paintFrame(context, offset, bounds);
+    // Foreground always paints in its own render ancestry, above the glass.
+    super.paint(context, offset);
+  }
+
+  @protected
+  Rect? prepareFrameGeometry() {
     final candidate = <(RenderLiquidGlassGeometry, GeometryCache, Matrix4)>[];
     final bounds = collectFrameGeometry(candidate);
     commitFrameGeometry(candidate);
     _frameState = classifyFrame(candidate);
-    paintFrame(context, offset, bounds);
-    // Foreground always paints in its own render ancestry, above the glass.
-    super.paint(context, offset);
+    return bounds;
   }
 
   /// Paints this layer's effect for the just-committed [frameState].
