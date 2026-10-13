@@ -11,18 +11,13 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
-/// Each output (matte, material map) retains two textures that only grow: a
-/// current one and a spare. A render draws into the top-left sub-rect of a
-/// texture no in-flight frame reads and reports the texture size, so the
-/// final shader scales its UVs to that sub-rect. Resizing geometry therefore
-/// reuses the same textures instead of allocating, which matters because a
-/// `gpu.Texture` is only freed when the GC finalizes its wrapper. A second
-/// render in the same frame cannot safely reuse the just-retired texture,
-/// so it allocates and drops a Dart reference instead of rewriting it;
-/// dropped textures stay natively alive in submitted scenes and command
-/// buffers until released or GC'd. The layer reuses the image without
-/// calling [render] when geometry is unchanged (including uniform
-/// translation).
+/// Each output keeps a current texture and one spare. Textures grow as needed;
+/// rendering uses only the top-left area, with shader UVs adjusted to match.
+/// Unchanged geometry reuses the image without rendering again.
+///
+/// Repeated renders in one frame may need a new texture to avoid overwriting
+/// an in-flight scene. The renderer keeps at most two texture references per
+/// output, but scenes and GC can keep dropped textures alive longer.
 ///
 /// This renderer owns the image handles returned by [gpu.Texture.asImage].
 /// Replacing/disposal releases those handles; recorded scenes hold independent
@@ -554,26 +549,18 @@ class FlutterGpuGeometryRenderer {
     _pendingCommandBuffers.clear();
   }
 
-  /// Frames after its replacement before a texture may be rendered into
-  /// again.
+  /// Frames to wait after retirement before reusing a texture.
   ///
-  /// A texture replaced during frame E was last sampled by frame E - 1's
-  /// scene. The engine keeps at most two frames in its pipeline and frees a
-  /// slot only after rasterizing and submitting that frame (`Animator`'s
-  /// `FramePipeline(2)`; `Pipeline::Consume` signals after the consumer
-  /// returns), so when frame E + 1 paints, frame E - 1 has been submitted.
-  /// Flutter GPU submits to the same queue as the raster thread (the IO
-  /// manager's context is the platform view's), and the GPU orders a write
-  /// after earlier reads on that queue: Metal tracks hazards on these
-  /// non-heap textures, and every Impeller Vulkan render pass declares an
-  /// external dependency on earlier fragment-shader reads. GLES submits on
-  /// the raster thread in posting order.
+  /// A texture retired in frame E was last read by frame E - 1. The engine's
+  /// two-frame pipeline (`Animator.FramePipeline(2)`) submits that scene before
+  /// frame E + 1 paints. Flutter GPU uses the same queue, which orders the next
+  /// write after those reads (Metal/Vulkan hazards; GLES posting order).
   static const int reuseAfterFrames = 1;
 
   static int _completedFrames = 0;
   static bool _countingFrames = false;
 
-  /// Counts frames that submit a scene, the unit [reuseAfterFrames] is in.
+  /// Counts scene-submitting frames for texture reuse.
   ///
   /// Renders outside a frame, as in unit tests, do not advance the count,
   /// so their textures are never reused.
@@ -780,15 +767,10 @@ final class _RingTexture {
       texture.width >= width && texture.height >= height;
 }
 
-/// The textures one output of a renderer cycles through.
+/// A current texture and one spare for a single output.
 ///
-/// The ring retains at most a current texture and one spare. Every texture
-/// is at least the ring's capacity, which only grows: in 1.5x steps, capped
-/// at the view unless one render needs more. A resize within the capacity
-/// reuses the ring; growth drops the smaller textures. Dropped textures may
-/// remain natively alive in submitted scenes and command buffers until they
-/// are released or GC'd, so the retained-slot bound is not a bound on live
-/// native allocations.
+/// Capacity grows in 1.5x steps, capped at the view size unless a render needs
+/// more. Smaller renders reuse that capacity; growth drops undersized textures.
 final class _TextureRing {
   _RingTexture? _current;
   _RingTexture? _spare;
@@ -814,9 +796,8 @@ final class _TextureRing {
     final spare = _spare;
     _current = null;
     _spare = null;
-    // The spare is the only candidate for reuse; selecting it before
-    // retiring the previous current means a render can never rewrite the
-    // texture the previous scene still samples.
+    // Only the old spare can be reused; the previous current may still be
+    // read by an in-flight scene.
     final _RingTexture selected;
     if (spare != null &&
         spare.covers(_width, _height) &&

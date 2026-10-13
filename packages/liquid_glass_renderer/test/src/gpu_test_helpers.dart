@@ -4,8 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
-/// Creates a geometry renderer from the shared test shader bundle and
-/// disposes it when the test ends.
+/// Creates a renderer and registers cleanup for the end of the test.
 Future<FlutterGpuGeometryRenderer> createGeometryRenderer() async {
   final renderer = await FlutterGpuGeometryRenderer.fromAsset(
     ShaderKeys.gpuGeometryShaderBundle,
@@ -14,8 +13,7 @@ Future<FlutterGpuGeometryRenderer> createGeometryRenderer() async {
   return renderer;
 }
 
-/// Renders the shared 64x64 rounded-rectangle test fixture and returns the
-/// matte image.
+/// Renders a 64x64 rounded rectangle and returns its matte image.
 ui.Image renderTestRectangle(
   FlutterGpuGeometryRenderer renderer, {
   double centerX = 16,
