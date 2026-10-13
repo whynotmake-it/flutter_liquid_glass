@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
@@ -95,6 +94,8 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   final _backdropLayer = LayerHandle<BackdropFilterLayer>();
   final _clipLayer = LayerHandle<ClipPathLayer>();
 
+  final _retainedFrameSlot = LayerHandle<ContainerLayer>();
+
   /// Capture shared by this layer's own backdrop filters when the user did
   /// not provide a [backdropKey] or [BackdropGroup]. Without it, a
   /// separately served shape would sample the shared filter's output in
@@ -118,7 +119,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
   List<int> _cachedClipClasses = const [];
-  bool _repaintAfterCompositingScheduled = false;
 
   bool get _hasBlur => settings.effectiveFrost > 0;
   bool get _hasColorTransfer =>
@@ -200,6 +200,19 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
   @override
   void paintFrame(
+    PaintingContext context,
+    Offset offset,
+    Rect? geometryBounds,
+  ) {
+    context.pushLayer(
+      _retainedFrameSlot.layer ??= ContainerLayer(),
+      (slotContext, slotOffset) =>
+          _paintFrame(slotContext, slotOffset, geometryBounds),
+      offset,
+    );
+  }
+
+  void _paintFrame(
     PaintingContext context,
     Offset offset,
     Rect? geometryBounds,
@@ -487,17 +500,23 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   void onCompositorTranslationMissed(
     ({bool needsRepaint, Offset? translation}) motion,
   ) {
-    if (motion.needsRepaint) _repaintAfterCompositing();
+    if (motion.needsRepaint) _refreshRetainedFrame();
   }
 
   // The retained layers of this frame are already in the scene.
-  void _repaintAfterCompositing() {
-    if (_repaintAfterCompositingScheduled) return;
-    _repaintAfterCompositingScheduled = true;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      _repaintAfterCompositingScheduled = false;
-      if (attached) markNeedsPaint();
-    });
+  void _refreshRetainedFrame() {
+    final slot = _retainedFrameSlot.layer;
+    if (slot == null) {
+      markNeedsPaint();
+      return;
+    }
+    final bounds = prepareFrameGeometry();
+    slot.removeAllChildren();
+    final context = PaintingContext(
+      slot,
+      paintBounds.shift(retainedPaintOffset),
+    );
+    _paintFrame(context, retainedPaintOffset, bounds);
   }
 
   void _releaseGlassLayers() {
@@ -516,7 +535,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
   @override
   void dispose() {
-    _repaintAfterCompositingScheduled = false;
+    _retainedFrameSlot.layer = null;
     _releaseLayers();
     super.dispose();
   }
