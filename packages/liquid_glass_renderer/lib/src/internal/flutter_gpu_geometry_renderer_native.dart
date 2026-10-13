@@ -15,9 +15,9 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 /// rendering uses only the top-left area, with shader UVs adjusted to match.
 /// Unchanged geometry reuses the image without rendering again.
 ///
-/// Repeated renders in one frame may need a new texture to avoid overwriting
-/// an in-flight scene. The renderer keeps at most two texture references per
-/// output, but scenes and GC can keep dropped textures alive longer.
+/// Repeated renders in one frame may need another texture. Each output keeps
+/// at most three textures (current plus two spares); scenes and GC can keep
+/// dropped textures alive longer.
 ///
 /// This renderer owns the image handles returned by [gpu.Texture.asImage].
 /// Replacing/disposal releases those handles; recorded scenes hold independent
@@ -767,18 +767,20 @@ final class _RingTexture {
       texture.width >= width && texture.height >= height;
 }
 
-/// A current texture and one spare for a single output.
+/// A current texture and up to two retired spares for one output.
 ///
-/// Capacity grows in 1.5x steps, capped at the view size unless a render needs
-/// more. Smaller renders reuse that capacity; growth drops undersized textures.
+/// Capacity grows in 1.5x steps, capped at the view unless a render needs more.
+/// A second spare avoids allocations when a frame renders twice.
 final class _TextureRing {
+  static const int _maxSpares = 2;
+
   _RingTexture? _current;
-  _RingTexture? _spare;
+  final List<_RingTexture> _spares = [];
   int _width = 0;
   int _height = 0;
 
-  int get spareCount => _spare == null ? 0 : 1;
-  int get textureCount => spareCount + (_current == null ? 0 : 1);
+  int get spareCount => _spares.length;
+  int get textureCount => _spares.length + (_current == null ? 0 : 1);
 
   /// Replaces the texture in use with one that holds [width] x [height].
   _RingTexture next(
@@ -791,38 +793,37 @@ final class _TextureRing {
     if (width > _width || height > _height) {
       _width = _grow(_width, width, maxWidth);
       _height = _grow(_height, height, maxHeight);
+      _spares.removeWhere((texture) {
+        if (texture.covers(_width, _height)) return false;
+        FlutterGpuGeometryRenderer._countDropped();
+        return true;
+      });
     }
     final previous = _current;
-    final spare = _spare;
     _current = null;
-    _spare = null;
-    // Only the old spare can be reused; the previous current may still be
-    // read by an in-flight scene.
-    final _RingTexture selected;
-    if (spare != null &&
-        spare.covers(_width, _height) &&
-        frame - spare.retiredFrame >=
+    if (previous != null) {
+      if (previous.covers(_width, _height)) {
+        previous.retiredFrame = frame;
+        _spares.add(previous);
+      } else {
+        FlutterGpuGeometryRenderer._countDropped();
+      }
+    }
+    // Reuse the oldest spare only after its frame-age guard has passed.
+    if (_spares.isNotEmpty &&
+        frame - _spares.first.retiredFrame >=
             FlutterGpuGeometryRenderer.reuseAfterFrames) {
       assert(() {
         FlutterGpuGeometryRenderer.debugReusedTextureCount++;
         return true;
       }(), 'Count reused geometry textures in debug builds.');
-      selected = spare;
-    } else {
-      if (spare != null) {
-        FlutterGpuGeometryRenderer._countDropped();
-      }
-      selected = _allocate(_width, _height);
+      return _current = _spares.removeAt(0);
     }
-    if (previous != null) {
-      if (previous.covers(_width, _height)) {
-        previous.retiredFrame = frame;
-        _spare = previous;
-      } else {
-        FlutterGpuGeometryRenderer._countDropped();
-      }
+    while (_spares.length > _maxSpares) {
+      _spares.removeAt(0);
+      FlutterGpuGeometryRenderer._countDropped();
     }
-    return _current = selected;
+    return _current = _allocate(_width, _height);
   }
 
   /// Retires the texture in use without replacing it.
@@ -830,24 +831,20 @@ final class _TextureRing {
     final previous = _current;
     if (previous == null) return;
     _current = null;
-    if (_spare != null) {
-      _spare = null;
-      FlutterGpuGeometryRenderer._countDropped();
-    }
     previous.retiredFrame = frame;
-    _spare = previous;
+    _spares.add(previous);
   }
 
-  /// Drops both textures and resets the ring's capacity.
+  /// Drops every texture and resets the ring's capacity.
   void release() {
     if (_current != null) {
       FlutterGpuGeometryRenderer._countDropped();
     }
-    if (_spare != null) {
+    for (final _ in _spares) {
       FlutterGpuGeometryRenderer._countDropped();
     }
     _current = null;
-    _spare = null;
+    _spares.clear();
     _width = 0;
     _height = 0;
   }

@@ -278,8 +278,8 @@ void runGeometryTextureReuseTests() {
           mattes.add(renderer.debugMatteTexture);
           expect(
             renderer.debugMatteTextureCount,
-            lessThanOrEqualTo(2),
-            reason: 'at most a current and a spare matte are retained',
+            lessThanOrEqualTo(3),
+            reason: 'at most three matte textures are retained',
           );
         }
         for (var index = 1; index < mattes.length; index++) {
@@ -331,6 +331,41 @@ void runGeometryTextureReuseTests() {
         );
         expect(_reused - reusedBefore, 0);
       });
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'two renders per frame stop allocating after warmup',
+    (tester) async {
+      final renderer = (await tester.runAsync(createGeometryRenderer))!;
+      // Registers the scene-frame counter before the first pump.
+      renderTestRectangle(renderer);
+      var frame = 0;
+      Future<void> pumpTwoRenders() async {
+        // Submit a frame before recording its two geometry updates.
+        await tester.pumpWidget(const SizedBox());
+        renderTestRectangle(renderer, writeMaterials: frame.isEven);
+        renderTestRectangle(renderer, centerX: 19, writeMaterials: true);
+        frame++;
+      }
+
+      for (var i = 0; i < 6; i++) {
+        await pumpTwoRenders();
+      }
+      final allocatedBefore = _allocated;
+      final droppedBefore = _dropped;
+      for (var i = 0; i < 8; i++) {
+        await pumpTwoRenders();
+      }
+      expect(
+        _allocated - allocatedBefore,
+        0,
+        reason: 'the ring covers two renders per submitted frame',
+      );
+      expect(_dropped - droppedBefore, 0);
+      expect(renderer.debugMatteTextureCount, lessThanOrEqualTo(3));
+      expect(renderer.materialImage, isNotNull);
     },
     skip: skipProperGlassTests,
   );
