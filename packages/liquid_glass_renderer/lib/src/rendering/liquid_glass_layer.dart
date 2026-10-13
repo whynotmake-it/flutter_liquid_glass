@@ -933,14 +933,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         needsGeometryUpdate = false;
         link.markClean();
         paintRetainedEffect(context, offset, (effectContext, effectOffset) {
-          if (recordGlassShadows(effectOffset) case final shadows?) {
-            effectContext.addLayer(shadows);
-          }
           _paintMaterialFilter(
             effectContext,
             effectOffset,
             materialPaintBounds,
           );
+          if (recordGlassShadows(effectOffset) case final shadows?) {
+            effectContext.addLayer(shadows);
+          }
         });
       case GlassFrameState.idle:
         // Keep the last matte and its encode snapshot; ancestor motion
@@ -984,14 +984,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             _debugPaintGeometry(effectContext, effectOffset);
           } else if (_geometryImage != null) {
             _bindGeometryShader(_geometryImage!);
-            if (recordGlassShadows(effectOffset) case final shadows?) {
-              effectContext.addLayer(shadows);
-            }
             _paintMaterialFilter(
               effectContext,
               effectOffset,
               materialPaintBounds,
             );
+            if (recordGlassShadows(effectOffset) case final shadows?) {
+              effectContext.addLayer(shadows);
+            }
           }
         });
     }

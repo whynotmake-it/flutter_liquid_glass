@@ -238,13 +238,35 @@ Future<void> _warm(
 RenderLiquidGlassLayer _layer(WidgetTester tester) =>
     tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
 
+/// Runs a test body with real blurred shadows: assertions sample pixels only
+/// a blurred shadow can reach, and the default hard-edged test shadows would
+/// make them unsatisfiable. Restores the flag before the invariant check.
+void testShadowWidgets(
+  String description,
+  WidgetTesterCallback body, {
+  bool? skip,
+}) {
+  testWidgets(
+    description,
+    (tester) async {
+      debugDisableShadows = false;
+      try {
+        await body(tester);
+      } finally {
+        debugDisableShadows = true;
+      }
+    },
+    skip: skip,
+  );
+}
+
 void main() {
   _binding = SubmittedSceneBinding()
     ..captureWidth = 160
     ..captureHeight = 160;
   for (final grouped in [false, true]) {
     for (final reveal in _Reveal.values) {
-      testWidgets(
+      testShadowWidgets(
         'first ${reveal.name} reveal preserves '
         '${grouped ? 'grouped' : 'standalone'} shadow',
         (tester) async {
@@ -297,7 +319,7 @@ void main() {
       );
     }
 
-    testWidgets(
+    testShadowWidgets(
       'shadow-only updates reuse ${grouped ? 'grouped' : 'standalone'} matte',
       (tester) async {
         await _warm(tester, _scene(grouped: grouped, shadows: const []));
@@ -334,7 +356,7 @@ void main() {
   }
 
   for (final fake in [true, false]) {
-    testWidgets(
+    testShadowWidgets(
       'negative spread zero-offset shadow stays outside the glass '
       '(fake=$fake)',
       (tester) async {
@@ -378,7 +400,7 @@ void main() {
     );
 
     for (final curvedClip in [false, true]) {
-      testWidgets(
+      testShadowWidgets(
         'individual ${curvedClip ? 'curved' : 'rect'} shadow clip '
         '(fake=$fake)',
         (tester) async {
@@ -428,7 +450,7 @@ void main() {
       );
     }
 
-    testWidgets(
+    testShadowWidgets(
       'individual shadow clips refresh during retained motion (fake=$fake)',
       (tester) async {
         final offset = ValueNotifier(Offset.zero);
@@ -464,7 +486,7 @@ void main() {
   }
 
   for (final offset in [Offset.zero, const Offset(8, 0)]) {
-    testWidgets(
+    testShadowWidgets(
       'singleton shadow with offset $offset has no interior leakage',
       (tester) async {
         await _warm(
