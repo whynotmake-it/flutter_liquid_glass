@@ -184,7 +184,6 @@ class FakeGlass extends StatelessWidget {
     return GlassShadow(
       shape: shape,
       shadows: shadows,
-      settings: settings,
       appearanceVisibility: appearance.visibility,
       child: clipped,
     );

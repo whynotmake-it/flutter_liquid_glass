@@ -4,6 +4,7 @@
 
 import 'dart:collection';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -53,7 +54,6 @@ enum GlassFrameState {
 Rect expandForGlassShadows(
   Rect bounds,
   Iterable<(List<ShapeGeometry>, Matrix4)> shapes,
-  LiquidGlassSettings settings,
 ) {
   var result = bounds;
   for (final (geometryShapes, geometryToLayer) in shapes) {
@@ -273,6 +273,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   final _compositionProbe = GlassCompositionProbe();
   final _framePoll = FramePollMarker();
   final _effectLayer = LayerHandle<OffsetLayer>();
+  final _originalShadows = LayerHandle<ContainerLayer>();
   final _ancestorClips = RetainedGlassClip();
   final _idleAncestorClips = RetainedGlassClip();
   List<Object> _retainedStructure = [];
@@ -696,6 +697,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     if (motion.translation case final translation?) {
       setCompositorTranslation(translation);
       onCompositorTranslated(translation);
+      if (_frameState == GlassFrameState.active &&
+          _originalShadows.layer != null &&
+          _ancestorClips.hasIndividualClips &&
+          !_framePoll.polledThisFrame) {
+        recordGlassShadows(retainedPaintOffset);
+      }
       return;
     }
     onCompositorTranslationMissed(motion);
@@ -732,7 +739,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   /// Drops the retained effect layer.
   @protected
-  void releaseRetainedEffectLayer() => _effectLayer.layer = null;
+  void releaseRetainedEffectLayer() {
+    _effectLayer.layer = null;
+    clearGlassShadows();
+  }
 
   /// Synchronizes the retained clips that are active for [frameState].
   @protected
@@ -764,7 +774,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect expandEffectBounds(Rect bounds) => expandForGlassShadows(
     bounds.inflate(materialOutset),
     _shadowSources(),
-    settings,
   );
 
   /// Grows [bounds] by the committed shapes' exterior shadows only.
@@ -772,7 +781,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Rect expandBoundsForShadows(Rect bounds) => expandForGlassShadows(
     bounds,
     _shadowSources(),
-    settings,
   );
 
   Iterable<(List<ShapeGeometry>, Matrix4)> _shadowSources() =>
@@ -787,7 +795,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     return expandForGlassShadows(
       material.inflate(effectSamplingReach(material)),
       shapes,
-      settings,
     );
   }
 
@@ -802,89 +809,108 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
       (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
     );
     if (!hasShadows) return;
+    final entry = shapesWithGeometry.singleOrNull;
+    final shape = entry?.$2.shapes.singleOrNull;
+    final useNativeOuterBlur =
+        shape != null &&
+        identical(entry!.$1, shape.renderObject) &&
+        shape.shadows.every(
+          (shadow) => shadow.offset == Offset.zero && shadow.spreadRadius >= 0,
+        );
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
-    canvas.saveLayer(effectPaintBounds, Paint());
+    if (!useNativeOuterBlur) {
+      canvas.saveLayer(effectPaintBounds, Paint());
+    }
 
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
       for (final shape in geometry.shapes) {
         final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
         if (shape.shadows.isEmpty || shapeVisibility <= 0) continue;
-        canvas.save();
-        canvas.transform(geometryToLayer.storage);
-        if (shape.shapeToGeometry case final transform?) {
-          canvas.transform(transform.storage);
-        }
-        final rect = Offset.zero & shape.renderObject.size;
-        for (final shadow in shape.shadows) {
-          final paint = shadow
-              .copyWith(
-                color: shadow.color.withValues(
-                  alpha: shadow.color.a * shapeVisibility,
-                ),
-                blurRadius: shadow.blurRadius * shapeVisibility,
-                blurStyle: BlurStyle.normal,
-              )
-              .toPaint();
-          _drawGlassShape(
+        _ancestorClips.paintWithIndividualClips(
+          canvas,
+          shape.renderObject,
+          compositorTranslation,
+          () {
+            canvas.save();
+            canvas.transform(geometryToLayer.storage);
+            if (shape.shapeToGeometry case final transform?) {
+              canvas.transform(transform.storage);
+            }
+            final rect = Offset.zero & shape.renderObject.size;
+            for (final shadow in shape.shadows) {
+              final paint = shadow
+                  .copyWith(
+                    color: shadow.color.withValues(
+                      alpha: shadow.color.a * shapeVisibility,
+                    ),
+                    blurRadius: shadow.blurRadius * shapeVisibility,
+                    blurStyle: useNativeOuterBlur
+                        ? BlurStyle.outer
+                        : BlurStyle.normal,
+                  )
+                  .toPaint();
+              drawGlassShape(
+                canvas,
+                shape.shape,
+                rect.shift(shadow.offset).inflate(shadow.spreadRadius),
+                paint,
+              );
+            }
+            canvas.restore();
+          },
+        );
+      }
+    }
+
+    if (!useNativeOuterBlur) {
+      for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+        for (final shape in geometry.shapes) {
+          final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
+          if (shapeVisibility <= 0) continue;
+          canvas.save();
+          canvas.transform(geometryToLayer.storage);
+          if (shape.shapeToGeometry case final transform?) {
+            canvas.transform(transform.storage);
+          }
+          drawGlassShape(
             canvas,
             shape.shape,
-            rect.shift(shadow.offset).inflate(shadow.spreadRadius),
-            paint,
+            (Offset.zero & shape.renderObject.size).deflate(.5),
+            Paint()
+              ..color = Color.fromRGBO(0, 0, 0, shapeVisibility)
+              ..blendMode = BlendMode.dstOut,
           );
+          canvas.restore();
         }
-        canvas.restore();
       }
+      canvas.restore();
     }
-
-    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
-      for (final shape in geometry.shapes) {
-        final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
-        if (shapeVisibility <= 0) continue;
-        canvas.save();
-        canvas.transform(geometryToLayer.storage);
-        if (shape.shapeToGeometry case final transform?) {
-          canvas.transform(transform.storage);
-        }
-        _drawGlassShape(
-          canvas,
-          shape.shape,
-          (Offset.zero & shape.renderObject.size).deflate(.5),
-          Paint()
-            ..color = Color.fromRGBO(0, 0, 0, shapeVisibility)
-            ..blendMode = BlendMode.dstOut,
-        );
-        canvas.restore();
-      }
-    }
-    canvas.restore();
     canvas.restore();
   }
 
-  void _drawGlassShape(
-    Canvas canvas,
-    LiquidShape shape,
-    Rect rect,
-    Paint paint,
-  ) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse(:final borderRadius):
-        canvas.drawRSuperellipse(
-          RSuperellipse.fromRectAndRadius(
-            rect,
-            Radius.circular(borderRadius),
-          ),
-          paint,
-        );
-      case LiquidOval():
-        canvas.drawOval(rect, paint);
-      case LiquidRoundedRectangle(:final borderRadius):
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
-          paint,
-        );
+  @protected
+  ContainerLayer? recordGlassShadows(Offset offset) {
+    final hasShadows = shapesWithGeometry.any(
+      (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
+    );
+    if (!hasShadows) {
+      clearGlassShadows();
+      return null;
     }
+    final slot = _originalShadows.layer ??= ContainerLayer();
+    slot.removeAllChildren();
+    if (!hasDrawableGlass(shapesWithGeometry)) return slot;
+    final recorder = ui.PictureRecorder();
+    drawGlassShadows(Canvas(recorder), offset);
+    final picture = PictureLayer(effectPaintBounds.shift(offset))
+      ..picture = recorder.endRecording();
+    slot.append(picture);
+    return slot;
   }
+
+  @protected
+  void clearGlassShadows() => _originalShadows.layer = null;
 
   @override
   @mustCallSuper
@@ -894,6 +920,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     _idleAncestorClips.dispose();
     clearFrameInputs();
     _effectLayer.layer = null;
+    clearGlassShadows();
     super.dispose();
   }
 }

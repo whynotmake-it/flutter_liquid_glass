@@ -287,10 +287,7 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
         geometry != null &&
         !_matteVisibilityChanged(geometry!.shapes, shapes)) {
       logger.finer('$hashCode Skipping geometry rebuild.');
-      // Paint-only shape metadata (currently grouped shadows) must still
-      // refresh even when the SDF inputs are reusable.
-      // This keeps interactive shadow controls live without re-encoding the
-      // Flutter-GPU geometry texture.
+      // Shadows refresh with cached geometry without re-encoding its matte.
       geometry = GeometryCache(
         bounds: geometry!.bounds,
         shapes: shapes,
