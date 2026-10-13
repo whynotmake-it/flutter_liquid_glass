@@ -11,14 +11,13 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
-/// Each output (matte, material map) cycles through a ring of textures that
-/// only grow. A render draws into the top-left sub-rect of a texture no
-/// in-flight frame reads and reports the texture size, so the final shader
-/// scales its UVs to that sub-rect. Resizing geometry therefore reuses the
-/// same textures instead of allocating, which matters because a
-/// `gpu.Texture` is only freed when the GC finalizes its wrapper. The layer
-/// reuses the image without calling [render] when geometry is unchanged
-/// (including uniform translation).
+/// Each output keeps a current texture and one spare. Textures grow as needed;
+/// rendering uses only the top-left area, with shader UVs adjusted to match.
+/// Unchanged geometry reuses the image without rendering again.
+///
+/// Repeated renders in one frame may need another texture. Each output keeps
+/// at most three textures (current plus two spares); scenes and GC can keep
+/// dropped textures alive longer.
 ///
 /// This renderer owns the image handles returned by [gpu.Texture.asImage].
 /// Replacing/disposal releases those handles; recorded scenes hold independent
@@ -271,13 +270,7 @@ class FlutterGpuGeometryRenderer {
   /// `textureWidth` x `textureHeight`. The returned image is a non-owning
   /// wrapper — do NOT dispose it. Its texture is written again
   /// [reuseAfterFrames] frames after a later render replaces it.
-  ({
-    ui.Image image,
-    int width,
-    int height,
-    int textureWidth,
-    int textureHeight,
-  })
+  ({ui.Image image, int width, int height, int textureWidth, int textureHeight})
   render({
     required int width,
     required int height,
@@ -306,7 +299,6 @@ class FlutterGpuGeometryRenderer {
     final (viewWidth, viewHeight) = _viewCapacity();
 
     _ensureFrameCounter();
-    _lastRenderFrame = _completedFrames;
     if (_texture != null) {
       // Release our handle; earlier submitted scenes hold their own.
       _image?.dispose();
@@ -381,9 +373,6 @@ class FlutterGpuGeometryRenderer {
     } else {
       _materials.releaseCurrent(_completedFrames);
     }
-    if (_mattes.spareCount + _materials.spareCount > 0) {
-      _renderersWithSpares.add(this);
-    }
 
     _packUniformData(
       offsetX: offsetX,
@@ -406,9 +395,8 @@ class FlutterGpuGeometryRenderer {
       boundsData: boundsData,
     );
 
-    final uniformView = _hostBufferForUniformSize(
-      _uniformSize,
-    ).emplace(_uniformData);
+    final uniformView = _hostBufferForUniformSize(_uniformSize)
+        .emplace(_uniformData);
 
     final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
     final geometryPass = geometryCommandBuffer.createRenderPass(_renderTarget!)
@@ -561,35 +549,18 @@ class FlutterGpuGeometryRenderer {
     _pendingCommandBuffers.clear();
   }
 
-  /// Frames after its replacement before a texture may be rendered into
-  /// again.
+  /// Frames to wait after retirement before reusing a texture.
   ///
-  /// A texture replaced during frame E was last sampled by frame E - 1's
-  /// scene. The engine keeps at most two frames in its pipeline and frees a
-  /// slot only after rasterizing and submitting that frame (`Animator`'s
-  /// `FramePipeline(2)`; `Pipeline::Consume` signals after the consumer
-  /// returns), so when frame E + 1 paints, frame E - 1 has been submitted.
-  /// Flutter GPU submits to the same queue as the raster thread (the IO
-  /// manager's context is the platform view's), and the GPU orders a write
-  /// after earlier reads on that queue: Metal tracks hazards on these
-  /// non-heap textures, and every Impeller Vulkan render pass declares an
-  /// external dependency on earlier fragment-shader reads. GLES submits on
-  /// the raster thread in posting order.
+  /// A texture retired in frame E was last read by frame E - 1. The engine's
+  /// two-frame pipeline (`Animator.FramePipeline(2)`) submits that scene before
+  /// frame E + 1 paints. Flutter GPU uses the same queue, which orders the next
+  /// write after those reads (Metal/Vulkan hazards; GLES posting order).
   static const int reuseAfterFrames = 1;
-
-  /// Spare textures are dropped after this many frames without a render,
-  /// and released ones after this many frames unclaimed.
-  static const int _idleFramesBeforeTrim = 120;
-
-  /// Released textures kept for other renderers, app-wide.
-  static const int _maxReleased = 4;
 
   static int _completedFrames = 0;
   static bool _countingFrames = false;
-  static final Set<FlutterGpuGeometryRenderer> _renderersWithSpares = {};
-  static final List<_RingTexture> _released = [];
 
-  /// Counts frames that submit a scene, the unit [reuseAfterFrames] is in.
+  /// Counts scene-submitting frames for texture reuse.
   ///
   /// Renders outside a frame, as in unit tests, do not advance the count,
   /// so their textures are never reused.
@@ -599,25 +570,8 @@ class FlutterGpuGeometryRenderer {
     SchedulerBinding.instance.addPersistentFrameCallback((_) {
       if (!RendererBinding.instance.sendFramesToEngine) return;
       _completedFrames++;
-      _released.removeWhere((texture) {
-        final stale =
-            _completedFrames - texture.retiredFrame > _idleFramesBeforeTrim;
-        if (stale) _countDropped();
-        return stale;
-      });
-      if (_renderersWithSpares.isEmpty) return;
-      for (final renderer in _renderersWithSpares.toList()) {
-        if (_completedFrames - renderer._lastRenderFrame >
-            _idleFramesBeforeTrim) {
-          renderer._mattes.dropSpares();
-          renderer._materials.dropSpares();
-          _renderersWithSpares.remove(renderer);
-        }
-      }
     });
   }
-
-  int _lastRenderFrame = 0;
 
   /// Textures this renderer holds that are not in use.
   @visibleForTesting
@@ -653,30 +607,11 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   static int debugDroppedTextureCount = 0;
 
-  /// Released textures waiting for another renderer.
-  @visibleForTesting
-  static int get debugReleasedTextureCount => _released.length;
-
   static void _countDropped() {
     assert(() {
       debugDroppedTextureCount++;
       return true;
     }(), 'Count dropped geometry textures in debug builds.');
-  }
-
-  /// A mature released texture that holds [width] x [height] without
-  /// wasting more than 1.5x per dimension, or null.
-  static _RingTexture? _claimReleased(int frame, int width, int height) {
-    for (var index = 0; index < _released.length; index++) {
-      final texture = _released[index];
-      if (frame - texture.retiredFrame < reuseAfterFrames) continue;
-      if (texture.covers(width, height) &&
-          texture.texture.width * texture.texture.height * 4 <=
-              width * height * 9) {
-        return _released.removeAt(index);
-      }
-    }
-    return null;
   }
 
   void _packUniformData({
@@ -776,9 +711,8 @@ class FlutterGpuGeometryRenderer {
   /// Callers retaining an output must clone its images before calling this.
   /// Independent clones and submitted native scenes remain valid.
   void releaseOutput() {
-    _mattes.release(_completedFrames);
-    _materials.release(_completedFrames);
-    _renderersWithSpares.remove(this);
+    _mattes.release();
+    _materials.release();
     _renderTarget = null;
     _image?.dispose();
     _image = null;
@@ -833,14 +767,11 @@ final class _RingTexture {
       texture.width >= width && texture.height >= height;
 }
 
-/// The textures one output of a renderer cycles through.
+/// A current texture and up to two retired spares for one output.
 ///
-/// Every texture is at least the ring's capacity, which only grows: in 1.5x
-/// steps, capped at the view unless one render needs more. A resize within
-/// the capacity reuses the ring; growth drops the smaller textures.
+/// Capacity grows in 1.5x steps, capped at the view unless a render needs more.
+/// A second spare avoids allocations when a frame renders twice.
 final class _TextureRing {
-  /// Spares beyond the one a steady ring needs, for frames that render
-  /// twice.
   static const int _maxSpares = 2;
 
   _RingTexture? _current;
@@ -859,13 +790,17 @@ final class _TextureRing {
     required int maxWidth,
     required int maxHeight,
   }) {
-    final previous = _current;
-    _current = null;
     if (width > _width || height > _height) {
       _width = _grow(_width, width, maxWidth);
       _height = _grow(_height, height, maxHeight);
-      dropSpares(keep: (texture) => texture.covers(_width, _height));
+      _spares.removeWhere((texture) {
+        if (texture.covers(_width, _height)) return false;
+        FlutterGpuGeometryRenderer._countDropped();
+        return true;
+      });
     }
+    final previous = _current;
+    _current = null;
     if (previous != null) {
       if (previous.covers(_width, _height)) {
         previous.retiredFrame = frame;
@@ -874,7 +809,7 @@ final class _TextureRing {
         FlutterGpuGeometryRenderer._countDropped();
       }
     }
-    // Spares retire in frame order, so the first is the oldest.
+    // Reuse the oldest spare only after its frame-age guard has passed.
     if (_spares.isNotEmpty &&
         frame - _spares.first.retiredFrame >=
             FlutterGpuGeometryRenderer.reuseAfterFrames) {
@@ -888,55 +823,30 @@ final class _TextureRing {
       _spares.removeAt(0);
       FlutterGpuGeometryRenderer._countDropped();
     }
-    final released = FlutterGpuGeometryRenderer._claimReleased(
-      frame,
-      _width,
-      _height,
-    );
-    if (released != null) {
-      assert(() {
-        FlutterGpuGeometryRenderer.debugReusedTextureCount++;
-        return true;
-      }(), 'Count reused geometry textures in debug builds.');
-      return _current = released;
-    }
     return _current = _allocate(_width, _height);
   }
 
   /// Retires the texture in use without replacing it.
   void releaseCurrent(int frame) {
     final previous = _current;
-    _current = null;
     if (previous == null) return;
+    _current = null;
     previous.retiredFrame = frame;
     _spares.add(previous);
   }
 
-  /// Drops spare textures, except those [keep] accepts.
-  void dropSpares({bool Function(_RingTexture texture)? keep}) {
-    _spares.removeWhere((texture) {
-      if (keep?.call(texture) ?? false) return false;
+  /// Drops every texture and resets the ring's capacity.
+  void release() {
+    if (_current != null) {
       FlutterGpuGeometryRenderer._countDropped();
-      return true;
-    });
-  }
-
-  /// Hands every texture to the app-wide released list.
-  void release(int frame) {
-    final textures = [..._spares, ?_current];
-    _spares.clear();
+    }
+    for (final _ in _spares) {
+      FlutterGpuGeometryRenderer._countDropped();
+    }
     _current = null;
+    _spares.clear();
     _width = 0;
     _height = 0;
-    final released = FlutterGpuGeometryRenderer._released;
-    for (final texture in textures) {
-      texture.retiredFrame = frame;
-      released.add(texture);
-    }
-    while (released.length > FlutterGpuGeometryRenderer._maxReleased) {
-      released.removeAt(0);
-      FlutterGpuGeometryRenderer._countDropped();
-    }
   }
 
   static int _grow(int capacity, int needed, int limit) {

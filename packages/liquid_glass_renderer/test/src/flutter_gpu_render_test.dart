@@ -3,7 +3,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/shaders.dart';
+
+import 'gpu_test_helpers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -12,14 +14,8 @@ void main() {
   test(
     'asset renderers share immutable pipeline resources',
     () async {
-      final first = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      final second = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      addTearDown(first.dispose);
-      addTearDown(second.dispose);
+      final first = await createGeometryRenderer();
+      final second = await createGeometryRenderer();
 
       expect(
         identical(first.debugPipelineIdentity, second.debugPipelineIdentity),
@@ -51,7 +47,7 @@ void main() {
       );
       expect(first.debugHostBufferBlockLength, greaterThan(0));
       final library = (await gpu.ShaderLibrary.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+        ShaderKeys.gpuGeometryShaderBundle,
       ))!;
       final size = library['GeometryFragment']!
           .getUniformSlot('GeometryUniforms')
@@ -68,10 +64,7 @@ void main() {
   test(
     'geometry renderer buckets dimensions without overwriting older images',
     () async {
-      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      addTearDown(renderer.dispose);
+      final renderer = await createGeometryRenderer();
 
       ({
         ui.Image image,
@@ -119,10 +112,7 @@ void main() {
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final renderer = await FlutterGpuGeometryRenderer.fromAsset(
-        'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-      );
-      addTearDown(renderer.dispose);
+      final renderer = await createGeometryRenderer();
 
       final result = renderer.render(
         width: 64,
@@ -179,18 +169,8 @@ void main() {
         -1,
       ];
       final renderers = await Future.wait(
-        List.generate(
-          40,
-          (_) => FlutterGpuGeometryRenderer.fromAsset(
-            'build/shaderbundles/liquid_glass_renderer.shaderbundle',
-          ),
-        ),
+        List.generate(40, (_) => createGeometryRenderer()),
       );
-      addTearDown(() {
-        for (final renderer in renderers) {
-          renderer.dispose();
-        }
-      });
 
       ui.Image? finalImage;
       for (var i = 0; i < renderers.length; i++) {
