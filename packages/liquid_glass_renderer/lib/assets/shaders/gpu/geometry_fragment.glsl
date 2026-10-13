@@ -1,13 +1,12 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
 // Geometry pass, run with Flutter GPU: renders the signed distance field of
-// every shape in a layer into the layer's matte (12-bit surface normal angle,
-// signed edge distance and 12-bit displacement, packed by
+// every shape in a layer into the layer's fp16 matte (displacement vector,
+// signed edge distance and support mask, written by
 // displacement_encoding.glsl). Normals are analytic; corner normals come from
 // a 1.5x corner radius, and refraction uses a quarter-circle bevel that can
 // fit the shape.
 
-// The matte packs 12-bit integer codes; fp16 cannot represent them exactly.
 precision highp float;
 
 #define MAX_SHAPES 16
@@ -60,7 +59,7 @@ void main() {
     );
     float emptyThreshold = uContourExtent + 2.0 + outsideBounds.y;
     if (outsideBounds.x > emptyThreshold * emptyThreshold) {
-        fragColor = vec4(0.0);
+        fragColor = vec4(0.0, 0.0, kOutsideDistance, 0.0);
         return;
     }
     SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
@@ -87,7 +86,7 @@ void main() {
     );
     float effectSupport = max(materialAlpha, contourSupport);
     if (effectSupport < 0.01) {
-        fragColor = vec4(0.0);
+        fragColor = vec4(0.0, 0.0, kOutsideDistance, 0.0);
         return;
     }
 
@@ -128,6 +127,7 @@ void main() {
         max(uRefractionAmount, 0.001),
         -sd,
         4.0 * uEdgeDistanceRange,
-        uContourExtent
+        uContourExtent,
+        effectSupport
     );
 }

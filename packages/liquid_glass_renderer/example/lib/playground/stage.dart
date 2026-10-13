@@ -7,8 +7,8 @@ import 'package:liquid_glass_renderer_example/playground/scenes/controls_scene.d
 import 'package:liquid_glass_renderer_example/playground/scenes/loupe_scene.dart';
 import 'package:liquid_glass_renderer_example/playground/sheet_avoidance.dart';
 
-/// All glass on the stage, rendered by a single [LiquidGlassLayer], with the
-/// settings button in its top trailing corner.
+/// Stage glass rendered by a shared [LiquidGlassLayer], with the controls
+/// bottom bar owning a smaller capture and layer for its loupe.
 ///
 /// Material changes rebuild only the layer: the scene subtree is passed
 /// through as a prebuilt child, so dragging a slider never rebuilds or
@@ -67,7 +67,10 @@ class Stage extends StatelessWidget {
                   builder: (context, scene, _) => KeyedSubtree(
                     key: ValueKey(scene),
                     child: switch (scene) {
-                      StageScene.controls => ControlsScene(fake: state.fake),
+                      StageScene.controls => ControlsScene(
+                        fake: state.fake,
+                        material: state.material,
+                      ),
                       StageScene.blend => AvoidSheet(
                         child: BlendScene(blend: state.blend),
                       ),

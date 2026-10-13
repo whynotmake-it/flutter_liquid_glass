@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -142,113 +141,19 @@ void main() {
       ).readAsStringSync(),
       contains('#include "gpu/displacement_encoding.glsl"'),
     );
-    expect(runtimeCodec, contains('0.5 * sqrt(normalizedInward)'));
-    expect(runtimeCodec, contains('0.5 * sqrt(normalizedExterior)'));
+    // The fp16 matte stores the displacement vector, the signed edge
+    // distance and the support mask as plain channels so the final pass can
+    // sample them bilinearly: under animated transforms the sampling
+    // position moves fractionally, and interpolation keeps the field smooth
+    // where nearest sampling would snap between texels.
     expect(
       runtimeCodec,
-      contains('normalizedMagnitude = centeredDistance * centeredDistance'),
+      contains('surfaceNormal * displacementMagnitude'),
     );
+    expect(runtimeCodec, contains('decodeDisplacement'));
     expect(runtimeCodec, contains('decodeSignedEdgeDistance'));
-    expect(runtimeCodec, contains('-normalizedMagnitude * exteriorRange'));
-    expect(
-      runtimeCodec,
-      contains('-displacementMagnitude / maxDisplacement'),
-    );
-    expect(runtimeCodec, contains('angleHigh / 255.0'));
-    expect(runtimeCodec, contains('magnitudeLow / 255.0'));
-  });
-
-  // Dart mirror of the packed RGBA8 codec in displacement_encoding.glsl:
-  // R = angle[11:4], G = angle[3:0] | magnitude[11:8], A = magnitude[7:0].
-  ({int r, int g, int a}) encodePacked(double angle, double magnitude) {
-    final x = math.cos(angle);
-    final y = math.sin(angle);
-    final manhattan = x.abs() + y.abs();
-    final dx = x / manhattan;
-    final dy = y / manhattan;
-    final diamond = dy >= 0
-        ? (dx >= 0 ? dy : 1 - dx)
-        : (dx < 0 ? 2 - dy : 3 + dx);
-    final angleCode = (diamond * 1024).round() % 4096;
-    final magnitudeCode = (magnitude.clamp(0.0, 1.0) * 4095).round();
-    return (
-      r: angleCode ~/ 16,
-      g: (angleCode % 16) * 16 + magnitudeCode ~/ 256,
-      a: magnitudeCode % 256,
-    );
-  }
-
-  ({double x, double y, double magnitude}) decodePacked(
-    ({int r, int g, int a}) texel,
-  ) {
-    final diamond = (texel.r * 16 + texel.g ~/ 16) / 1024;
-    final dx = diamond < 2 ? 1 - diamond : diamond - 3;
-    final dy = diamond < 1
-        ? diamond
-        : (diamond < 3 ? 2 - diamond : diamond - 4);
-    final length = math.sqrt(dx * dx + dy * dy);
-    final magnitudeCode = (texel.g % 16) * 256 + texel.a;
-    return (
-      x: dx / length,
-      y: dy / length,
-      magnitude: magnitudeCode / 4095,
-    );
-  }
-
-  test('packed codec keeps refracted content steps far below a pixel', () {
-    // iOS 27's 60 pt edge displacement at 3x. An 8-bit compander would step
-    // by up to 2 / 255 of this (1.4 device pixels) deep in the bevel and draw
-    // refracted lines as staircases.
-    const maxDisplacement = 180.0;
-    var maximumError = 0.0;
-    for (var index = 0; index <= 10000; index++) {
-      final magnitude = index / 10000;
-      final decoded = decodePacked(encodePacked(0, magnitude)).magnitude;
-      maximumError = math.max(
-        maximumError,
-        (decoded - magnitude).abs() * maxDisplacement,
-      );
-    }
-    expect(maximumError, lessThan(0.05));
-
-    for (var code = 0; code < 4096; code++) {
-      final texel = encodePacked(0, code / 4095);
-      expect(
-        (decodePacked(texel).magnitude * 4095).round(),
-        code,
-        reason: 'every magnitude code must survive the byte packing',
-      );
-    }
-  });
-
-  test('normal codec represents cardinal optical walls exactly', () {
-    for (final (angle, x, y) in [
-      (0.0, 1.0, 0.0),
-      (math.pi / 2, 0.0, 1.0),
-      (math.pi, -1.0, 0.0),
-      (-math.pi / 2, 0.0, -1.0),
-    ]) {
-      final decoded = decodePacked(encodePacked(angle, 0));
-      expect(decoded.x, x);
-      expect(decoded.y, y);
-    }
-
-    // At the deliberately strong 160-pixel diagnostic displacement the
-    // 12-bit diamond angle keeps the worst lateral error far below a pixel
-    // (two 8-bit components would reach about 0.85 pixels).
-    var maximumVectorError = 0.0;
-    for (var index = 0; index < 36000; index++) {
-      final angle = index * 2 * math.pi / 36000;
-      final decoded = decodePacked(encodePacked(angle, 1));
-      final error =
-          160 *
-          math.sqrt(
-            math.pow(decoded.x - math.cos(angle), 2) +
-                math.pow(decoded.y - math.sin(angle), 2),
-          );
-      maximumVectorError = math.max(maximumVectorError, error);
-    }
-    expect(maximumVectorError, lessThan(0.2));
+    expect(runtimeCodec, contains('encoded.rg'));
+    expect(runtimeCodec, contains('encoded.b'));
   });
 
   test('smooth refraction keeps undisplaced glass an exact backdrop copy', () {
@@ -328,7 +233,7 @@ void main() {
     }
   });
 
-  test('rim precision does not increase geometry texture bandwidth', () {
+  test('only the bilinearly sampled matte is fp16', () {
     final renderer = File(
       'lib/src/internal/flutter_gpu_geometry_renderer_native.dart',
     ).readAsStringSync();
@@ -338,18 +243,20 @@ void main() {
       'gpu.gpuContext.createTexture('.allMatches(renderer).length,
       1,
     );
-    final geometryAllocationStart = renderer.indexOf(
-      'gpu.gpuContext.createTexture(',
+    // The matte is fp16 so the final pass can interpolate it; the material
+    // map packs discrete shape IDs and stays byte-exact.
+    expect(
+      renderer,
+      contains(
+        '_mattes = _TextureRing(\n    gpu.PixelFormat.r16g16b16a16Float',
+      ),
     );
-    final geometryAllocationEnd = renderer.indexOf(
-      ');',
-      geometryAllocationStart,
+    expect(
+      renderer,
+      contains(
+        '_materials = _TextureRing(\n    gpu.PixelFormat.r8g8b8a8UNormInt',
+      ),
     );
-    final geometryAllocation = renderer.substring(
-      geometryAllocationStart,
-      geometryAllocationEnd,
-    );
-    expect(geometryAllocation, isNot(contains('format:')));
   });
 
   test('attached contour can move outside without a shadow pass', () {

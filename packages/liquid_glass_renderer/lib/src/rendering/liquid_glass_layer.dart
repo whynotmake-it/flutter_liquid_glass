@@ -1062,9 +1062,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         geometryImage,
         filterQuality: FilterQuality.low,
       )
-      // Nearest: the matte packs 12-bit normal angle and displacement codes
-      // across byte boundaries, which filtering between texels would mix.
-      ..setImageSampler(1, geometryImage);
+      // The fp16 matte stores continuous fields (displacement vector and
+      // signed edge distance), so bilinear sampling keeps matte positions
+      // that move fractionally under animated transforms smooth instead of
+      // snapping between texels.
+      ..setImageSampler(1, geometryImage, filterQuality: FilterQuality.low);
     if (_materialImage case final materialImage?) {
       if (_usesTintOnlyAppearance) {
         activeRenderShader.setImageSampler(
@@ -1130,10 +1132,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// outside the clip the filter input is transparent.
   @protected
   Rect? get backdropSampleBounds {
-    final clip = _filterClip;
-    if (clip == null || blurPassSigma <= 0) return clip;
+    // Inside a capture the filter input holds the whole capture pass: the
+    // ancestor clip bounds the filter's coverage in device space, which is
+    // stable under this layer's own animated transform.
+    final coverageBounds = _coverageBounds;
+    if (coverageBounds == null || blurPassSigma <= 0) return coverageBounds;
     final translation = compositorTranslation;
-    var captured = clip.shift(translation);
+    var captured = coverageBounds.shift(translation);
     final ancestorClips = [
       retainedClipBounds,
       localPaintClipAbove(
@@ -1223,16 +1228,39 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   Rect? _filterMaterialBounds;
   Offset _filterPaintOffset = Offset.zero;
 
-  // The native filter clip, kept on stable pixel buckets in the translated
-  // frame so retained compositor motion does not resize its render target.
-  Rect? get _filterClip {
+  // The region the filter's input texture can hold, in this layer's space.
+  // Inside a capture that is the whole capture pass; outside it, this
+  // layer's own material bounds snapped to device pixels.
+  Rect? get _coverageBounds {
     final bounds = _filterMaterialBounds;
     if (bounds == null) return null;
+    if (RenderLiquidGlassCapture.enclosing(this) case final capture?) {
+      final toLayer = Matrix4.tryInvert(getTransformTo(capture));
+      if (toLayer != null) {
+        return MatrixUtils.transformRect(toLayer, capture.captureRect);
+      }
+    }
     final translation = compositorTranslation;
     return bounds
         .shift(translation)
         .expandToPixelBuckets(devicePixelRatio)
         .shift(-translation);
+  }
+
+  // The native filter clip. Inside a capture, don't bound the filter at
+  // all: the capture's own ancestor clip already limits the filter's
+  // coverage to the pass in device space, which is stable. A tighter local
+  // clip rides this layer's transform instead, so an animated transform
+  // drags the filter's device coverage — and the texel grid Impeller
+  // snapshots the backdrop into — fractionally every frame, resampling the
+  // whole input.
+  Rect? get _filterClip {
+    final bounds = _filterMaterialBounds;
+    if (bounds == null) return null;
+    if (RenderLiquidGlassCapture.enclosing(this) != null) {
+      return Rect.largest;
+    }
+    return _coverageBounds;
   }
 
   // Unblurred, the filter input is the backdrop inside the filter's own clip.
@@ -1261,12 +1289,19 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     return filter;
   }
 
+  void _syncFilterClip() {
+    final clip = _filterClip;
+    if (clip == null) return;
+    debugFilterBounds = clip;
+    _clipRectLayerHandle.layer?.clipRect = clip.shift(_filterPaintOffset);
+  }
+
   // Both painting and retained geometry updates need the same native filter
   // bounds. This only updates existing handles; it never paints children.
   Rect _syncMaterialFilter(Rect materialBounds, Offset offset) {
-    final filterBounds = materialBounds.expandToPixelBuckets(devicePixelRatio);
     _filterMaterialBounds = materialBounds;
     _filterPaintOffset = offset;
+    final filterBounds = _filterClip ?? materialBounds;
     debugFilterBounds = filterBounds;
     _clipRectLayerHandle.layer?.clipRect = filterBounds.shift(offset);
     if (drawableEmpty) {
@@ -1343,10 +1378,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   void onCompositorTranslated(Offset translation) {
-    final clip = _filterClip;
-    if (clip != null && _clipRectLayerHandle.layer != null) {
-      _clipRectLayerHandle.layer!.clipRect = clip.shift(_filterPaintOffset);
-    }
+    _syncFilterClip();
     if (!drawableEmpty && hasReusableGeometry && syncCoordinateMapping()) {
       _shaderHandle.layer?.filter = _updateShaderFilter();
     }
@@ -1360,6 +1392,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // with paint-only changes inside it — moves no tracked transform, so the
     // translation poll misses it. Re-sync the coordinate mapping into the
     // retained filter, or repaint when its inputs cannot be reused.
+    _syncFilterClip();
     if (syncCoordinateMapping()) {
       if (!drawableEmpty &&
           hasReusableGeometry &&

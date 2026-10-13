@@ -10,10 +10,11 @@ export 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart'
 /// The iOS 27 bottom bar: an optional accessory capsule (a mini player, say)
 /// above a [LoupeTabBar] and a round trailing button.
 ///
-/// All segments are grouped glass in one [LiquidGlassBlendGroup] on the
-/// ambient [LiquidGlassLayer]. At rest the gaps are wider than the blend
-/// distance so the segments stay apart; pulling one toward another stretches
-/// it across the gap and they merge.
+/// All segments are grouped glass in one [LiquidGlassBlendGroup]. The
+/// playground places this bar in its own [LiquidGlassLayer] and capture so
+/// the loupe can sample the bar without capturing the whole stage. At rest
+/// the gaps are wider than the blend distance so the segments stay apart;
+/// pulling one toward another stretches it across the gap and they merge.
 ///
 /// Tab bar interaction details (the loupe, masked tint and icon scale) are
 /// informed by `GlassTabBar` in

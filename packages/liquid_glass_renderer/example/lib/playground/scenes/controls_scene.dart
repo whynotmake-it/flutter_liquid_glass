@@ -4,18 +4,20 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
+import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/control_glass.dart';
 import 'package:liquid_glass_renderer_example/playground/sheet_avoidance.dart';
 import 'package:motor/motor.dart';
 
-/// Everyday controls: navigation buttons at the top and a bottom bar. Every
-/// shape samples the one shared backdrop capture.
+/// Everyday controls: navigation buttons at the top and a bottom bar. The
+/// bottom bar owns a small capture so its loupe can sample the bar beneath it.
 class ControlsScene extends StatelessWidget {
-  const ControlsScene({required this.fake, super.key});
+  const ControlsScene({required this.fake, required this.material, super.key});
 
   /// Whether the stage renders fake glass, which the bottom bar's loupe
   /// layer has to match.
   final ValueListenable<bool> fake;
+  final ValueListenable<GlassMaterial> material;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +46,7 @@ class ControlsScene extends StatelessWidget {
                   bottomBarSide,
                   bottomBarGap(bottomInset),
                 ),
-                child: _BottomBar(fake: fake),
+                child: _BottomBar(fake: fake, material: material),
               ),
             ),
           ),
@@ -123,9 +125,10 @@ class _TopControlsState extends State<_TopControls> {
 /// The mini player, tab bar and search button, adapting to the backdrop as
 /// one group.
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.fake});
+  const _BottomBar({required this.fake, required this.material});
 
   final ValueListenable<bool> fake;
+  final ValueListenable<GlassMaterial> material;
 
   static const _tabs = [
     BottomBarTab(icon: CupertinoIcons.house_fill, label: 'Home'),
@@ -139,12 +142,26 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
+    return ValueListenableBuilder<bool>(
       valueListenable: fake,
-      builder: (context, fake, _) => IosBottomBar(
-        tabs: _tabs,
-        accessory: const NowPlayingAccessory(),
-        fake: fake,
+      builder: (context, fake, _) => ListenableBuilder(
+        listenable: material,
+        builder: (context, child) {
+          final value = material.value;
+          return LiquidGlassCapture(
+            child: LiquidGlassLayer(
+              settings: value.settings,
+              defaultAppearance: value.appearance,
+              fake: fake,
+              child: child!,
+            ),
+          );
+        },
+        child: IosBottomBar(
+          tabs: _tabs,
+          accessory: const NowPlayingAccessory(),
+          fake: fake,
+        ),
       ),
     );
   }

@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
@@ -9,7 +11,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'geometry normals are exact per pixel on tight curves',
+    'geometry displacement follows the inward normal on tight curves',
     () async {
       final renderer = await FlutterGpuGeometryRenderer.fromAsset(
         'build/shaderbundles/liquid_glass_renderer.shaderbundle',
@@ -35,29 +37,34 @@ void main() {
         offsetX: 0,
         offsetY: 0,
       );
-      final bytes = (await result.image.toByteData())!;
+      // The matte is fp16: channels R and G hold the displacement vector in
+      // pixels, channel B the signed inward edge distance.
+      final bytes = (await result.image.toByteData(
+        format: ui.ImageByteFormat.rawExtendedRgba128,
+      ))!;
+      final pixels = Float32List.sublistView(bytes);
 
       var worst = 0.0;
       var checked = 0;
       for (var y = 0; y < 64; y++) {
         for (var x = 0; x < 64; x++) {
           final i = (y * result.width + x) * 4;
+          final signedEdgeDistance = pixels[i + 2];
           final dx = x + 0.5 - cx;
           final dy = y + 0.5 - cy;
           final r = math.sqrt(dx * dx + dy * dy);
-          if (bytes.getUint8(i + 2) < 128 || r < 3 || r > radius - 0.5) {
+          // Only the bevel band refracts, and only pixels strictly inside
+          // carry a usable inward distance.
+          if (signedEdgeDistance <= 0 || r < 3 || r > radius - 0.5) {
             continue;
           }
-          // Diamond-angle normal code, as decodeSurfaceNormal in
-          // displacement_encoding.glsl.
-          final diamond =
-              (bytes.getUint8(i) * 16 + (bytes.getUint8(i + 1) >> 4)) / 1024;
-          final nx = diamond < 2 ? 1 - diamond : diamond - 3;
-          final ny = diamond < 1
-              ? diamond
-              : (diamond < 3 ? 2 - diamond : diamond - 4);
-          final cosine =
-              (nx * dx + ny * dy) / (math.sqrt(nx * nx + ny * ny) * r);
+          final disX = pixels[i];
+          final disY = pixels[i + 1];
+          final disLength = math.sqrt(disX * disX + disY * disY);
+          if (disLength < 1e-3) continue;
+          // The displacement points opposite the outward normal, so
+          // -displacement should align with the radial direction.
+          final cosine = -(disX * dx + disY * dy) / (disLength * r);
           worst = math.max(worst, math.acos(cosine.clamp(-1.0, 1.0)));
           checked++;
         }

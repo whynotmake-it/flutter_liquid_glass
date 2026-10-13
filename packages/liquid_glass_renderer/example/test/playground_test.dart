@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/app.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
@@ -10,6 +11,7 @@ import 'package:liquid_glass_renderer_example/playground/inspector/inspector.dar
 import 'package:liquid_glass_renderer_example/playground/inspector/material_sections.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
 import 'package:liquid_glass_renderer_example/playground/presets.dart';
+import 'package:liquid_glass_renderer_example/playground/scenes/controls_scene.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
 
 void main() {
@@ -178,11 +180,11 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Inspector), findsNothing);
-    expect(find.byType(LiquidGlassLayer), findsOneWidget);
+    expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
 
     await openSettings(tester);
     expect(find.byType(Inspector), findsOneWidget);
-    expect(find.byType(LiquidGlassLayer), findsOneWidget);
+    expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
 
     await tester.tap(find.bySemanticsLabel('Settings'));
     await tester.pumpAndSettle();
@@ -355,7 +357,7 @@ void main() {
     await openSettings(tester);
 
     expect(find.text('Liquid Glass'), findsWidgets);
-    expect(find.byType(LiquidGlassLayer), findsOneWidget);
+    expect(find.byType(LiquidGlassLayer), findsNWidgets(2));
     expect(find.text('Refraction'), findsWidgets);
 
     await tester.tap(find.text('Blend'));
@@ -369,6 +371,87 @@ void main() {
     expect(find.byType(LiquidGlassLayer), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'the controls bottom bar owns its capture and follows stage material',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(const PlaygroundApp());
+      await tester.pump();
+
+      final capture = find.byType(LiquidGlassCapture);
+      expect(capture, findsOneWidget);
+      expect(
+        find.descendant(
+          of: capture,
+          matching: find.byType(LiquidGlassLayer),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byType(IosBottomBar),
+          matching: capture,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byType(CircleButton).first,
+          matching: capture,
+        ),
+        findsNothing,
+      );
+
+      await openSettings(tester);
+      final refraction = find.descendant(
+        of: find.ancestor(
+          of: find.text('Amount'),
+          matching: find.byType(SliderRow),
+        ),
+        matching: find.byType(CupertinoSlider),
+      );
+      tester.widget<CupertinoSlider>(refraction).onChanged!(12);
+      await tester.pump();
+      final barLayer = tester.widget<LiquidGlassLayer>(
+        find.descendant(
+          of: capture,
+          matching: find.byType(LiquidGlassLayer),
+        ),
+      );
+      expect(barLayer.settings.refractionAmount, 12);
+
+      final fakeRow = find.ancestor(
+        of: find.text('FakeGlass'),
+        matching: find.byType(SwitchRow),
+      );
+      await tester.tap(fakeRow);
+      await tester.pump();
+      expect(
+        tester.widget<IosBottomBar>(find.byType(IosBottomBar)).fake,
+        isTrue,
+      );
+      expect(
+        tester.widget<LoupeTabBar>(find.byType(LoupeTabBar)).fake,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<LiquidGlassLayer>(
+              find.descendant(
+                of: find.byType(LiquidGlassCapture),
+                matching: find.byType(LiquidGlassLayer),
+              ),
+            )
+            .fake,
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('the loupe scene shows package loupes over the backdrop', (
     tester,

@@ -262,8 +262,17 @@ class FlutterGpuGeometryRenderer {
   /// the matte size, as in the final shader.
   ui.Image? get materialImage => _materialImage;
 
-  final _TextureRing _mattes = _TextureRing();
-  final _TextureRing _materials = _TextureRing();
+  // The matte is fp16: it stores continuous fields (displacement vector and
+  // signed edge distance) that the final pass samples bilinearly, so matte
+  // positions that move fractionally under animated transforms interpolate
+  // instead of snapping between texels.
+  final _TextureRing _mattes = _TextureRing(
+    gpu.PixelFormat.r16g16b16a16Float,
+  );
+  // The material map packs discrete shape IDs; it stays byte-exact.
+  final _TextureRing _materials = _TextureRing(
+    gpu.PixelFormat.r8g8b8a8UNormInt,
+  );
 
   /// Renders a new geometry matte and returns it as a [ui.Image].
   ///
@@ -666,10 +675,16 @@ class FlutterGpuGeometryRenderer {
 
   /// A mature released texture that holds [width] x [height] without
   /// wasting more than 1.5x per dimension, or null.
-  static _RingTexture? _claimReleased(int frame, int width, int height) {
+  static _RingTexture? _claimReleased(
+    int frame,
+    int width,
+    int height,
+    gpu.PixelFormat format,
+  ) {
     for (var index = 0; index < _released.length; index++) {
       final texture = _released[index];
       if (frame - texture.retiredFrame < reuseAfterFrames) continue;
+      if (texture.format != format) continue;
       if (texture.covers(width, height) &&
           texture.texture.width * texture.texture.height * 4 <=
               width * height * 9) {
@@ -815,7 +830,7 @@ class FlutterGpuGeometryRenderer {
 
 /// A texture and its render target.
 final class _RingTexture {
-  _RingTexture(this.texture)
+  _RingTexture(this.texture, this.format)
     : renderTarget = gpu.RenderTarget.singleColor(
         gpu.ColorAttachment(
           texture: texture,
@@ -824,6 +839,7 @@ final class _RingTexture {
       );
 
   final gpu.Texture texture;
+  final gpu.PixelFormat format;
   final gpu.RenderTarget renderTarget;
 
   /// Frame count when this texture was last replaced or released.
@@ -839,9 +855,17 @@ final class _RingTexture {
 /// steps, capped at the view unless one render needs more. A resize within
 /// the capacity reuses the ring; growth drops the smaller textures.
 final class _TextureRing {
+  _TextureRing(this.format);
+
   /// Spares beyond the one a steady ring needs, for frames that render
   /// twice.
   static const int _maxSpares = 2;
+
+  /// The pixel format textures of this ring are allocated with. Mattes are
+  /// fp16 so the final pass can sample them bilinearly: their fields are
+  /// continuous quantities, and linear interpolation keeps sub-texel matte
+  /// motion smooth where nearest sampling would snap between texels.
+  final gpu.PixelFormat format;
 
   _RingTexture? _current;
   final List<_RingTexture> _spares = [];
@@ -892,6 +916,7 @@ final class _TextureRing {
       frame,
       _width,
       _height,
+      format,
     );
     if (released != null) {
       assert(() {
@@ -900,7 +925,7 @@ final class _TextureRing {
       }(), 'Count reused geometry textures in debug builds.');
       return _current = released;
     }
-    return _current = _allocate(_width, _height);
+    return _current = _allocate(_width, _height, format);
   }
 
   /// Retires the texture in use without replacing it.
@@ -946,7 +971,11 @@ final class _TextureRing {
     return math.max(needed, math.min(stepped, limit));
   }
 
-  static _RingTexture _allocate(int width, int height) {
+  static _RingTexture _allocate(
+    int width,
+    int height,
+    gpu.PixelFormat format,
+  ) {
     assert(() {
       FlutterGpuGeometryRenderer.debugAllocatedTextureCount++;
       return true;
@@ -956,7 +985,9 @@ final class _TextureRing {
         gpu.StorageMode.devicePrivate,
         width,
         height,
+        format: format,
       ),
+      format,
     );
   }
 }

@@ -350,7 +350,10 @@ renders into:
   example app does this in its app delegate.
 - **macOS**: with `FLTEnableWideGamut` on capable hardware, the surface keeps
   the full range.
-- **Android**: 8-bit surfaces, so the glint is SDR.
+- **Android**: Flutter 3.47.1's Android Impeller uses 8-bit SDR swapchain
+  surfaces. The highlight shader still emits values above white, but an HDR
+  display or window color mode cannot change the SDR surface; Android HDR
+  needs Flutter engine support for HDR surface formats.
 
 `FakeGlass` draws a neutral glint within SDR white.
 

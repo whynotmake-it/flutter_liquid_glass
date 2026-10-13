@@ -522,10 +522,18 @@ void main() {
         return;
     }
 
-    vec4 geometryData = texture(
-        uGeometryTexture,
-        geometryUV * uGeometryUVScale
+    // The matte is fp16 and sampled bilinearly: under animated transforms the
+    // matte coordinate moves fractionally, and filtering interpolates the
+    // field smoothly where nearest sampling would snap whole texels at once.
+    // Clamp to written texel centres so the filter footprint never reaches
+    // the undefined padding of the bucketed texture.
+    vec2 geometryHalfTexel = 0.5 * uGeometryUVScale / uGeometrySize;
+    vec2 geometrySampleUV = clamp(
+        geometryUV * uGeometryUVScale,
+        geometryHalfTexel,
+        uGeometryUVScale - geometryHalfTexel
     );
+    vec4 geometryData = texture(uGeometryTexture, geometrySampleUV);
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
     // Weight of the material over the refracted backdrop. Frosted glass
@@ -671,7 +679,49 @@ void main() {
     vec2 displacement =
         decodeDisplacement(geometryData, maxDisplacement) *
         appearanceVisibility;
-    vec2 surfaceNormal = decodeSurfaceNormal(geometryData);
+    // The matte stores a displacement vector rather than a normal: where
+    // refraction is zero the direction is undefined, and bilinear filtering
+    // would blend opposing directions anyway. The true normal of the filtered
+    // field is the inward signed-distance gradient, so take it from the same
+    // (already smooth) channel.
+    vec2 geometryTexel = 1.0 / uGeometrySize;
+    float sdRight = texture(
+        uGeometryTexture,
+        clamp(
+            (geometryUV + vec2(geometryTexel.x, 0.0)) * uGeometryUVScale,
+            geometryHalfTexel,
+            uGeometryUVScale - geometryHalfTexel
+        )
+    ).b;
+    float sdLeft = texture(
+        uGeometryTexture,
+        clamp(
+            (geometryUV - vec2(geometryTexel.x, 0.0)) * uGeometryUVScale,
+            geometryHalfTexel,
+            uGeometryUVScale - geometryHalfTexel
+        )
+    ).b;
+    float sdUp = texture(
+        uGeometryTexture,
+        clamp(
+            (geometryUV + vec2(0.0, geometryTexel.y)) * uGeometryUVScale,
+            geometryHalfTexel,
+            uGeometryUVScale - geometryHalfTexel
+        )
+    ).b;
+    float sdDown = texture(
+        uGeometryTexture,
+        clamp(
+            (geometryUV - vec2(0.0, geometryTexel.y)) * uGeometryUVScale,
+            geometryHalfTexel,
+            uGeometryUVScale - geometryHalfTexel
+        )
+    ).b;
+    vec2 sdGradient = vec2(sdRight - sdLeft, sdUp - sdDown);
+    vec2 surfaceNormal = vec2(0.0);
+    if (dot(sdGradient, sdGradient) > 1e-6) {
+        surfaceNormal = -normalize(sdGradient);
+    }
 
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);

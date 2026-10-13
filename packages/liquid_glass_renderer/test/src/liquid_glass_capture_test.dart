@@ -186,6 +186,74 @@ void main() {
     skip: skipProperGlassTests,
   );
 
+  testWidgets(
+    'glass filters inside a capture stay unbounded under animation',
+    (tester) async {
+      // A filter clip in the layer's own space rides its animated transform,
+      // dragging the device-space coverage — and the backdrop snapshot's
+      // texel grid — fractionally every frame. Inside a capture the
+      // ancestor clip already bounds coverage to the pass in device space,
+      // so the local clip must stay unbounded to keep that coverage stable.
+      final scale = ValueNotifier<double>(1);
+      addTearDown(scale.dispose);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 2),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: LiquidGlassCapture(
+                bleed: const EdgeInsets.all(80),
+                child: SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: scale,
+                    builder: (context, value, child) => Transform.scale(
+                      scale: value,
+                      child: child,
+                    ),
+                    child: const LiquidGlassLayer(
+                      child: Align(
+                        child: LiquidGlass(
+                          shape: LiquidRoundedSuperellipse(borderRadius: 22),
+                          child: SizedBox(width: 80, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layer =
+          glassLayersBelow(
+                tester.renderObject<RenderObject>(
+                  find.byType(LiquidGlassLayer),
+                ),
+              ).single
+              as RenderLiquidGlassLayer;
+      void expectUnbounded() {
+        expect(layer.debugFilterBounds, Rect.largest);
+        expect(
+          layer.debugBackdropSampleBounds,
+          isNotNull,
+          reason: 'the shader must still know the real captured region',
+        );
+      }
+
+      expectUnbounded();
+      scale.value = 1.17;
+      await tester.pump();
+      expectUnbounded();
+    },
+    skip: skipProperGlassTests,
+  );
+
   testWidgets('nested captures resolve to the nearest one', (tester) async {
     await tester.pumpWidget(
       const Directionality(
