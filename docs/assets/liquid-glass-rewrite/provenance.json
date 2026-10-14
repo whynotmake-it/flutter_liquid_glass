@@ -10,7 +10,8 @@
       "status": "superseded: earlier grid capture with widget-test shadows; not used in article",
       "note": "kept as archived source artifact under assets, raw copies in raw/"
     },
-    "toolbar-comparison.png": {
+    "capture-pass.png": "illustrative schematic; not a numeric pass budget",
+    "toolbar-comparison.jpg": {
       "type": "comparison composite",
       "flutter_source": "packages/liquid_glass_renderer/example/tool/apple_match/flutter/test/host_capture_test.dart, probes A/C/D in separate processes; scene tool/apple_match/scenes/toolbar_capsule.json unmodified; settings toolbar-settings.json (shipped ios27Light material with geometry override and explicit exterior shadow, verbatim copy in this directory)",
       "geometry_override": "shapeWidth 224.0, shapeHeight 94.0 pt to match the reference button's visible bounds",
@@ -25,9 +26,10 @@
         996,
         1518
       ],
-      "diff": "per-channel absolute RGB difference, amplified x4 (min(255, 4*|a-b|)); no registration or color adjustment"
+      "diff": "per-channel absolute RGB difference |a-b|, not amplified; no registration or color adjustment",
+      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels"
     },
-    "merge-comparison.png": {
+    "merge-comparison.jpg": {
       "type": "comparison composite",
       "flutter_source": "host_capture_test.dart probes A/C/D, scene merge_equal_rects_gap.json unmodified; settings merge-settings.json (shipped ios27Clear preset + explicit blend radius 32, verbatim copy in this directory)",
       "blend_selection": "calibrated: Apple containerSpacing 40 did not map 1:1 to the smooth-union radius; 32 selected from {28,32,36,40} on probes C/D (visible bridge notch + regional MAE in merge-blend-diagnostics.json) before probe A was captured. Optics, appearance, and scene geometry unchanged. Scene-specific calibration, not a universal conversion.",
@@ -38,169 +40,87 @@
         1029,
         1479
       ],
-      "diff": "same x4 absolute RGB difference",
+      "diff": "per-channel absolute RGB difference |a-b|, not amplified; no registration or color adjustment",
       "frozen_inputs": "raw/merge-blend32-{A,C,D}.png (new candidate); raw/merge-comparison-blend40.png (archived previous published figure); control captures /tmp/liquid-glass-blog-captures/clear-merge never rerun",
-      "diagnostics": "merge-blend-diagnostics.json: one-scene local RGB error and visible-response diagnostics, not a perceptual or global score; merge-bridge-variants.png: frozen black-probe bridge crops for visual comparison."
+      "diagnostics": "merge-blend-diagnostics.json: one-scene local RGB error and visible-response diagnostics, not a perceptual or global score; merge-bridge-variants.png: frozen black-probe bridge crops for visual comparison.",
+      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels"
     },
-    "pipeline.png": "illustrative layout diagram; not a debug texture, not a performance count",
-    "render-passes.png": "frozen data graphic: impeeler validation scenes, 11 vs 5 (Metal M4 Max), 12 vs 6 (Pixel 10 Vulkan); counts predicted by tool and confirmed in recorded traces; not this renderer's full-frame budget",
-    "capture-pass.png": "illustrative schematic; not a numeric pass budget",
-    "hero-controls.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
+    "hero-controls.jpg": {
+      "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
+      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=BLOG_FIGURES_OUT=<out> test/blog_figures_test.dart",
+      "composition": "example/tool/compose_blog_figures.py: crop at 3x coordinates, rounded corners, drop shadow, background; glass pixels not retouched",
       "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture composite",
-      "scene": "controls-light",
-      "backdrop": "photos (real photo feed)",
-      "state": "default controls scene, platform brightness light",
-      "raw": "raw/hero-controls-light.png",
-      "crops_px": [
-        [
-          0,
-          120,
-          1206,
-          540
-        ],
-        [
-          0,
-          2040,
-          1206,
-          2622
-        ]
+      "raw": "not committed (~4 MB per frame); regenerate with the command above",
+      "captures": [
+        "controls-light (photos)",
+        "controls-dark (night)"
       ],
-      "transform": "two bands + text labels, no resampling, no retouch",
-      "note": "Accessory font inheritance corrected by DefaultTextStyle.merge; controls-light recaptured for this bug fix. The capture asserts that the title and subtitle resolve to CupertinoSystemText.",
-      "out_dir": "/tmp/liquid-glass-real-heroes/font-fix",
-      "previous_frame": "archived at /tmp/liquid-glass-real-heroes/controls-before-font-fix.png"
+      "transform": "full screens downscaled into phone bezels"
     },
-    "hero-blend-light.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
+    "hero-blend.jpg": {
+      "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
+      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=BLOG_FIGURES_OUT=<out> test/blog_figures_test.dart",
+      "composition": "example/tool/compose_blog_figures.py: crop at 3x coordinates, rounded corners, drop shadow, background; glass pixels not retouched",
       "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture, cropped",
-      "scene": "blend-light",
-      "backdrop": "photos",
-      "raw": "raw/hero-blend-light.png",
+      "raw": "not committed (~4 MB per frame); regenerate with the command above",
+      "captures": [
+        "blend-light (photos, scroll 230)",
+        "blend-dark (night, scroll 880)"
+      ],
+      "crop_logical": [
+        21,
+        352,
+        381,
+        580
+      ]
+    },
+    "hero-colors.jpg": {
+      "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
+      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=BLOG_FIGURES_OUT=<out> test/blog_figures_test.dart",
+      "composition": "example/tool/compose_blog_figures.py: crop at 3x coordinates, rounded corners, drop shadow, background; glass pixels not retouched",
+      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
+      "raw": "not committed (~4 MB per frame); regenerate with the command above",
+      "captures": [
+        "colors-light (photos, scroll 600)"
+      ],
+      "crop_logical": [
+        36,
+        292,
+        366,
+        612
+      ]
+    },
+    "hero-loupe.jpg": {
+      "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
+      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=BLOG_FIGURES_OUT=<out> test/blog_figures_test.dart",
+      "composition": "example/tool/compose_blog_figures.py: crop at 3x coordinates, rounded corners, drop shadow, background; glass pixels not retouched",
+      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
+      "raw": "not committed (~4 MB per frame); regenerate with the command above",
+      "captures": [
+        "loupe-light (article)"
+      ],
       "crop_logical": [
         0,
-        300,
+        40,
         402,
-        650
-      ],
-      "transform": "single crop at 3x coordinates, no resampling"
+        408
+      ]
     },
-    "hero-blend-dark.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
-      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture, cropped",
-      "scene": "blend-dark",
-      "backdrop": "night",
-      "raw": "raw/hero-blend-dark.png",
-      "crop_logical": [
-        0,
-        300,
-        402,
-        650
-      ],
-      "transform": "single crop at 3x coordinates, no resampling"
+    "cover.jpg": {
+      "steps": "example/tool/blog_cover.py background -> example/test/blog_cover_test.dart (renders the glass over it) -> example/tool/blog_cover.py overlay",
+      "size": "1200x630 logical at 2x",
+      "style": "whynotmake.it: flat blue paper grain, off-white Space Grotesk (OFL) headline, hand-drawn ink",
+      "settings": "ios27Clear settings (frost 0) and appearance, blend group 40; the headline under the pill is refracted by the renderer"
     },
-    "hero-blend.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
-      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "contact sheet",
-      "inputs": [
-        "hero-blend-light.png",
-        "hero-blend-dark.png"
-      ],
-      "transform": "side-by-side with labels, no resampling, no retouch"
-    },
-    "hero-colors.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
-      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture, cropped",
-      "scene": "colors-light",
-      "backdrop": "photos",
-      "raw": "raw/hero-colors-light.png",
-      "crop_logical": [
-        30,
-        310,
-        372,
-        660
-      ],
-      "transform": "single crop at 3x coordinates, no resampling"
-    },
-    "hero-loupe.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
-      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture, cropped",
-      "scene": "loupe-light",
-      "backdrop": "article",
-      "raw": "raw/hero-loupe-light.png",
-      "crop_logical": [
-        0,
-        140,
-        402,
-        530
-      ],
-      "transform": "single crop at 3x coordinates, no resampling"
-    },
-    "hero-controls-font-fixed.png": {
-      "harness": "packages/liquid_glass_renderer/example/test/readme_screenshots_test.dart; sets debugDisableShadows=false while capturing and restores the previous value in finally, before widget-test binding invariants run.",
-      "command": "flutter test --no-pub --enable-impeller --enable-flutter-gpu --dart-define=README_SHOTS_OUT=<out> test/readme_screenshots_test.dart --plain-name \"captures <scene>-<brightness>\"",
-      "sdk": "3.47.1 stable (revision 6655482ec0), host macOS / Darwin 27 arm64, Impeller, SDR",
-      "fake": false,
-      "debugDisableShadows": false,
-      "frozen": "do not recapture for display",
-      "type": "current host capture composite",
-      "scene": "controls-light",
-      "backdrop": "photos (real photo feed)",
-      "state": "default controls scene, platform brightness light",
-      "raw": "raw/hero-controls-light.png",
-      "crops_px": [
-        [
-          0,
-          120,
-          1206,
-          540
-        ],
-        [
-          0,
-          2040,
-          1206,
-          2622
-        ]
-      ],
-      "transform": "two bands + text labels, no resampling, no retouch",
-      "note": "Accessory font inheritance corrected by DefaultTextStyle.merge; controls-light recaptured for this bug fix. The capture asserts that the title and subtitle resolve to CupertinoSystemText.",
-      "out_dir": "/tmp/liquid-glass-real-heroes/font-fix",
-      "previous_frame": "archived at /tmp/liquid-glass-real-heroes/controls-before-font-fix.png",
-      "source_image": "hero-controls.png",
-      "publication_note": "Byte-identical copy under a new filename so Markdown previews can load the font-corrected hero without reusing the previous image URL."
+    "pipeline.jpg": "illustrative diagram drawn by example/tool/compose_blog_figures.py; not a debug texture, not a performance count",
+    "render-passes.jpg": "data graphic drawn by example/tool/compose_blog_figures.py: impeeler validation scenes, 11 vs 5 (Metal M4 Max), 12 vs 6 (Pixel 10 Vulkan); counts predicted by tool and confirmed in recorded traces; not this renderer's full-frame budget",
+    "merge-bridges.jpg": {
+      "type": "restyled crops of the frozen merge-bridge-variants.png (iOS 27, blend 28/32/36/40, black probe)",
+      "composition": "example/tool/compose_blog_figures.py"
     }
   },
   "reference_integrity": "Apple reference PNG and scene JSON hashes match the hashes recorded in capture metadata; the capture source scripts changed after the references were produced, so these are retained references with provenance rather than freshly revalidated captures.",
   "comparison_recipe": "Rows are probes A/C/D; columns are the retained Apple reference, Flutter host capture, and per-channel absolute RGB difference amplified x4 (clipped to 255). Native 3x crops, no registration, resampling, or color adjustment. Frozen blend-32 merge candidate frames are bundled under raw/merge-blend32-{A,C,D}.png; toolbar candidate frames remain at /tmp/liquid-glass-blog-captures/regular. Original recipe: /tmp/liquid-glass-blog-captures/compose_comparisons.py; blend-32 recipe: /tmp/liquid-glass-real-heroes/compose_merge32.py.",
-  "presets": "Shipped optical and appearance presets with unchanged scene geometry. The toolbar uses unmodified ios27Light; the merge pair uses ios27Clear plus a scene-specific blend radius of 32, selected on probes C/D before capturing A. No optical optimizer fit or exterior-shadow overrides. Comparison references are SDR, not HDR."
+  "presets": "Shipped optical and appearance presets with unchanged scene geometry. The toolbar uses unmodified ios27Light; the merge pair uses ios27Clear plus a scene-specific blend radius of 32, selected on probes C/D before capturing A. No optical optimizer fit or exterior-shadow overrides. Comparison references are SDR, not HDR.",
+  "style": "Figures use the whynotmake.it look: grained paper background, Space Grotesk labels, blue/coral accents (example/tool/compose_blog_figures.py, example/tool/blog_cover.py)."
 }
