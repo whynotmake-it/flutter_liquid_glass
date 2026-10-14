@@ -69,70 +69,81 @@ void main() {
       testWidgets(
         'captures $name',
         (tester) async {
-          tester.view
-            ..physicalSize = _screen * _scale
-            ..devicePixelRatio = _scale
-            ..padding = _padding
-            ..viewPadding = _padding;
-          addTearDown(tester.view.reset);
-
-          final state = PlaygroundState(brightness: brightness);
-          state.scene.value = scene;
-          state.fake.value = fake;
-          state.backdrop.value = switch ((scene, brightness)) {
-            (StageScene.loupe, _) => Backdrop.article,
-            (_, Brightness.dark) => Backdrop.night,
-            (_, Brightness.light) => Backdrop.photos,
-          };
-          if (scene == StageScene.loupe) {
-            state.material.value = GlassMaterial.preset(
-              style: GlassStyle.loupe,
-              brightness: brightness,
+          final shadowsWereDisabled = debugDisableShadows;
+          debugDisableShadows = false;
+          try {
+            expect(
+              const BoxShadow(blurRadius: 24).toPaint().maskFilter,
+              isNotNull,
             );
-          }
-          // The text loupe over the specimen line and the round magnifier
-          // over the body text.
-          state.loupes[0].offset.value = const Offset(-40, -110);
-          state.loupes[1].offset.value = const Offset(100, -205);
-          final captureKey = GlobalKey();
-          await tester.pumpWidget(
-            RepaintBoundary(
-              key: captureKey,
-              child: CupertinoApp(
-                debugShowCheckedModeBanner: false,
-                theme: CupertinoThemeData(brightness: brightness),
-                home: Playground(state: state),
-              ),
-            ),
-          );
-          await tester.runAsync(() async {
-            final context = tester.element(find.byType(Playground));
-            for (final asset in backdropPhotos) {
-              await precacheImage(AssetImage(asset), context);
+            tester.view
+              ..physicalSize = _screen * _scale
+              ..devicePixelRatio = _scale
+              ..padding = _padding
+              ..viewPadding = _padding;
+            addTearDown(tester.view.reset);
+
+            final state = PlaygroundState(brightness: brightness);
+            state.scene.value = scene;
+            state.fake.value = fake;
+            state.backdrop.value = switch ((scene, brightness)) {
+              (StageScene.loupe, _) => Backdrop.article,
+              (_, Brightness.dark) => Backdrop.night,
+              (_, Brightness.light) => Backdrop.photos,
+            };
+            if (scene == StageScene.loupe) {
+              state.material.value = GlassMaterial.preset(
+                style: GlassStyle.loupe,
+                brightness: brightness,
+              );
             }
-          });
-          for (var frame = 0; frame < 60; frame++) {
-            await tester.pump(const Duration(milliseconds: 16));
-            if (fake || find.byType(FakeGlass).evaluate().isEmpty) break;
-          }
-          for (var frame = 0; frame < 60; frame++) {
-            await tester.pump(const Duration(milliseconds: 16));
-          }
+            // The text loupe over the specimen line and the round magnifier
+            // over the body text.
+            state.loupes[0].offset.value = const Offset(-40, -110);
+            state.loupes[1].offset.value = const Offset(100, -205);
+            final captureKey = GlobalKey();
+            await tester.pumpWidget(
+              RepaintBoundary(
+                key: captureKey,
+                child: CupertinoApp(
+                  debugShowCheckedModeBanner: false,
+                  theme: CupertinoThemeData(brightness: brightness),
+                  home: Playground(state: state),
+                ),
+              ),
+            );
+            await tester.runAsync(() async {
+              final context = tester.element(find.byType(Playground));
+              for (final asset in backdropPhotos) {
+                await precacheImage(AssetImage(asset), context);
+              }
+            });
+            for (var frame = 0; frame < 60; frame++) {
+              await tester.pump(const Duration(milliseconds: 16));
+              if (fake || find.byType(FakeGlass).evaluate().isEmpty) break;
+            }
+            for (var frame = 0; frame < 60; frame++) {
+              await tester.pump(const Duration(milliseconds: 16));
+            }
+            final boundary =
+                captureKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            final image = await boundary.toImage(pixelRatio: _scale);
+            await tester.runAsync(() async {
+              final png = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              final file = File('$_out/$name.png');
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(png!.buffer.asUint8List());
+            });
+            image.dispose();
 
-          final boundary =
-              captureKey.currentContext!.findRenderObject()!
-                  as RenderRepaintBoundary;
-          final image = await boundary.toImage(pixelRatio: _scale);
-          await tester.runAsync(() async {
-            final png = await image.toByteData(format: ui.ImageByteFormat.png);
-            final file = File('$_out/$name.png');
-            await file.parent.create(recursive: true);
-            await file.writeAsBytes(png!.buffer.asUint8List());
-          });
-          image.dispose();
-
-          await tester.pumpWidget(const SizedBox());
-          await tester.pump();
+            await tester.pumpWidget(const SizedBox());
+            await tester.pump();
+          } finally {
+            debugDisableShadows = shadowsWereDisabled;
+          }
         },
         skip: _out.isEmpty,
         tags: 'golden',

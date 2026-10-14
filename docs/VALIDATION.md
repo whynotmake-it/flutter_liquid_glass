@@ -108,6 +108,59 @@ replaced `_ShaderInputSnapshot`, and the removal of the identity
   shadow; limit 4). It reproduces on the committed branch (`72859eea1`), so it
   predates the cleanup; the old defaults had both off. Tracked in `TODO.md`.
 
+## Shadow defaults audit (2026-10-14)
+
+- **Decision:** retain the material's `bevelShadowStrength = 0.036` and the
+  caller-owned exterior-shadow API. Do not promote a universal exterior-shadow
+  replacement from this host-only audit.
+- **Inputs:** retained
+  `example/tool/apple_match/references/ios27-iphone17pro-reduce-motion-off/slider-000/`
+  references, validated with the existing provenance tool; Flutter 3.47.1,
+  macOS 27, Impeller and Flutter GPU, 3x SDR captures. The existing host capture
+  harness enables real MaskFilter shadows. No alignment or color adjustment
+  was applied to the images.
+- **The blog toolbar is not a shadow-default comparison:** its material-only
+  settings omit exterior shadows. Its scene renders a roughly 225x101 pt
+  capsule, whereas the Apple black-probe support measures 224x94 pt. Holding
+  the renderer at 224x94 pt reproduces Apple's support bounds exactly
+  (`267,1170` to `939,1452`, exclusive right/bottom, physical pixels).
+- **Inner shadow:** with geometry corrected and appearance held fixed,
+  the white-probe mean absolute error of face-relative darkening in the
+  12-48 physical-pixel inner band is 1.790 at strength 0, 0.513 at 0.030,
+  0.253 at the current 0.036, 0.282 at 0.040, and 0.558 at 0.050.
+  Face-relative darkening removes the uniform core-color residual from the
+  measurement, not from the images. This supports the current strength,
+  not a claim that all rim/profile residuals are solved.
+- **Exterior shadow:** measured white-probe RGB MAE in the annulus 6-60
+  physical pixels outside the Apple black-probe silhouette (2-20 pt).
+  The toolbar search held all material controls fixed; the small and large
+  capsules are holdouts with their unmodified scene geometry.
+
+  | Shape | No exterior shadow | Example shadow | Toolbar host fit |
+  | --- | ---: | ---: | ---: |
+  | Small capsule | 0.330 | 6.944 | 1.711 |
+  | Toolbar, corrected geometry | 1.805 | 5.887 | 0.357 |
+  | Large capsule | 3.763 | 4.028 | 1.578 |
+
+  Values are 8-bit channel levels, not perceptual or whole-render scores.
+  The example shadow is black alpha `31/255`, blur radius 24 pt, offset
+  `(0,8)` pt, spread 0. The toolbar host fit is black alpha 0.06, blur
+  radius 12 pt, offset `(0,6)` pt, spread 0. Its regression on the small
+  holdout is why it must not become a universal default.
+- **Evidence:** 23 toolbar candidate vectors plus six holdout vectors and
+  their frozen C/D frames, manifests, logs, measurement scripts/JSON and
+  `toolbar-shadow-audit.png` under
+  `example/tool/apple_match/out/shadow-audit/` (ignored local output).
+  The audit preserved the original blog inputs and retained Apple captures. The blog toolbar figure was subsequently updated, at the user’s request, to show the scene-specific host fit; its original raw inputs remain archived alongside the fitted ones.
+- **Regression checks:** `liquid_glass_settings_test.dart` and
+  `fake_glass_bevel_shadow_test.dart` passed, 11 tests total, with Impeller
+  and Flutter GPU enabled.
+- **Promotion blocker:** the fitting tool's pinned iPhone 17 Pro/iOS 27
+  simulator (`DB4F41F3-1C36-476D-B775-AFDC3686C75B`) is absent on this
+  machine. A matching pinned iOS capture must confirm any replacement before
+  changing shipped shadow values; this audit did not recreate a simulator or
+  change its pin. The user chose a clearly labeled host-only blog illustration rather than simulator setup or a shipped-default change.
+
 ## Implementation summaries
 
 <!-- Summaries from the agents that implemented each piece go here. -->

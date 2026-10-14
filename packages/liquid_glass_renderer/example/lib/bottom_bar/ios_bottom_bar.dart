@@ -143,7 +143,7 @@ class _GlassButton extends StatelessWidget {
               value: CupertinoColors.label.resolveFrom(context),
               builder: (context, glyph, child) => IconTheme(
                 data: IconThemeData(color: glyph, size: 22),
-                child: DefaultTextStyle(
+                child: DefaultTextStyle.merge(
                   style: TextStyle(
                     color: glyph,
                     fontSize: 15,
