@@ -1,0 +1,91 @@
+{
+  "purpose": "One-scene blend sensitivity, not a general fidelity score.",
+  "bridge_boxes_logical_px": [
+    [
+      186,
+      391,
+      216,
+      422
+    ],
+    [
+      186,
+      452,
+      216,
+      483
+    ]
+  ],
+  "control_box_logical_px": [
+    120,
+    427,
+    150,
+    447
+  ],
+  "response_start_definition": "First 2-logical-pixel-wide center-strip row reaching a fraction of each image's own interior black-probe brightness; visible response, not mathematical SDF boundary. White reference has no interior deficit, so a normalized white-response threshold is undefined and is not reported.",
+  "reference_C_response_start_y": {
+    "0.25": 406.3333333333333,
+    "0.5": 406.3333333333333,
+    "0.75": 406.6666666666667
+  },
+  "candidates": {
+    "28": {
+      "C": {
+        "bridge_mean_absolute_rgb_error_8bit": 6.889247311827957,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0,
+        "response_start_y_logical_px": {
+          "0.25": 409.0,
+          "0.5": 409.0,
+          "0.75": 409.3333333333333
+        }
+      },
+      "D": {
+        "bridge_mean_absolute_rgb_error_8bit": 0.6195937873357228,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0
+      }
+    },
+    "32": {
+      "C": {
+        "bridge_mean_absolute_rgb_error_8bit": 2.8847072879330944,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0,
+        "response_start_y_logical_px": {
+          "0.25": 406.3333333333333,
+          "0.5": 406.3333333333333,
+          "0.75": 406.3333333333333
+        }
+      },
+      "D": {
+        "bridge_mean_absolute_rgb_error_8bit": 0.4112305854241338,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0
+      }
+    },
+    "36": {
+      "C": {
+        "bridge_mean_absolute_rgb_error_8bit": 5.068458781362007,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0,
+        "response_start_y_logical_px": {
+          "0.25": 404.3333333333333,
+          "0.5": 404.3333333333333,
+          "0.75": 404.3333333333333
+        }
+      },
+      "D": {
+        "bridge_mean_absolute_rgb_error_8bit": 0.5087216248506571,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0
+      }
+    },
+    "40": {
+      "C": {
+        "bridge_mean_absolute_rgb_error_8bit": 6.493070489844683,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0,
+        "response_start_y_logical_px": {
+          "0.25": 402.6666666666667,
+          "0.5": 402.6666666666667,
+          "0.75": 402.6666666666667
+        }
+      },
+      "D": {
+        "bridge_mean_absolute_rgb_error_8bit": 0.4848267622461171,
+        "unchanged_control_max_absolute_difference_vs_blend40": 0.0
+      }
+    }
+  }
+}
