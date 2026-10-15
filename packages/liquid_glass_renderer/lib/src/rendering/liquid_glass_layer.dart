@@ -792,8 +792,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
-  // The matte and material map fill the top-left of textures sized to their
-  // ring's current capacity.
+  // The matte and material map fill the top-left of textures that only grow.
   Size _geometryTextureSize = Size.zero;
   Size _materialTextureSize = const Size(1, 1);
 
