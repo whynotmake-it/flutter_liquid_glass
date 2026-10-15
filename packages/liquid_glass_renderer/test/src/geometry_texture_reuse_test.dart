@@ -123,10 +123,12 @@ void runGeometryTextureReuseTests() {
     (tester) async {
       useDpr3(tester);
       // 4 logical px per frame at DPR 3 crosses a 64 px bucket every few
-      // frames, in both directions.
+      // frames, in both directions. The period stays under
+      // shrinkAfterFrames so every shrink window still sees the sweep's
+      // peak and the ring never gives back capacity it needs again.
       double width(int frame) {
-        final phase = frame % 100;
-        return 130 + 4.0 * (phase < 50 ? phase : 100 - phase);
+        final phase = frame % 40;
+        return 130 + 4.0 * (phase < 20 ? phase : 40 - phase);
       }
 
       await tester.pumpWidget(_scene(width(0)));
@@ -152,6 +154,71 @@ void runGeometryTextureReuseTests() {
       final (textureWidth, _) = renderer.debugMatteTextureSize!;
       expect(textureWidth, lessThanOrEqualTo(2432), reason: 'capped at view');
       expect(renderer.debugMatteTextureCount, 2);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'a ring shrinks after smaller renders outlast the shrink horizon',
+    (tester) async {
+      useDpr3(tester);
+      // Grow the ring toward the 2400 px-wide view, like a sheet.
+      await tester.pumpWidget(_scene(700));
+      final renderer = _layer(tester).gpuGeometryRenderer!;
+      final (grownWidth, _) = renderer.debugMatteTextureSize!;
+
+      // Sub-bucket wiggles keep re-rendering a toolbar-sized matte for
+      // longer than the shrink horizon.
+      final droppedBefore = _dropped;
+      for (
+        var frame = 0;
+        frame <= FlutterGpuGeometryRenderer.shrinkAfterFrames + 4;
+        frame++
+      ) {
+        await tester.pumpWidget(_scene(130 + frame * 0.05));
+      }
+
+      final (width, _) = renderer.debugMatteTextureSize!;
+      expect(
+        width,
+        lessThan(grownWidth),
+        reason: 'the ring gives back the sheet-sized capacity',
+      );
+      expect(
+        _dropped - droppedBefore,
+        greaterThan(0),
+        reason: 'oversized textures are dropped, not kept as spares',
+      );
+
+      // The shrunken ring keeps ping-ponging without allocating.
+      final allocatedBefore = _allocated;
+      for (var frame = 0; frame < 6; frame++) {
+        await tester.pumpWidget(_scene(130 + frame * 0.05));
+      }
+      expect(_allocated - allocatedBefore, 0);
+      expect(renderer.debugMatteTextureCount, 2);
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
+    'brief dips below capacity do not shrink the ring',
+    (tester) async {
+      useDpr3(tester);
+      await tester.pumpWidget(_scene(700));
+      final renderer = _layer(tester).gpuGeometryRenderer!;
+      final (grownWidth, grownHeight) = renderer.debugMatteTextureSize!;
+
+      // Fewer small renders than the horizon leaves the capacity alone.
+      for (
+        var frame = 0;
+        frame < FlutterGpuGeometryRenderer.shrinkAfterFrames - 1;
+        frame++
+      ) {
+        await tester.pumpWidget(_scene(130 + frame * 0.05));
+      }
+
+      expect(renderer.debugMatteTextureSize, (grownWidth, grownHeight));
     },
     skip: skipProperGlassTests,
   );
