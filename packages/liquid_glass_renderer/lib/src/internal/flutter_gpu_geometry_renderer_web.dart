@@ -31,6 +31,9 @@ class FlutterGpuGeometryRenderer {
 
   /// Matches the native renderer's reuse horizon; nothing is reused here.
   static const int reuseAfterFrames = 1;
+
+  /// Matches the native renderer's shrink horizon; nothing shrinks here.
+  static const int shrinkAfterFrames = 60;
   static int debugReusedTextureCount = 0;
   static int debugAllocatedTextureCount = 0;
   static int debugDroppedTextureCount = 0;

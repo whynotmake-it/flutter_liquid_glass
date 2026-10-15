@@ -11,9 +11,10 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
-/// Each output keeps a current texture and one spare. Textures grow as needed;
-/// rendering uses only the top-left area, with shader UVs adjusted to match.
-/// Unchanged geometry reuses the image without rendering again.
+/// Each output keeps a current texture and one spare. Textures grow as needed
+/// and shrink after [shrinkAfterFrames] frames of smaller renders; rendering
+/// uses only the top-left area, with shader UVs adjusted to match. Unchanged
+/// geometry reuses the image without rendering again.
 ///
 /// Repeated renders in one frame may need another texture. Each output keeps
 /// at most three textures (current plus two spares); scenes and GC can keep
@@ -557,6 +558,14 @@ class FlutterGpuGeometryRenderer {
   /// write after those reads (Metal/Vulkan hazards; GLES posting order).
   static const int reuseAfterFrames = 1;
 
+  /// Frames of smaller renders before a ring shrinks its capacity.
+  ///
+  /// A dropped texture frees its storage only when the GC collects its
+  /// wrapper, so capacity comes down once smaller renders have persisted for
+  /// about half a second at 120 Hz instead of tracking brief dips, like a
+  /// sheet dragged shut between stretches that reopen it.
+  static const int shrinkAfterFrames = 60;
+
   static int _completedFrames = 0;
   static bool _countingFrames = false;
 
@@ -763,14 +772,26 @@ final class _RingTexture {
   /// Frame count when this texture was last replaced or released.
   int retiredFrame = 0;
 
+  /// Whether this texture fills the top-left [width] x [height] sub-rect.
   bool covers(int width, int height) =>
       texture.width >= width && texture.height >= height;
+
+  /// Whether this texture was allocated at exactly [width] x [height].
+  ///
+  /// Spares and the current texture are always allocated at the ring's
+  /// capacity, so a texture that still covers that capacity is exactly that
+  /// size — while an oversized leftover from before a shrink covers it
+  /// without matching and must be dropped to free its storage.
+  bool fits(int width, int height) =>
+      texture.width == width && texture.height == height;
 }
 
 /// A current texture and up to two retired spares for one output.
 ///
-/// Capacity grows in 1.5x steps, capped at the view unless a render needs more.
-/// A second spare avoids allocations when a frame renders twice.
+/// Capacity grows in 1.5x steps, capped at the view unless a render needs
+/// more, and shrinks once renders have fit inside a smaller size for
+/// [FlutterGpuGeometryRenderer.shrinkAfterFrames] frames. A second spare
+/// avoids allocations when a frame renders twice.
 final class _TextureRing {
   static const int _maxSpares = 2;
 
@@ -778,6 +799,14 @@ final class _TextureRing {
   final List<_RingTexture> _spares = [];
   int _width = 0;
   int _height = 0;
+
+  /// Frame when the current streak of fitting renders began, or -1 when the
+  /// last render grew the capacity.
+  int _smallerSince = -1;
+
+  /// Largest request since [_smallerSince], the size a shrink targets.
+  int _smallerWidth = 0;
+  int _smallerHeight = 0;
 
   int get spareCount => _spares.length;
   int get textureCount => _spares.length + (_current == null ? 0 : 1);
@@ -793,16 +822,19 @@ final class _TextureRing {
     if (width > _width || height > _height) {
       _width = _grow(_width, width, maxWidth);
       _height = _grow(_height, height, maxHeight);
+      _smallerSince = -1;
       _spares.removeWhere((texture) {
         if (texture.covers(_width, _height)) return false;
         FlutterGpuGeometryRenderer._countDropped();
         return true;
       });
+    } else {
+      _trackSmaller(frame, width, height, maxWidth, maxHeight);
     }
     final previous = _current;
     _current = null;
     if (previous != null) {
-      if (previous.covers(_width, _height)) {
+      if (previous.fits(_width, _height)) {
         previous.retiredFrame = frame;
         _spares.add(previous);
       } else {
@@ -831,8 +863,12 @@ final class _TextureRing {
     final previous = _current;
     if (previous == null) return;
     _current = null;
-    previous.retiredFrame = frame;
-    _spares.add(previous);
+    if (previous.fits(_width, _height)) {
+      previous.retiredFrame = frame;
+      _spares.add(previous);
+    } else {
+      FlutterGpuGeometryRenderer._countDropped();
+    }
   }
 
   /// Drops every texture and resets the ring's capacity.
@@ -847,6 +883,51 @@ final class _TextureRing {
     _spares.clear();
     _width = 0;
     _height = 0;
+    _smallerSince = -1;
+  }
+
+  /// Tracks renders that fit inside the capacity and shrinks it once they
+  /// have stayed smaller for [FlutterGpuGeometryRenderer.shrinkAfterFrames].
+  ///
+  /// The new capacity keeps the same 1.5x headroom over the largest recent
+  /// request as growth does, per dimension, so a size drifting back up a
+  /// little does not reallocate. Oversized spares are dropped; the current
+  /// texture stays until its replacement's retirement drops it.
+  void _trackSmaller(
+    int frame,
+    int width,
+    int height,
+    int maxWidth,
+    int maxHeight,
+  ) {
+    if (_smallerSince < 0) {
+      _smallerSince = frame;
+      _smallerWidth = width;
+      _smallerHeight = height;
+      return;
+    }
+    _smallerWidth = math.max(_smallerWidth, width);
+    _smallerHeight = math.max(_smallerHeight, height);
+    if (frame - _smallerSince < FlutterGpuGeometryRenderer.shrinkAfterFrames) {
+      return;
+    }
+    _smallerSince = -1;
+    final shrunkWidth = _shrink(_width, _smallerWidth, maxWidth);
+    final shrunkHeight = _shrink(_height, _smallerHeight, maxHeight);
+    if (shrunkWidth == _width && shrunkHeight == _height) return;
+    _width = shrunkWidth;
+    _height = shrunkHeight;
+    _spares.removeWhere((texture) {
+      if (texture.fits(_width, _height)) return false;
+      FlutterGpuGeometryRenderer._countDropped();
+      return true;
+    });
+  }
+
+  /// Capacity grown to [needed] would reach, clamped so it never grows.
+  static int _shrink(int capacity, int needed, int limit) {
+    if (needed < 1) return capacity;
+    return math.min(capacity, _grow(needed, needed, limit));
   }
 
   static int _grow(int capacity, int needed, int limit) {
