@@ -11,10 +11,6 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
 
-// The same workload can run against the unmodified baseline. It checks the old
-// submission counts there, while keeping all pixel/reference checks identical.
-const _baseline = bool.fromEnvironment('EXPECT_FULL_APPEARANCE_REBUILD');
-
 void main() {
   runAppearanceOutputSplitTests(SubmittedSceneBinding());
 }
@@ -140,22 +136,12 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
         );
       }
 
-      // Stable, portable readback fingerprints in the raw test log.
-      String digest(Uint8List bytes) {
-        var hash = 0x811c9dc5;
-        for (final byte in bytes) {
-          hash = ((hash ^ byte) * 0x01000193) & 0xffffffff;
-        }
-        return '${bytes.length}:${hash.toRadixString(16)}';
-      }
-
       Future<void> check(
         String name,
         void Function() change, {
         bool geometryChanged = false,
         bool uniform = false,
         bool appearanceChanged = true,
-        bool translated = false,
       }) async {
         final oldMatte = renderer.debugMatteTexture;
         final oldImage = layer.debugGeometryImage;
@@ -169,13 +155,11 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
         final scene = await capture();
         final count =
             FlutterGpuGeometryRenderer.debugDeferredPassCount - passes;
-        final expectedMatte =
-            geometryChanged || (_baseline && appearanceChanged);
         final expectedMaterial =
             !uniform && (geometryChanged || appearanceChanged);
         expect(
           count,
-          (expectedMatte ? 1 : 0) + (expectedMaterial ? 1 : 0),
+          (geometryChanged ? 1 : 0) + (expectedMaterial ? 1 : 0),
           reason: name,
         );
         if (retained && !geometryChanged) {
@@ -183,10 +167,8 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
         }
         if (!geometryChanged) {
           expect(revisions(), oldRevisions, reason: '$name CPU matte revision');
-          if (!_baseline) {
-            expect(renderer.debugMatteTexture, same(oldMatte), reason: name);
-            expect(layer.debugGeometryImage, same(oldImage), reason: name);
-          }
+          expect(renderer.debugMatteTexture, same(oldMatte), reason: name);
+          expect(layer.debugGeometryImage, same(oldImage), reason: name);
           expect(await matteBytes(), before, reason: '$name unchanged matte');
         } else {
           expect(
@@ -210,13 +192,6 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
           reason: '$name material reference',
         );
         expect(scene, reference, reason: '$name submitted filter snapshot');
-        // ignore: avoid_print
-        print(
-          '$name retained=$retained passes=$count translated=$translated '
-          'matte=${digest(matte)} '
-          'material=${material == null ? "none" : digest(material)} '
-          'scene=${digest(scene)}',
-        );
       }
 
       await check('unequal-alpha tint / three-way junction', () {
@@ -286,7 +261,6 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
           translation = 8;
         },
         appearanceChanged: false,
-        translated: true,
       );
       await check('appearance after translation', () {
         appearances = [
@@ -343,20 +317,17 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
           final scene = await capture();
           expect(
             FlutterGpuGeometryRenderer.debugDeferredPassCount - passes,
-            _baseline ? 2 : 1,
+            1,
           );
           expect(revisions(), cpuRevisions);
           if (retained) expect(layer.debugPaintCount, paints);
-          if (!_baseline) {
-            expect(renderer.debugMatteTexture, same(texture));
-            expect(await matteBytes(), matte);
-            expect(
-              layer.debugGeometryMatteBounds,
-              bounds.shift(delta),
-              reason:
-                  'material-only encoding must retain the matte raster phase',
-            );
-          }
+          expect(renderer.debugMatteTexture, same(texture));
+          expect(await matteBytes(), matte);
+          expect(
+            layer.debugGeometryMatteBounds,
+            bounds.shift(delta),
+            reason: 'material-only encoding must retain the matte raster phase',
+          );
 
           layer
             // ignore: invalid_use_of_protected_member
@@ -365,27 +336,18 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
           final reference = await capture();
           var totalError = 0;
           var largeErrors = 0;
-          var maxError = 0;
           for (var i = 0; i < scene.length; i++) {
             if (i % 4 == 3) continue; // Compare RGB, not opaque alpha.
             final error = (scene[i] - reference[i]).abs();
             totalError += error;
             if (error > 16) largeErrors++;
-            if (error > maxError) maxError = error;
           }
           final samples = scene.length * 3 ~/ 4;
           final meanError = totalError / samples;
           final largeFraction = largeErrors / samples;
           // Unlike integral translations, a full build samples a newly snapped
           // analytic matte. Allow mean error <= 1/255, with >16/255 differences
-          // in at most 1% of RGB samples. Report the maximum, too.
-          // ignore: avoid_print
-          print(
-            'fractional retained=$retained general=$general '
-            'simultaneous=$simultaneous mean=$meanError '
-            'largeFraction=$largeFraction max=$maxError '
-            'scene=${digest(scene)} reference=${digest(reference)}',
-          );
+          // in at most 1% of RGB samples.
           expect(meanError, lessThanOrEqualTo(1));
           expect(largeFraction, lessThanOrEqualTo(0.01));
         }
