@@ -290,9 +290,9 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             : null);
     final shaderFiltersSupported = ImageFilter.isShaderFilterSupported;
     if (!widget.fake && shaderFiltersSupported) {
-      // Android's Impeller context is not available until its first surface
-      // frame has been established. Creating flutter_gpu resources directly
-      // from build can therefore block the UI isolate before the first frame.
+      // Keep uncached GPU setup out of build: acquiring the engine's context
+      // may take startup time. Explicit precaching can load these resources
+      // before any frame; rendering a frame is not a prerequisite.
       _scheduleGpuGeometryRendererInitialization();
     }
     final gpuRenderer = _gpuGeometryRenderer;
