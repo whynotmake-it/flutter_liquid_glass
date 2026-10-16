@@ -220,6 +220,26 @@ class ThermalGateTests(unittest.TestCase):
                 device_call.assert_not_called()
 
 
+class DeviceSettingsTests(unittest.TestCase):
+    def test_pin_snapshots_original_power_setting(self):
+        with mock.patch.object(ab_bench, "sh", return_value="8\n") as shell:
+            original = ab_bench.pin_device()
+        self.assertEqual(original[("global", "stay_on_while_plugged_in")], "8")
+        self.assertIn(mock.call("settings", "get", "global",
+                                "stay_on_while_plugged_in"), shell.call_args_list)
+
+    def test_restore_preserves_power_value_and_absent_settings(self):
+        with mock.patch.object(ab_bench, "sh") as shell:
+            ab_bench.restore({
+                ("global", "stay_on_while_plugged_in"): "8",
+                ("system", "min_refresh_rate"): "null",
+            })
+        self.assertEqual(shell.call_args_list, [
+            mock.call("settings", "put", "global", "stay_on_while_plugged_in", "8"),
+            mock.call("settings", "delete", "system", "min_refresh_rate"),
+        ])
+
+
 class ScenarioRegistryTests(unittest.TestCase):
     def test_pixel_suite(self):
         self.assertEqual(ab_bench.resolve_scenarios("pixel"), PIXEL_SUITE)

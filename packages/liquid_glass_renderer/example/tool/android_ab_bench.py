@@ -96,7 +96,8 @@ def wait_cool(max_skin, min_wait):
 
 def pin_device():
     keys = [("system", "peak_refresh_rate"), ("system", "min_refresh_rate"),
-            ("system", "screen_brightness_mode"), ("system", "screen_brightness")]
+            ("system", "screen_brightness_mode"), ("system", "screen_brightness"),
+            ("global", "stay_on_while_plugged_in")]
     orig = {k: sh("settings", "get", *k).strip() for k in keys}
     sh("settings", "put", "system", "peak_refresh_rate", "120")
     sh("settings", "put", "system", "min_refresh_rate", "120")
@@ -110,7 +111,8 @@ def restore(orig):
     for (ns, key), value in orig.items():
         if value and value != "null":
             sh("settings", "put", ns, key, value)
-    sh("svc", "power", "stayon", "false")
+        else:
+            sh("settings", "delete", ns, key)
 
 
 PERFETTO_CFG = """buffers: {{ size_kb: 131072 fill_policy: RING_BUFFER }}

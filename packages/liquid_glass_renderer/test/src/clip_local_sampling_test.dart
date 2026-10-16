@@ -307,7 +307,17 @@ void main() {
     expect(source, contains('backdropScaleOffset + redOffset'));
     expect(source, contains('backdropScaleOffset + blueOffset'));
     expect(renderer, contains('_materialCenterInMatte'));
-    expect(renderer, contains('final materialCenter = bounds.center;'));
+    // Fresh geometry establishes the lens center; material-only updates must
+    // retain that center, including its fractional translation/raster phase.
+    expect(
+      renderer,
+      matches(
+        RegExp(
+          r'final materialCenter = writeMatte\s*'
+          r'\? bounds\.center\s*: _materialCenterInMatte;',
+        ),
+      ),
+    );
     expect(renderer, contains('setFloatUniforms(initialIndex: 34'));
 
     double boundaryWeight(double distance, double transition) {

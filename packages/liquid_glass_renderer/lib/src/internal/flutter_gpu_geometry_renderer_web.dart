@@ -50,6 +50,8 @@ class FlutterGpuGeometryRenderer {
   static const int materialRasterScale = 8;
 
   int debugRenderCount = 0;
+  int debugMatteDrawCount = 0;
+  int debugMaterialDrawCount = 0;
   Object get debugPipelineIdentity => this;
   int get debugHostBufferBlockLength => 0;
   Object? get debugHostBufferIdentity => null;
@@ -76,6 +78,7 @@ class FlutterGpuGeometryRenderer {
     double? edgeDistanceRange,
     bool refractionFitsShape = true,
     double contourExtent = 0.5,
+    bool writeMatte = true,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],

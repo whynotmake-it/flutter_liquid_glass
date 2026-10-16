@@ -490,6 +490,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   List<LiquidGlassAppearance> _shapeAppearances = const [];
   bool _usesShapeAppearances = false;
   bool _usesTintOnlyAppearance = false;
+  bool _needsMaterialUpdate = false;
 
   /// Whether the latest geometry pass writes per-shape contributor data.
   @visibleForTesting
@@ -841,31 +842,41 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // A drawable-empty refresh encodes nothing; the committed list alone
     // is the compositor-translation poll's baseline.
     if (hasDrawableGlass(shapesWithGeometry)) {
-      // Keep old borrowed handles valid until the replacement is installed.
-      if (!_ownsGeometryImages && _geometryImage != null) {
-        final geometry = _geometryImage!.clone();
-        ui.Image? material;
-        try {
-          material = _materialImage?.clone();
-        } catch (_) {
-          geometry.dispose();
-          rethrow;
+      final reuseMatte =
+          !needsGeometryUpdate &&
+          _geometryImage != null &&
+          _reuseUniformlyTranslatedGeometry(bounds);
+      if (!reuseMatte || _needsMaterialUpdate) {
+        // Keep old borrowed handles valid until the replacement is installed.
+        if (!_ownsGeometryImages && _geometryImage != null) {
+          final geometry = _geometryImage!.clone();
+          ui.Image? material;
+          try {
+            material = _materialImage?.clone();
+          } catch (_) {
+            geometry.dispose();
+            rethrow;
+          }
+          _geometryImage = geometry;
+          _materialImage = material;
+          _ownsGeometryImages = true;
         }
-        _geometryImage = geometry;
-        _materialImage = material;
-        _ownsGeometryImages = true;
+        final result = _buildGpuGeometryImage(
+          shapesWithGeometry,
+          bounds,
+          writeMatte: !reuseMatte,
+        );
+        _releaseGeometryImageHandles();
+        _geometryImage = result.image;
+        _materialImage = result.materialImage;
+        _geometryMatteBounds = result.matteBounds;
+        _geometryTextureSize = result.textureSize;
+        _materialTextureSize = result.materialTextureSize;
+        _materialCenterInMatte = result.materialCenter;
+        _setShapeAppearances(result.appearances);
+        _rememberEncodedGeometry(bounds);
       }
-      final result = _buildGpuGeometryImage(shapesWithGeometry, bounds);
-      _releaseGeometryImageHandles();
-      _geometryImage = result.image;
-      _materialImage = result.materialImage;
-      _geometryMatteBounds = result.matteBounds;
-      _geometryTextureSize = result.textureSize;
-      _materialTextureSize = result.materialTextureSize;
-      _materialCenterInMatte = result.materialCenter;
-      _setShapeAppearances(result.appearances);
-      _rememberEncodedGeometry(bounds);
-      _bindGeometryShader(result.image);
+      _bindGeometryShader(_geometryImage!);
     }
     needsGeometryUpdate = false;
     link
@@ -951,7 +962,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         _releaseCompositorFilter();
         paintRetainedEffect(context, offset, (effectContext, effectOffset) {});
       case GlassFrameState.active:
-        if (needsGeometryUpdate || _geometryImage == null || link.isDirty) {
+        if (needsGeometryUpdate ||
+            _geometryImage == null ||
+            link.isDirty ||
+            _needsMaterialUpdate) {
           link
             ..updateAllGeometries()
             ..markClean();
@@ -962,12 +976,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
               _reuseUniformlyTranslatedGeometry(geometryBounds);
           needsGeometryUpdate = false;
 
-          if (!canReuseTranslatedGeometry) {
-            _clearGeometryImage();
+          if (!canReuseTranslatedGeometry || _needsMaterialUpdate) {
+            if (!canReuseTranslatedGeometry) _clearGeometryImage();
             final gpuResult = _buildGpuGeometryImage(
               shapesWithGeometry,
               geometryBounds,
+              writeMatte: !canReuseTranslatedGeometry,
             );
+            _releaseGeometryImageHandles();
             _geometryImage = gpuResult.image;
             _materialImage = gpuResult.materialImage;
             _geometryMatteBounds = gpuResult.matteBounds;
@@ -1012,9 +1028,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (usedShapeAppearances != _usesShapeAppearances ||
         usedTintOnlyAppearance != _usesTintOnlyAppearance ||
         (_usesShapeAppearances && appearanceValuesChanged)) {
-      // Mixed material data is encoded in the geometry render target. Only
-      // uniform appearance changes can be applied with final-pass uniforms.
-      needsGeometryUpdate = true;
+      // Appearance maps have their own output. Matte validity is decided by
+      // the encoded geometry snapshot, including visibility zero crossings.
+      _needsMaterialUpdate = true;
     }
     final materialBounds = boundingBox.inflate(_contourOutset);
     effectPaintBounds = expandBoundsForShadows(materialBounds);
@@ -1478,8 +1494,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   _GpuGeometryFrame _buildGpuGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
-    Rect bounds,
-  ) {
+    Rect bounds, {
+    bool writeMatte = true,
+  }) {
     final renderer = _gpuGeometryRenderer;
     if (renderer == null) {
       throw StateError(
@@ -1497,14 +1514,23 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       // The matte is in this layer's local coordinates. Ancestor transforms
       // are applied once by the compositor; baking them in would apply scale
       // and rotation twice.
-      final boundsInMatteSpace = bounds
-          .inflate(aaPadding)
-          .snapToPixels(devicePixelRatio);
-      final materialCenter = bounds.center;
+      // Reused mattes may have moved by a fractional physical pixel. Keep
+      // their raster phase and bucket-sized extent: snapping again would
+      // register the new material map against an origin its matte never used.
+      final boundsInMatteSpace = writeMatte
+          ? bounds.inflate(aaPadding).snapToPixels(devicePixelRatio)
+          : _geometryMatteBounds;
+      final materialCenter = writeMatte
+          ? bounds.center
+          : _materialCenterInMatte;
 
-      final textureWidth = (boundsInMatteSpace.width * devicePixelRatio).ceil();
-      final textureHeight = (boundsInMatteSpace.height * devicePixelRatio)
-          .ceil();
+      final physicalSize = boundsInMatteSpace.size * devicePixelRatio;
+      final textureWidth = writeMatte
+          ? physicalSize.width.ceil()
+          : physicalSize.width.round();
+      final textureHeight = writeMatte
+          ? physicalSize.height.ceil()
+          : physicalSize.height.round();
 
       if (textureWidth <= 0 || textureHeight <= 0) {
         throw StateError('Cannot render empty liquid-glass geometry.');
@@ -1636,6 +1662,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           _classifyShapeAppearances(appearances, defaultAppearance);
 
       final result = renderer.render(
+        writeMatte: writeMatte,
         width: textureWidth,
         height: textureHeight,
         shapeData: _shapeData,
@@ -1656,6 +1683,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,
       );
+      _needsMaterialUpdate = false;
       return (
         image: result.image,
         materialImage: renderer.materialImage,
@@ -1669,12 +1697,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           null => const Size(1, 1),
         },
         appearances: appearances,
-        matteBounds: Rect.fromLTWH(
-          boundsInMatteSpace.left,
-          boundsInMatteSpace.top,
-          result.width / devicePixelRatio,
-          result.height / devicePixelRatio,
-        ),
+        matteBounds: writeMatte
+            ? Rect.fromLTWH(
+                boundsInMatteSpace.left,
+                boundsInMatteSpace.top,
+                result.width / devicePixelRatio,
+                result.height / devicePixelRatio,
+              )
+            : _geometryMatteBounds,
       );
     } catch (e) {
       throw StateError('Flutter GPU geometry render failed: $e');

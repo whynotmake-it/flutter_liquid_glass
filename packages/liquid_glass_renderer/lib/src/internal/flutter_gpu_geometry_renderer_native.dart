@@ -216,7 +216,7 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   Object? get debugHostBufferIdentity => _sharedHostBuffer;
 
-  /// Number of geometry command buffers submitted by this renderer.
+  /// Number of output-update calls, including material-only updates.
   @visibleForTesting
   int debugRenderCount = 0;
 
@@ -264,12 +264,23 @@ class FlutterGpuGeometryRenderer {
   final _TextureRing _mattes = _TextureRing();
   final _TextureRing _materials = _TextureRing();
 
+  /// Actual output draws, separate from calls that only retire a material map.
+  @visibleForTesting
+  int debugMatteDrawCount = 0;
+
+  @visibleForTesting
+  int debugMaterialDrawCount = 0;
+
   /// Renders a new geometry matte and returns it as a [ui.Image].
   ///
   /// The matte fills the top-left `width` x `height` of the image, which is
   /// `textureWidth` x `textureHeight`. The returned image is a non-owning
   /// wrapper — do NOT dispose it. Its texture is written again
   /// [reuseAfterFrames] frames after a later render replaces it.
+  ///
+  /// With [writeMatte] false, retain the current matte and only replace (or
+  /// retire) the material output. The caller must verify that geometry,
+  /// raster dimensions and optical settings still match the encoded matte.
   ({ui.Image image, int width, int height, int textureWidth, int textureHeight})
   render({
     required int width,
@@ -283,6 +294,7 @@ class FlutterGpuGeometryRenderer {
     double? edgeDistanceRange,
     bool refractionFitsShape = true,
     double contourExtent = 0.5,
+    bool writeMatte = true,
     bool writeMaterials = false,
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
@@ -299,33 +311,39 @@ class FlutterGpuGeometryRenderer {
     final (viewWidth, viewHeight) = _viewCapacity();
 
     _ensureFrameCounter();
-    if (_texture != null) {
-      // Release our handle; earlier submitted scenes hold their own.
-      _image?.dispose();
-      _image = null;
-      _renderTarget = null;
-      _texture = null;
-      assert(() {
-        _debugActiveGeometryTextureCount--;
-        return true;
-      }(), 'Track replaced geometry textures in debug builds.');
-    }
-    // The shader writes every pixel of the sub-rect; the rest of the texture
-    // is undefined and never sampled, so no clear or copy is needed.
-    final matte = _mattes.next(
-      _completedFrames,
-      width: matteWidth,
-      height: matteHeight,
-      maxWidth: viewWidth,
-      maxHeight: viewHeight,
+    assert(
+      writeMatte || _texture != null,
+      'A material-only update requires an existing matte.',
     );
-    _texture = matte.texture;
-    _renderTarget = matte.renderTarget;
-    _image = _texture!.asImage();
-    assert(() {
-      _debugActiveGeometryTextureCount++;
-      return true;
-    }(), 'Track live geometry textures in debug builds.');
+    if (writeMatte) {
+      if (_texture != null) {
+        // Release our handle; earlier submitted scenes hold their own.
+        _image?.dispose();
+        _image = null;
+        _renderTarget = null;
+        _texture = null;
+        assert(() {
+          _debugActiveGeometryTextureCount--;
+          return true;
+        }(), 'Track replaced geometry textures in debug builds.');
+      }
+      // The shader writes every pixel of the sub-rect; the rest of the texture
+      // is undefined and never sampled, so no clear or copy is needed.
+      final matte = _mattes.next(
+        _completedFrames,
+        width: matteWidth,
+        height: matteHeight,
+        maxWidth: viewWidth,
+        maxHeight: viewHeight,
+      );
+      _texture = matte.texture;
+      _renderTarget = matte.renderTarget;
+      _image = _texture!.asImage();
+      assert(() {
+        _debugActiveGeometryTextureCount++;
+        return true;
+      }(), 'Track live geometry textures in debug builds.');
+    }
 
     final materialMapWidth = math.max(
       1,
@@ -398,16 +416,27 @@ class FlutterGpuGeometryRenderer {
     final uniformView = _hostBufferForUniformSize(_uniformSize)
         .emplace(_uniformData);
 
-    final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
-    final geometryPass = geometryCommandBuffer.createRenderPass(_renderTarget!)
-      ..bindPipeline(_pipeline)
-      ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
-      ..bindUniform(_uniformSlot, uniformView)
-      ..bindVertexBuffer(_vertexBufferView);
-    _restrictTo(geometryPass, _texture!, matteWidth, matteHeight);
-    geometryPass.draw(4);
-    _submitOrDefer(geometryCommandBuffer);
+    if (writeMatte) {
+      assert(() {
+        debugMatteDrawCount++;
+        return true;
+      }(), 'Track matte draws in debug builds.');
+      final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
+      final geometryPass =
+          geometryCommandBuffer.createRenderPass(_renderTarget!)
+            ..bindPipeline(_pipeline)
+            ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
+            ..bindUniform(_uniformSlot, uniformView)
+            ..bindVertexBuffer(_vertexBufferView);
+      _restrictTo(geometryPass, _texture!, matteWidth, matteHeight);
+      geometryPass.draw(4);
+      _submitOrDefer(geometryCommandBuffer);
+    }
     if (writeMaterials) {
+      assert(() {
+        debugMaterialDrawCount++;
+        return true;
+      }(), 'Track material draws in debug builds.');
       final materialCommandBuffer = gpu.gpuContext.createCommandBuffer();
       final materialPass =
           materialCommandBuffer.createRenderPass(_materialRenderTarget!)
