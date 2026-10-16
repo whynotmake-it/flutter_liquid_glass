@@ -104,8 +104,8 @@ Future<void> main() async {
 }
 ```
 
-This works on Android too, without waiting for a first frame. Awaiting precache
-trades startup time for having glass resources ready when the UI mounts.
+Awaiting precache trades startup time for having glass resources ready when
+the UI mounts.
 It does not eliminate all first-use GPU work; omit it if showing an initial
 fallback is preferable to delaying startup.
 
