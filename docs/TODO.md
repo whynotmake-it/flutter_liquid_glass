@@ -5,31 +5,10 @@ Paths are relative to `packages/liquid_glass_renderer/`.
 
 ## Needs the Pixel 10
 
-### Simplify `LiquidGlass.precache` and GPU renderer loading
+### Preload GPU resources directly
 
-`precache` no longer waits for a frame on Android. On the Pixel 10 with Vulkan
-and Flutter 3.47.1, 13 fresh-process precache calls completed in 2–6 ms,
-including before `runApp` and while the first frame was deferred. GPU resources
-were ready at completion. Other hardware may take longer to acquire its context;
-this is startup work, not a requirement to render a frame first.
-
-Remaining cleanup: `precache` builds a whole `FlutterGpuGeometryRenderer` and
-disposes it only to fill the static `_resolvedAssetResources` cache.
-
-Proposed design:
-
-- One `FlutterGpuGeometryRenderer.preload()` that awaits
-  `ShaderLibrary.fromAsset`, creates the three pipelines and caches them in a
-  single static `Future<_SharedGeometryResources>?` (replacing the two maps
-  keyed by asset).
-- `precache` calls `preload()` immediately. An uncached layer may schedule
-  loading after build to keep build lightweight, not because GPU readiness
-  requires a frame.
-- The dispose dance and the separate `fromAsset` path go away.
-
-Keep `preload()` awaitable before `runApp`; do not restore a first-frame
-dependency. Measure any proposed loading/cache refactor separately from the
-first-use drawing work that precaching does not eliminate.
+Let `precache` load and cache shared GPU resources without constructing and
+disposing a temporary `FlutterGpuGeometryRenderer`.
 
 ### Simpler geometry texture reuse
 
