@@ -7,11 +7,14 @@ Paths are relative to `packages/liquid_glass_renderer/`.
 
 ### Simplify `LiquidGlass.precache` and GPU renderer loading
 
-Today `precache` waits for the first rasterized frame on Android, builds a
-whole `FlutterGpuGeometryRenderer` and disposes it, only to fill the static
-`_resolvedAssetResources` cache. The "reading `gpuContext` before the first
-frame blocks the UI thread for 100 ms or more" claim behind
-`waitUntilGpuContextAvailable` has no recorded measurement.
+`precache` no longer waits for a frame on Android. On the Pixel 10 with Vulkan
+and Flutter 3.47.1, 13 fresh-process precache calls completed in 2–6 ms,
+including before `runApp` and while the first frame was deferred. GPU resources
+were ready at completion. Other hardware may take longer to acquire its context;
+this is startup work, not a requirement to render a frame first.
+
+Remaining cleanup: `precache` builds a whole `FlutterGpuGeometryRenderer` and
+disposes it only to fill the static `_resolvedAssetResources` cache.
 
 Proposed design:
 
@@ -19,14 +22,14 @@ Proposed design:
   `ShaderLibrary.fromAsset`, creates the three pipelines and caches them in a
   single static `Future<_SharedGeometryResources>?` (replacing the two maps
   keyed by asset).
-- `precache` calls `preload()`. A layer calls `tryCreateCached` and falls back
-  to `preload()` post-frame.
+- `precache` calls `preload()` immediately. An uncached layer may schedule
+  loading after build to keep build lightweight, not because GPU readiness
+  requires a frame.
 - The dispose dance and the separate `fromAsset` path go away.
 
-Measure first: a Perfetto trace of a cold start that reads `gpuContext`
-before the first frame. If it is cheap, drop `waitUntilGpuContextAvailable`.
-If it blocks, `preload()` has to run post-frame, because creating pipelines
-reads `gpuContext`.
+Keep `preload()` awaitable before `runApp`; do not restore a first-frame
+dependency. Measure any proposed loading/cache refactor separately from the
+first-use drawing work that precaching does not eliminate.
 
 ### Simpler geometry texture reuse
 

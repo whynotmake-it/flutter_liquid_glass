@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -123,23 +122,6 @@ class FlutterGpuGeometryRenderer {
       }
       return null;
     }
-  }
-
-  /// Completes once the Flutter GPU context exists without blocking.
-  ///
-  /// Workaround for Flutter 3.47.1 on Android: the engine creates the
-  /// Impeller context on the raster thread after startup, off the critical
-  /// path (`shell/common/shell.cc`), and reading `gpu.gpuContext` before
-  /// then blocks the UI thread until it exists, which takes 100 ms or more on
-  /// some Vulkan devices. The first rasterized frame needs the context, so
-  /// waiting for it avoids the block. This initializes the widgets binding
-  /// if needed, including before `runApp`. Remove it once the engine creates
-  /// the context before the first frame or offers a non-blocking way to wait
-  /// for it. On every other platform it completes immediately.
-  static Future<void> waitUntilGpuContextAvailable() async {
-    if (!Platform.isAndroid) return;
-    await WidgetsFlutterBinding.ensureInitialized()
-        .waitUntilFirstFrameRasterized;
   }
 
   static final Map<String, Future<_SharedGeometryResources>> _assetResources =
