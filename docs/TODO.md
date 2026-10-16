@@ -5,28 +5,10 @@ Paths are relative to `packages/liquid_glass_renderer/`.
 
 ## Needs the Pixel 10
 
-### Simplify `LiquidGlass.precache` and GPU renderer loading
+### Preload GPU resources directly
 
-Today `precache` waits for the first rasterized frame on Android, builds a
-whole `FlutterGpuGeometryRenderer` and disposes it, only to fill the static
-`_resolvedAssetResources` cache. The "reading `gpuContext` before the first
-frame blocks the UI thread for 100 ms or more" claim behind
-`waitUntilGpuContextAvailable` has no recorded measurement.
-
-Proposed design:
-
-- One `FlutterGpuGeometryRenderer.preload()` that awaits
-  `ShaderLibrary.fromAsset`, creates the three pipelines and caches them in a
-  single static `Future<_SharedGeometryResources>?` (replacing the two maps
-  keyed by asset).
-- `precache` calls `preload()`. A layer calls `tryCreateCached` and falls back
-  to `preload()` post-frame.
-- The dispose dance and the separate `fromAsset` path go away.
-
-Measure first: a Perfetto trace of a cold start that reads `gpuContext`
-before the first frame. If it is cheap, drop `waitUntilGpuContextAvailable`.
-If it blocks, `preload()` has to run post-frame, because creating pipelines
-reads `gpuContext`.
+Let `precache` load and cache shared GPU resources without constructing and
+disposing a temporary `FlutterGpuGeometryRenderer`.
 
 ### Simpler geometry texture reuse
 
