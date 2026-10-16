@@ -336,6 +336,53 @@ void runGeometryTextureReuseTests() {
   );
 
   testWidgets(
+    'material-only updates retain the matte and respect same-frame retirement',
+    (tester) async {
+      await tester.runAsync(() async {
+        final renderer = await createGeometryRenderer();
+        final reusedBefore = _reused;
+        final matte = renderTestRectangle(renderer, writeMaterials: true);
+        final texture = renderer.debugMatteTexture;
+        final firstMaterial = renderer.materialImage!.clone();
+        addTearDown(firstMaterial.dispose);
+        final before = (await firstMaterial.toByteData())!.buffer.asUint8List();
+
+        renderTestRectangle(
+          renderer,
+          writeMatte: false,
+          writeMaterials: true,
+        );
+        final secondMaterial = renderer.materialImage!.clone();
+        addTearDown(secondMaterial.dispose);
+        expect(secondMaterial.isCloneOf(firstMaterial), isFalse);
+        renderTestRectangle(renderer, writeMatte: false);
+        expect(renderer.materialImage, isNull);
+        renderTestRectangle(
+          renderer,
+          writeMatte: false,
+          writeMaterials: true,
+        );
+        expect(renderer.materialImage!.isCloneOf(firstMaterial), isFalse);
+        expect(renderer.materialImage!.isCloneOf(secondMaterial), isFalse);
+        expect(renderer.debugMatteTexture, same(texture));
+        expect(
+          renderTestRectangle(renderer, writeMatte: false),
+          same(matte),
+        );
+        expect(renderer.debugMatteDrawCount, 1);
+        expect(renderer.debugMaterialDrawCount, 3);
+        expect(_reused - reusedBefore, 0);
+        expect(
+          (await firstMaterial.toByteData())!.buffer.asUint8List(),
+          before,
+          reason: 'an earlier material snapshot must not be overwritten',
+        );
+      });
+    },
+    skip: skipProperGlassTests,
+  );
+
+  testWidgets(
     'two renders per frame stop allocating after warmup',
     (tester) async {
       final renderer = (await tester.runAsync(createGeometryRenderer))!;

@@ -94,17 +94,23 @@ class GlassPill extends StatelessWidget {
 ```
 
 Shaders and the GPU pipeline load on first use, so the first glass on screen
-paints `FakeGlass` for a frame or two. Warm them up before `runApp`:
+paints `FakeGlass` for a frame or two. Start warming them during startup
+without delaying `runApp`:
 
 ```dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LiquidGlass.precache();
+  final glassReady = LiquidGlass.precache();
   runApp(const MyApp());
+  await glassReady;
 }
 ```
 
-On Android the GPU part finishes after the first frame.
+On Android the GPU part waits for the first rasterized frame. Do not await
+precache before `runApp`, or defer the first frame until it completes: either
+creates a circular wait. To avoid fallback on the first glass frame, mount a
+splash screen first, await precache while that screen can render, then reveal
+the glass UI.
 
 ## The widgets
 
@@ -476,7 +482,8 @@ Best practices:
 - **For low power, don't sample the backdrop.** `FakeGlass` pays the same copy
   and blur as full glass. When the device or power state calls for it, draw an
   opaque surface instead.
-- **Call `LiquidGlass.precache()` before `runApp`.**
+- **Start `LiquidGlass.precache()` without awaiting it before `runApp`.**
+  On Android it needs the first rasterized frame to complete.
 
 The full evidence is in the
 [performance audit](example/tool/results/performance-audit.md), and the

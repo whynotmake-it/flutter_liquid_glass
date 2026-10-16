@@ -201,10 +201,11 @@ class LiquidGlass extends StatefulWidget {
   /// real glass as fake glass. Glass layers mounted after the returned future
   /// completes render real glass from their first frame.
   ///
-  /// This can be called before `runApp`. On Android it initializes the
-  /// widgets binding itself, and the GPU portion then completes after the
-  /// first frame, so it never blocks the UI thread on the engine's deferred
-  /// Impeller context.
+  /// This can be started before `runApp`, but must not be awaited before
+  /// mounting a root widget. On Android the GPU portion waits for the first
+  /// rasterized frame to avoid blocking the UI thread on the engine's deferred
+  /// Impeller context. Do not defer that frame until precache completes.
+  /// To warm glass before showing it, await this while a splash can render.
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.

@@ -17,6 +17,7 @@ Future<FlutterGpuGeometryRenderer> createGeometryRenderer() async {
 ui.Image renderTestRectangle(
   FlutterGpuGeometryRenderer renderer, {
   double centerX = 16,
+  bool writeMatte = true,
   bool writeMaterials = false,
   List<double> appearanceData = const <double>[],
 }) => renderer
@@ -33,6 +34,7 @@ ui.Image renderTestRectangle(
       refractionHeight: 10,
       offsetX: 0,
       offsetY: 0,
+      writeMatte: writeMatte,
       writeMaterials: writeMaterials,
       appearanceData: appearanceData,
     )

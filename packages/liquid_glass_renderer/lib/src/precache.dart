@@ -10,15 +10,17 @@ import 'package:liquid_glass_renderer/src/shaders.dart';
 ///
 /// Without it the first glass on screen paints its fallback for a frame or
 /// two while the programs load: fake glass without its surface shader, real
-/// glass as fake glass. Call it once, for example before `runApp` or on a
-/// splash screen, and glass renders fully from its first frame.
+/// glass as fake glass. Start it once without delaying `runApp`, or await it
+/// while a mounted splash can render before revealing the glass UI.
 ///
 /// Loads the fake-glass surface program everywhere, and the real-glass
 /// programs plus the Flutter GPU geometry bundle where shader filters are
 /// supported. On Android, the GPU part initializes the widgets binding if
 /// needed and awaits the first rasterized frame, so it never blocks the UI
 /// thread on the engine's deferred Impeller context; called before `runApp`,
-/// the GPU portion therefore completes after the first frame.
+/// the GPU portion therefore completes after the first frame. Awaiting it
+/// before mounting a root, or deferring that frame until it completes,
+/// creates a circular wait.
 /// Failures are reported through
 /// [FlutterError] and never thrown; the layers fall back the same way they
 /// would without precaching.
