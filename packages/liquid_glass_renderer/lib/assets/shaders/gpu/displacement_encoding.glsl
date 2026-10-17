@@ -10,10 +10,11 @@
 //    on the |x| + |y| = 1 diamond, which decodes without trigonometry and
 //    represents the four axis directions exactly.
 //    Refracted content is placed by these two values, so their steps must
-//    stay well below a pixel: 8 bits each would leave magnitude steps of up
-//    to 1.4 device pixels at iOS 27's 60 pt edge displacement and turn
-//    smooth refracted lines into staircases. The texture must be sampled
-//    nearest.
+//    stay well below a pixel. The magnitude spans 0 to maxDisplacement
+//    (refractionAmount in device pixels, about 180 at iOS 27's 60 pt and
+//    3x), so 8 bits would leave magnitude steps of about 0.7 device pixels,
+//    enough to turn smooth refracted lines into staircases. The texture must
+//    be sampled nearest.
 // B: Signed inward edge distance (positive inside, negative outside).
 // The displacement always points opposite the outward SDF normal, so the
 // magnitude is one-sided.
