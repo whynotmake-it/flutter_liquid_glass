@@ -20,7 +20,7 @@ jobs:
       github.event_name == 'pull_request' &&
       !contains(github.event.pull_request.labels.*.name, 'performance')
     name: Run Benchmark Sanity Check
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     permissions:
       contents: read
@@ -72,7 +72,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'performance')
     name: Run Performance Benchmarks
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     permissions:
       pull-requests: write

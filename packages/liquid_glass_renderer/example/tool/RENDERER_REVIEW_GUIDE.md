@@ -71,8 +71,9 @@ Metal and Vulkan render correctly:
   nested fade and real/fake opacity cases skip under `flutter_tester`
   (`SubmittedSceneCapture.isFlutterTester`) and run on a device.
 - It rasterizes differently on every host, so golden comparisons run on macOS
-  only, against references rendered by `flutter test --update-goldens` on the
-  CI golden job's image (`macos-26`). Elsewhere the tests keep their other
+  only, against references rendered by `flutter test --update-goldens` on a
+  host matching the CI golden job's image (`xcode-27`, macOS 27.0.1). Elsewhere
+  the tests keep their other
   checks.
 - An intermittent native `flutter_tester`/SwiftShader crash remains.
 
