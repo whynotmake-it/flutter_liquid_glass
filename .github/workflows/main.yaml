@@ -80,7 +80,7 @@ jobs:
   check_generation:
     name: Check Code Generation
     timeout-minutes: 10
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4
@@ -110,8 +110,9 @@ jobs:
     # Only run on main or if PR is labeled with "goldens"
     if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'goldens')
     # The macOS goldens are rendered with `flutter test --update-goldens` on
-    # this image; regenerate them on the same macOS version when it changes.
-    runs-on: macos-26
+    # this image (macOS 27); regenerate them on the same image when it changes
+    # (see `.github/workflows/update-goldens.yaml`).
+    runs-on: xcode-27
     steps:
       - name: 📚 Checkout
         uses: actions/checkout@v4

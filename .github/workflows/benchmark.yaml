@@ -6,6 +6,15 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      task:
+        description: 'Manual job to run'
+        required: true
+        default: benchmark
+        type: choice
+        options:
+          - benchmark
+          - goldens
   pull_request:
     branches:
       - main
@@ -20,7 +29,7 @@ jobs:
       github.event_name == 'pull_request' &&
       !contains(github.event.pull_request.labels.*.name, 'performance')
     name: Run Benchmark Sanity Check
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     permissions:
       contents: read
@@ -69,10 +78,10 @@ jobs:
 
   benchmark:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.task == 'benchmark') ||
       contains(github.event.pull_request.labels.*.name, 'performance')
     name: Run Performance Benchmarks
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     permissions:
       pull-requests: write
@@ -141,3 +150,13 @@ jobs:
           path: |
             packages/liquid_glass_renderer/example/build/benchmark/
           retention-days: 30
+
+  # Manual golden regeneration. The job itself lives in update-goldens.yaml;
+  # this thin caller exists because GitHub only exposes `workflow_dispatch` for
+  # workflows that already exist on the default branch, and this one does.
+  update-goldens:
+    name: Regenerate Goldens
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'goldens'
+    uses: ./.github/workflows/update-goldens.yaml
+    permissions:
+      contents: write

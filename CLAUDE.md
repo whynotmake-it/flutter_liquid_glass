@@ -49,7 +49,8 @@ melos run test:select
 # Run tests without golden tests (useful for PRs without golden label)
 melos run test-without-goldens
 
-# Update golden test images
+# Update golden test images on this machine (local hardware; differs from the
+# CI references, which come from the xcode-27 runner — see Testing > Golden Tests)
 melos run update-goldens
 
 # Generate coverage for all packages
@@ -121,7 +122,19 @@ The project uses `build_runner` for code generation. Always run `melos run gener
 Golden tests verify visual output and are tagged with `golden` in `dart_test.yaml`. They only run:
 - On main branch
 - On PRs labeled with "goldens"
-- On macOS only, against references rendered by `flutter test --update-goldens` on the golden job's `macos-26` runner (see `.github/workflows/main.yaml`); regenerate them on that macOS version
+- On macOS 27 only, against references rendered by `flutter test --update-goldens` on the golden job's `xcode-27` runner (macOS 27, arm64; see `.github/workflows/main.yaml`)
+
+**Regenerating goldens:** VM GPU output differs from local hardware, so the references must be rendered on the CI runner, not locally. Dispatch the manual `Regenerate Goldens` workflow (`.github/workflows/update-goldens.yaml`) on the branch you want to refresh; it regenerates on `xcode-27` and commits the updated images back:
+
+```bash
+# After update-goldens.yaml is on main:
+gh workflow run update-goldens.yaml --ref <your-branch>
+
+# Before that (GitHub only exposes workflow_dispatch for workflows on the
+# default branch), dispatch it through the already-dispatchable benchmark
+# workflow:
+gh workflow run benchmark.yaml --ref <your-branch> -f task=goldens
+```
 
 All tests must use the `--enable-impeller` flag since Skia is not supported.
 
