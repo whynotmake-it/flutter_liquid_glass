@@ -190,12 +190,15 @@ void main() {
     });
 
     test('the default and regular presets are floored per device', () {
-      for (final (deviceScale, expected) in [
-        (1.0, 5.8),
+      for (final (deviceScale, expected, downsampled) in [
+        // Below 2x the floor is capped at the 2x value (2.9); a
+        // full-resolution blur is cheap there, so it need not downsample.
+        (1.0, 2.9, false),
+        (1.5, 2.9, false),
+        (2.0, 5.8 / 2, true),
+        (2.625, 5.8 / 2.625, true),
         // 3x iPhones keep today's frost: 5.8 / 3 < 2.1.
-        (3.0, baseSigma),
-        (2.625, 5.8 / 2.625),
-        (2.0, 5.8 / 2),
+        (3.0, baseSigma, true),
       ]) {
         for (final settings in [
           const LiquidGlassSettings(),
@@ -209,8 +212,8 @@ void main() {
           );
           expect(
             downsamples(settings.frostSigmaAt(deviceScale), deviceScale),
-            isTrue,
-            reason: '$settings at $deviceScale must downsample',
+            downsampled,
+            reason: '$settings at $deviceScale',
           );
         }
       }

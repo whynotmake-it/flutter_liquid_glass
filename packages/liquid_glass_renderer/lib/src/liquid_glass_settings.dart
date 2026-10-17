@@ -237,10 +237,10 @@ final class LiquidGlassSettings with Equatable {
   /// `4 * sqrt(2) ~= 5.657` device pixels. `ScaleSigma` maps a logical sigma
   /// `s` to `s * (1 - 3.4e-3 * s + 3.4e-6 * s^2)` before the device scale
   /// multiplies it, so a logical floor `k` at device scale `d` reaches the
-  /// gate at `k * (1 - 3.4e-3 * k/d + 3.4e-6 * (k/d)^2) >= 4 * sqrt(2)`. The
-  /// worst case is the smallest device scale `d = 1`, which needs `k >=
-  /// 5.77`; `5.8` clears it with a small margin and stays below `2.1 * 3 =
-  /// 6.3`, so 3x displays keep today's `2.1`.
+  /// gate at `k * (1 - 3.4e-3 * k/d + 3.4e-6 * (k/d)^2) >= 4 * sqrt(2)`. `5.8`
+  /// clears that for every `d >= 2` (the tightest case, `d = 2`, is `5.743`
+  /// device pixels) and stays below `2.1 * 3 = 6.3`, so 3x displays keep
+  /// today's `2.1`. Below 2x the floor is capped; see [frostSigmaAt].
   static const double _frostFloorDevicePx = 5.8;
 
   /// The blur the regular presets render at slider position [tintAmount]:
@@ -395,14 +395,16 @@ final class LiquidGlassSettings with Equatable {
   /// Explicit [frost] is returned as-is. Frost chosen by the default
   /// constructor or a preset is raised to at least [_frostFloorDevicePx]
   /// divided by [deviceScale], so Impeller downsamples the blur pass on the
-  /// actual display; `0` stays `0`. Pass the smaller axis scale when
-  /// [deviceScale] is not uniform.
+  /// actual display; `0` stays `0`. The raise is capped at the 2x value: on a
+  /// 1x display a full-resolution blur is cheap (a quarter of 2x's pixels), so
+  /// the floor is not worth the larger look change there. Pass the smaller axis
+  /// scale when [deviceScale] is not uniform.
   @internal
   double frostSigmaAt(double deviceScale) {
     final sigma = effectiveFrost;
     if (!_frostIsFloorEligible || sigma <= 0) return sigma;
     final scale = deviceScale > 0 ? deviceScale : 1.0;
-    return math.max(sigma, _frostFloorDevicePx / scale);
+    return math.max(sigma, _frostFloorDevicePx / math.max(scale, 2.0));
   }
 
   /// Shared displacement codec scale for the geometry and final passes.

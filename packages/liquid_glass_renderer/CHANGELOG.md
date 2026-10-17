@@ -46,8 +46,8 @@ prerelease; APIs and rendering may still change.
   settings, plus the iOS 27 regular appearance for the platform brightness,
   so unconfigured glass looks different from `0.2.x`. These defaults may be
   retuned before 1.0; the `ios27*` presets track iOS 27. Preset and default
-  frost is raised further on the device so Impeller downsamples the blur pass;
-  an explicit `frost` is used as given.
+  frost is raised further on the device so Impeller downsamples the blur pass,
+  capped at the 2x value; an explicit `frost` is used as given.
 - **Dark regular glass is size-independent.** The fitted
   `GlassColorParameters.ios27Dark` transmittance no longer blends a small- and
   a large-side curve by the shape's short side, which the layer could only
@@ -138,7 +138,9 @@ prerelease; APIs and rendering may still change.
 - Frost always uses Impeller's blur. Preset and default frost is raised per
   device so Impeller downsamples the blur pass: it picks a power-of-two
   downsample factor from the blur's device-space size and only downsamples
-  above roughly 5.8 device pixels. An explicit `frost` is used as given.
+  above roughly 5.8 device pixels. The raise is capped at the 2x value (2.9
+  logical pixels), since a full-resolution blur is cheap on 1x displays. An
+  explicit `frost` is used as given.
 - Debug builds log a warning when a frame makes more than one independent
   backdrop capture, and when a layer has more glass shapes than
   `LiquidGlassBlendGroup.maxShapesPerLayer` and drops the rest.

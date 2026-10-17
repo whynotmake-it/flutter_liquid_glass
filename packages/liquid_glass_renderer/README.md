@@ -469,7 +469,7 @@ Best practices:
   downsample factor from the blur's device-space size and only starts
   downsampling above roughly 5.8 device pixels, so very small blurs can cost
   more than moderate ones. Preset and default `frost` is raised to that point
-  per device; an explicit `frost` is used as given.
+  per device, capped at the 2x value; an explicit `frost` is used as given.
 - **For low power, don't sample the backdrop.** `FakeGlass` pays the same copy
   and blur as full glass. When the device or power state calls for it, draw an
   opaque surface instead.
