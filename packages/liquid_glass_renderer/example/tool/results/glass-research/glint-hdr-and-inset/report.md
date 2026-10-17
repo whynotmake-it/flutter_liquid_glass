@@ -63,41 +63,6 @@ device, and 2.0 compensated for the clipping. Re-judge on the EDR build. If Appl
 still reads brighter, the remaining gap needs an HDR measurement of Apple's glass on
 the device; no value can be derived from the SDR data.
 
-## Glint on device vs simulator (EDR build, 17:00)
-
-Same-device A/B (`lib/glint_ab_main.dart`, #182 `5fcbb80`): native
-`UIGlassEffect(.regular)` platform view vs our toolbar preset at the same
-spot, 300×64 capsule. iPhone 15 screenshots vs the same app on an iOS 27
-iPhone 17 Pro simulator (system default tint). Integrated glint lift over the
-face, rows 1–7 below the top edge, center 30% (levels):
-
-| backdrop | Apple iPhone | Apple sim | ratio | ours on iPhone at h 1.0 / 1.5 / 2.0 |
-|---|---|---|---|---|
-| gray 128 | 152 | 78 | 1.95 | 68 / 96 / 124 |
-| black | 151 | 94 | 1.61 | 77 / 117 / 154 |
-| coast | 156 | 97 | 1.61 | 85 / 115 / 139 |
-| city | 134 | 69 | 1.93 | 80 / 112 / 143 |
-
-- Per row on gray: Apple on the iPhone +55 / +39 / +16 / +13, and on the simulator +27 / +18 / +9 / +7.
-  Ours at h1 gives +26 / +16 / +8 / +7, so the fit matches the simulator. Apple's device glint is
-  about 2× across all rows, and row 2 is slightly wider than ours at h2 (39 vs 28).
-- Not our EDR flag: Apple's device values are identical with our layer's EDR off.
-- Not the tint slider: the simulator at the same default tint shows the
-  simulator-level glint, and the slider sweep leaves the glint mask unchanged.
-- So it's device vs simulator. This fits the filter's headroom inputs
-  (`inputMaxHeadroom 9999`, `inputSDRHoldingToneEnabled`, SDR-only
-  gradient/shadow terms). The simulator display is SDR, while the iPhone panel is EDR
-  capable (potential headroom 8).
-- Highlight that matches Apple on the iPhone: 1.85–2.5 (mean ≈ 2.15), with our face
-  at tint 0 vs Apple's default. At a matched, brighter face the value would be
-  slightly higher still.
-- Side finding: the system default tint is not Clear. Apple's face over black is 130
-  on both the simulator (key unset) and the iPhone, vs 102 in the tint-0 references.
-  That matches our model at tintAmount ≈ 0.45.
-- The Mac HDR capture path (ScreenCaptureKit, `hdrglass/probe.swift`) is blocked:
-  the worker process lacks Screen Recording permission.
-- Crops: `glint-device-vs-sim-5x.jpg`.
-
 ## Inner-shadow inset (not changed)
 
 Host GPU-golden renders of `toolbar_capsule` (light, highlight 1) vs the
