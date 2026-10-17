@@ -67,6 +67,50 @@ jobs:
           path: packages/liquid_glass_renderer/example/build/benchmark/
           retention-days: 7
 
+  matte-order:
+    if: >-
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'performance')
+    name: Validate Matte Order
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: |
+          flutter config --enable-macos-desktop
+          flutter config --no-enable-swift-package-manager
+
+      - name: 🔧 Get dependencies
+        working-directory: packages/liquid_glass_renderer/example
+        run: flutter pub get
+
+      - name: 🩷 Run matte-order validator
+        working-directory: packages/liquid_glass_renderer/example
+        run: |
+          chmod +x tool/matte_order_check.sh
+          ./tool/matte_order_check.sh
+
+      - name: 📤 Upload matte-order logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: matte-order-${{ github.run_id }}
+          path: packages/liquid_glass_renderer/example/build/matte-order/
+          retention-days: 7
+
   benchmark:
     if: >-
       github.event_name == 'workflow_dispatch' ||

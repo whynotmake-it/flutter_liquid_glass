@@ -60,6 +60,14 @@ uniform vec2 uMaterialTextureSize;
 //   +7: contourResponse
 uniform vec4 uColorModelParams[24];
 
+#ifdef LIQUID_GLASS_VALIDATE_MATTE_ORDER
+// Harness-only render-order check: the serial the sampled matte must carry, or
+// -1. Declared last so the validation variant keeps every shipped uniform at
+// the same float index; the shipped shaders never define the guard, so they
+// gain neither the uniform nor the texture read below.
+uniform float uMatteSerial;
+#endif
+
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 8 + field];
 }
@@ -520,6 +528,24 @@ void main() {
         uGeometryTexture,
         geometryUV * uGeometryUVScale
     );
+    #ifdef LIQUID_GLASS_VALIDATE_MATTE_ORDER
+        if (uMatteSerial >= 0.0) {
+            // The serial sits in the texel row just below the matte. Paint
+            // magenta where the matte was rewritten by a newer render before
+            // this frame sampled it.
+            vec2 textureSize = uGeometrySize / uGeometryUVScale;
+            vec3 stamp = floor(
+                texture(
+                    uGeometryTexture,
+                    vec2(0.5, uGeometrySize.y + 0.5) / textureSize
+                ).rgb * 255.0 + 0.5
+            );
+            if (stamp.r * 65536.0 + stamp.g * 256.0 + stamp.b != uMatteSerial) {
+                fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+                return;
+            }
+        }
+    #endif
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
     // Weight of the material over the refracted backdrop. Frosted glass

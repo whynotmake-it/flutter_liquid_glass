@@ -7,6 +7,7 @@ only).
 | --- | --- |
 | `bench_scenes.sh` | The benchmark scene registry: suites shared by both runners. |
 | `benchmark.sh` | Metal runner (macOS profile build); refuses to replace existing results unless explicitly enabled. |
+| `matte_order_check.sh` | Matte-order validator on macOS: fails if a frame samples a matte rewritten out of order. |
 | `android_gpu_bench.sh` | Android runner (Pixel 10, power rails in mW). |
 | `android_ab_bench.py` | Android A/B runner: installed arms interleaved, analyzed by `android_ab_analyze.py`. |
 | `bench_analyze.sh` | One analyzer entry point for either runner's result directory. |
@@ -58,6 +59,28 @@ result directory), and opt-in xctrace via `..._TRACE_SCENARIOS` are documented
 at the top of `benchmark.sh`. The parser requires every resolved scenario to
 meet the minimum successful repetitions; failed or incomplete runs fail the
 benchmark even when performance thresholds are informational.
+
+## Matte-order validator
+
+`LIQUID_GLASS_VALIDATE_MATTE_ORDER` is a compile-time flag: the renderer stamps
+each matte with its render serial and the final shader paints magenta where a
+frame samples a matte rewritten before it was rasterized. With the flag off,
+nothing is compiled or drawn; the shipped shaders are unchanged.
+
+On macOS, `./tool/matte_order_check.sh` builds and runs the animating scenes
+(`resizeAnimated pxSheetResize pxButtonStretch pxBlend5Motion` by default) and
+fails on any magenta frame; it runs in CI (`benchmark.yaml`). To run the same
+check on an Android device (the Pixel/Vulkan case CI cannot cover), build and
+launch the benchmark app with the flag and a few animating scenes:
+
+```sh
+flutter build apk --profile --target=integration_test/benchmark_test.dart \
+  --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true
+# install/launch, then watch logcat for the per-scene line and fail when field
+# 3 (framesWithMagenta) is non-zero:
+adb logcat | grep LIQUID_GLASS_MATTE_ORDER
+# e.g. LIQUID_GLASS_MATTE_ORDER:pxSheetResize:180:0:0
+```
 
 ## Android (Pixel 10)
 

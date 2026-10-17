@@ -17,6 +17,12 @@ const _runtimeEffectShaders = [
   'liquid_glass_final_render',
   'liquid_glass_final_render_material',
   'liquid_glass_final_render_tint',
+  // Validation variants of the same core, loaded only under
+  // LIQUID_GLASS_VALIDATE_MATTE_ORDER. Compiling them here keeps the shipped
+  // shaders' uniform layout and texture reads byte-identical.
+  'liquid_glass_final_render_validate',
+  'liquid_glass_final_render_material_validate',
+  'liquid_glass_final_render_tint_validate',
 ];
 
 void main(List<String> args) async {
@@ -25,6 +31,19 @@ void main(List<String> args) async {
       buildInput: input,
       buildOutput: output,
       manifestFileName: 'liquid_glass_renderer.shaderbundle.json',
+      includeDirectories: [
+        input.packageRoot.resolve('lib/assets/shaders/gpu/'),
+      ],
+      glesLanguageVersion: 300,
+      assetMode: ShaderBundleAssetMode.dataAssetsIfAvailable,
+    );
+    // The validation-only vertex/stamp bundle. Keeping the serial stamp out of
+    // the production bundle means a shipped geometry shader bundle is
+    // byte-identical whether or not the validator exists.
+    await buildShaderBundleJson(
+      buildInput: input,
+      buildOutput: output,
+      manifestFileName: 'liquid_glass_renderer_validate.shaderbundle.json',
       includeDirectories: [
         input.packageRoot.resolve('lib/assets/shaders/gpu/'),
       ],

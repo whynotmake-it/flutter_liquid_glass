@@ -48,6 +48,14 @@ jobs:
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens
 
+      - name: 🩷 Run matte-order validator test
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
+        working-directory: packages/liquid_glass_renderer
+        run: >-
+          flutter test --enable-impeller --enable-flutter-gpu
+          --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true
+          test/src/matte_order_validation_test.dart
+
 
   skia_build:
     name: Skia Build Check
