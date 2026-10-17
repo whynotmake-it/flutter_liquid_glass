@@ -92,12 +92,12 @@ class _GlintAbPageState extends State<GlintAbPage> {
   Widget _ours(Brightness brightness) {
     final settings = _clear
         ? LiquidGlassSettings.ios27Clear()
-        : LiquidGlassSettings.ios27Toolbar(brightness: brightness);
+        : LiquidGlassSettings.ios27Regular(brightness: brightness);
     return LiquidGlass.withOwnLayer(
       settings: settings.copyWith(highlight: _glint),
       appearance: _clear
           ? const LiquidGlassAppearance.ios27Clear()
-          : LiquidGlassAppearance.ios27Toolbar(brightness: brightness),
+          : LiquidGlassAppearance.ios27Regular(brightness: brightness),
       shape: LiquidRoundedRectangle(borderRadius: _size.height / 2),
       child: SizedBox.fromSize(size: _size),
     );

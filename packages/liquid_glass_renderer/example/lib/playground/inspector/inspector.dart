@@ -338,6 +338,7 @@ class _ActionsState extends State<_Actions> {
 /// Dart source for [settings], listing only fields that differ from the
 /// defaults.
 String settingsSource(LiquidGlassSettings settings) {
+  // ignore: experimental_member_use
   final defaults = const LiquidGlassSettings().toJson();
   String literal(Object value) => switch (value) {
     final double v =>
@@ -348,6 +349,7 @@ String settingsSource(LiquidGlassSettings settings) {
     _ => '$value',
   };
   final fields = [
+    // ignore: experimental_member_use
     for (final MapEntry(:key, :value) in settings.toJson().entries)
       if (value != defaults[key]) '  $key: ${literal(value)},',
   ];

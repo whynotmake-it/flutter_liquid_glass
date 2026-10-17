@@ -104,7 +104,7 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// Appearance inherited by shapes that do not provide an override.
   ///
-  /// When omitted, the fitted iOS 27 toolbar appearance follows the ambient
+  /// When omitted, the fitted iOS 27 regular appearance follows the ambient
   /// platform brightness.
   final LiquidGlassAppearance? defaultAppearance;
 
@@ -122,11 +122,10 @@ class LiquidGlassLayer extends StatefulWidget {
   /// work. Multiple [LiquidGlassLayer]s need a common ancestor group or an
   /// explicit shared [backdropKey] to share across layer boundaries.
   ///
-  /// On Impeller, each independent backdrop capture does a full-screen
-  /// readback (~115 mW GPU at 120 Hz on a Pixel 10) before blur or glass
-  /// work. Sharing one [BackdropGroup] or [BackdropKey] pays that readback
-  /// once: two real layers dropped from 797 mW to 688 mW, two plain σ7 blurs
-  /// from 426 mW to 312 mW, on the same device.
+  /// On Impeller, each independent backdrop capture reads back the screen
+  /// before any blur or glass work. Sharing one [BackdropGroup] or
+  /// [BackdropKey] pays for that readback once, which can noticeably reduce
+  /// GPU load when several layers are on screen.
   ///
   /// Shared members do not see content painted between them. Group only
   /// elements that sit over the same content plane (for example all root
@@ -280,7 +279,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   Widget _buildLayer(BuildContext context) {
     final defaultAppearance =
         widget.defaultAppearance ??
-        LiquidGlassAppearance.ios27Toolbar(
+        LiquidGlassAppearance.ios27Regular(
           brightness: MediaQuery.platformBrightnessOf(context),
         );
     final backdropKey =
@@ -467,6 +466,20 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
+
+  bool _debugWarnedShapeLimit = false;
+
+  void _debugWarnShapeLimitExceeded() {
+    if (!kDebugMode || _debugWarnedShapeLimit) return;
+    _debugWarnedShapeLimit = true;
+    const message =
+        'a LiquidGlassLayer has more than '
+        '${LiquidGlassBlendGroup.maxShapesPerLayer} glass shapes; the extra '
+        'shapes are not drawn. Split the glass across several layers.';
+    LiquidGlassRenderObject.logger.warning(message);
+    debugPrint('liquid_glass_renderer: $message');
+  }
+
   FragmentShader get renderShader => switch ((
     _usesShapeAppearances,
     _usesTintOnlyAppearance,
@@ -1535,7 +1548,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
         for (final shape in geometry.shapes) {
-          if (numShapes >= 16) break; // MAX_SHAPES limit
+          if (numShapes >= LiquidGlassBlendGroup.maxShapesPerLayer) {
+            _debugWarnShapeLimitExceeded();
+            break;
+          }
 
           final shapeToGeometry = shape.shapeToGeometry ?? _identity;
           final basis = _matteShapeBasis(geometryToLayer, shapeToGeometry);

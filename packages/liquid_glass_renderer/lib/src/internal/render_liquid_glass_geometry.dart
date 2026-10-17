@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
+import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
@@ -384,16 +385,12 @@ enum RawShapeType {
 
   final double shaderIndex;
 
-  static RawShapeType fromLiquidGlassShape(LiquidShape shape) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse():
-        return RawShapeType.squircle;
-      case LiquidOval():
-        return RawShapeType.ellipse;
-      case LiquidRoundedRectangle():
-        return RawShapeType.roundedRectangle;
-    }
-  }
+  static RawShapeType fromLiquidGlassShape(LiquidShape shape) =>
+      switch (shape.kind) {
+        LiquidShapeKind.roundedSuperellipse => RawShapeType.squircle,
+        LiquidShapeKind.oval => RawShapeType.ellipse,
+        LiquidShapeKind.roundedRectangle => RawShapeType.roundedRectangle,
+      };
 }
 
 /// The geometry of a single shape.
@@ -409,19 +406,8 @@ class ShapeGeometry extends Equatable {
     required this.appearance,
     this.shadows = const [],
     this.shapeToGeometry,
-  }) : rawCornerRadius = _getRadiusFromGlassShape(shape),
+  }) : rawCornerRadius = shape.cornerRadius,
        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
-
-  static double _getRadiusFromGlassShape(LiquidShape shape) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse():
-        return shape.borderRadius;
-      case LiquidRoundedRectangle():
-        return shape.borderRadius;
-      case LiquidOval():
-        return 0;
-    }
-  }
 
   final LiquidGlassShapeRenderObject renderObject;
 

@@ -700,9 +700,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance(saturation: 1.5),
       ),
       BenchmarkScenario.realToolbarMaterial => _realLayer(
-        LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27RegularLight(),
         t,
-        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+        appearance: const LiquidGlassAppearance.ios27RegularLight(),
       ),
       BenchmarkScenario.realClearMaterial => _realLayer(
         LiquidGlassSettings.ios27Clear(),
@@ -754,9 +754,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         appearance: const LiquidGlassAppearance(saturation: 1.5),
       ),
       BenchmarkScenario.fakeToolbarMaterial => _fakeLayer(
-        LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27RegularLight(),
         t,
-        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+        appearance: const LiquidGlassAppearance.ios27RegularLight(),
       ),
       BenchmarkScenario.realToFakeTransition => _RealThenFakeScenario(
         t: t,
@@ -1290,7 +1290,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ];
     final spread = 100 + 24 * math.sin(t * math.pi * 2);
     return LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
+      settings: LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
       child: Center(
         child: SizedBox.square(
           dimension: 560,
@@ -1570,7 +1570,7 @@ class _RealThenFakeScenarioState extends State<_RealThenFakeScenario> {
   @override
   Widget build(BuildContext context) => LiquidGlassLayer(
     fake: _fake,
-    settings: LiquidGlassSettings.ios27ToolbarLight(),
+    settings: LiquidGlassSettings.ios27RegularLight(),
     child: Center(
       child: Transform.translate(
         offset: Offset(-180 + 360 * widget.t, 0),
@@ -1616,8 +1616,8 @@ enum _AppChromeKind {
   realTabsOwnLoupeStatic,
 }
 
-final _appToolbarSettings = LiquidGlassSettings.ios27ToolbarLight();
-const _appToolbarAppearance = LiquidGlassAppearance.ios27ToolbarLight();
+final _appToolbarSettings = LiquidGlassSettings.ios27RegularLight();
+const _appToolbarAppearance = LiquidGlassAppearance.ios27RegularLight();
 const _appChromeShadows = [
   BoxShadow(
     color: Color(0x2E000000),

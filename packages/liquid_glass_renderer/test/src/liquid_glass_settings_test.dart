@@ -5,14 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 void main() {
-  test('the default constructor is the light iOS 27 toolbar', () {
+  test('the default constructor is the light iOS 27 regular glass', () {
     expect(
       const LiquidGlassSettings(),
-      LiquidGlassSettings.ios27ToolbarLight(),
+      LiquidGlassSettings.ios27RegularLight(),
     );
   });
 
-  test('iOS 27 clear preset keeps the toolbar glint shape', () {
+  test('iOS 27 clear preset keeps the regular glint shape', () {
     final clear = LiquidGlassSettings.ios27Clear();
 
     expect(clear.refractionHeight, 20);
@@ -47,7 +47,7 @@ void main() {
     expect(settings.effectiveFrost, 3);
     expect(const LiquidGlassSettings(frost: -1).effectiveFrost, 0);
     expect(
-      LiquidGlassSettings.ios27Toolbar(
+      LiquidGlassSettings.ios27Regular(
         brightness: Brightness.dark,
         tintAmount: .25,
       ).tintAmount,
@@ -69,7 +69,7 @@ void main() {
         closeTo(sigma, .01),
       );
       for (final brightness in Brightness.values) {
-        final toolbar = LiquidGlassSettings.ios27Toolbar(
+        final toolbar = LiquidGlassSettings.ios27Regular(
           brightness: brightness,
           tintAmount: position,
         );
@@ -89,19 +89,19 @@ void main() {
     expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(2, 1e-9));
     expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
     expect(
-      LiquidGlassSettings.ios27ToolbarLight(tintAmount: 1, frost: 2).frost,
+      LiquidGlassSettings.ios27RegularLight(tintAmount: 1, frost: 2).frost,
       2,
     );
   });
 
-  test('brightness-aware toolbar factory selects structural presets', () {
+  test('brightness-aware regular factory selects structural presets', () {
     expect(
-      LiquidGlassSettings.ios27Toolbar(brightness: Brightness.light),
-      LiquidGlassSettings.ios27ToolbarLight(),
+      LiquidGlassSettings.ios27Regular(brightness: Brightness.light),
+      LiquidGlassSettings.ios27RegularLight(),
     );
     expect(
-      LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
-      LiquidGlassSettings.ios27ToolbarDark(),
+      LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
+      LiquidGlassSettings.ios27RegularDark(),
     );
   });
 

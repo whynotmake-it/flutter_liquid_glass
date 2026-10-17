@@ -13,11 +13,16 @@ import 'package:meta/meta.dart';
 /// [LiquidGlassAppearance]. The renderer derives the glint, the dark border
 /// and the inner bevel shadow from the same SDF, so these controls remain
 /// stable across toolbars, capsules, and tabs.
-class LiquidGlassSettings with Equatable {
+///
+/// Lighting strengths are display-referred. The defaults of the unnamed
+/// constructor may be retuned before 1.0; the version-named presets
+/// (`ios27*`) track Apple's appearance on that OS version.
+final class LiquidGlassSettings with Equatable {
   /// Creates a material from optical and lighting controls.
   ///
-  /// The defaults are the light iOS 27 toolbar
-  /// ([LiquidGlassSettings.ios27ToolbarLight]) at slider position `0`.
+  /// The defaults are the light iOS 27 regular glass
+  /// ([LiquidGlassSettings.ios27RegularLight]) at slider position `0`, and
+  /// may be retuned before 1.0.
   /// Distances are logical pixels; strengths use the `0` to `1` range.
   const LiquidGlassSettings({
     this.refractionHeight = 20.0,
@@ -34,6 +39,9 @@ class LiquidGlassSettings with Equatable {
   });
 
   /// Restores a material vector produced by [toJson].
+  ///
+  /// The JSON schema is experimental and may change between releases.
+  @experimental
   factory LiquidGlassSettings.fromJson(Map<String, Object?> json) {
     const defaults = LiquidGlassSettings();
     double number(String key, double fallback) =>
@@ -60,7 +68,8 @@ class LiquidGlassSettings with Equatable {
     );
   }
 
-  /// Light-mode settings fitted to an iOS 27 toolbar capsule.
+  /// Light-mode settings fitted to iOS 27 regular glass (`Glass.regular`,
+  /// which Apple also uses for toolbars and `.glass` buttons).
   ///
   /// This is a useful starting point, not a universal Apple-material preset:
   /// platform materials vary with appearance, control role, and accessibility
@@ -75,7 +84,7 @@ class LiquidGlassSettings with Equatable {
   ///
   /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
   /// [minBlurPassSigma].
-  factory LiquidGlassSettings.ios27ToolbarLight({
+  factory LiquidGlassSettings.ios27RegularLight({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
@@ -83,14 +92,14 @@ class LiquidGlassSettings with Equatable {
     tintAmount: tintAmount,
   );
 
-  /// Dark-mode settings fitted to an iOS 27 toolbar capsule.
+  /// Dark-mode settings fitted to iOS 27 regular glass.
   ///
   /// The glint is dimmed; the border is stronger and
   /// vanishes entirely where the normal faces the light axis.
   ///
   /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
   /// [minBlurPassSigma].
-  factory LiquidGlassSettings.ios27ToolbarDark({
+  factory LiquidGlassSettings.ios27RegularDark({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
@@ -103,7 +112,7 @@ class LiquidGlassSettings with Equatable {
 
   /// Settings fitted to iOS 27 `Glass.clear`, identical in light and dark.
   ///
-  /// Clear glass has the same glint line and angular falloff as the toolbar;
+  /// Clear glass has the same glint line and angular falloff as regular glass;
   /// its brighter glint comes from its color model. The border exists only
   /// where the normal is perpendicular to the light axis, and there is no
   /// inner shadow. The Liquid Glass slider only blurs clear glass, so [frost]
@@ -111,11 +120,9 @@ class LiquidGlassSettings with Equatable {
   /// [LiquidGlassAppearance.ios27Clear].
   ///
   /// The lens is the full 20 pt / 60 pt bevel on every shape. At slider 0
-  /// the glass is completely clear and uses no blur pass at all. Tinted
-  /// positions floor the blur at [minBlurPassSigma] logical pixels:
-  /// below a device-pixel sigma of four Impeller runs the blur at
-  /// full resolution, where a larger downsampled kernel is cheaper. Pass
-  /// [frost] to override, for example `frost: 0` for unsoftened glass.
+  /// the glass is completely clear and unblurred. Tinted positions floor the
+  /// blur at [minBlurPassSigma]. Pass [frost] to override, for example
+  /// `frost: 0` for unsoftened glass at every position.
   factory LiquidGlassSettings.ios27Clear({
     double tintAmount = 0,
     double? frost,
@@ -129,17 +136,17 @@ class LiquidGlassSettings with Equatable {
     highlight: .6,
   );
 
-  /// Creates fitted iOS 27 toolbar settings for [brightness].
-  factory LiquidGlassSettings.ios27Toolbar({
+  /// Creates fitted iOS 27 regular glass settings for [brightness].
+  factory LiquidGlassSettings.ios27Regular({
     required Brightness brightness,
     double? frost,
     double tintAmount = 0,
   }) => brightness == Brightness.dark
-      ? LiquidGlassSettings.ios27ToolbarDark(
+      ? LiquidGlassSettings.ios27RegularDark(
           frost: frost,
           tintAmount: tintAmount,
         )
-      : LiquidGlassSettings.ios27ToolbarLight(
+      : LiquidGlassSettings.ios27RegularLight(
           frost: frost,
           tintAmount: tintAmount,
         );
@@ -186,13 +193,11 @@ class LiquidGlassSettings with Equatable {
         );
   }
 
-  /// Smallest blur any preset spends a backdrop blur pass on, in logical
-  /// pixels.
+  /// Smallest non-zero blur the presets use, in logical pixels.
   ///
-  /// Impeller runs a full-resolution Gaussian at a scaled sigma of four
-  /// device pixels or less, where a larger downsampled kernel is cheaper.
-  /// 2.1 logical pixels clear that gate on every display with a device
-  /// pixel ratio of about 1.9 or more — all 2x+ displays.
+  /// On Impeller, smaller non-zero blurs are not cheaper to render than this
+  /// one on typical 2x and 3x displays, so the presets never go below it.
+  /// The value may change in a future release.
   static const double minBlurPassSigma = 2.1;
 
   /// The blur the regular presets render at slider position [tintAmount]:
@@ -262,12 +267,13 @@ class LiquidGlassSettings with Equatable {
   /// own layer when it should shrink about itself.
   final double backdropShrink;
 
-  /// Backdrop blur sigma in logical pixels.
+  /// Backdrop blur, as an approximate Gaussian-equivalent sigma in logical
+  /// pixels.
   ///
-  /// The value is absolute and does not change with the material's size.
-  /// The default is [minBlurPassSigma], the smallest blur Impeller
-  /// downsamples: below it the blur pass runs at full resolution and a
-  /// larger sigma is cheaper. Explicit values below it are honored.
+  /// The renderer may round or adjust the blur it actually applies. The blur
+  /// does not change with the material's size. The default is
+  /// [minBlurPassSigma]; smaller values are honored but are not cheaper to
+  /// render than the default.
   final double frost;
 
   /// Separation of the color channels in the refracted edge.
@@ -275,8 +281,8 @@ class LiquidGlassSettings with Equatable {
   /// Red is displaced by `1 + dispersion / 2` and blue by
   /// `1 - dispersion / 2` times the edge displacement. Negative values bend
   /// blue more, as real glass does; the iOS 27 loupe measures about `-0.06`
-  /// and other iOS 27 glass `0`. At `0` the glass reads the backdrop once
-  /// per pixel instead of three times.
+  /// and other iOS 27 glass `0`. Non-zero values are more expensive to
+  /// render, so leave this at `0` unless the glass needs the effect.
   final double dispersion;
 
   /// Strength of the glint along the light axis.
@@ -284,9 +290,8 @@ class LiquidGlassSettings with Equatable {
   /// The glint recolors the face instead of adding white: it pulls the lit
   /// material toward a target brighter than SDR white carrying the face's own
   /// chroma amplified, so glass over color glints in that color. `1` is the
-  /// strength an iPhone shows on iOS 27 in light mode; the dark toolbar and
-  /// clear presets dim it to `0.8` and `0.6`. Apple's simulator captures,
-  /// which are SDR, correspond to about `0.56`.
+  /// strength of the light iOS 27 regular preset; the dark regular and clear
+  /// presets dim it to `0.8` and `0.6`.
   final double highlight;
 
   /// Peak absorption of the dark border just outside the silhouette, which
@@ -309,32 +314,41 @@ class LiquidGlassSettings with Equatable {
   /// Position of the iOS 27 Liquid Glass slider in Settings, from `0`
   /// (Clear) to `1` (Tinted).
   ///
+  /// Experimental: this may move to the per-shape color model or otherwise
+  /// change before 1.0.
+  ///
   /// Apps set this themselves; the renderer does not read the system value.
   /// The slider makes the iOS 27 neutral wash more opaque and strengthens the
   /// dark border; the glint is unchanged, and the direct color model ignores
   /// it. It does not change [frost]: the iOS 27 presets derive their blur
-  /// from the same position ([ios27RegularFrost], [ios27ClearFrost]). It is
-  /// one uniform per layer and adds no per-pixel work.
+  /// from the same position ([ios27RegularFrost], [ios27ClearFrost]).
+  @experimental
   final double tintAmount;
 
   /// Effective bevel width; never negative.
+  @internal
   double get effectiveRefractionHeight => math.max(0, refractionHeight);
 
   /// Effective edge displacement; never negative.
+  @internal
   double get effectiveRefractionAmount => math.max(0, refractionAmount);
 
   /// Effective backdrop shrink, clamped to `0` to `0.75`.
+  @internal
   double get effectiveBackdropShrink => backdropShrink.clamp(0.0, 0.75);
 
   /// Effective slider position, clamped to `0` to `1`.
+  @internal
   double get effectiveTintAmount => tintAmount.clamp(0.0, 1.0);
 
   /// Effective blur sigma; never negative.
+  @internal
   double get effectiveFrost => math.max(0, frost);
 
   /// Shared displacement codec scale for the geometry and final passes.
   /// [refractionAmount] is the exact peak of the profile, so the RGBA8 code
   /// range is spent only on reachable displacement.
+  @internal
   double get effectiveDisplacementScale =>
       math.max(1e-3, effectiveRefractionAmount);
 
@@ -343,6 +357,7 @@ class LiquidGlassSettings with Equatable {
   /// The geometry matte encodes signed edge distance up to four times this
   /// depth, so rim lighting keeps its precision even when [refractionHeight]
   /// is small or refraction is disabled.
+  @internal
   double get effectiveEdgeDistanceRange => math.max(12, refractionHeight);
 
   /// Width of the dark border in logical pixels; `0` without a border.
@@ -377,6 +392,9 @@ class LiquidGlassSettings with Equatable {
   );
 
   /// Serializes the public material vector for example presets and tooling.
+  ///
+  /// The JSON schema is experimental and may change between releases.
+  @experimental
   Map<String, Object> toJson() => {
     'refractionHeight': refractionHeight,
     'refractionAmount': refractionAmount,

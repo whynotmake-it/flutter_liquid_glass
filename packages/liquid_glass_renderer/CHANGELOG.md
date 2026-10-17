@@ -42,22 +42,43 @@ prerelease; APIs and rendering may still change.
   `LiquidGlassAppearance.visibility`. `Opacity` above a whole
   `LiquidGlassLayer` still works.
 - **New defaults.** Glass renders with a 20 pt bevel, 60 pt edge
-  displacement, 2 pt frost and the rest of the light iOS 27 toolbar
-  settings, plus the iOS 27 toolbar appearance for the platform brightness, so
-  unconfigured glass looks different from `0.2.x`.
+  displacement, 2.1 pt frost and the rest of the light iOS 27 regular glass
+  settings, plus the iOS 27 regular appearance for the platform brightness,
+  so unconfigured glass looks different from `0.2.x`. These defaults may be
+  retuned before 1.0; the `ios27*` presets track iOS 27.
+- **A smaller, closed public API.**
+  - `LiquidShape` is an `abstract final class` and `LiquidOval`,
+    `LiquidRoundedRectangle` and `LiquidRoundedSuperellipse` are `final`:
+    shapes can't be subclassed or switched over exhaustively. The glass
+    ignores a shape's `side`.
+  - `LiquidGlassSettings`, `LiquidGlassAppearance` and `LgrLogs` are `final`.
+  - `LiquidGlass.grouped` and `LiquidGlass.withOwnLayer` no longer take
+    `blendGroupLink`, and the `grouped`, `blendGroupLink` and
+    `ownLayerConfig` fields are gone from `LiquidGlass`.
+  - `FakeGlass` and `FakeGlass.inLayer` no longer take
+    `backdropHandledByLayer`.
+  - `LiquidGlassBlendGroup.of` and `maybeOf` and the
+    `LiquidGlassSettings.effective*` getters are internal.
+  - There is one regular glass preset, as in SwiftUI: the identical
+    `LiquidGlassAppearance.ios27Toolbar*` presets are removed, and
+    `LiquidGlassSettings.ios27Toolbar*` are renamed to `ios27Regular`,
+    `ios27RegularLight` and `ios27RegularDark`.
+  - Experimental, and may change before 1.0: `LiquidGlassSettings.tintAmount`,
+    `LiquidGlassAppearance.saturation`, `transmissionGamma` and `vibrancy`,
+    every `toJson`/`fromJson`, and `LgrLogs`.
 
 ### New features
 
-- **iOS 27 presets.** `LiquidGlassSettings.ios27Toolbar`, `ios27ToolbarLight`,
-  `ios27ToolbarDark` and `ios27Clear`, and `LiquidGlassAppearance.ios27Regular`,
-  `ios27Toolbar` and `ios27Clear` (with light and dark variants), fitted
-  against captures of Apple's glass in light and dark.
+- **iOS 27 presets.** `ios27Regular` and `ios27Clear` on both
+  `LiquidGlassSettings` and `LiquidGlassAppearance` (with light and dark
+  variants of regular), fitted against captures of Apple's glass in light and
+  dark.
 - **The Liquid Glass slider.** `LiquidGlassSettings.tintAmount` takes the
   position of the iOS 27 Settings slider, from Clear (`0`) to Tinted (`1`). It
   moves the iOS 27 wash and border along fitted curves, and the presets derive
   their blur from it through `LiquidGlassSettings.ios27RegularFrost` and
   `ios27ClearFrost`.
-- **Color models.** A sealed `LiquidGlassColorModel`: the iOS 27 models turn
+- **Color models.** `LiquidGlassColorModel`: the iOS 27 models turn
   one tint and its opacity into backdrop-dependent tones, with dark regular
   glass getting denser on larger shapes. The direct model exposes
   `saturation`, `transmissionGamma` and `vibrancy` for manual looks.
@@ -101,11 +122,13 @@ prerelease; APIs and rendering may still change.
 - Geometry mattes, coordinate mappings, image filters and static transforms
   are cached; geometry textures grow only when needed and are reused after one
   frame. Fragment work is clipped to the glass.
-- Frost up to 1.25 device pixels runs in the final pass instead of a separate
-  blur pass.
+- Frost always uses Impeller's blur. The presets never use a non-zero blur
+  below `LiquidGlassSettings.minBlurPassSigma`, since smaller blurs render no
+  faster.
 - Debug builds log a warning when a frame makes more than one independent
-  backdrop capture.
-- The README documents measured Pixel 10 GPU-power costs and best practices.
+  backdrop capture, and when a layer has more glass shapes than
+  `LiquidGlassBlendGroup.maxShapesPerLayer` and drops the rest.
+- The README documents performance best practices.
 
 ## 0.2.0-dev.4
 

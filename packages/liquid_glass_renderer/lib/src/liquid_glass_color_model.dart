@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart' show experimental;
 
 /// Interpolates linearly between the Liquid Glass slider endpoints: Clear
 /// (`0`) and Tinted (`1`).
@@ -20,9 +21,7 @@ class GlassColorCurve with Equatable {
   const GlassColorCurve(this.clear, this.tinted);
 
   /// A curve that holds [value] at every slider position.
-  const GlassColorCurve.constant(double value)
-    : clear = value,
-      tinted = value;
+  const GlassColorCurve.constant(double value) : clear = value, tinted = value;
 
   /// Value at the Clear slider position (`0`).
   final double clear;
@@ -182,7 +181,6 @@ class GlassColorParameters with Equatable {
     );
   }
 
-
   /// Unpremultiplied emission color of the face wash.
   final Color emissionColor;
 
@@ -327,11 +325,17 @@ class GlassColorParameters with Equatable {
     'fakeGlintLuminance': fakeGlintLuminance,
   };
 
-  static List<double> _curveToJson(GlassColorCurve curve) =>
-      [curve.clear, curve.tinted];
+  static List<double> _curveToJson(GlassColorCurve curve) => [
+    curve.clear,
+    curve.tinted,
+  ];
 
-  static List<double> _rampToJson(GlassToneRamp ramp) =>
-      [ramp.base, ramp.amplitude, ramp.pivot, ramp.exponent];
+  static List<double> _rampToJson(GlassToneRamp ramp) => [
+    ramp.base,
+    ramp.amplitude,
+    ramp.pivot,
+    ramp.exponent,
+  ];
 
   /// A copy with the given fields replaced.
   GlassColorParameters copyWith({
@@ -512,6 +516,10 @@ final class LiquidGlassColorModel with Equatable {
 
   /// Restores a model written by [toJson]: a preset name or a parameter map
   /// (see [GlassColorParameters.fromJson]).
+  ///
+  /// The parameter map exposes the model's internal constants. Its schema is
+  /// experimental and may change between releases.
+  @experimental
   factory LiquidGlassColorModel.fromJson(Object? value) => switch (value) {
     'ios27Light' => const LiquidGlassColorModel.ios27(
       brightness: Brightness.light,
@@ -531,7 +539,10 @@ final class LiquidGlassColorModel with Equatable {
   @internal
   final GlassColorParameters? parameters;
 
-  /// Stable identifier (or parameter map) used by appearance preset JSON.
+  /// Identifier (or parameter map) used by appearance preset JSON.
+  ///
+  /// The schema is experimental and may change between releases.
+  @experimental
   Object toJson() => switch (parameters) {
     null => 'direct',
     GlassColorParameters.ios27Light => 'ios27Light',

@@ -537,7 +537,7 @@ void main() {
                         width: 340,
                         height: 220,
                         child: LiquidGlassLayer(
-                          settings: LiquidGlassSettings.ios27ToolbarLight(
+                          settings: LiquidGlassSettings.ios27RegularLight(
                             frost: 0,
                           ),
                           child: LiquidGlassBlendGroup(
@@ -622,7 +622,7 @@ void main() {
                         // golden proves that the directional bevel follows
                         // the smooth-union SDF instead of a shape bounds box.
                         settings:
-                            LiquidGlassSettings.ios27ToolbarLight(
+                            LiquidGlassSettings.ios27RegularLight(
                               frost: 0,
                             ).copyWith(
                               highlight: 0,
@@ -1399,7 +1399,7 @@ Widget _appearanceBlendScene({
 
   return buildWithGridPaper(
     LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       defaultAppearance: white,
       child: LiquidGlassBlendGroup(
         blend: 44,
@@ -1444,13 +1444,13 @@ Widget _appearanceBlendScene({
 }
 
 Widget _transparentTintBlendScene() {
-  const toolbar = LiquidGlassAppearance.ios27ToolbarLight();
-  const red = LiquidGlassAppearance.ios27ToolbarLight(
+  const toolbar = LiquidGlassAppearance.ios27RegularLight();
+  const red = LiquidGlassAppearance.ios27RegularLight(
     tint: Color(0xA0FF3B30),
   );
   return buildWithGridPaper(
     LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       defaultAppearance: toolbar,
       child: const LiquidGlassBlendGroup(
         blend: 44,

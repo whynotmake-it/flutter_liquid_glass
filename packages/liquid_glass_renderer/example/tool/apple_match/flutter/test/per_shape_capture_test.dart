@@ -94,7 +94,7 @@ class _DefaultAppearance extends StatelessWidget {
     child: _Backdrop(
       dark: brightness == Brightness.dark,
       child: LiquidGlassLayer(
-        settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
+        settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
         child: const Center(
           child: LiquidGlass(
             shape: LiquidRoundedSuperellipse(borderRadius: 42),
@@ -120,7 +120,7 @@ class _ColorAxes extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Backdrop(
     child: LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       child: Center(
         child: Wrap(
           spacing: 18,
@@ -160,7 +160,7 @@ class _MergedAppearance extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Backdrop(
     child: LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       child: Center(
         child: LiquidGlassBlendGroup(
           blend: 38,

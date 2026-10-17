@@ -75,7 +75,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
                   ? ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8)
                   : fakeGlassBackdropFilter(
                       const LiquidGlassSettings(frost: 8),
-                      LiquidGlassAppearance.ios27Toolbar(
+                      LiquidGlassAppearance.ios27Regular(
                         brightness: Brightness.light,
                       ),
                     )!,

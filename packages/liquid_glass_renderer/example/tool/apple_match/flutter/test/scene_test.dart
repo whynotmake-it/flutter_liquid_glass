@@ -1,3 +1,6 @@
+// The harness drives the experimental JSON and color-model API on purpose.
+// ignore_for_file: experimental_member_use
+
 import 'dart:convert';
 import 'dart:io';
 

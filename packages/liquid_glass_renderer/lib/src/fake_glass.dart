@@ -17,11 +17,10 @@ import 'package:meta/meta.dart';
 
 /// A lower-cost approximation of [LiquidGlass] without refraction geometry.
 ///
-/// Tint and saturation use one native affine color filter on Impeller and
-/// Skia. Each shape renders tint, contour, bevel, and highlight with one
-/// lightweight analytic-SDF fragment draw on both backends. Fake shapes inside
-/// a [LiquidGlassBlendGroup] remain visually independent; this fallback does
-/// not compute smooth-union geometry.
+/// It blurs and color-filters the backdrop and draws the tint, contour, bevel
+/// and highlight analytically, and works on both Impeller and Skia. Fake
+/// shapes inside a [LiquidGlassBlendGroup] remain visually independent; this
+/// fallback does not compute smooth-union geometry.
 class FakeGlass extends StatelessWidget {
   /// Creates a new [FakeGlass] widget with the given [child], [shape], and
   /// [settings].
@@ -33,9 +32,9 @@ class FakeGlass extends StatelessWidget {
     this.shadows = const [],
     this.backdropKey,
     this.useBackdropGroup = false,
-    this.backdropHandledByLayer = false,
     super.key,
-  }) : inheritVisibility = true;
+  }) : backdropHandledByLayer = false,
+       inheritVisibility = true;
 
   /// Creates a new [FakeGlass] widget that takes settings from the nearest
   /// ancestor [LiquidGlassLayer].
@@ -44,11 +43,11 @@ class FakeGlass extends StatelessWidget {
     required this.child,
     this.appearance,
     this.shadows = const [],
-    this.backdropHandledByLayer = false,
     super.key,
   }) : settings = null,
        backdropKey = null,
        useBackdropGroup = false,
+       backdropHandledByLayer = false,
        inheritVisibility = true;
 
   /// Creates an in-layer fallback whose appearance is already resolved.
@@ -78,9 +77,8 @@ class FakeGlass extends StatelessWidget {
   /// [LiquidGlassSettings.refractionAmount],
   /// [LiquidGlassSettings.backdropShrink] and
   /// [LiquidGlassSettings.dispersion] therefore have no effect, and
-  /// [LiquidGlassAppearance.vibrancy] is likewise ignored. When tint or
-  /// saturation already requires a native color filter, transmission gamma is
-  /// approximated in that same filter at no additional pass cost.
+  /// [LiquidGlassAppearance.vibrancy] is likewise ignored.
+  /// [LiquidGlassAppearance.transmissionGamma] is only approximated.
   /// [LiquidGlassSettings.refractionHeight] only controls the width of the
   /// approximate inner light bleed.
   final LiquidGlassSettings? settings;

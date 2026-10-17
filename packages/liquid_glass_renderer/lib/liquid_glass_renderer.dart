@@ -13,7 +13,12 @@ export 'src/liquid_glass_capture.dart' show LiquidGlassCapture;
 export 'src/liquid_glass_color_model.dart' show LiquidGlassColorModel;
 export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
-export 'src/liquid_shape.dart';
+export 'src/liquid_shape.dart'
+    show
+        LiquidOval,
+        LiquidRoundedRectangle,
+        LiquidRoundedSuperellipse,
+        LiquidShape;
 export 'src/logging.dart' show LgrLogs;
 export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
 export 'src/stretch.dart'

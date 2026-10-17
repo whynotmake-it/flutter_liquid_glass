@@ -22,9 +22,9 @@ void main() {
     );
   });
 
-  test('toolbar appearances derive color response from one optional tint', () {
-    const light = LiquidGlassAppearance.ios27ToolbarLight();
-    const dark = LiquidGlassAppearance.ios27ToolbarDark();
+  test('regular appearances derive color response from one optional tint', () {
+    const light = LiquidGlassAppearance.ios27RegularLight();
+    const dark = LiquidGlassAppearance.ios27RegularDark();
 
     expect(light.tint.a, 0);
     expect(
@@ -47,7 +47,7 @@ void main() {
 
     const blue = Color(0x66007AFF);
     expect(
-      const LiquidGlassAppearance.ios27ToolbarLight(tint: blue).tint,
+      const LiquidGlassAppearance.ios27RegularLight(tint: blue).tint,
       blue,
     );
   });
@@ -133,10 +133,9 @@ void main() {
       150: {0: .447, 100: .208},
     };
     for (final MapEntry(key: size, value: sweep) in darkBySize.entries) {
-      double darkDensity(double position) =>
-          dark
-              .faceTransfer(size.toDouble(), tintAmount: position)!
-              .transmittance;
+      double darkDensity(double position) => dark
+          .faceTransfer(size.toDouble(), tintAmount: position)!
+          .transmittance;
       expect(darkDensity(0), closeTo(sweep[0]!, .02));
       expect(darkDensity(1), closeTo(sweep[100]!, .02));
       for (final position in const [.25, .5, .75]) {
@@ -226,7 +225,7 @@ void main() {
     );
     expect(
       scope.defaultAppearance,
-      const LiquidGlassAppearance.ios27ToolbarDark(),
+      const LiquidGlassAppearance.ios27RegularDark(),
     );
   });
 

@@ -118,7 +118,7 @@ class LiquidGlassLoupe extends StatelessWidget {
 
   /// The glass optics and lighting.
   ///
-  /// Its [LiquidGlassSettings.tintAmount] is ignored: the iOS 27 loupe is
+  /// Its `tintAmount` is ignored: the iOS 27 loupe is
   /// identical at every Liquid Glass slider position.
   final LiquidGlassSettings settings;
 
@@ -148,6 +148,7 @@ class LiquidGlassLoupe extends StatelessWidget {
             devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
           ),
           LiquidGlass.withOwnLayer(
+            // ignore: experimental_member_use
             settings: settings.tintAmount == 0
                 ? settings
                 : settings.copyWith(tintAmount: 0),

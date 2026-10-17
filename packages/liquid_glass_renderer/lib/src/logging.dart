@@ -6,7 +6,7 @@ import 'package:meta/meta.dart';
 export 'package:logging/logging.dart' show Level, Logger;
 
 @internal
-abstract class LgrLogNames {
+abstract final class LgrLogNames {
   static const _root = 'lgr';
 
   static const render = '$_root.render';
@@ -15,7 +15,11 @@ abstract class LgrLogNames {
 }
 
 /// Logging utilities for the Liquid Glass Renderer package.
-abstract class LgrLogs {
+///
+/// Experimental: the logger names and what is logged may change between
+/// releases.
+@experimental
+abstract final class LgrLogs {
   static final _root = Logger(LgrLogNames._root);
 
   static final _activeLoggers = <Logger>{};

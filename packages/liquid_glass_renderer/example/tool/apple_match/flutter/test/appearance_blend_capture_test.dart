@@ -17,42 +17,45 @@ const _grid = bool.fromEnvironment('APPEARANCE_BLEND_GRID', defaultValue: true);
 void main() {
   for (final fake in [false, true]) {
     for (final dpr in [2.0, 3.0]) {
-      testWidgets('captures merged appearances fake=$fake dpr=$dpr', (
-        tester,
-      ) async {
-        if (!fake) {
-          expect(ui.ImageFilter.isShaderFilterSupported, isTrue);
-        }
-        final output = Directory(_outputPath)..createSync(recursive: true);
-        tester.view
-          ..devicePixelRatio = dpr
-          ..physicalSize = const Size(360, 360) * dpr;
-        addTearDown(tester.view.reset);
-        final captureKey = GlobalKey();
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: RepaintBoundary(
-              key: captureKey,
-              child: _ColorsScene(fake: fake),
+      testWidgets(
+        'captures merged appearances fake=$fake dpr=$dpr',
+        (tester) async {
+          if (!fake) {
+            expect(ui.ImageFilter.isShaderFilterSupported, isTrue);
+          }
+          final output = Directory(_outputPath)..createSync(recursive: true);
+          tester.view
+            ..devicePixelRatio = dpr
+            ..physicalSize = const Size(360, 360) * dpr;
+          addTearDown(tester.view.reset);
+          final captureKey = GlobalKey();
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              home: RepaintBoundary(
+                key: captureKey,
+                child: _ColorsScene(fake: fake),
+              ),
             ),
-          ),
-        );
-        for (var frame = 0; frame < 30; frame++) {
-          await tester.pump(const Duration(milliseconds: 16));
-        }
-        final boundary =
-            captureKey.currentContext!.findRenderObject()!
-                as RenderRepaintBoundary;
-        final image = await boundary.toImage(pixelRatio: dpr);
-        final kind = fake ? 'fake' : 'real';
-        await expectLater(
-          image,
-          matchesGoldenFile(
-            Uri.file('${output.path}/colors-$kind-dpr${dpr.round()}.png'),
-          ),
-        );
-      }, skip: _outputPath.isEmpty, tags: 'golden');
+          );
+          for (var frame = 0; frame < 30; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          final boundary =
+              captureKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: dpr);
+          final kind = fake ? 'fake' : 'real';
+          await expectLater(
+            image,
+            matchesGoldenFile(
+              Uri.file('${output.path}/colors-$kind-dpr${dpr.round()}.png'),
+            ),
+          );
+        },
+        skip: _outputPath.isEmpty,
+        tags: 'golden',
+      );
     }
   }
 }
@@ -94,7 +97,7 @@ class _ColorsScene extends StatelessWidget {
         ),
       LiquidGlassLayer(
         fake: fake,
-        settings: LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
+        settings: LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
         child: LiquidGlassBlendGroup(
           blend: 24,
           child: Stack(

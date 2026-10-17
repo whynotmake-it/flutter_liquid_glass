@@ -340,8 +340,8 @@ Widget _comparisonSurface({
   return Center(
     child: LiquidGlassLayer(
       fake: fake,
-      settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
-      defaultAppearance: LiquidGlassAppearance.ios27Toolbar(
+      settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
+      defaultAppearance: LiquidGlassAppearance.ios27Regular(
         brightness: brightness,
       ),
       child: const LiquidGlassBlendGroup(

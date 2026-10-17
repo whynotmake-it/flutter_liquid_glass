@@ -1,3 +1,5 @@
+// ignore_for_file: experimental_member_use
+
 // The example intentionally inspects the package's consolidated layer to
 // verify fake/real ordering; this is test-only use of an internal API.
 // ignore_for_file: invalid_use_of_internal_member

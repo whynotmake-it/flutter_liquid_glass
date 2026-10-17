@@ -7,15 +7,14 @@ import 'package:liquid_glass_renderer/src/internal/capture_pass.dart';
 /// Captures the backdrop once for all the glass inside it.
 ///
 /// Every `BackdropFilter`, and so every `LiquidGlassLayer`, has to read the
-/// pixels behind it. On Impeller that copies the whole current render pass,
-/// the entire screen at the top level, into a texture. Two glass layers that
-/// must stay independent (an indicator that refracts its tab bar) therefore
-/// pay two full-screen copies.
+/// pixels behind it, and on Impeller that read can cover the whole screen.
+/// Two glass layers that must stay independent (an indicator that refracts
+/// its tab bar) therefore each pay for a large read.
 ///
-/// [LiquidGlassCapture] pays that copy once. It clips to the glass inside it
-/// plus everything that glass paints or samples, and starts a render pass of
-/// that size seeded with the backdrop. Glass layers inside then read back only
-/// this small pass. The look is identical to glass without a capture.
+/// [LiquidGlassCapture] limits that work. It clips to the glass inside it
+/// plus everything that glass paints or samples, captures the backdrop for
+/// that region, and lets the glass layers inside read back only that region.
+/// The look is identical to glass without a capture.
 ///
 /// Paint the content the glass should refract below the capture, not inside
 /// it. Keep captures small: a capture the size of the screen saves nothing.

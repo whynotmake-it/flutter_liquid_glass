@@ -80,7 +80,7 @@ class GlassPill extends StatelessWidget {
         const Positioned.fill(child: MyContent()),
         Center(
           child: LiquidGlassLayer(
-            settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
+            settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
             child: const LiquidGlass(
               shape: LiquidRoundedSuperellipse(borderRadius: 28),
               child: SizedBox(width: 220, height: 56),
@@ -195,19 +195,18 @@ layer's `defaultAppearance` or per shape.
 
 | Material | Settings | Appearance |
 | --- | --- | --- |
-| Regular (`.regular`, `.glass` buttons) | `LiquidGlassSettings(frost: LiquidGlassSettings.ios27RegularFrost(t), tintAmount: t)` | `ios27Regular(brightness:)` |
-| Toolbar | `ios27Toolbar(brightness:)` | `ios27Toolbar(brightness:)` |
-| Clear (`.clear`) | `ios27Clear()` | `ios27Clear()` |
+| Regular (`.regular`: toolbars, tab bars, `.glass` buttons) | `ios27Regular(brightness:, tintAmount: t)` | `ios27Regular(brightness:)` |
+| Clear (`.clear`) | `ios27Clear(tintAmount: t)` | `ios27Clear()` |
 
 Light and dark variants exist as separate constructors too
-(`ios27ToolbarLight`, `ios27ToolbarDark`, ...). A layer without a
-`defaultAppearance` uses the toolbar appearance for the platform brightness.
+(`ios27RegularLight`, `ios27RegularDark`). A layer without a
+`defaultAppearance` uses the regular appearance for the platform brightness.
 
 ```dart
 final brightness = MediaQuery.platformBrightnessOf(context);
 
 LiquidGlassLayer(
-  settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
+  settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
   defaultAppearance: LiquidGlassAppearance.ios27Regular(brightness: brightness),
   child: const MyToolbar(),
 )
@@ -222,10 +221,11 @@ accessibility settings.
 
 iOS 27 has a Liquid Glass slider in Settings, from Clear (`0`) to Tinted
 (`1`). Pass its position as `tintAmount`. The renderer does not read the
-system setting; your app decides.
+system setting; your app decides. `tintAmount` is experimental and may move
+to the per-shape color model before 1.0.
 
 ```dart
-LiquidGlassSettings.ios27Toolbar(brightness: brightness, tintAmount: 0.5)
+LiquidGlassSettings.ios27Regular(brightness: brightness, tintAmount: 0.5)
 ```
 
 The slider changes three things, each along a curve fitted to Apple's glass:
@@ -253,7 +253,7 @@ cross-fade their colors where they meet, from the same backdrop sample:
 
 ```dart
 LiquidGlass.grouped(
-  appearance: const LiquidGlassAppearance.ios27ToolbarLight(
+  appearance: const LiquidGlassAppearance.ios27RegularLight(
     tint: Color(0xFF0A84FF),
   ),
   shape: const LiquidOval(),
@@ -304,8 +304,8 @@ bevel refracts; the face shows the backdrop undisplaced.
 - `dispersion`: splits the colors in the refracted edge. Red moves by
   `1 + dispersion / 2` and blue by `1 - dispersion / 2` times the edge
   displacement; negative values bend blue more, as real glass does. iOS 27
-  regular and clear glass show none, so it defaults to `0`, where the glass
-  reads the backdrop once per pixel instead of three times.
+  regular and clear glass show none, so it defaults to `0`, which is also the
+  cheapest setting to render.
 
 The backdrop is always sampled bilinearly, so refracted lines move smoothly
 instead of snapping to whole pixels.
@@ -450,17 +450,11 @@ saves nothing.
 
 ## Performance
 
-The unit of cost is the backdrop copy, not the glass widget. Measured on a
-Pixel 10 (Impeller/Vulkan, 120 Hz, GPU power rail):
-
-| Workload | GPU power |
-| --- | --- |
-| Backdrop copy alone, per independent `BackdropFilter` | ~115 mW |
-| Plain `BackdropFilter` blur, σ7 | ~165 mW |
-| `FakeGlass` | ~230 mW |
-| Full glass | ~335 mW |
-| Two full layers, independent vs. sharing a `BackdropGroup` | 797 vs. 688 mW |
-| Glass shadow | ~75 mW per shape |
+The unit of cost is the backdrop copy, not the glass widget. Every
+independent `BackdropFilter`, and so every independent layer, copies the
+backdrop before it can blur or refract it. On top of that copy, a plain blur,
+`FakeGlass` and full glass each cost progressively more, and every glass
+shadow adds its own cost.
 
 Best practices:
 
@@ -471,17 +465,17 @@ Best practices:
   independent copy.
 - **Keep layers small.** A layer's cost grows with the area its glass covers.
 - **Don't animate blend-group geometry every frame.** Moving one shape in a
-  group re-renders the whole group's geometry, which can miss 120 Hz. Static
+  group re-renders the whole group's geometry, which can drop frames. Static
   geometry is cached.
 - **Keep shadows few and small.**
-- **Mind the blur.** Impeller stops downsampling at σ ≤ 4, which makes small
-  blurs cost more than σ7; σ20 costs about three times σ7.
+- **Mind the blur.** Larger blurs cost more, and on Impeller very small
+  blurs can cost more than moderate ones.
 - **For low power, don't sample the backdrop.** `FakeGlass` pays the same copy
   and blur as full glass. When the device or power state calls for it, draw an
   opaque surface instead.
 - **Optionally await `LiquidGlass.precache()` before `runApp`.**
 
-The full evidence is in the
+Measurements are in the
 [performance audit](example/tool/results/performance-audit.md), and the
 [Android GPU power harness](example/tool/README.md#android-pixel-10)
 measures your own screens.
