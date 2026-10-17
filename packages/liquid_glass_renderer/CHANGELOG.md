@@ -63,9 +63,10 @@ prerelease; APIs and rendering may still change.
     `LiquidGlassAppearance.ios27Toolbar*` presets are removed, and
     `LiquidGlassSettings.ios27Toolbar*` are renamed to `ios27Regular`,
     `ios27RegularLight` and `ios27RegularDark`.
-  - Experimental, and may change before 1.0: `LiquidGlassSettings.tintAmount`,
+  - Experimental, and may change before 1.0:
     `LiquidGlassAppearance.saturation`, `transmissionGamma` and `vibrancy`,
-    every `toJson`/`fromJson`, and `LgrLogs`.
+    every `toJson`/`fromJson`, and `LgrLogs`. `LiquidGlassSettings.tintAmount`
+    is not experimental, but may move to the per-shape color model before 1.0.
 
 ### New features
 

@@ -148,7 +148,6 @@ class LiquidGlassLoupe extends StatelessWidget {
             devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
           ),
           LiquidGlass.withOwnLayer(
-            // ignore: experimental_member_use
             settings: settings.tintAmount == 0
                 ? settings
                 : settings.copyWith(tintAmount: 0),
