@@ -29,18 +29,43 @@ final class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
-    this.frost = minBlurPassSigma,
+    double? frost,
     this.dispersion = 0.0,
     this.highlight = 1.0,
     this.contourStrength = 0.43,
     this.contourDirectionality = 0.77,
     this.bevelShadowStrength = 0.036,
     this.tintAmount = 0.0,
-  });
+  }) : frost = frost ?? _minBlurPassSigma,
+       _frostIsFloorEligible = frost == null;
+
+  /// The public fields with [frost] already resolved.
+  ///
+  /// [floorEligible] marks frost the renderer may raise to the device's
+  /// Impeller downsampling point. Frost that came from the default
+  /// constructor's default or a preset's floored path is eligible; an
+  /// explicitly passed frost is not.
+  const LiquidGlassSettings._({
+    this.refractionHeight = 20.0,
+    this.refractionAmount = 60.0,
+    this.refractionFitsShape = true,
+    this.backdropShrink = 0.0,
+    this.frost = _minBlurPassSigma,
+    this.dispersion = 0.0,
+    this.highlight = 1.0,
+    this.contourStrength = 0.43,
+    this.contourDirectionality = 0.77,
+    this.bevelShadowStrength = 0.036,
+    this.tintAmount = 0.0,
+    bool floorEligible = false,
+  }) : _frostIsFloorEligible = floorEligible;
 
   /// Restores a material vector produced by [toJson].
   ///
   /// The JSON schema is experimental and may change between releases.
+  ///
+  /// The device blur floor is not serialized: restored settings carry an
+  /// explicit [frost], which the renderer uses as given.
   @experimental
   factory LiquidGlassSettings.fromJson(Map<String, Object?> json) {
     const defaults = LiquidGlassSettings();
@@ -83,12 +108,14 @@ final class LiquidGlassSettings with Equatable {
   /// of the unnamed constructor.
   ///
   /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
-  /// [minBlurPassSigma].
+  /// `2.1` logical pixels. The renderer may raise a preset or default frost
+  /// further on the device, so the blur pass downsamples there.
   factory LiquidGlassSettings.ios27RegularLight({
     double tintAmount = 0,
     double? frost,
-  }) => LiquidGlassSettings(
+  }) => LiquidGlassSettings._(
     frost: frost ?? _ios27RegularBlur(tintAmount),
+    floorEligible: frost == null,
     tintAmount: tintAmount,
   );
 
@@ -98,12 +125,14 @@ final class LiquidGlassSettings with Equatable {
   /// vanishes entirely where the normal faces the light axis.
   ///
   /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
-  /// [minBlurPassSigma].
+  /// `2.1` logical pixels. The renderer may raise a preset or default frost
+  /// further on the device, so the blur pass downsamples there.
   factory LiquidGlassSettings.ios27RegularDark({
     double tintAmount = 0,
     double? frost,
-  }) => LiquidGlassSettings(
+  }) => LiquidGlassSettings._(
     frost: frost ?? _ios27RegularBlur(tintAmount),
+    floorEligible: frost == null,
     highlight: 0.8,
     contourStrength: 0.88,
     contourDirectionality: 1,
@@ -121,14 +150,15 @@ final class LiquidGlassSettings with Equatable {
   ///
   /// The lens is the full 20 pt / 60 pt bevel on every shape. At slider 0
   /// the glass is completely clear and unblurred. Tinted positions floor the
-  /// blur at [minBlurPassSigma]. Pass [frost] to override, for example
+  /// blur at `2.1` logical pixels. Pass [frost] to override, for example
   /// `frost: 0` for unsoftened glass at every position.
   factory LiquidGlassSettings.ios27Clear({
     double tintAmount = 0,
     double? frost,
-  }) => LiquidGlassSettings(
+  }) => LiquidGlassSettings._(
     refractionFitsShape: false,
     frost: frost ?? _ios27ClearBlur(tintAmount),
+    floorEligible: frost == null,
     contourStrength: 0.36,
     contourDirectionality: 1,
     bevelShadowStrength: 0,
@@ -164,7 +194,7 @@ final class LiquidGlassSettings with Equatable {
   /// and smaller glass less.
   ///
   /// This is Apple's measured curve; the regular presets render
-  /// _ios27RegularBlur instead, which floors it at [minBlurPassSigma].
+  /// _ios27RegularBlur instead, which floors it at `2.1` logical pixels.
   static double ios27RegularFrost(double tintAmount) {
     final amount = tintAmount.clamp(0.0, 1.0);
     return 2 *
@@ -184,7 +214,7 @@ final class LiquidGlassSettings with Equatable {
   ///
   /// This is Apple's measured curve; [LiquidGlassSettings.ios27Clear]
   /// renders _ios27ClearBlur instead, which returns no blur at slider 0 and
-  /// floors tinted positions at [minBlurPassSigma].
+  /// floors tinted positions at `2.1` logical pixels.
   static double ios27ClearFrost(double tintAmount) {
     final amount = tintAmount.clamp(0.0, 1.0);
     return 0.35 *
@@ -193,25 +223,37 @@ final class LiquidGlassSettings with Equatable {
         );
   }
 
-  /// Smallest non-zero blur the presets use, in logical pixels.
+  /// Smallest non-zero base blur the presets use, in logical pixels.
   ///
-  /// On Impeller, smaller non-zero blurs are not cheaper to render than this
-  /// one on typical 2x and 3x displays, so the presets never go below it.
-  /// The value may change in a future release.
-  static const double minBlurPassSigma = 2.1;
+  /// Preset and default frost is raised further, per device, at render time;
+  /// see [frostSigmaAt].
+  static const double _minBlurPassSigma = 2.1;
+
+  /// Device-space blur sigma at which Impeller first downsamples its Gaussian.
+  ///
+  /// Impeller 3.47.1 `GaussianBlurFilterContents::CalculateScale` returns
+  /// `1.0` for a sigma up to `4` device pixels and otherwise
+  /// `2^round(log2(4 / sigma))`, so the scale stays `1.0` until
+  /// `4 * sqrt(2) ~= 5.657` device pixels. `ScaleSigma` maps a logical sigma
+  /// `s` to `s * (1 - 3.4e-3 * s + 3.4e-6 * s^2)` before the device scale
+  /// multiplies it, so a logical floor `k` at device scale `d` reaches the
+  /// gate at `k * (1 - 3.4e-3 * k/d + 3.4e-6 * (k/d)^2) >= 4 * sqrt(2)`. The
+  /// worst case is the smallest device scale `d = 1`, which needs `k >=
+  /// 5.77`; `5.8` clears it with a small margin and stays below `2.1 * 3 =
+  /// 6.3`, so 3x displays keep today's `2.1`.
+  static const double _frostFloorDevicePx = 5.8;
 
   /// The blur the regular presets render at slider position [tintAmount]:
-  /// [ios27RegularFrost] floored at [minBlurPassSigma], since a smaller
-  /// sigma is not cheaper.
+  /// [ios27RegularFrost] floored at `2.1` logical pixels.
   static double _ios27RegularBlur(double tintAmount) =>
-      math.max(minBlurPassSigma, ios27RegularFrost(tintAmount));
+      math.max(_minBlurPassSigma, ios27RegularFrost(tintAmount));
 
   /// The blur [LiquidGlassSettings.ios27Clear] renders at slider position
   /// [tintAmount]: `0` at slider 0, where the glass is completely clear,
-  /// and [minBlurPassSigma] or more everywhere else.
+  /// and `2.1` logical pixels or more everywhere else.
   static double _ios27ClearBlur(double tintAmount) {
     if (tintAmount <= 0) return 0;
-    return math.max(minBlurPassSigma, ios27ClearFrost(tintAmount));
+    return math.max(_minBlurPassSigma, ios27ClearFrost(tintAmount));
   }
 
   /// Returns the material settings supplied by the nearest glass layer.
@@ -271,9 +313,10 @@ final class LiquidGlassSettings with Equatable {
   /// pixels.
   ///
   /// The renderer may round or adjust the blur it actually applies. The blur
-  /// does not change with the material's size. The default is
-  /// [minBlurPassSigma]; smaller values are honored but are not cheaper to
-  /// render than the default.
+  /// does not change with the material's size. The default is `2.1`, and the
+  /// renderer may raise the default, or a preset's frost, on the device so
+  /// Impeller downsamples the blur pass there. An explicitly passed frost is
+  /// always used as given.
   final double frost;
 
   /// Separation of the color channels in the refracted edge.
@@ -321,6 +364,11 @@ final class LiquidGlassSettings with Equatable {
   /// from the same position ([ios27RegularFrost], [ios27ClearFrost]).
   final double tintAmount;
 
+  /// Whether [frost] came from the default constructor's default or a
+  /// preset's floored path, so the renderer may raise it to the device's
+  /// Impeller downsampling point. An explicitly passed [frost] clears it.
+  final bool _frostIsFloorEligible;
+
   /// Effective bevel width; never negative.
   @internal
   double get effectiveRefractionHeight => math.max(0, refractionHeight);
@@ -340,6 +388,22 @@ final class LiquidGlassSettings with Equatable {
   /// Effective blur sigma; never negative.
   @internal
   double get effectiveFrost => math.max(0, frost);
+
+  /// Backdrop blur sigma to render at [deviceScale] device pixels per logical
+  /// pixel.
+  ///
+  /// Explicit [frost] is returned as-is. Frost chosen by the default
+  /// constructor or a preset is raised to at least [_frostFloorDevicePx]
+  /// divided by [deviceScale], so Impeller downsamples the blur pass on the
+  /// actual display; `0` stays `0`. Pass the smaller axis scale when
+  /// [deviceScale] is not uniform.
+  @internal
+  double frostSigmaAt(double deviceScale) {
+    final sigma = effectiveFrost;
+    if (!_frostIsFloorEligible || sigma <= 0) return sigma;
+    final scale = deviceScale > 0 ? deviceScale : 1.0;
+    return math.max(sigma, _frostFloorDevicePx / scale);
+  }
 
   /// Shared displacement codec scale for the geometry and final passes.
   /// [refractionAmount] is the exact peak of the profile, so the RGBA8 code
@@ -373,12 +437,14 @@ final class LiquidGlassSettings with Equatable {
     double? contourDirectionality,
     double? bevelShadowStrength,
     double? tintAmount,
-  }) => LiquidGlassSettings(
+  }) => LiquidGlassSettings._(
     refractionHeight: refractionHeight ?? this.refractionHeight,
     refractionAmount: refractionAmount ?? this.refractionAmount,
     refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
     backdropShrink: backdropShrink ?? this.backdropShrink,
     frost: frost ?? this.frost,
+    // Passing an explicit frost makes it the caller's, not the preset's.
+    floorEligible: frost == null && _frostIsFloorEligible,
     dispersion: dispersion ?? this.dispersion,
     highlight: highlight ?? this.highlight,
     contourStrength: contourStrength ?? this.contourStrength,
@@ -418,6 +484,7 @@ final class LiquidGlassSettings with Equatable {
     contourDirectionality,
     bevelShadowStrength,
     tintAmount,
+    _frostIsFloorEligible,
   ];
 }
 

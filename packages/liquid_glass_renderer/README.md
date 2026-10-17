@@ -465,8 +465,11 @@ Best practices:
   group re-renders the whole group's geometry, which can drop frames. Static
   geometry is cached.
 - **Keep shadows few and small.**
-- **Mind the blur.** Larger blurs cost more, and on Impeller very small
-  blurs can cost more than moderate ones.
+- **Mind the blur.** Larger blurs cost more, but Impeller picks a power-of-two
+  downsample factor from the blur's device-space size and only starts
+  downsampling above roughly 5.8 device pixels, so very small blurs can cost
+  more than moderate ones. Preset and default `frost` is raised to that point
+  per device; an explicit `frost` is used as given.
 - **For low power, don't sample the backdrop.** `FakeGlass` pays the same copy
   and blur as full glass. When the device or power state calls for it, draw an
   opaque surface instead.

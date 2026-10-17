@@ -677,7 +677,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
   double get blurPassSigma => _frostSigma;
 
-  double get _frostSigma => settings.effectiveFrost;
+  double get _frostSigma => settings.frostSigmaAt(devicePixelRatio);
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,

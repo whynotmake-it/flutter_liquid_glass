@@ -137,12 +137,13 @@ List<double> fakeGlassFaceMatrix({
 @internal
 ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassSettings settings,
-  LiquidGlassAppearance appearance,
-) {
+  LiquidGlassAppearance appearance, {
+  double deviceScale = 1,
+}) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
   final colorModel = appearance.colorModel;
-  final frost = settings.effectiveFrost;
+  final frost = settings.frostSigmaAt(deviceScale);
   final blur = frost != 0
       ? ImageFilter.blur(
           sigmaX: frost,
