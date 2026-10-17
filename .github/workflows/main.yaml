@@ -50,11 +50,11 @@ jobs:
 
       - name: 🩷 Run matte-order validator test
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
-        working-directory: packages/liquid_glass_renderer
+        working-directory: packages/liquid_glass_renderer/example
         run: >-
           flutter test --enable-impeller --enable-flutter-gpu
           --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true
-          test/src/matte_order_validation_test.dart
+          test/matte_order_validation_test.dart
 
 
   skia_build:

@@ -36,7 +36,7 @@ refer to `example/tool/results/pixel10-2026-09-30.md` unless noted.
 - **Reasoning** (engine frame pipeline and queue ordering): doc comment on
   `FlutterGpuGeometryRenderer.reuseAfterFrames`.
 - **Permanent check:** `tool/matte_order_check.sh` (macOS Metal) and
-  `test/src/matte_order_validation_test.dart` (host, negative and positive
+  `example/test/matte_order_validation_test.dart` (host, negative and positive
   cases) fail when any captured frame samples a matte rewritten out of order.
   The Pixel/Vulkan case stays manual; see `example/tool/README.md`.
 

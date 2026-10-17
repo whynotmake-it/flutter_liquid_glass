@@ -65,7 +65,10 @@ benchmark even when performance thresholds are informational.
 `LIQUID_GLASS_VALIDATE_MATTE_ORDER` is a compile-time flag: the renderer stamps
 each matte with its render serial and the final shader paints magenta where a
 frame samples a matte rewritten before it was rasterized. With the flag off,
-nothing is compiled or drawn; the shipped shaders are unchanged.
+nothing is compiled or drawn; the shipped shaders are unchanged. The example's
+`pubspec.yaml` opts into the validator with the `validate_matte_order` hook
+user-define, so its builds (and CI) compile the extra validation shaders;
+consumers of the published package never set it, so they ship nothing extra.
 
 On macOS, `./tool/matte_order_check.sh` builds and runs the animating scenes
 (`resizeAnimated pxSheetResize pxButtonStretch pxBlend5Motion` by default) and

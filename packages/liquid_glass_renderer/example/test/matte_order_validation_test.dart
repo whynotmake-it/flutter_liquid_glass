@@ -1,21 +1,39 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 
-import 'shared.dart';
-import 'submitted_scene_binding.dart';
+import '../../test/src/submitted_scene_binding.dart';
 
 // Proves the matte-order validator. Run with
-// --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true; without it the
-// validation shaders are not loaded and both cases skip.
+// --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true and a build whose
+// workspace sets the `validate_matte_order` hook user-define (this example
+// does); without the flag the validation shaders are not loaded and both
+// cases skip.
+//
+// The validator lives in the package's internal renderer; the example is the
+// only host that builds and runs it.
+// ignore_for_file: invalid_use_of_internal_member
 void main() {
   final binding = SubmittedSceneBinding()
     ..captureWidth = 400
     ..captureHeight = 200;
   const enabled = FlutterGpuGeometryRenderer.validateMatteOrder;
+  const expectFlutterGpuFallback = bool.fromEnvironment(
+    'EXPECT_FLUTTER_GPU_FALLBACK',
+  );
+  final skip =
+      expectFlutterGpuFallback || !ui.ImageFilter.isShaderFilterSupported;
+
+  const settingsWithoutLighting = LiquidGlassSettings(
+    highlight: 0,
+    contourStrength: 0,
+    bevelShadowStrength: 0,
+    frost: 0,
+  );
 
   Widget scene(double width) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -68,7 +86,7 @@ void main() {
         );
       }
     },
-    skip: !enabled || skipProperGlassTests,
+    skip: !enabled || skip,
   );
 
   testWidgets(
@@ -80,6 +98,6 @@ void main() {
       addTearDown(() => FlutterGpuGeometryRenderer.debugMatteSerialSkew = 0);
       expect(await magentaInNextFrame(tester, 126), greaterThan(1000));
     },
-    skip: !enabled || skipProperGlassTests,
+    skip: !enabled || skip,
   );
 }
