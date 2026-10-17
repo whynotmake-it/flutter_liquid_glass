@@ -49,8 +49,8 @@ melos run test:select
 # Run tests without golden tests (useful for PRs without golden label)
 melos run test-without-goldens
 
-# Update golden test images on this machine (local hardware; differs from the
-# CI references, which come from the xcode-27 runner — see Testing > Golden Tests)
+# Update golden test images (regenerate on macOS 27.0.1, matching the xcode-27
+# CI runner — see Testing > Golden Tests)
 melos run update-goldens
 
 # Generate coverage for all packages
@@ -122,19 +122,15 @@ The project uses `build_runner` for code generation. Always run `melos run gener
 Golden tests verify visual output and are tagged with `golden` in `dart_test.yaml`. They only run:
 - On main branch
 - On PRs labeled with "goldens"
-- On macOS 27 only, against references rendered by `flutter test --update-goldens` on the golden job's `xcode-27` runner (macOS 27, arm64; see `.github/workflows/main.yaml`)
+- On macOS 27 only, against references rendered by `flutter test --update-goldens` on a host matching the golden job's macOS version (`xcode-27` = macOS 27.0.1 / 26A434, arm64; see `.github/workflows/main.yaml`)
 
-**Regenerating goldens:** VM GPU output differs from local hardware, so the references must be rendered on the CI runner, not locally. Dispatch the manual `Regenerate Goldens` workflow (`.github/workflows/update-goldens.yaml`) on the branch you want to refresh; it regenerates on `xcode-27` and commits the updated images back:
+**Regenerating goldens:** GPU output differs between hosts, so references must be regenerated on the same macOS version as the golden CI job (currently macOS 27.0.1 / 26A434). On such a machine run:
 
 ```bash
-# After update-goldens.yaml is on main:
-gh workflow run update-goldens.yaml --ref <your-branch>
-
-# Before that (GitHub only exposes workflow_dispatch for workflows on the
-# default branch), dispatch it through the already-dispatchable benchmark
-# workflow:
-gh workflow run benchmark.yaml --ref <your-branch> -f task=goldens
+melos run update-goldens
 ```
+
+Do not regenerate on a different macOS version — the references then fail on the `xcode-27` golden job.
 
 All tests must use the `--enable-impeller` flag since Skia is not supported.
 
