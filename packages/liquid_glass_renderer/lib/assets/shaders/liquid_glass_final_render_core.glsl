@@ -36,11 +36,6 @@ uniform vec2 uFilterToMatteOffset;
 // material to the refracted backdrop instead, so visibility 0 is an exact
 // identity of the backdrop.
 uniform float uBlurFade;
-// 1.0 folds sub-pixel frost into this pass: the refracted texel plus its two
-// diagonal neighbours, weighted 1/2, 1/4, 1/4 (sigma ~0.7 device px), instead
-// of a blur pass. Whole-texel offsets, because the filter input is sampled
-// nearest.
-uniform float uSoften;
 // Matte-space rect (LTRB, device px) the filter captured backdrop for.
 // Outside it the filter input is transparent or clamped, so displaced samples
 // are mirrored back in at its edge.
@@ -324,9 +319,8 @@ vec2 mirrorIntoBackdrop(vec2 sourceOffset, vec2 matteCoord) {
         dot(uFilterToMatteBasis.xy, sourceOffset),
         dot(uFilterToMatteBasis.zw, sourceOffset)
     );
-    // Keep bilinear footprints, and the softening taps one texel out, off
-    // the uncaptured side of the edge.
-    float margin = 0.5 + uSoften;
+    // Keep bilinear footprints off the uncaptured side of the edge.
+    float margin = 0.5;
     vec2 lo = uBackdropBounds.xy + margin;
     vec2 hi = uBackdropBounds.zw - margin;
     if (all(greaterThanEqual(sampleMatte, lo)) &&
@@ -724,17 +718,6 @@ void main() {
             refractColor = texture(
                 uBackgroundTexture,
                 mirrorBackgroundUV(refractedUV, invUSize)
-            );
-        }
-        if (uSoften > 0.5) {
-            // The offset scales with visibility, so hidden glass collapses
-            // the kernel onto the unfiltered backdrop.
-            vec2 softenTap = vec2(appearanceVisibility) * invUSize;
-            vec2 tapA = mirrorBackgroundUV(refractedUV + softenTap, invUSize);
-            vec2 tapB = mirrorBackgroundUV(refractedUV - softenTap, invUSize);
-            refractColor = 0.5 * refractColor + 0.25 * (
-                texture(uBackgroundTexture, tapA) +
-                texture(uBackgroundTexture, tapB)
             );
         }
     } else {

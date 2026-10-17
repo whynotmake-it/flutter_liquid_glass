@@ -74,11 +74,11 @@ void main() {
     expect(source, contains('toneSum / vec3(adaptiveShare)'));
     expect(
       RegExp(r'texture\(uBackgroundTexture').allMatches(source).length,
-      6,
+      4,
       reason:
           'the tint response must reuse the existing refracted sample; the '
-          'only additions are the two optional sub-pixel softening taps and '
-          "the GLES stages' texel-centre read, which replaces texelFetch",
+          "only addition is the GLES stages' texel-centre read, which "
+          'replaces texelFetch',
     );
   });
 
@@ -285,7 +285,6 @@ void main() {
       RegExp(r'mirrorIntoBackdrop\s*\(').allMatches(source).length,
       5,
     );
-    expect(renderer, contains('initialIndex: 55'));
     // The bounds are the native filter clip, not the material bounds: the
     // clip is rounded out to pixel buckets and holds real backdrop.
     expect(layer, contains('Rect? get backdropSampleBounds'));

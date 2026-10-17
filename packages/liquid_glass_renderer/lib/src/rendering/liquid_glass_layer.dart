@@ -649,17 +649,15 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           _materialShortSide,
         ]);
     });
-    // Float indices 53 and 54, after the 47-float common block and the
-    // 6-float filter->matte mapping: frosted glass cross-fades its blur away,
-    // while unfrosted glass stays alpha-1 and cross-fades its material in the
+    // Float index 53, after the 47-float common block and the 6-float
+    // filter->matte mapping: frosted glass cross-fades its blur away, while
+    // unfrosted glass stays alpha-1 and cross-fades its material in the
     // shader, so both match the backdrop exactly at visibility 0.
-    shader
-      ..setFloat(53, blurPassSigma > 0 ? 1 : 0)
-      ..setFloat(54, softensInShader ? 1 : 0);
-    // Float index 63, after the geometry/material texture sizes: the three
+    shader.setFloat(53, blurPassSigma > 0 ? 1 : 0);
+    // Float index 62, after the geometry/material texture sizes: the three
     // adaptive color-model slots (eight vec4 each), zero-filled when fewer
     // than three distinct models are in use.
-    shader.setFloatUniforms(initialIndex: 63, (value) {
+    shader.setFloatUniforms(initialIndex: 62, (value) {
       value.setFloats([
         for (var i = 0; i < 3; i++)
           ...i < colorModels.length
@@ -669,20 +667,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     });
   }
 
-  /// Largest frost, in device pixels, folded into the final pass instead of
-  /// a separate blur pass. Enabling the blur pass costs about four command
-  /// buffers per frame on Metal regardless of its radius.
-  static const double shaderSofteningMaxDeviceSigma = 1.25;
-
-  /// Whether the frost is small enough for the final pass's softening kernel.
-  bool get softensInShader {
-    final frost = _frostSigma;
-    return frost > 0 &&
-        frost * devicePixelRatio <= shaderSofteningMaxDeviceSigma;
-  }
-
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
-  double get blurPassSigma => softensInShader ? 0 : _frostSigma;
+  double get blurPassSigma => _frostSigma;
 
   double get _frostSigma => settings.effectiveFrost;
 
@@ -1051,8 +1037,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
-      // Float index 59, after uBackdropBounds.
-      ..setFloatUniforms(initialIndex: 59, (value) {
+      // Float index 58, after uBackdropBounds.
+      ..setFloatUniforms(initialIndex: 58, (value) {
         final matteSize = _geometryMatteBounds.size * devicePixelRatio;
         value.setFloats([
           if (_geometryTextureSize.isEmpty) ...[
@@ -1185,9 +1171,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         mapping.$6,
       ]);
     });
-    // Float index 55, after the frost flags.
+    // Float index 54, after uBlurFade.
     final matteBounds = backdropBounds ?? Rect.largest;
-    shader.setFloatUniforms(initialIndex: 55, (value) {
+    shader.setFloatUniforms(initialIndex: 54, (value) {
       value.setFloats([
         matteBounds.left * devicePixelRatio,
         matteBounds.top * devicePixelRatio,
@@ -1430,7 +1416,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   double backdropSamplingReach(Rect material) {
     final blur = blurPassSigma > 0
         ? blurPassSigma * 3 + 1 / devicePixelRatio
-        : (softensInShader ? 1 / devicePixelRatio : 0.0);
+        : 0.0;
     final displacement =
         settings.effectiveDisplacementScale *
         (1 + settings.dispersion.abs() * 0.5);
