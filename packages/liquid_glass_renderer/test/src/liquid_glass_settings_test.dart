@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -16,23 +18,24 @@ void main() {
     expect(clear.refractionHeight, 20);
     expect(clear.refractionAmount, 60);
     expect(clear.refractionFitsShape, isFalse);
-    expect(clear.frost, closeTo(.35, 1e-9));
+    expect(clear.frost, 0);
     expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
-    // Clear glass's slider blur: 0.35/0.67/1.28/4.6/16.4 pt.
+    // Slider 0 is completely clear: no blur pass. Tinted positions floor at
+    // minBlurPassSigma until Apple's curve clears it at ~.69.
     for (final (position, sigma) in [
-      (0.0, .35),
-      (.25, .67),
-      (.5, 1.28),
+      (0.0, .0),
+      (.25, 2.1),
+      (.5, 2.1),
       (.75, 4.6),
       (1.0, 16.4),
     ]) {
       expect(
         LiquidGlassSettings.ios27Clear(tintAmount: position).frost,
-        closeTo(sigma, sigma * .03),
+        closeTo(sigma, sigma * .03 + 1e-9),
       );
       expect(
         LiquidGlassSettings.ios27Clear(tintAmount: position).effectiveFrost,
-        closeTo(sigma, sigma * .03),
+        closeTo(sigma, sigma * .03 + 1e-9),
       );
     }
   });
@@ -70,10 +73,19 @@ void main() {
           brightness: brightness,
           tintAmount: position,
         );
-        expect(toolbar.frost, LiquidGlassSettings.ios27RegularFrost(position));
+        // The preset floors Apple's curve at minBlurPassSigma so the blur
+        // pass Impeller adds always downsamples.
+        expect(
+          toolbar.frost,
+          math.max(
+            LiquidGlassSettings.minBlurPassSigma,
+            LiquidGlassSettings.ios27RegularFrost(position),
+          ),
+        );
         expect(toolbar.tintAmount, position);
       }
     }
+    expect(const LiquidGlassSettings().frost, 2.1);
     expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(2, 1e-9));
     expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
     expect(

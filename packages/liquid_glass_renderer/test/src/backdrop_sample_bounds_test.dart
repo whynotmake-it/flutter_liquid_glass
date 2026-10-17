@@ -7,8 +7,8 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 import 'shared.dart';
 
 void main() {
-  // 6 device px of frost at 3x: past the in-shader kernel, so the filter
-  // composes a blur pass.
+  // 6 device px of frost at 3x: nonzero, so the filter composes a blur
+  // pass.
   const blurred = LiquidGlassSettings(highlight: 0);
 
   const glass = LiquidGlass(
@@ -114,7 +114,7 @@ void main() {
     skip: skipProperGlassTests,
   );
 
-  for (final frost in [0.0, 0.35]) {
+  for (final frost in [0.0]) {
     testWidgets(
       'without a blur pass (frost $frost) ancestor clips keep the backdrop',
       (tester) async {

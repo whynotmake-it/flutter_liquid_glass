@@ -24,7 +24,7 @@ class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
-    this.frost = 2.0,
+    this.frost = minBlurPassSigma,
     this.dispersion = 0.0,
     this.highlight = 1.0,
     this.contourStrength = 0.43,
@@ -73,12 +73,13 @@ class LiquidGlassSettings with Equatable {
   /// rim, fitted on the Reduce Motion off references. These are the defaults
   /// of the unnamed constructor.
   ///
-  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
+  /// [minBlurPassSigma].
   factory LiquidGlassSettings.ios27ToolbarLight({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
-    frost: frost ?? ios27RegularFrost(tintAmount),
+    frost: frost ?? _ios27RegularBlur(tintAmount),
     tintAmount: tintAmount,
   );
 
@@ -87,12 +88,13 @@ class LiquidGlassSettings with Equatable {
   /// The glint is dimmed; the border is stronger and
   /// vanishes entirely where the normal faces the light axis.
   ///
-  /// [frost] defaults to [ios27RegularFrost] for [tintAmount].
+  /// [frost] defaults to [ios27RegularFrost] for [tintAmount], floored at
+  /// [minBlurPassSigma].
   factory LiquidGlassSettings.ios27ToolbarDark({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
-    frost: frost ?? ios27RegularFrost(tintAmount),
+    frost: frost ?? _ios27RegularBlur(tintAmount),
     highlight: 0.8,
     contourStrength: 0.88,
     contourDirectionality: 1,
@@ -109,16 +111,17 @@ class LiquidGlassSettings with Equatable {
   /// [LiquidGlassAppearance.ios27Clear].
   ///
   /// The lens is the full 20 pt / 60 pt bevel on every shape. At slider 0
-  /// the blur is 0.35 pt, which up to about 3.5x device pixel ratio stays
-  /// within the renderer's 1.25 device-pixel in-pass kernel and so costs no
-  /// blur pass. Pass [frost] to override, for example `frost: 0` for
-  /// unsoftened glass.
+  /// the glass is completely clear and uses no blur pass at all. Tinted
+  /// positions floor the blur at [minBlurPassSigma] logical pixels:
+  /// below a device-pixel sigma of four Impeller runs the blur at
+  /// full resolution, where a larger downsampled kernel is cheaper. Pass
+  /// [frost] to override, for example `frost: 0` for unsoftened glass.
   factory LiquidGlassSettings.ios27Clear({
     double tintAmount = 0,
     double? frost,
   }) => LiquidGlassSettings(
     refractionFitsShape: false,
-    frost: frost ?? ios27ClearFrost(tintAmount),
+    frost: frost ?? _ios27ClearBlur(tintAmount),
     contourStrength: 0.36,
     contourDirectionality: 1,
     bevelShadowStrength: 0,
@@ -152,6 +155,9 @@ class LiquidGlassSettings with Equatable {
   /// 0, 0.5 and 1, growing at a slightly faster exponential rate up to the
   /// Settings middle tick than beyond it. Apple diffuses larger glass more
   /// and smaller glass less.
+  ///
+  /// This is Apple's measured curve; the regular presets render
+  /// _ios27RegularBlur instead, which floors it at [minBlurPassSigma].
   static double ios27RegularFrost(double tintAmount) {
     final amount = tintAmount.clamp(0.0, 1.0);
     return 2 *
@@ -168,12 +174,39 @@ class LiquidGlassSettings with Equatable {
   /// blurs. The blur grows exponentially at one rate up to the Settings
   /// middle tick and at twice that rate beyond it: 0.35, 1.28 and 16.4 pt at
   /// 0, 0.5 and 1.
+  ///
+  /// This is Apple's measured curve; [LiquidGlassSettings.ios27Clear]
+  /// renders _ios27ClearBlur instead, which returns no blur at slider 0 and
+  /// floors tinted positions at [minBlurPassSigma].
   static double ios27ClearFrost(double tintAmount) {
     final amount = tintAmount.clamp(0.0, 1.0);
     return 0.35 *
         math.exp(
           2.6 * math.min(amount, 0.5) + 5.1 * math.max(amount - 0.5, 0.0),
         );
+  }
+
+  /// Smallest blur any preset spends a backdrop blur pass on, in logical
+  /// pixels.
+  ///
+  /// Impeller runs a full-resolution Gaussian at a scaled sigma of four
+  /// device pixels or less, where a larger downsampled kernel is cheaper.
+  /// 2.1 logical pixels clear that gate on every display with a device
+  /// pixel ratio of about 1.9 or more — all 2x+ displays.
+  static const double minBlurPassSigma = 2.1;
+
+  /// The blur the regular presets render at slider position [tintAmount]:
+  /// [ios27RegularFrost] floored at [minBlurPassSigma], since a smaller
+  /// sigma is not cheaper.
+  static double _ios27RegularBlur(double tintAmount) =>
+      math.max(minBlurPassSigma, ios27RegularFrost(tintAmount));
+
+  /// The blur [LiquidGlassSettings.ios27Clear] renders at slider position
+  /// [tintAmount]: `0` at slider 0, where the glass is completely clear,
+  /// and [minBlurPassSigma] or more everywhere else.
+  static double _ios27ClearBlur(double tintAmount) {
+    if (tintAmount <= 0) return 0;
+    return math.max(minBlurPassSigma, ios27ClearFrost(tintAmount));
   }
 
   /// Returns the material settings supplied by the nearest glass layer.
@@ -232,7 +265,9 @@ class LiquidGlassSettings with Equatable {
   /// Backdrop blur sigma in logical pixels.
   ///
   /// The value is absolute and does not change with the material's size.
-  /// The default is [ios27RegularFrost] at slider position `0`.
+  /// The default is [minBlurPassSigma], the smallest blur Impeller
+  /// downsamples: below it the blur pass runs at full resolution and a
+  /// larger sigma is cheaper. Explicit values below it are honored.
   final double frost;
 
   /// Separation of the color channels in the refracted edge.
