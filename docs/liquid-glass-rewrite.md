@@ -49,9 +49,9 @@ views [still have costs](https://github.com/flutter/flutter/issues/190815),
 but those are worth fixing in the engine rather than chasing a moving target
 in shaders.
 
-We built this anyway because it pushes what Flutter can do and exposes what's
-missing, it works on every platform, and it lets you create looks Apple's API
-doesn't offer.
+**So why did we build this?** Because pushing an effect this far shows where
+Flutter falls short, and we'd like to see that fixed. It also runs on every
+platform, and you can take it in directions Apple's glass doesn't go.
 
 ## Glass in two halves
 
