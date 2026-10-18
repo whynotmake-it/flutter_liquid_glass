@@ -21,7 +21,7 @@ void main() {
     expect(clear.frost, 0);
     expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
     // Slider 0 is completely clear: no blur pass. Tinted positions floor at
-    // minBlurPassSigma until Apple's curve clears it at ~.69.
+    // 2.1 logical pixels until Apple's curve clears it at ~.69.
     for (final (position, sigma) in [
       (0.0, .0),
       (.25, 2.1),
@@ -73,14 +73,10 @@ void main() {
           brightness: brightness,
           tintAmount: position,
         );
-        // The preset floors Apple's curve at minBlurPassSigma so the blur
-        // pass Impeller adds always downsamples.
+        // The preset floors Apple's curve at 2.1 logical pixels.
         expect(
           toolbar.frost,
-          math.max(
-            LiquidGlassSettings.minBlurPassSigma,
-            LiquidGlassSettings.ios27RegularFrost(position),
-          ),
+          math.max(2.1, LiquidGlassSettings.ios27RegularFrost(position)),
         );
         expect(toolbar.tintAmount, position);
       }
@@ -169,5 +165,113 @@ void main() {
       const LiquidGlassSettings(refractionHeight: -4).effectiveRefractionHeight,
       0,
     );
+  });
+
+  group('device blur floor', () {
+    // Impeller 3.47.1: `GaussianBlurFilterContents::CalculateScale` returns
+    // 1.0 up to a sigma of 4 device pixels and otherwise
+    // 2^round(log2(4 / sigma)), so it stays 1.0 until 4 * sqrt(2) ~= 5.657
+    // device pixels. `ScaleSigma` maps a logical sigma s to
+    // s * (1 - 3.4e-3 * s + 3.4e-6 * s^2) before the device scale multiplies
+    // it.
+    double scaledSigma(double sigma) =>
+        sigma * (1 - 3.4e-3 * sigma + 3.4e-6 * sigma * sigma);
+    bool downsamples(double logicalSigma, double deviceScale) =>
+        scaledSigma(logicalSigma) * deviceScale > 4 * math.sqrt2;
+
+    const baseSigma = 2.1;
+
+    test("today's 2.1 only downsamples on 3x displays", () {
+      // 2.1 logical pixels is 4.2 device pixels at 2x and 5.5 at 2.625x,
+      // both below the gate; 6.3 at 3x clears it.
+      expect(downsamples(baseSigma, 2), isFalse);
+      expect(downsamples(baseSigma, 2.625), isFalse);
+      expect(downsamples(baseSigma, 3), isTrue);
+    });
+
+    test('the default and regular presets are floored per device', () {
+      for (final (deviceScale, expected, downsampled) in [
+        // Below 2x the floor is capped at the 2x value (2.9); a
+        // full-resolution blur is cheap there, so it need not downsample.
+        (1.0, 2.9, false),
+        (1.5, 2.9, false),
+        (2.0, 5.8 / 2, true),
+        (2.625, 5.8 / 2.625, true),
+        // 3x iPhones keep today's frost: 5.8 / 3 < 2.1.
+        (3.0, baseSigma, true),
+      ]) {
+        for (final settings in [
+          const LiquidGlassSettings(),
+          LiquidGlassSettings.ios27RegularLight(),
+          LiquidGlassSettings.ios27RegularDark(),
+        ]) {
+          expect(
+            settings.frostSigmaAt(deviceScale),
+            closeTo(expected, 1e-9),
+            reason: '$settings at $deviceScale',
+          );
+          expect(
+            downsamples(settings.frostSigmaAt(deviceScale), deviceScale),
+            downsampled,
+            reason: '$settings at $deviceScale',
+          );
+        }
+      }
+    });
+
+    test('ios27Clear stays blur-free at slider 0', () {
+      final clear = LiquidGlassSettings.ios27Clear();
+      for (final deviceScale in [1.0, 2.0, 2.625, 3.0]) {
+        expect(clear.frostSigmaAt(deviceScale), 0);
+      }
+    });
+
+    test('ios27Clear floors tinted positions per device', () {
+      final tinted = LiquidGlassSettings.ios27Clear(tintAmount: 0.5);
+      // Apple's 1.28 pt is below the preset floor.
+      expect(tinted.frost, baseSigma);
+      expect(tinted.frostSigmaAt(3), baseSigma);
+      expect(tinted.frostSigmaAt(2), closeTo(2.9, 1e-9));
+      expect(tinted.frostSigmaAt(2.625), closeTo(5.8 / 2.625, 1e-9));
+    });
+
+    test('explicit frost is used verbatim', () {
+      for (final frost in [0.0, 0.5, 1.5, 2.1, 4.0]) {
+        final settings = LiquidGlassSettings(frost: frost);
+        for (final deviceScale in [1.0, 2.0, 2.625, 3.0]) {
+          expect(settings.frostSigmaAt(deviceScale), frost);
+        }
+      }
+    });
+
+    test('an explicit preset frost override is not floored', () {
+      final preset = LiquidGlassSettings.ios27RegularLight(frost: 0.5);
+      for (final deviceScale in [1.0, 2.0, 2.625, 3.0]) {
+        expect(preset.frostSigmaAt(deviceScale), 0.5);
+      }
+    });
+
+    test('copyWith clears the floor only when it sets frost', () {
+      final preset = LiquidGlassSettings.ios27RegularLight();
+      // Copying another field keeps the preset's floor.
+      final changed = preset.copyWith(refractionAmount: 42);
+      expect(changed.frostSigmaAt(2), closeTo(2.9, 1e-9));
+      // Passing frost makes it the caller's value.
+      final explicit = preset.copyWith(frost: 1);
+      expect(explicit.frostSigmaAt(2), 1.0);
+      expect(explicit.frostSigmaAt(1), 1.0);
+    });
+
+    test('floor eligibility is part of equality', () {
+      expect(
+        const LiquidGlassSettings(),
+        LiquidGlassSettings.ios27RegularLight(),
+      );
+      // Same frost, but the explicit one is not floor-eligible.
+      expect(
+        const LiquidGlassSettings(frost: 2.1),
+        isNot(const LiquidGlassSettings()),
+      );
+    });
   });
 }

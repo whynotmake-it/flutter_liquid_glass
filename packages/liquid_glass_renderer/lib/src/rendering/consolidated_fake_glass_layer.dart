@@ -177,7 +177,13 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   // One extra logical pixel covers the kernel's rounding at any DPR.
   @override
   double effectSamplingReach(Rect material) =>
-      _hasBlur ? settings.effectiveFrost * 3 + 1 : 0.0;
+      _hasBlur ? settings.frostSigmaAt(devicePixelRatio) * 3 + 1 : 0.0;
+
+  @override
+  void onDevicePixelRatioChanged() {
+    _cachedFilter = null;
+    markNeedsCompositingBitsUpdate();
+  }
 
   @override
   void onSettingsChanged(LiquidGlassSettings old) {
@@ -386,6 +392,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         final filter = fakeGlassBackdropFilter(
           settings,
           shape.appearance,
+          deviceScale: devicePixelRatio,
         );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
@@ -463,6 +470,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     return fakeGlassBackdropFilter(
       settings,
       defaultAppearance.copyWith(visibility: 1),
+      deviceScale: devicePixelRatio,
     )!;
   }
 

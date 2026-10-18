@@ -417,6 +417,7 @@ class RenderFakeGlass extends RenderProxyBox {
     final backdropFilter = fakeGlassBackdropFilter(
       settings,
       appearance,
+      deviceScale: devicePixelRatio,
     )!;
     assert(() {
       debugRegisterBackdropCapture(this, backdropKey);
