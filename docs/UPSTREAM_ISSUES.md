@@ -9,6 +9,19 @@ repro), `filed` (link added).
 
 Engine references are to Flutter 3.47.1 (`engine/src/flutter/impeller/`).
 
+## Existing issues to support
+
+- [flutter/flutter#177133](https://github.com/flutter/flutter/issues/177133)
+  (open, P2): `ImageFilter.combine(left, right, combiner)`, i.e. `f(x, g(x))`.
+  Would let the glass shader see the sharp and the blurred backdrop at once,
+  which is what Apple's clear glass appears to do, without a second backdrop
+  pass. Comment with our use case and measurements.
+- [flutter/flutter#190815](https://github.com/flutter/flutter/issues/190815)
+  (open, P2): jank on iOS whenever a platform view is on screen. Blocks the
+  native-glass route we recommend in the blog post.
+- [flutter/flutter#127520](https://github.com/flutter/flutter/issues/127520)
+  (open): EDR on macOS; related to the iOS EDR entry below.
+
 ## Rendering
 
 ### Write backdrop filter output straight to the parent pass
