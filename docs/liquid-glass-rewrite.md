@@ -40,18 +40,18 @@ authoritative engine documentation.
 *The example app in light and dark mode. Every screenshot of our glass in
 this post is rendered by Flutter, at iPhone 17 Pro size.*
 
-## On liquid glass in Flutter
-
-A disclaimer first: on iOS, we think the best way to get Liquid Glass in
-Flutter is Apple's own glass in a platform view. Apple renders it with access
-to the OS we'll never have, and it follows every retune for free. Platform
-views [still have costs](https://github.com/flutter/flutter/issues/190815),
-but those are worth fixing in the engine rather than chasing a moving target
-in shaders.
-
-**So why did we build this?** Because pushing an effect this far shows where
-Flutter falls short, and we'd like to see that fixed. It also runs on every
-platform, and you can take it in directions Apple's glass doesn't go.
+> A disclaimer first: on iOS, we think the best way to get Liquid Glass in
+> Flutter is Apple's own glass in a platform view. Apple renders it with
+> access to the OS we'll never have, and when they decide to adjust the look,
+> as they have done many times already, it will stay up to date for free.
+> Platform views [still have costs](https://github.com/flutter/flutter/issues/190815),
+> but those are worth fixing in the engine rather than chasing a moving target
+> in shaders.
+>
+> **So why did we build this?** First of all, it was a fun challenge, and we
+> learned a lot. On top of that, pushing an effect this far shows where
+> Flutter falls short, and that helps the ecosystem. It also runs on every
+> platform, and you can take it in directions Apple's glass doesn't go.
 
 ## Glass in two halves
 
