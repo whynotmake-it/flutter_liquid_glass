@@ -142,6 +142,7 @@ ImageFilter? fakeGlassBackdropFilter(
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
+  final colorModel = appearance.colorModel;
   final frost = settings.effectiveFrost;
   final blur = frost != 0
       ? ImageFilter.blur(
@@ -150,7 +151,7 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
-  final faceTransfer = appearance.colorModel.faceTransfer(
+  final faceTransfer = colorModel.faceTransfer(
     shortSide,
     tintAmount: settings.effectiveTintAmount,
   );
@@ -161,22 +162,22 @@ ImageFilter? fakeGlassBackdropFilter(
         emission: faceTransfer.emission,
         transmittance: faceTransfer.transmittance,
         lift: faceTransfer.lift,
-        chromaGain: faceTransfer.chromaGain * appearance.saturation,
-        transmissionGamma: appearance.transmissionGamma,
+        chromaGain: faceTransfer.chromaGain * colorModel.saturation,
+        transmissionGamma: colorModel.transmissionGamma,
         opacity: visibility,
       ),
     );
   } else {
     final hasMaterialColorTransfer =
-        appearance.saturation != 1 || appearance.transmissionGamma != 1;
+        colorModel.saturation != 1 || colorModel.transmissionGamma != 1;
     final hasColorTransfer =
         hasMaterialColorTransfer || (blur != null && visibility < 1);
     colorTransfer = hasColorTransfer
         ? ColorFilter.matrix(
             fakeGlassColorMatrix(
-              saturation: appearance.saturation,
+              saturation: colorModel.saturation,
               tint: const Color(0x00000000),
-              transmissionGamma: appearance.transmissionGamma,
+              transmissionGamma: colorModel.transmissionGamma,
               // A partially transparent filtered backdrop composites over the
               // untouched backdrop, matching RealGlass's material fade without
               // another backdrop sample. The opacity alone fades the transfer,

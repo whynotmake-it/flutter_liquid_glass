@@ -273,11 +273,12 @@ For full control, use the direct model and tune each transfer yourself:
 
 ```dart
 const LiquidGlassAppearance(
-  colorModel: LiquidGlassColorModel.direct(),
   tint: Color(0x663B82F6),
-  saturation: 1.4,
-  transmissionGamma: 0.9,
-  vibrancy: 0.15,
+  colorModel: LiquidGlassColorModel.direct(
+    saturation: 1.4,
+    transmissionGamma: 0.9,
+    vibrancy: 0.15,
+  ),
 )
 ```
 

@@ -18,7 +18,7 @@ prerelease; APIs and rendering may still change.
   `defaultAppearance`.
 - **Renamed and replaced settings:**
   - `glassColor` becomes `LiquidGlassAppearance.tint`.
-  - `saturation` moves to `LiquidGlassAppearance.saturation`.
+  - `saturation` becomes `LiquidGlassColorModel.direct(saturation: ...)`.
   - `visibility` moves to `LiquidGlassAppearance.visibility` and the new
     `LiquidGlassVisibility` widget.
   - `blur` becomes `frost`, a blur sigma in logical pixels.
@@ -60,14 +60,18 @@ prerelease; APIs and rendering may still change.
     `backdropHandledByLayer`.
   - `LiquidGlassBlendGroup.of` and `maybeOf` and the
     `LiquidGlassSettings.effective*` getters are internal.
+  - `LiquidGlassAppearance` keeps only `tint`, `visibility` and `colorModel`.
+    Its `saturation`, `transmissionGamma` and `vibrancy` are removed and move
+    onto `LiquidGlassColorModel.direct(saturation:, transmissionGamma:,
+    vibrancy:)`; the iOS 27 models carry the whole transfer in their fitted
+    parameters.
   - There is one regular glass preset, as in SwiftUI: the identical
     `LiquidGlassAppearance.ios27Toolbar*` presets are removed, and
     `LiquidGlassSettings.ios27Toolbar*` are renamed to `ios27Regular`,
     `ios27RegularLight` and `ios27RegularDark`.
-  - Experimental, and may change before 1.0:
-    `LiquidGlassAppearance.saturation`, `transmissionGamma` and `vibrancy`,
-    every `toJson`/`fromJson`, and `LgrLogs`. `LiquidGlassSettings.tintAmount`
-    is not experimental, but may move to the per-shape color model before 1.0.
+  - Experimental, and may change before 1.0: every `toJson`/`fromJson` and
+    `LgrLogs`. `LiquidGlassSettings.tintAmount` is not experimental, but may
+    move to the per-shape color model before 1.0.
 
 ### New features
 

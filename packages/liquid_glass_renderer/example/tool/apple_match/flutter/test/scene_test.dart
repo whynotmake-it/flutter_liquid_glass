@@ -124,7 +124,7 @@ void main() {
     expect(settings.refractionAmount, 54.5);
     expect(settings.backdropShrink, 0.1);
     expect(settings.dispersion, -0.06);
-    expect(appearance.saturation, 1.2);
+    expect(appearance.colorModel.saturation, 1.2);
   });
 
   MatchScene loadScene(String id) => MatchScene.fromJson(

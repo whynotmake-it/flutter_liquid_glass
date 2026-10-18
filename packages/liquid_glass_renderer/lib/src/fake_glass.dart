@@ -77,8 +77,8 @@ class FakeGlass extends StatelessWidget {
   /// [LiquidGlassSettings.refractionAmount],
   /// [LiquidGlassSettings.backdropShrink] and
   /// [LiquidGlassSettings.dispersion] therefore have no effect, and
-  /// [LiquidGlassAppearance.vibrancy] is likewise ignored.
-  /// [LiquidGlassAppearance.transmissionGamma] is only approximated.
+  /// [LiquidGlassColorModel.vibrancy] is likewise ignored.
+  /// [LiquidGlassColorModel.transmissionGamma] is only approximated.
   /// [LiquidGlassSettings.refractionHeight] only controls the width of the
   /// approximate inner light bleed.
   final LiquidGlassSettings? settings;
@@ -351,8 +351,8 @@ class RenderFakeGlass extends RenderProxyBox {
 
   bool get _hasColorTransfer =>
       appearance.visibility > 0 &&
-      (appearance.saturation != 1 ||
-          appearance.transmissionGamma != 1 ||
+      (appearance.colorModel.saturation != 1 ||
+          appearance.colorModel.transmissionGamma != 1 ||
           appearance.colorModel.faceTransfer(0) != null);
 
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;

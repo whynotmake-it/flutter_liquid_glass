@@ -613,7 +613,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.highlight,
           1 - settings.effectiveBackdropShrink,
-          appearance.saturation,
+          appearance.colorModel.saturation,
         ])
         ..setOffset(
           const Offset(0, 1),
@@ -646,8 +646,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           GlassRim.highlightWrap,
         ])
         ..setFloats([
-          appearance.transmissionGamma,
-          appearance.vibrancy,
+          appearance.colorModel.transmissionGamma,
+          appearance.colorModel.vibrancy,
           settings.effectiveTintAmount,
         ])
         ..setFloats([
@@ -702,9 +702,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         at(i).tint.a,
       ],
       for (var i = 0; i < 16; i++) ...<double>[
-        at(i).saturation / 4,
-        at(i).transmissionGamma / 4,
-        at(i).vibrancy / 4,
+        at(i).colorModel.saturation / 4,
+        at(i).colorModel.transmissionGamma / 4,
+        at(i).colorModel.vibrancy / 4,
         (at(i).visibility +
                 _colorModelCode(at(i).colorModel, colorModels) * 2) /
             7,
@@ -1736,9 +1736,6 @@ typedef _GpuGeometryFrame = ({
       mixed &&
       appearances.every(
         (appearance) =>
-            appearance.saturation == first.saturation &&
-            appearance.transmissionGamma == first.transmissionGamma &&
-            appearance.vibrancy == first.vibrancy &&
             appearance.visibility == first.visibility &&
             appearance.colorModel == first.colorModel,
       );

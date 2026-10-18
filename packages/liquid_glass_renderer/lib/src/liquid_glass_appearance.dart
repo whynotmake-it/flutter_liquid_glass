@@ -18,9 +18,6 @@ final class LiquidGlassAppearance with Equatable {
   /// The defaults may be retuned before 1.0.
   const LiquidGlassAppearance({
     this.tint = const Color.fromARGB(0, 255, 255, 255),
-    this.saturation = 1,
-    this.transmissionGamma = 1,
-    this.vibrancy = 0,
     this.visibility = 1,
     this.colorModel = const LiquidGlassColorModel.direct(),
   });
@@ -36,9 +33,6 @@ final class LiquidGlassAppearance with Equatable {
     final colorModel = LiquidGlassColorModel.fromJson(json['colorModel']);
     return LiquidGlassAppearance(
       tint: tint is num ? Color(tint.toInt()) : const Color(0x00FFFFFF),
-      saturation: number('saturation', 1),
-      transmissionGamma: number('transmissionGamma', 1),
-      vibrancy: number('vibrancy', 0),
       visibility: number('visibility', 1),
       colorModel: colorModel,
     );
@@ -49,10 +43,7 @@ final class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27RegularLight({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
+  }) : colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.light,
        );
 
@@ -60,10 +51,7 @@ final class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27RegularDark({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
+  }) : colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.dark,
        );
 
@@ -86,64 +74,28 @@ final class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27Clear({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27Clear();
+  }) : colorModel = const LiquidGlassColorModel.ios27Clear();
 
   /// Material tint; alpha controls how strongly it mixes with the backdrop.
   final Color tint;
-
-  /// Saturation applied to transmitted backdrop content.
-  ///
-  /// With an iOS 27 [colorModel] this scales Apple's own chroma transfer, so
-  /// `1` is the platform face.
-  ///
-  /// Experimental: this may move into the color model or otherwise change
-  /// before 1.0.
-  @experimental
-  final double saturation;
-
-  /// Display-referred transfer applied to transmitted content.
-  ///
-  /// With an iOS 27 [colorModel] this is applied on top of Apple's luminance
-  /// transfer, so `1` is the platform face.
-  ///
-  /// Experimental: this may move into the color model or otherwise change
-  /// before 1.0.
-  @experimental
-  final double transmissionGamma;
-
-  /// Backdrop-aware chroma lift.
-  ///
-  /// Experimental: this may move into the color model or otherwise change
-  /// before 1.0.
-  @experimental
-  final double vibrancy;
 
   /// Shape materialization progress, conventionally from zero to one.
   final double visibility;
 
   /// The transfer model used to combine [tint] with the backdrop.
   ///
-  /// The iOS 27 models derive the accompanying tonal response automatically;
-  /// use [LiquidGlassColorModel.direct] with the other fields for unrestricted
-  /// manual control.
+  /// [LiquidGlassColorModel.direct] carries its own saturation, gamma and
+  /// vibrancy; the iOS 27 models derive the accompanying tonal response
+  /// automatically from their fitted parameters.
   final LiquidGlassColorModel colorModel;
 
   /// Returns a copy with the supplied appearance controls replaced.
   LiquidGlassAppearance copyWith({
     Color? tint,
-    double? saturation,
-    double? transmissionGamma,
-    double? vibrancy,
     double? visibility,
     LiquidGlassColorModel? colorModel,
   }) => LiquidGlassAppearance(
     tint: tint ?? this.tint,
-    saturation: saturation ?? this.saturation,
-    transmissionGamma: transmissionGamma ?? this.transmissionGamma,
-    vibrancy: vibrancy ?? this.vibrancy,
     visibility: visibility ?? this.visibility,
     colorModel: colorModel ?? this.colorModel,
   );
@@ -154,20 +106,10 @@ final class LiquidGlassAppearance with Equatable {
   @experimental
   Map<String, Object> toJson() => {
     'tint': tint.toARGB32(),
-    'saturation': saturation,
-    'transmissionGamma': transmissionGamma,
-    'vibrancy': vibrancy,
     'visibility': visibility,
     'colorModel': colorModel.toJson(),
   };
 
   @override
-  List<Object?> get props => [
-    tint,
-    saturation,
-    transmissionGamma,
-    vibrancy,
-    visibility,
-    colorModel,
-  ];
+  List<Object?> get props => [tint, visibility, colorModel];
 }

@@ -498,21 +498,38 @@ class GlassColorParameters with Equatable {
 /// internal — custom values enter through [LiquidGlassColorModel.fromJson].
 final class LiquidGlassColorModel with Equatable {
   /// A backdrop-adaptive model driven entirely by [parameters].
+  ///
+  /// The relative adjustments ([saturation], [transmissionGamma] and
+  /// [vibrancy]) are fixed identity: the fitted parameter set carries the
+  /// whole transfer.
   @internal
-  const LiquidGlassColorModel(this.parameters);
+  const LiquidGlassColorModel(this.parameters)
+    : saturation = 1,
+      transmissionGamma = 1,
+      vibrancy = 0;
 
   /// Applies tint, gamma, saturation, and vibrancy directly.
-  const LiquidGlassColorModel.direct() : parameters = null;
+  const LiquidGlassColorModel.direct({
+    this.saturation = 1,
+    this.transmissionGamma = 1,
+    this.vibrancy = 0,
+  }) : parameters = null;
 
   /// The fitted iOS 27-style tonal response for [brightness].
   const LiquidGlassColorModel.ios27({required Brightness brightness})
     : parameters = brightness == Brightness.dark
           ? GlassColorParameters.ios27Dark
-          : GlassColorParameters.ios27Light;
+          : GlassColorParameters.ios27Light,
+      saturation = 1,
+      transmissionGamma = 1,
+      vibrancy = 0;
 
   /// iOS 27 `Glass.clear`, identical in light and dark appearance.
   const LiquidGlassColorModel.ios27Clear()
-    : parameters = GlassColorParameters.ios27Clear;
+    : parameters = GlassColorParameters.ios27Clear,
+      saturation = 1,
+      transmissionGamma = 1,
+      vibrancy = 0;
 
   /// Restores a model written by [toJson]: a preset name or a parameter map
   /// (see [GlassColorParameters.fromJson]).
@@ -529,22 +546,53 @@ final class LiquidGlassColorModel with Equatable {
     ),
     'ios27Clear' => const LiquidGlassColorModel.ios27Clear(),
     'direct' => const LiquidGlassColorModel.direct(),
+    {'direct': final Map<String, Object?> direct} =>
+      LiquidGlassColorModel.direct(
+        saturation: _number(direct['saturation'], 1),
+        transmissionGamma: _number(direct['transmissionGamma'], 1),
+        vibrancy: _number(direct['vibrancy'], 0),
+      ),
     final Map<String, Object?> map => LiquidGlassColorModel(
       GlassColorParameters.fromJson(map),
     ),
     _ => throw ArgumentError.value(value, 'colorModel'),
   };
 
+  static double _number(Object? value, double fallback) =>
+      (value as num?)?.toDouble() ?? fallback;
+
   /// The model's constants, or `null` for [LiquidGlassColorModel.direct].
   @internal
   final GlassColorParameters? parameters;
+
+  /// Saturation applied to transmitted backdrop content.
+  ///
+  /// Only the direct model reads this; the iOS 27 models carry the whole
+  /// transfer in their fitted parameters, so their value is always `1`.
+  final double saturation;
+
+  /// Display-referred transfer applied to transmitted content.
+  ///
+  /// Only the direct model reads this; the iOS 27 models are always `1`.
+  final double transmissionGamma;
+
+  /// Backdrop-aware chroma lift.
+  ///
+  /// Only the direct model reads this; the iOS 27 models are always `0`.
+  final double vibrancy;
 
   /// Identifier (or parameter map) used by appearance preset JSON.
   ///
   /// The schema is experimental and may change between releases.
   @experimental
   Object toJson() => switch (parameters) {
-    null => 'direct',
+    null => {
+      'direct': {
+        'saturation': saturation,
+        'transmissionGamma': transmissionGamma,
+        'vibrancy': vibrancy,
+      },
+    },
     GlassColorParameters.ios27Light => 'ios27Light',
     GlassColorParameters.ios27Dark => 'ios27Dark',
     GlassColorParameters.ios27Clear => 'ios27Clear',
@@ -604,5 +652,10 @@ final class LiquidGlassColorModel with Equatable {
   }
 
   @override
-  List<Object?> get props => [parameters];
+  List<Object?> get props => [
+    parameters,
+    saturation,
+    transmissionGamma,
+    vibrancy,
+  ];
 }

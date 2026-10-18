@@ -122,17 +122,15 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
   bool get _hasBlur => settings.effectiveFrost > 0;
   bool get _hasColorTransfer =>
-      defaultAppearance.saturation != 1 ||
-      defaultAppearance.transmissionGamma != 1 ||
+      defaultAppearance.colorModel.saturation != 1 ||
+      defaultAppearance.colorModel.transmissionGamma != 1 ||
       defaultAppearance.colorModel.faceTransfer(_shortSide) != null;
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
   /// Whether [appearance] can be served by the layer's shared backdrop
   /// filter — that is, it differs from [defaultAppearance] only in fields
-  /// the surface pass and opacity handle (tint, vibrancy, visibility).
+  /// the surface pass and opacity handle (tint and visibility).
   bool _sharesLayerBackdrop(LiquidGlassAppearance appearance) =>
-      appearance.saturation == defaultAppearance.saturation &&
-      appearance.transmissionGamma == defaultAppearance.transmissionGamma &&
       appearance.colorModel == defaultAppearance.colorModel;
 
   @visibleForTesting

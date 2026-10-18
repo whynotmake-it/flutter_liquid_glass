@@ -9,16 +9,21 @@ void main() {
   test('JSON round-trip preserves every appearance field', () {
     const appearance = LiquidGlassAppearance(
       tint: Color(0x804080C0),
-      saturation: 1.8,
-      transmissionGamma: .75,
-      vibrancy: .3,
       visibility: .4,
-      colorModel: LiquidGlassColorModel.ios27(brightness: Brightness.dark),
+      colorModel: LiquidGlassColorModel.direct(
+        saturation: 1.8,
+        transmissionGamma: .75,
+        vibrancy: .3,
+      ),
     );
 
     expect(
       LiquidGlassAppearance.fromJson(appearance.toJson()),
       appearance,
+    );
+    expect(
+      LiquidGlassColorModel.fromJson(appearance.colorModel.toJson()),
+      appearance.colorModel,
     );
   });
 
@@ -33,17 +38,17 @@ void main() {
     );
     // The iOS 27 color model carries Apple's face transfer, so the
     // adjustments are identity.
-    expect(light.saturation, 1);
-    expect(light.transmissionGamma, 1);
-    expect(light.vibrancy, 0);
+    expect(light.colorModel.saturation, 1);
+    expect(light.colorModel.transmissionGamma, 1);
+    expect(light.colorModel.vibrancy, 0);
     expect(dark.tint.a, 0);
     expect(
       dark.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.dark),
     );
-    expect(dark.saturation, 1);
-    expect(dark.transmissionGamma, 1);
-    expect(dark.vibrancy, 0);
+    expect(dark.colorModel.saturation, 1);
+    expect(dark.colorModel.transmissionGamma, 1);
+    expect(dark.colorModel.vibrancy, 0);
 
     const blue = Color(0x66007AFF);
     expect(
@@ -57,22 +62,22 @@ void main() {
 
     expect(clear.tint.a, 0);
     expect(clear.colorModel, const LiquidGlassColorModel.ios27Clear());
-    expect(clear.saturation, 1);
-    expect(clear.transmissionGamma, 1);
+    expect(clear.colorModel.saturation, 1);
+    expect(clear.colorModel.transmissionGamma, 1);
   });
 
   test('regular material uses the iOS 27 face transfer unadjusted', () {
     const light = LiquidGlassAppearance.ios27RegularLight();
     const dark = LiquidGlassAppearance.ios27RegularDark();
 
-    expect(light.saturation, 1);
-    expect(light.transmissionGamma, 1);
+    expect(light.colorModel.saturation, 1);
+    expect(light.colorModel.transmissionGamma, 1);
     expect(
       light.colorModel,
       const LiquidGlassColorModel.ios27(brightness: Brightness.light),
     );
-    expect(dark.saturation, 1);
-    expect(dark.transmissionGamma, 1);
+    expect(dark.colorModel.saturation, 1);
+    expect(dark.colorModel.transmissionGamma, 1);
     final lightFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.light,
     ).faceTransfer(94)!;
@@ -234,10 +239,12 @@ void main() {
   ) async {
     const appearance = LiquidGlassAppearance(
       tint: Color(0x804080C0),
-      saturation: 1.8,
-      transmissionGamma: .75,
-      vibrancy: .3,
       visibility: .6,
+      colorModel: LiquidGlassColorModel.direct(
+        saturation: 1.8,
+        transmissionGamma: .75,
+        vibrancy: .3,
+      ),
     );
     await tester.pumpWidget(
       const MediaQuery(

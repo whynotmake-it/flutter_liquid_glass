@@ -129,11 +129,23 @@ class _ColorAxes extends StatelessWidget {
             _AppearanceChip(
               appearance: LiquidGlassAppearance(tint: Color(0x994C8DFF)),
             ),
-            _AppearanceChip(appearance: LiquidGlassAppearance(saturation: 2.4)),
             _AppearanceChip(
-              appearance: LiquidGlassAppearance(transmissionGamma: .62),
+              appearance: LiquidGlassAppearance(
+                colorModel: LiquidGlassColorModel.direct(saturation: 2.4),
+              ),
             ),
-            _AppearanceChip(appearance: LiquidGlassAppearance(vibrancy: .4)),
+            _AppearanceChip(
+              appearance: LiquidGlassAppearance(
+                colorModel: LiquidGlassColorModel.direct(
+                  transmissionGamma: .62,
+                ),
+              ),
+            ),
+            _AppearanceChip(
+              appearance: LiquidGlassAppearance(
+                colorModel: LiquidGlassColorModel.direct(vibrancy: .4),
+              ),
+            ),
           ],
         ),
       ),
@@ -175,7 +187,7 @@ class _MergedAppearance extends StatelessWidget {
                   child: LiquidGlass.grouped(
                     appearance: LiquidGlassAppearance(
                       tint: Color(0xA8FFFFFF),
-                      saturation: .8,
+                      colorModel: LiquidGlassColorModel.direct(saturation: .8),
                     ),
                     shape: LiquidRoundedSuperellipse(borderRadius: 34),
                     child: SizedBox(width: 220, height: 120),
@@ -187,9 +199,11 @@ class _MergedAppearance extends StatelessWidget {
                   child: LiquidGlass.grouped(
                     appearance: LiquidGlassAppearance(
                       tint: Color(0xA52B7CFF),
-                      saturation: 1.8,
-                      transmissionGamma: .78,
-                      vibrancy: .2,
+                      colorModel: LiquidGlassColorModel.direct(
+                        saturation: 1.8,
+                        transmissionGamma: .78,
+                        vibrancy: .2,
+                      ),
                     ),
                     shape: LiquidRoundedSuperellipse(borderRadius: 34),
                     child: SizedBox(width: 220, height: 120),

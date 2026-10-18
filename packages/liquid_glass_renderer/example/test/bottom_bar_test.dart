@@ -1,5 +1,3 @@
-// ignore_for_file: experimental_member_use
-
 // The example intentionally inspects the package's consolidated layer to
 // verify fake/real ordering; this is test-only use of an internal API.
 // ignore_for_file: invalid_use_of_internal_member
@@ -27,9 +25,9 @@ void main() {
       find.byKey(const ValueKey('bottom-bar-drag-glass')),
     );
     expect(lens.appearance?.tint.a, 0);
-    expect(lens.appearance?.saturation, 1);
-    expect(lens.appearance?.transmissionGamma, 1);
-    expect(lens.appearance?.vibrancy, 0);
+    expect(lens.appearance?.colorModel.saturation, 1);
+    expect(lens.appearance?.colorModel.transmissionGamma, 1);
+    expect(lens.appearance?.colorModel.vibrancy, 0);
   });
 
   testWidgets(

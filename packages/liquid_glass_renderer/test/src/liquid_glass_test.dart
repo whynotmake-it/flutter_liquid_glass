@@ -326,7 +326,9 @@ void main() {
                         ),
                         2 => const LiquidGlassAppearance(
                           tint: Color(0x804080FF),
-                          saturation: 1.5,
+                          colorModel: LiquidGlassColorModel.direct(
+                            saturation: 1.5,
+                          ),
                         ),
                         _ => null,
                       },
@@ -1380,21 +1382,27 @@ Widget _appearanceBlendScene({
 }) {
   const white = LiquidGlassAppearance(
     tint: Color(0x70FFFFFF),
-    saturation: .9,
-    transmissionGamma: .92,
-    vibrancy: .1,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: .9,
+      transmissionGamma: .92,
+      vibrancy: .1,
+    ),
   );
   const blue = LiquidGlassAppearance(
     tint: Color(0xA02870FF),
-    saturation: 1.8,
-    transmissionGamma: .72,
-    vibrancy: .3,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: 1.8,
+      transmissionGamma: .72,
+      vibrancy: .3,
+    ),
   );
   const coral = LiquidGlassAppearance(
     tint: Color(0xA0FF6048),
-    saturation: 1.35,
-    transmissionGamma: .82,
-    vibrancy: .2,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: 1.35,
+      transmissionGamma: .82,
+      vibrancy: .2,
+    ),
   );
 
   return buildWithGridPaper(
