@@ -1,4 +1,4 @@
-## 1.0.0-dev.1
+## 1.0.0-dev.0
 
 - Adopt the redesigned `liquid_glass_renderer` 1.0 prerelease API and Flutter
   3.47 rendering pipeline.
