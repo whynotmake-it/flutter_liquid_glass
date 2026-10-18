@@ -70,8 +70,7 @@ prerelease; APIs and rendering may still change.
     `LiquidGlassSettings.ios27Toolbar*` are renamed to `ios27Regular`,
     `ios27RegularLight` and `ios27RegularDark`.
   - Experimental, and may change before 1.0: every `toJson`/`fromJson` and
-    `LgrLogs`. `LiquidGlassSettings.tintAmount` is not experimental, but may
-    move to the per-shape color model before 1.0.
+    `LgrLogs`.
 
 ### New features
 

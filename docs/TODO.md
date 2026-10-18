@@ -54,24 +54,6 @@ and the other rim uniforms. Moving them into the GLSL as constants shrinks the
 uniform blocks of the final pass and `fake_glass_surface.frag`. Mind the
 hand-counted float indices (47, 53) in `rendering/liquid_glass_layer.dart`.
 
-## Waiting on a decision
-
-### Move the remaining color controls onto the color model
-
-The color models are parameterized (`GlassColorParameters`, #222). Still
-open, and breaking:
-
-- `LiquidGlassSettings.tintAmount` moves onto the per-shape color model;
-  `uTintAmount` leaves the uniform block with it.
-- `LiquidGlassAppearance` shrinks to `tint`, `visibility` and `colorModel`.
-  `saturation`, `transmissionGamma` and `vibrancy` become parameters of the
-  direct model. Both shader branches consume them today (for iOS 27 as
-  relative adjustments where `1` is the platform face), but no preset sets
-  them, and they invite the stale direct-model fits in
-  `tool/apple_match/settings/*.json`.
-
-These members are marked `@experimental` until this lands.
-
 ## Tooling
 
 See the subagent prompt in the review thread for the full audit. Known so far:

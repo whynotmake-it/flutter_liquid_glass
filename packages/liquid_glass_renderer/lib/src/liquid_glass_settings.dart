@@ -314,8 +314,6 @@ final class LiquidGlassSettings with Equatable {
   /// Position of the iOS 27 Liquid Glass slider in Settings, from `0`
   /// (Clear) to `1` (Tinted).
   ///
-  /// May move to the per-shape color model before 1.0.
-  ///
   /// Apps set this themselves; the renderer does not read the system value.
   /// The slider makes the iOS 27 neutral wash more opaque and strengthens the
   /// dark border; the glint is unchanged, and the direct color model ignores

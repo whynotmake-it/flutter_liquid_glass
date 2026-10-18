@@ -221,8 +221,7 @@ accessibility settings.
 
 iOS 27 has a Liquid Glass slider in Settings, from Clear (`0`) to Tinted
 (`1`). Pass its position as `tintAmount`. The renderer does not read the
-system setting; your app decides. `tintAmount` may move to the per-shape color
-model before 1.0.
+system setting; your app decides.
 
 ```dart
 LiquidGlassSettings.ios27Regular(brightness: brightness, tintAmount: 0.5)
