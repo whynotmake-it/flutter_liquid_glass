@@ -40,6 +40,36 @@ authoritative engine documentation.
 *The example app in light and dark mode. Every screenshot of our glass in
 this post is rendered by Flutter, at iPhone 17 Pro size.*
 
+## On liquid glass in Flutter
+
+A disclaimer before we dive in. On iOS, we think the best way for Flutter to
+support Liquid Glass is not to draw it at all, but to embed Apple's own glass
+in a platform view. Apple renders the effect in the system compositor, with
+the whole window behind it, the display's full HDR range, and the Liquid Glass
+slider and accessibility settings like Reduce Transparency built in. When
+Apple retunes the material, as it did for iOS 27, native glass follows for
+free. Our own example app embeds Apple's glass this way, and it refracts the
+Flutter content behind it just fine. A shader re-implementation chases a
+moving target, and without the access to the OS that Apple has, it will never
+be quite as accurate or as efficient.
+
+Platform views have costs of their own today. Flutter content drawn on top of
+a native view needs extra overlay surfaces, Flutter widgets can't be
+refracted inside the glass, and there's an
+[open issue](https://github.com/flutter/flutter/issues/190815) about jank on
+iOS whenever a platform view is on screen. We'd rather see those fixed,
+because that helps every app, than see everyone re-implement glass.
+
+So why build this at all?
+
+- **It pushes Flutter.** An effect this complex finds the rough edges in
+  Impeller and Flutter GPU. This post covers a few we ran into, from textures
+  that can't be freed to the hidden cost of render passes.
+- **It's cross-platform.** If you want the same glass on Android, this is how
+  you get it.
+- **It's yours to shape.** Refraction, lighting, colour and blending are all
+  parameters, so you can build looks that Apple's API doesn't offer.
+
 ## Glass in two halves
 
 Rendering glass involves two kinds of work, and they change at very different
