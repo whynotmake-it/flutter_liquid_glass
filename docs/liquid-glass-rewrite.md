@@ -353,9 +353,8 @@ are all in the repository.
 **If you know GPUs, please tell us what we're missing.** Some questions we
 couldn't answer ourselves:
 
-- **Blur.** Apple seems to mix a heavily blurred background with a sharp
-  one. In Flutter that costs an extra backdrop pass per layer. Is there a
-  cheaper way to get that look, or a better blur strategy altogether?
+- **Blur.** Is there a better blur strategy for glass than one Gaussian per
+  layer?
 - **The matte format.** Our packed RGBA8 matte forces full resolution. Would
   a linear distance field at lower precision or half resolution, with the
   rest derived in the final pass, hold up at the corners?
@@ -364,6 +363,27 @@ couldn't answer ourselves:
   How much of what we measured carries over to other phones?
 - **Anything else.** If something in this post is wrong, we'd rather hear it
   from you than keep repeating it.
+
+**Where we hit the engine.** Some of what's left isn't ours to fix. Apple
+appears to mix a sharp and a heavily blurred background, which in Flutter
+needs a second backdrop pass per layer;
+[flutter/flutter#177133](https://github.com/flutter/flutter/issues/177133),
+a way to combine two image filters in one shader, would remove that. On top
+of that, we're opening issues for what our audit of Impeller found:
+
+- a backdrop filter's result is copied into a layer and back again, instead
+  of being drawn straight onto the screen;
+- the glass shader can't read the downsampled blur, so Impeller first scales
+  it back up to full size;
+- separate glass layers each copy the backdrop, even when nothing between
+  them overlaps;
+- backdrop filters that only apply a colour filter could use framebuffer
+  fetch and skip the copy entirely;
+- Flutter GPU textures can't be freed, and can't take part in backdrop
+  filters at all. If they could, we'd write the whole pipeline ourselves.
+
+We'll link them here once they're filed. If you're on the Impeller team and
+see a better way around any of these, we'd love to talk.
 
 1.0.0-dev.0 is a preview, and the API can still change before 1.0. Try it in
 your app, tell us what breaks, and help us make it faster.
