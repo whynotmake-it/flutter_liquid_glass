@@ -4,6 +4,9 @@ example/coverage/
 example/integration_test/
 example/test/
 example/tool/
+example/test_driver/
+example/lib/glint_ab_main.dart
+example/lib/pages/glint_ab_page.dart
 example/macos/DerivedData/
 test/src/failures/
 test/src/goldens/
@@ -16,3 +19,7 @@ doc/showcase.gif
 doc/example.gif
 doc/shapes.png
 doc/blended.png
+doc/screenshot.png
+
+# Golden-test artifacts written by test/flutter_test_config.dart.
+doc/generated/
