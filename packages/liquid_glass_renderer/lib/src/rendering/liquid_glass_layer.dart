@@ -517,11 +517,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @visibleForTesting
   ui.Image? get debugMaterialImage => _materialImage;
 
-  /// Shorter side in logical pixels of the smallest shape in this layer.
-  /// Adaptive color models use it to choose the material density; it is
-  /// resolved once per geometry update, never per fragment.
-  double _materialShortSide = 10000;
-
   bool _shaderInputsChanged = true;
 
   /// Whether a uniform or sampler of [renderShader] changed since the last
@@ -659,18 +654,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           _colorModelCode(appearance.colorModel, colorModels),
           appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
-          _materialShortSide,
         ]);
     });
-    // Float index 53, after the 47-float common block and the 6-float
+    // Float index 52, after the 46-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
     // unfrosted glass stays alpha-1 and cross-fades its material in the
     // shader, so both match the backdrop exactly at visibility 0.
-    shader.setFloat(53, blurPassSigma > 0 ? 1 : 0);
-    // Float index 62, after the geometry/material texture sizes: the three
-    // adaptive color-model slots (eight vec4 each), zero-filled when fewer
+    shader.setFloat(52, blurPassSigma > 0 ? 1 : 0);
+    // Float index 61, after the geometry/material texture sizes: the three
+    // adaptive color-model slots (six vec4 each), zero-filled when fewer
     // than three distinct models are in use.
-    shader.setFloatUniforms(initialIndex: 62, (value) {
+    shader.setFloatUniforms(initialIndex: 61, (value) {
       value.setFloats([
         for (var i = 0; i < 3; i++)
           ...i < colorModels.length
@@ -1050,8 +1044,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
-      // Float index 58, after uBackdropBounds.
-      ..setFloatUniforms(initialIndex: 58, (value) {
+      // Float index 57, after uBackdropBounds.
+      ..setFloatUniforms(initialIndex: 57, (value) {
         final matteSize = _geometryMatteBounds.size * devicePixelRatio;
         value.setFloats([
           if (_geometryTextureSize.isEmpty) ...[
@@ -1174,7 +1168,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     (double, double, double, double, double, double) mapping,
     Rect? backdropBounds,
   ) {
-    shader.setFloatUniforms(initialIndex: 47, (value) {
+    shader.setFloatUniforms(initialIndex: 46, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,
@@ -1184,9 +1178,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         mapping.$6,
       ]);
     });
-    // Float index 54, after uBlurFade.
+    // Float index 53, after uBlurFade.
     final matteBounds = backdropBounds ?? Rect.largest;
-    shader.setFloatUniforms(initialIndex: 54, (value) {
+    shader.setFloatUniforms(initialIndex: 53, (value) {
       value.setFloats([
         matteBounds.left * devicePixelRatio,
         matteBounds.top * devicePixelRatio,
@@ -1543,7 +1537,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
-      var shortSide = double.infinity;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
@@ -1647,7 +1640,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             ..add(distanceScale)
             ..add(blendMarker);
           appearances.add(shape.appearance);
-          shortSide = min(shortSide, size.shortestSide);
           numShapes++;
           firstInGroup = false;
         }
@@ -1655,10 +1647,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
       if (numShapes == 0) {
         throw StateError('No invertible liquid-glass shapes to render.');
-      }
-      if (shortSide != _materialShortSide) {
-        _materialShortSide = shortSide;
-        _updateShaderSettings();
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);

@@ -46,6 +46,12 @@ prerelease; APIs and rendering may still change.
   settings, plus the iOS 27 regular appearance for the platform brightness,
   so unconfigured glass looks different from `0.2.x`. These defaults may be
   retuned before 1.0; the `ios27*` presets track iOS 27.
+- **Dark regular glass is size-independent.** The fitted
+  `GlassColorParameters.ios27Dark` transmittance no longer blends a small- and
+  a large-side curve by the shape's short side, which the layer could only
+  feed as the smallest shape's short side. Both curves are replaced by their
+  equal-weight midpoint, so small shapes render slightly darker and large
+  shapes slightly lighter. Other presets are unchanged.
 - **A smaller, closed public API.**
   - `LiquidShape` is `sealed`; `LiquidOval`, `LiquidRoundedRectangle` and
     `LiquidRoundedSuperellipse` are `final`: the set of shapes is closed and

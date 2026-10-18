@@ -28,7 +28,7 @@ uniform vec3 uContourConfig;
 uniform vec4 uProfileConfig;
 uniform vec3 uMaterialConfig;
 uniform vec3 uBevelShadowConfig;
-uniform vec4 uAppearanceConfig;
+uniform vec3 uAppearanceConfig;
 uniform vec4 uFilterToMatteBasis;
 uniform vec2 uFilterToMatteOffset;
 // 1.0 lets material alpha cross-fade the frost away, and the rest of the
@@ -48,20 +48,19 @@ uniform vec2 uMaterialTextureSize;
 
 // Per-model parameter blocks for the three adaptive color-model slots the
 // layer assigned this frame: slot code 1..3 selects
-// uColorModelParams[(code - 1) * 8 .. code * 8 - 1]. Packing, mirrored from
+// uColorModelParams[(code - 1) * 6 .. code * 6 - 1]. Packing, mirrored from
 // GlassColorParameters.toShaderParameters:
 //   +0: emissionColor.rgb,           emissionAlpha.clear
-//   +1: emissionAlpha.tinted, -,     transmittanceSizeStart/End
-//   +2: transmittanceSmall c/t,      transmittanceLarge c/t
-//   +3: luminanceLift c/t,           chromaGain c/t
-//   +4: toneLow   (base, amplitude, pivot, exponent)
-//   +5: toneHigh  (base, amplitude, pivot, exponent)
-//   +6: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
-//   +7: contourResponse
-uniform vec4 uColorModelParams[24];
+//   +1: emissionAlpha.tinted,        transmittance.clear,
+//       transmittance.tinted,        contourResponse
+//   +2: luminanceLift c/t,           chromaGain c/t
+//   +3: toneLow   (base, amplitude, pivot, exponent)
+//   +4: toneHigh  (base, amplitude, pivot, exponent)
+//   +5: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
+uniform vec4 uColorModelParams[18];
 
 vec4 colorModelSlot(int slot, int field) {
-    return uColorModelParams[slot * 8 + field];
+    return uColorModelParams[slot * 6 + field];
 }
 
 float uDisplacementScale = uOpticalProps.x;
@@ -148,38 +147,21 @@ vec4 shapeLookup(
 }
 #endif
 
-// Transmittance of one model's face. The small-side and large-side
-// clear/tinted endpoints blend over a smoothstep of the shape's short side;
-// an empty size range makes the model size-independent. Dark iOS 27 glass
-// keeps its emission but becomes denser with size: controls up to 75 pt
-// transmit like light glass and surfaces from 105 pt are denser from the
-// start.
-float parametricTransmittance(
-    int slot,
-    float shortSide,
-    float tintAmount
-) {
-    vec4 sizeRange = colorModelSlot(slot, 1);
-    float sizeMix = sizeRange.w > sizeRange.z
-        ? smoothstep(sizeRange.z, sizeRange.w, shortSide)
-        : 0.0;
-    vec4 transmittance = colorModelSlot(slot, 2);
-    return mix(
-        mix(transmittance.x, transmittance.z, sizeMix),
-        mix(transmittance.y, transmittance.w, sizeMix),
-        tintAmount
-    );
+// Transmittance of one model's face, blended linearly between the Clear and
+// Tinted slider endpoints. The dark model's transmittance is size-independent.
+float parametricTransmittance(int slot, float tintAmount) {
+    vec4 transmittance = colorModelSlot(slot, 1);
+    return mix(transmittance.y, transmittance.z, tintAmount);
 }
 
 // Neutral wash of one model's untinted face: premultiplied emission over
 // the wash's opacity, the complement of its transmittance.
-vec4 parametricNeutralTint(int slot, float shortSide, float tintAmount) {
-    float transmittance =
-        parametricTransmittance(slot, shortSide, tintAmount);
+vec4 parametricNeutralTint(int slot, float tintAmount) {
+    float transmittance = parametricTransmittance(slot, tintAmount);
     vec4 emission = colorModelSlot(slot, 0);
-    vec4 sizeRange = colorModelSlot(slot, 1);
+    vec4 response = colorModelSlot(slot, 1);
     float alpha = 1.0 - transmittance;
-    float emissionAlpha = mix(emission.w, sizeRange.x, tintAmount);
+    float emissionAlpha = mix(emission.w, response.x, tintAmount);
     return vec4(
         emission.rgb * emissionAlpha / max(alpha, 1e-4),
         alpha
@@ -188,7 +170,7 @@ vec4 parametricNeutralTint(int slot, float shortSide, float tintAmount) {
 
 // Luminance lift and chroma gain of one model's untinted face.
 vec2 parametricFaceTransfer(int slot, float tintAmount) {
-    vec4 liftChroma = colorModelSlot(slot, 3);
+    vec4 liftChroma = colorModelSlot(slot, 2);
     return vec2(
         mix(liftChroma.x, liftChroma.y, tintAmount),
         mix(liftChroma.z, liftChroma.w, tintAmount)
@@ -201,9 +183,9 @@ vec2 parametricFaceTransfer(int slot, float tintAmount) {
 // gamma is 1 + toneGammaLuminance * (1 - Y).
 vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
     float luminance = clamp(backdropLuminance, 0.0, 1.0);
-    vec4 low = colorModelSlot(slot, 4);
-    vec4 high = colorModelSlot(slot, 5);
-    vec4 misc = colorModelSlot(slot, 6);
+    vec4 low = colorModelSlot(slot, 3);
+    vec4 high = colorModelSlot(slot, 4);
+    vec4 misc = colorModelSlot(slot, 5);
     float floor_ = low.x + low.y * pow(
         min(1.0, luminance / max(low.z, 1e-6)),
         low.w
@@ -224,12 +206,12 @@ vec3 parametricTintTone(int slot, vec3 tint, float backdropLuminance) {
 
 // Glint target parameters of one model: luminance, face gain, vibrancy.
 vec3 parametricGlint(int slot) {
-    return colorModelSlot(slot, 6).yzw;
+    return colorModelSlot(slot, 5).yzw;
 }
 
 // How strongly a model's border follows the opacity the slider adds.
 float parametricContourResponse(int slot) {
-    return colorModelSlot(slot, 7).x;
+    return colorModelSlot(slot, 1).w;
 }
 
 // Shares of a color model code: direct (0) plus the layer's three model
@@ -802,22 +784,14 @@ void main() {
             if (share <= 0.0) {
                 continue;
             }
-            vec4 wash = parametricNeutralTint(
-                slot,
-                uAppearanceConfig.w,
-                uTintAmount
-            );
+            vec4 wash = parametricNeutralTint(slot, uTintAmount);
             washSum += share * vec4(wash.rgb * wash.a, wash.a);
             transferSum +=
                 share * parametricFaceTransfer(slot, uTintAmount);
             // A model's border strengthens with the opacity the slider adds.
             contourBoost += share * parametricContourResponse(slot) * (
-                parametricTransmittance(slot, uAppearanceConfig.w, 0.0) -
-                parametricTransmittance(
-                    slot,
-                    uAppearanceConfig.w,
-                    uTintAmount
-                )
+                parametricTransmittance(slot, 0.0) -
+                parametricTransmittance(slot, uTintAmount)
             );
             if (materialTint.a >= 0.001) {
                 toneSum += share * parametricTintTone(

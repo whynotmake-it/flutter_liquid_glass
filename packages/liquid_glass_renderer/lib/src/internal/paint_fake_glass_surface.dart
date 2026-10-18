@@ -108,10 +108,7 @@ void paintFakeGlassSurface(
   );
   final faceEmission =
       appearance.colorModel
-          .faceTransfer(
-            size.shortestSide,
-            tintAmount: settings.effectiveTintAmount,
-          )
+          .faceTransfer(tintAmount: settings.effectiveTintAmount)
           ?.emission ??
       const Color(0x00000000);
   final shapeType = switch (shape) {
@@ -134,7 +131,6 @@ void paintFakeGlassSurface(
         GlassRim.highlightOppositeStrength * appearanceVisibility,
         settings.contourStrength *
             appearance.colorModel.contourScale(
-              size.shortestSide,
               settings.effectiveTintAmount,
             ) *
             appearanceVisibility,

@@ -262,11 +262,8 @@ LiquidGlass.grouped(
 
 The iOS 27 presets use `LiquidGlassColorModel.ios27`. It turns one tint color
 and its opacity into tones that depend on the brightness of the backdrop,
-like Apple's single-tint API. Dark regular glass also gets denser with size:
-up to 75 pt on the short side it transmits like light glass, and from 105 pt
-it settles at Apple's denser dark material. The smallest shape in a layer
-decides. Clear glass (`LiquidGlassColorModel.ios27Clear`) is the same in light
-and dark.
+like Apple's single-tint API. Clear glass (`LiquidGlassColorModel.ios27Clear`)
+is the same in light and dark.
 
 For full control, use the direct model and tune each transfer yourself:
 
@@ -400,7 +397,7 @@ to test that path.
 
 It keeps frost, tint, the color model, the glint, the border, the inner
 shadow, visibility and exterior shadows. It leaves out refraction,
-`backdropShrink`, `dispersion` and vibrancy.
+`backdropShrink`, `dispersion` and the direct model's vibrancy.
 
 `FakeGlass` is not a cheaper mode: it pays for the same backdrop readback and
 blur as full glass (see below).

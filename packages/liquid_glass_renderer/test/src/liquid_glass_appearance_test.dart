@@ -80,34 +80,26 @@ void main() {
     expect(dark.colorModel.transmissionGamma, 1);
     final lightFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.light,
-    ).faceTransfer(94)!;
+    ).faceTransfer()!;
     expect(lightFace.lift, .13);
     expect(lightFace.chromaGain, 1.17);
     expect(lightFace.transmittance, closeTo(.592, 1e-9));
     final darkFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.dark,
-    ).faceTransfer(94)!;
+    ).faceTransfer()!;
     expect(darkFace.lift, 1);
     expect(darkFace.chromaGain, 1.02);
     expect(darkFace.emission.r, closeTo(32 / 255, 1e-9));
   });
 
-  test('dark regular glass becomes denser with its short side', () {
+  test('dark regular glass transmittance is size-independent', () {
     const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
-    // Face transmittance of the pinned Reduce Motion off dark captures.
-    const measured = {63: .599, 94: .486, 118: .447, 150: .447};
-    for (final MapEntry(key: shortSide, value: transmittance)
-        in measured.entries) {
-      expect(
-        dark.faceTransfer(shortSide.toDouble())!.transmittance,
-        closeTo(transmittance, .008),
-        reason: '$shortSide pt',
-      );
-    }
-    const light = LiquidGlassColorModel.ios27(brightness: Brightness.light);
+    // The small-side (0.597, 0.295) and large-side (0.447, 0.195) fits are
+    // averaged into their equal-weight midpoint; one curve serves every size.
+    expect(dark.faceTransfer()!.transmittance, closeTo(0.522, 1e-9));
     expect(
-      light.faceTransfer(63)!.transmittance,
-      light.faceTransfer(150)!.transmittance,
+      dark.faceTransfer(tintAmount: 1)!.transmittance,
+      closeTo(0.245, 1e-9),
     );
   });
 
@@ -119,7 +111,7 @@ void main() {
     // the composite captures worse; the model pins the measured endpoints
     // and interpolates linearly instead.
     double lightDensity(double position) =>
-        light.faceTransfer(94, tintAmount: position)!.transmittance;
+        light.faceTransfer(tintAmount: position)!.transmittance;
     expect(lightDensity(0), closeTo(.592, .006));
     expect(lightDensity(1), closeTo(.290, .006));
     for (final position in const [.25, .45, .5, .55, .75]) {
@@ -132,42 +124,33 @@ void main() {
         reason: 'light ${position * 100}%',
       );
     }
-    const darkBySize = {
-      63: {0: .599, 100: .298},
-      94: {0: .486, 100: .215},
-      150: {0: .447, 100: .208},
-    };
-    for (final MapEntry(key: size, value: sweep) in darkBySize.entries) {
-      double darkDensity(double position) => dark
-          .faceTransfer(size.toDouble(), tintAmount: position)!
-          .transmittance;
-      expect(darkDensity(0), closeTo(sweep[0]!, .02));
-      expect(darkDensity(1), closeTo(sweep[100]!, .02));
-      for (final position in const [.25, .5, .75]) {
-        expect(
-          darkDensity(position),
-          closeTo(
-            sliderKeyframes(position, darkDensity(0), darkDensity(1)),
-            1e-9,
-          ),
-          reason: 'dark $size pt ${position * 100}%',
-        );
-      }
+    // The dark density also interpolates the averaged endpoint linearly.
+    expect(dark.faceTransfer()!.transmittance, closeTo(.522, .01));
+    expect(dark.faceTransfer(tintAmount: 1)!.transmittance, closeTo(.245, .01));
+    double darkDensity(double position) =>
+        dark.faceTransfer(tintAmount: position)!.transmittance;
+    for (final position in const [.25, .5, .75]) {
+      expect(
+        darkDensity(position),
+        closeTo(
+          sliderKeyframes(position, darkDensity(0), darkDensity(1)),
+          1e-9,
+        ),
+        reason: 'dark ${position * 100}%',
+      );
     }
-    expect(light.contourScale(94, 1), 1);
-    expect(dark.contourScale(94, 0), closeTo(1, 1e-9));
-    expect(dark.contourScale(94, 1), greaterThan(1.2));
+    expect(light.contourScale(1), 1);
+    expect(dark.contourScale(0), closeTo(1, 1e-9));
+    expect(dark.contourScale(1), greaterThan(1.2));
   });
 
-  test('clear glass is appearance- and size-independent', () {
+  test('clear glass is appearance-independent', () {
     const clear = LiquidGlassColorModel.ios27Clear();
-    final small = clear.faceTransfer(40)!;
-    final large = clear.faceTransfer(400);
-    expect(small, large);
-    expect(small.emission.r, closeTo(.126, 1e-9));
-    expect(small.transmittance, .954);
-    expect(small.lift, 0);
-    expect(small.chromaGain, 1.057);
+    final face = clear.faceTransfer()!;
+    expect(face.emission.r, closeTo(.126, 1e-9));
+    expect(face.transmittance, .954);
+    expect(face.lift, 0);
+    expect(face.chromaGain, 1.057);
     expect(clear.toJson(), 'ios27Clear');
     expect(LiquidGlassColorModel.fromJson('ios27Clear'), clear);
   });

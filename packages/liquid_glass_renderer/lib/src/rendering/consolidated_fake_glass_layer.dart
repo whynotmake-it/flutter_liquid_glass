@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -114,8 +113,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   _separateBackdropLayers = {};
   ImageFilter? _cachedFilter;
 
-  /// Shorter side of the smallest shape sharing the consolidated filter.
-  double _shortSide = 10000;
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
   List<int> _cachedClipClasses = const [];
@@ -124,7 +121,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   bool get _hasColorTransfer =>
       defaultAppearance.colorModel.saturation != 1 ||
       defaultAppearance.colorModel.transmissionGamma != 1 ||
-      defaultAppearance.colorModel.faceTransfer(_shortSide) != null;
+      defaultAppearance.colorModel.faceTransfer() != null;
   bool get _hasBackdropEffect => _hasBlur || _hasColorTransfer;
 
   /// Whether [appearance] can be served by the layer's shared backdrop
@@ -230,7 +227,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
     if (!_clipInputsMatch()) {
       Rect? rebuiltBounds;
-      var rebuiltShortSide = double.infinity;
       final rebuiltPath = Path();
       final rebuiltClasses = <int>[];
       for (final (_, geometry, transform) in shapesWithGeometry) {
@@ -253,10 +249,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           // backdrop transfer matches the layer's; every other visible shape
           // gets its own clipped pass below.
           if (backdropClass == 2) {
-            rebuiltShortSide = math.min(
-              rebuiltShortSide,
-              shape.renderObject.size.shortestSide,
-            );
             rebuiltPath.addPath(
               shape.shape.getOuterPath(shapeBounds),
               Offset.zero,
@@ -264,10 +256,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
             );
           }
         }
-      }
-      if (rebuiltShortSide != _shortSide) {
-        _shortSide = rebuiltShortSide;
-        _cachedFilter = null;
       }
       _cachedClipPath = rebuiltPath;
       _cachedClipBounds = rebuiltBounds;
@@ -398,7 +386,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         final filter = fakeGlassBackdropFilter(
           settings,
           shape.appearance,
-          shortSide: shape.renderObject.size.shortestSide,
         );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
@@ -476,7 +463,6 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     return fakeGlassBackdropFilter(
       settings,
       defaultAppearance.copyWith(visibility: 1),
-      shortSide: _shortSide,
     )!;
   }
 

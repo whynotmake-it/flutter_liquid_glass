@@ -137,9 +137,8 @@ List<double> fakeGlassFaceMatrix({
 @internal
 ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassSettings settings,
-  LiquidGlassAppearance appearance, {
-  double shortSide = 1e4,
-}) {
+  LiquidGlassAppearance appearance,
+) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
   final colorModel = appearance.colorModel;
@@ -152,7 +151,6 @@ ImageFilter? fakeGlassBackdropFilter(
         )
       : null;
   final faceTransfer = colorModel.faceTransfer(
-    shortSide,
     tintAmount: settings.effectiveTintAmount,
   );
   final ColorFilter? colorTransfer;
