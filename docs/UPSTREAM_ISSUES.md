@@ -100,6 +100,30 @@ still samples it. Today we rely on the engine's two-frame pipeline depth
 (or a fence/callback when a recorded scene has been rasterized) would make
 reuse safe without guessing.
 
+### Backdrop effects in Flutter GPU (a recorded "backdrop node")
+
+`draft` · large; frame it as a general capability, not a glass feature
+
+Flutter GPU can only render offscreen: Dart records and submits passes during
+paint, before the backdrop exists, which only appears when the raster thread
+plays the frame back. Proposal: a layer whose Flutter GPU passes are recorded
+at paint time against placeholders ("the backdrop texture", "the parent
+pass"), then replayed by Impeller at raster time. Impeller would do the usual
+backdrop split, bind the real backdrop texture, run the recorded passes, and
+run the final draw directly inside the parent render pass. Flutter GPU already
+shares Impeller's context and queue, so no cross-API synchronization is
+needed.
+
+That would let packages own the whole pipeline: downsample to any level, use
+their own blur kernel, sample the low-resolution result without upscaling it,
+draw straight into the parent pass, share one downsample chain across several
+layers, and reuse blurred textures across frames when the backdrop is
+unchanged. For glass that covers the first three rendering entries above in
+package code. It does not remove the backdrop split itself; only framebuffer
+fetch or fewer splits do that. Open questions: how these nodes compose with
+clips, other backdrop filters and platform views, what a recorded program may
+do, and fallback on Skia and web.
+
 ## iOS
 
 ### Request extended dynamic range on the Flutter layer
