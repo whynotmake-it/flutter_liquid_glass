@@ -651,9 +651,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           settings: settings,
           appearance: const LiquidGlassAppearance(
             tint: Color(0xAA287DFF),
-            saturation: 1.8,
-            transmissionGamma: .78,
-            vibrancy: .25,
+            colorModel: LiquidGlassColorModel.direct(
+              saturation: 1.8,
+              transmissionGamma: .78,
+              vibrancy: .25,
+            ),
           ),
           shape: const LiquidRoundedSuperellipse(borderRadius: 32),
           child: _tile(0),
@@ -689,7 +691,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           highlight: 0,
         ),
         t,
-        appearance: const LiquidGlassAppearance(saturation: 1.5),
+        appearance: const LiquidGlassAppearance(
+          colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
+        ),
       ),
       BenchmarkScenario.realBlurSaturation => _realLayer(
         const LiquidGlassSettings(
@@ -697,12 +701,14 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           highlight: 0,
         ),
         t,
-        appearance: const LiquidGlassAppearance(saturation: 1.5),
+        appearance: const LiquidGlassAppearance(
+          colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
+        ),
       ),
       BenchmarkScenario.realToolbarMaterial => _realLayer(
-        LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27RegularLight(),
         t,
-        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+        appearance: const LiquidGlassAppearance.ios27RegularLight(),
       ),
       BenchmarkScenario.realClearMaterial => _realLayer(
         LiquidGlassSettings.ios27Clear(),
@@ -743,7 +749,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           highlight: 0,
         ),
         t,
-        appearance: const LiquidGlassAppearance(saturation: 1.5),
+        appearance: const LiquidGlassAppearance(
+          colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
+        ),
       ),
       BenchmarkScenario.fakeBlurSaturation => _fakeLayer(
         const LiquidGlassSettings(
@@ -751,12 +759,14 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           highlight: 0,
         ),
         t,
-        appearance: const LiquidGlassAppearance(saturation: 1.5),
+        appearance: const LiquidGlassAppearance(
+          colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
+        ),
       ),
       BenchmarkScenario.fakeToolbarMaterial => _fakeLayer(
-        LiquidGlassSettings.ios27ToolbarLight(),
+        LiquidGlassSettings.ios27RegularLight(),
         t,
-        appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+        appearance: const LiquidGlassAppearance.ios27RegularLight(),
       ),
       BenchmarkScenario.realToFakeTransition => _RealThenFakeScenario(
         t: t,
@@ -1290,7 +1300,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     ];
     final spread = 100 + 24 * math.sin(t * math.pi * 2);
     return LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27Toolbar(brightness: Brightness.dark),
+      settings: LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
       child: Center(
         child: SizedBox.square(
           dimension: 560,
@@ -1351,9 +1361,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
                             const Color(0xAA287DFF),
                             index / math.max(count - 1, 1),
                           )!,
-                          saturation: 0.8 + index / count * 1.8,
-                          transmissionGamma: 0.75 + index / count * 0.35,
-                          vibrancy: index / count * 0.25,
+                          colorModel: LiquidGlassColorModel.direct(
+                            saturation: 0.8 + index / count * 1.8,
+                            transmissionGamma: 0.75 + index / count * 0.35,
+                            vibrancy: index / count * 0.25,
+                          ),
                           visibility: animateVisibility
                               ? (0.5 + 0.5 * math.sin(t * math.pi * 2 + index))
                               : 1,
@@ -1459,9 +1471,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
           const Color(0xAA287DFF),
           index / 2,
         )!,
-        saturation: variedResponse ? 0.9 + index * 0.6 : 1,
-        transmissionGamma: variedResponse ? 0.8 + index * 0.1 : 1,
-        vibrancy: variedResponse ? index * 0.1 : 0,
+        colorModel: LiquidGlassColorModel.direct(
+          saturation: variedResponse ? 0.9 + index * 0.6 : 1,
+          transmissionGamma: variedResponse ? 0.8 + index * 0.1 : 1,
+          vibrancy: variedResponse ? index * 0.1 : 0,
+        ),
       );
     }
 
@@ -1570,7 +1584,7 @@ class _RealThenFakeScenarioState extends State<_RealThenFakeScenario> {
   @override
   Widget build(BuildContext context) => LiquidGlassLayer(
     fake: _fake,
-    settings: LiquidGlassSettings.ios27ToolbarLight(),
+    settings: LiquidGlassSettings.ios27RegularLight(),
     child: Center(
       child: Transform.translate(
         offset: Offset(-180 + 360 * widget.t, 0),
@@ -1616,8 +1630,8 @@ enum _AppChromeKind {
   realTabsOwnLoupeStatic,
 }
 
-final _appToolbarSettings = LiquidGlassSettings.ios27ToolbarLight();
-const _appToolbarAppearance = LiquidGlassAppearance.ios27ToolbarLight();
+final _appToolbarSettings = LiquidGlassSettings.ios27RegularLight();
+const _appToolbarAppearance = LiquidGlassAppearance.ios27RegularLight();
 const _appChromeShadows = [
   BoxShadow(
     color: Color(0x2E000000),

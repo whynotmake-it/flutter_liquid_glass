@@ -104,7 +104,7 @@ class LiquidGlassLayer extends StatefulWidget {
 
   /// Appearance inherited by shapes that do not provide an override.
   ///
-  /// When omitted, the fitted iOS 27 toolbar appearance follows the ambient
+  /// When omitted, the fitted iOS 27 regular appearance follows the ambient
   /// platform brightness.
   final LiquidGlassAppearance? defaultAppearance;
 
@@ -122,11 +122,10 @@ class LiquidGlassLayer extends StatefulWidget {
   /// work. Multiple [LiquidGlassLayer]s need a common ancestor group or an
   /// explicit shared [backdropKey] to share across layer boundaries.
   ///
-  /// On Impeller, each independent backdrop capture does a full-screen
-  /// readback (~115 mW GPU at 120 Hz on a Pixel 10) before blur or glass
-  /// work. Sharing one [BackdropGroup] or [BackdropKey] pays that readback
-  /// once: two real layers dropped from 797 mW to 688 mW, two plain σ7 blurs
-  /// from 426 mW to 312 mW, on the same device.
+  /// On Impeller, each independent backdrop capture reads back the screen
+  /// before any blur or glass work. Sharing one [BackdropGroup] or
+  /// [BackdropKey] pays for that readback once, which can noticeably reduce
+  /// GPU load when several layers are on screen.
   ///
   /// Shared members do not see content painted between them. Group only
   /// elements that sit over the same content plane (for example all root
@@ -280,7 +279,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   Widget _buildLayer(BuildContext context) {
     final defaultAppearance =
         widget.defaultAppearance ??
-        LiquidGlassAppearance.ios27Toolbar(
+        LiquidGlassAppearance.ios27Regular(
           brightness: MediaQuery.platformBrightnessOf(context),
         );
     final backdropKey =
@@ -467,6 +466,20 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
+
+  bool _debugWarnedShapeLimit = false;
+
+  void _debugWarnShapeLimitExceeded() {
+    if (!kDebugMode || _debugWarnedShapeLimit) return;
+    _debugWarnedShapeLimit = true;
+    const message =
+        'a LiquidGlassLayer has more than '
+        '${LiquidGlassBlendGroup.maxShapesPerLayer} glass shapes; the extra '
+        'shapes are not drawn. Split the glass across several layers.';
+    LiquidGlassRenderObject.logger.warning(message);
+    debugPrint('liquid_glass_renderer: $message');
+  }
+
   FragmentShader get renderShader => switch ((
     _usesShapeAppearances,
     _usesTintOnlyAppearance,
@@ -503,11 +516,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// The optional contributor texture sampled by the final material pass.
   @visibleForTesting
   ui.Image? get debugMaterialImage => _materialImage;
-
-  /// Shorter side in logical pixels of the smallest shape in this layer.
-  /// Adaptive color models use it to choose the material density; it is
-  /// resolved once per geometry update, never per fragment.
-  double _materialShortSide = 10000;
 
   bool _shaderInputsChanged = true;
 
@@ -600,7 +608,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           settings.effectiveEdgeDistanceRange * devicePixelRatio,
           settings.highlight,
           1 - settings.effectiveBackdropShrink,
-          appearance.saturation,
+          appearance.colorModel.saturation,
         ])
         ..setOffset(
           const Offset(0, 1),
@@ -633,8 +641,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           GlassRim.highlightWrap,
         ])
         ..setFloats([
-          appearance.transmissionGamma,
-          appearance.vibrancy,
+          appearance.colorModel.transmissionGamma,
+          appearance.colorModel.vibrancy,
           settings.effectiveTintAmount,
         ])
         ..setFloats([
@@ -646,18 +654,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           _colorModelCode(appearance.colorModel, colorModels),
           appearance.visibility,
           FlutterGpuGeometryRenderer.materialRasterScale.toDouble(),
-          _materialShortSide,
         ]);
     });
-    // Float index 53, after the 47-float common block and the 6-float
+    // Float index 52, after the 46-float common block and the 6-float
     // filter->matte mapping: frosted glass cross-fades its blur away, while
     // unfrosted glass stays alpha-1 and cross-fades its material in the
     // shader, so both match the backdrop exactly at visibility 0.
-    shader.setFloat(53, blurPassSigma > 0 ? 1 : 0);
-    // Float index 62, after the geometry/material texture sizes: the three
-    // adaptive color-model slots (eight vec4 each), zero-filled when fewer
+    shader.setFloat(52, blurPassSigma > 0 ? 1 : 0);
+    // Float index 61, after the geometry/material texture sizes: the three
+    // adaptive color-model slots (six vec4 each), zero-filled when fewer
     // than three distinct models are in use.
-    shader.setFloatUniforms(initialIndex: 62, (value) {
+    shader.setFloatUniforms(initialIndex: 61, (value) {
       value.setFloats([
         for (var i = 0; i < 3; i++)
           ...i < colorModels.length
@@ -689,9 +696,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         at(i).tint.a,
       ],
       for (var i = 0; i < 16; i++) ...<double>[
-        at(i).saturation / 4,
-        at(i).transmissionGamma / 4,
-        at(i).vibrancy / 4,
+        at(i).colorModel.saturation / 4,
+        at(i).colorModel.transmissionGamma / 4,
+        at(i).colorModel.vibrancy / 4,
         (at(i).visibility +
                 _colorModelCode(at(i).colorModel, colorModels) * 2) /
             7,
@@ -1037,8 +1044,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
-      // Float index 58, after uBackdropBounds.
-      ..setFloatUniforms(initialIndex: 58, (value) {
+      // Float index 57, after uBackdropBounds.
+      ..setFloatUniforms(initialIndex: 57, (value) {
         final matteSize = _geometryMatteBounds.size * devicePixelRatio;
         value.setFloats([
           if (_geometryTextureSize.isEmpty) ...[
@@ -1161,7 +1168,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     (double, double, double, double, double, double) mapping,
     Rect? backdropBounds,
   ) {
-    shader.setFloatUniforms(initialIndex: 47, (value) {
+    shader.setFloatUniforms(initialIndex: 46, (value) {
       value.setFloats([
         mapping.$1,
         mapping.$2,
@@ -1171,9 +1178,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         mapping.$6,
       ]);
     });
-    // Float index 54, after uBlurFade.
+    // Float index 53, after uBlurFade.
     final matteBounds = backdropBounds ?? Rect.largest;
-    shader.setFloatUniforms(initialIndex: 54, (value) {
+    shader.setFloatUniforms(initialIndex: 53, (value) {
       value.setFloats([
         matteBounds.left * devicePixelRatio,
         matteBounds.top * devicePixelRatio,
@@ -1530,12 +1537,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
-      var shortSide = double.infinity;
 
       for (final (_, geometry, geometryToLayer) in geometries) {
         var firstInGroup = true;
         for (final shape in geometry.shapes) {
-          if (numShapes >= 16) break; // MAX_SHAPES limit
+          if (numShapes >= LiquidGlassBlendGroup.maxShapesPerLayer) {
+            _debugWarnShapeLimitExceeded();
+            break;
+          }
 
           final shapeToGeometry = shape.shapeToGeometry ?? _identity;
           final basis = _matteShapeBasis(geometryToLayer, shapeToGeometry);
@@ -1631,7 +1640,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             ..add(distanceScale)
             ..add(blendMarker);
           appearances.add(shape.appearance);
-          shortSide = min(shortSide, size.shortestSide);
           numShapes++;
           firstInGroup = false;
         }
@@ -1639,10 +1647,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
       if (numShapes == 0) {
         throw StateError('No invertible liquid-glass shapes to render.');
-      }
-      if (shortSide != _materialShortSide) {
-        _materialShortSide = shortSide;
-        _updateShaderSettings();
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);
@@ -1720,9 +1724,6 @@ typedef _GpuGeometryFrame = ({
       mixed &&
       appearances.every(
         (appearance) =>
-            appearance.saturation == first.saturation &&
-            appearance.transmissionGamma == first.transmissionGamma &&
-            appearance.vibrancy == first.vibrancy &&
             appearance.visibility == first.visibility &&
             appearance.colorModel == first.colorModel,
       );

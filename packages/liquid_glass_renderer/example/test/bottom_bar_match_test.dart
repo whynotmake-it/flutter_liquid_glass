@@ -71,7 +71,7 @@ void main() {
             ..devicePixelRatio = _scale;
           addTearDown(tester.view.reset);
           final material = GlassMaterial.preset(
-            style: GlassStyle.toolbar,
+            style: GlassStyle.regular,
             brightness: brightness,
           );
           final captureKey = GlobalKey();

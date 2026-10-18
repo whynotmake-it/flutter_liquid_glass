@@ -14,7 +14,9 @@ import 'submitted_scene_binding.dart';
 void main() {
   final binding = SubmittedSceneBinding();
   const settings = LiquidGlassSettings(frost: 4);
-  const appearance = LiquidGlassAppearance(saturation: 1.1);
+  const appearance = LiquidGlassAppearance(
+    colorModel: LiquidGlassColorModel.direct(saturation: 1.1),
+  );
 
   testWidgets('fake shapes share one parent backdrop filter', (tester) async {
     await tester.pumpWidget(
@@ -243,7 +245,7 @@ void main() {
             frost: 4,
           ),
           defaultAppearance: LiquidGlassAppearance(
-            saturation: 0.8,
+            colorModel: LiquidGlassColorModel.direct(saturation: 0.8),
             tint: Color.fromARGB(96, 220, 240, 255),
           ),
           child: LiquidGlass(
@@ -323,7 +325,9 @@ void main() {
             child: Row(
               children: [
                 LiquidGlass(
-                  appearance: LiquidGlassAppearance(saturation: 2),
+                  appearance: LiquidGlassAppearance(
+                    colorModel: LiquidGlassColorModel.direct(saturation: 2),
+                  ),
                   shape: LiquidOval(),
                   child: SizedBox(width: 80, height: 60),
                 ),
@@ -381,7 +385,9 @@ void main() {
             settings: LiquidGlassSettings(frost: 0),
             defaultAppearance: LiquidGlassAppearance(),
             child: LiquidGlass(
-              appearance: LiquidGlassAppearance(saturation: 2),
+              appearance: LiquidGlassAppearance(
+                colorModel: LiquidGlassColorModel.direct(saturation: 2),
+              ),
               shape: LiquidOval(),
               child: SizedBox(width: 80, height: 60),
             ),
@@ -413,7 +419,7 @@ void main() {
           defaultAppearance: LiquidGlassAppearance(),
           child: LiquidGlass(
             appearance: LiquidGlassAppearance(
-              saturation: 2,
+              colorModel: LiquidGlassColorModel.direct(saturation: 2),
               visibility: 0.5,
             ),
             shape: LiquidOval(),
@@ -447,7 +453,9 @@ void main() {
             frost: 0,
             contourStrength: 0,
           ),
-          defaultAppearance: const LiquidGlassAppearance(saturation: 0),
+          defaultAppearance: const LiquidGlassAppearance(
+            colorModel: LiquidGlassColorModel.direct(saturation: 0),
+          ),
           useBackdropGroup: grouped,
           child: const Stack(
             children: [
@@ -461,7 +469,9 @@ void main() {
               Align(
                 alignment: Alignment(0.4, 0),
                 child: LiquidGlass(
-                  appearance: LiquidGlassAppearance(saturation: 2),
+                  appearance: LiquidGlassAppearance(
+                    colorModel: LiquidGlassColorModel.direct(saturation: 2),
+                  ),
                   shape: LiquidOval(),
                   child: SizedBox(width: 200, height: 200),
                 ),
@@ -686,7 +696,7 @@ void main() {
 
   test('iOS 27 face matrix reproduces the native light solid palette', () {
     const model = LiquidGlassColorModel.ios27(brightness: Brightness.light);
-    final transfer = model.faceTransfer(94)!;
+    final transfer = model.faceTransfer()!;
     final matrix = fakeGlassFaceMatrix(
       emission: transfer.emission,
       transmittance: transfer.transmittance,

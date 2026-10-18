@@ -29,7 +29,7 @@ Future<({double top, double bottom})> _innerShadow(
           child: LiquidGlassLayer(
             fake: true,
             settings: settings,
-            defaultAppearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+            defaultAppearance: const LiquidGlassAppearance.ios27RegularLight(),
             child: Stack(
               children: [
                 Positioned(
@@ -72,7 +72,7 @@ Future<({double top, double bottom})> _innerShadow(
 }
 
 void main() {
-  final base = LiquidGlassSettings.ios27ToolbarLight(
+  final base = LiquidGlassSettings.ios27RegularLight(
     frost: 0,
   ).copyWith(highlight: 0, contourStrength: 0);
 

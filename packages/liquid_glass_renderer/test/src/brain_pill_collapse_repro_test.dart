@@ -511,7 +511,7 @@ RenderBox? _pillBox(WidgetTester tester) {
   return node is RenderBox ? node : null;
 }
 
-const _toolbarAppearance = LiquidGlassAppearance.ios27ToolbarLight();
+const _toolbarAppearance = LiquidGlassAppearance.ios27RegularLight();
 
 const _pillShadows = [
   BoxShadow(color: Color(0x1A000000), blurRadius: 30),

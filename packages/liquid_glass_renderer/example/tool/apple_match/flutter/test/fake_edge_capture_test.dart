@@ -22,34 +22,39 @@ void main() {
       for (final dpr in [1.0, 2.0, 3.0]) {
         final kind = fake ? 'fake' : 'real';
         final name = '$kind-${brightness.name}-dpr${dpr.round()}';
-        testWidgets('captures glass edges $name', (tester) async {
-          final output = Directory(_outputPath)..createSync(recursive: true);
-          tester.view
-            ..devicePixelRatio = dpr
-            ..physicalSize = const Size(360, 300) * dpr;
-          addTearDown(tester.view.reset);
-          final captureKey = GlobalKey();
-          await tester.pumpWidget(
-            MaterialApp(
-              debugShowCheckedModeBanner: false,
-              home: RepaintBoundary(
-                key: captureKey,
-                child: _Shapes(fake: fake, brightness: brightness),
+        testWidgets(
+          'captures glass edges $name',
+          (tester) async {
+            final output = Directory(_outputPath)..createSync(recursive: true);
+            tester.view
+              ..devicePixelRatio = dpr
+              ..physicalSize = const Size(360, 300) * dpr;
+            addTearDown(tester.view.reset);
+            final captureKey = GlobalKey();
+            await tester.pumpWidget(
+              MaterialApp(
+                debugShowCheckedModeBanner: false,
+                home: RepaintBoundary(
+                  key: captureKey,
+                  child: _Shapes(fake: fake, brightness: brightness),
+                ),
               ),
-            ),
-          );
-          for (var frame = 0; frame < 20; frame++) {
-            await tester.pump(const Duration(milliseconds: 16));
-          }
-          final boundary =
-              captureKey.currentContext!.findRenderObject()!
-                  as RenderRepaintBoundary;
-          final image = await boundary.toImage(pixelRatio: dpr);
-          await expectLater(
-            image,
-            matchesGoldenFile(Uri.file('${output.path}/$name.png')),
-          );
-        }, skip: _outputPath.isEmpty, tags: 'golden');
+            );
+            for (var frame = 0; frame < 20; frame++) {
+              await tester.pump(const Duration(milliseconds: 16));
+            }
+            final boundary =
+                captureKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            final image = await boundary.toImage(pixelRatio: dpr);
+            await expectLater(
+              image,
+              matchesGoldenFile(Uri.file('${output.path}/$name.png')),
+            );
+          },
+          skip: _outputPath.isEmpty,
+          tags: 'golden',
+        );
       }
     }
   }
@@ -88,10 +93,10 @@ class _Shapes extends StatelessWidget {
         fake: fake,
         settings: _noBackdrop
             ? const LiquidGlassSettings(frost: 0)
-            : LiquidGlassSettings.ios27Toolbar(brightness: brightness),
+            : LiquidGlassSettings.ios27Regular(brightness: brightness),
         defaultAppearance: _noBackdrop
             ? const LiquidGlassAppearance(tint: Color(0x66FFFFFF))
-            : LiquidGlassAppearance.ios27Toolbar(brightness: brightness),
+            : LiquidGlassAppearance.ios27Regular(brightness: brightness),
         child: Stack(
           children: [
             // Pill button (the example's GlassButton).

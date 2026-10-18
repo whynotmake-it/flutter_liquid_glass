@@ -384,16 +384,12 @@ enum RawShapeType {
 
   final double shaderIndex;
 
-  static RawShapeType fromLiquidGlassShape(LiquidShape shape) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse():
-        return RawShapeType.squircle;
-      case LiquidOval():
-        return RawShapeType.ellipse;
-      case LiquidRoundedRectangle():
-        return RawShapeType.roundedRectangle;
-    }
-  }
+  static RawShapeType fromLiquidGlassShape(LiquidShape shape) =>
+      switch (shape) {
+        LiquidRoundedSuperellipse() => RawShapeType.squircle,
+        LiquidOval() => RawShapeType.ellipse,
+        LiquidRoundedRectangle() => RawShapeType.roundedRectangle,
+      };
 }
 
 /// The geometry of a single shape.
@@ -409,19 +405,8 @@ class ShapeGeometry extends Equatable {
     required this.appearance,
     this.shadows = const [],
     this.shapeToGeometry,
-  }) : rawCornerRadius = _getRadiusFromGlassShape(shape),
+  }) : rawCornerRadius = shape.cornerRadius,
        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
-
-  static double _getRadiusFromGlassShape(LiquidShape shape) {
-    switch (shape) {
-      case LiquidRoundedSuperellipse():
-        return shape.borderRadius;
-      case LiquidRoundedRectangle():
-        return shape.borderRadius;
-      case LiquidOval():
-        return 0;
-    }
-  }
 
   final LiquidGlassShapeRenderObject renderObject;
 

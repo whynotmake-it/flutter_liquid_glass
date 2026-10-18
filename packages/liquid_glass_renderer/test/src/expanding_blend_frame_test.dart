@@ -46,7 +46,10 @@ void main() {
                                   appearance: materials
                                       ? const LiquidGlassAppearance(
                                           tint: Color(0x40FF0000),
-                                          saturation: 1.2,
+                                          colorModel:
+                                              LiquidGlassColorModel.direct(
+                                                saturation: 1.2,
+                                              ),
                                         )
                                       : const LiquidGlassAppearance(),
                                   shape: const LiquidRoundedRectangle(
@@ -62,7 +65,10 @@ void main() {
                                   appearance: materials
                                       ? const LiquidGlassAppearance(
                                           tint: Color(0x400000FF),
-                                          saturation: 0.8,
+                                          colorModel:
+                                              LiquidGlassColorModel.direct(
+                                                saturation: 0.8,
+                                              ),
                                         )
                                       : const LiquidGlassAppearance(),
                                   shape: const LiquidOval(),

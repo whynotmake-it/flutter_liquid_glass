@@ -160,5 +160,50 @@ void main() {
       },
       skip: skipProperGlassTests,
     );
+
+    testWidgets(
+      'warns once when a layer has more shapes than it renders',
+      (tester) async {
+        final messages = <String>[];
+        final previousDebugPrint = debugPrint;
+        debugPrint = (message, {wrapWidth}) {
+          if (message != null) messages.add(message);
+        };
+        try {
+          await tester.runAsync(LiquidGlass.precache);
+          await tester.pumpWidget(
+            CupertinoApp(
+              home: LiquidGlassLayer(
+                child: LiquidGlassBlendGroup(
+                  child: Wrap(
+                    children: [
+                      for (
+                        var i = 0;
+                        i <= LiquidGlassBlendGroup.maxShapesPerLayer;
+                        i++
+                      )
+                        const LiquidGlass.grouped(
+                          shape: LiquidOval(),
+                          child: SizedBox.square(dimension: 20),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.pump();
+
+          expect(
+            messages.where((message) => message.contains('are not drawn')),
+            hasLength(1),
+          );
+        } finally {
+          debugPrint = previousDebugPrint;
+        }
+      },
+      skip: skipProperGlassTests,
+    );
   });
 }

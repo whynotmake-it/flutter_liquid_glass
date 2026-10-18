@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
 /// Conservative pixel support of Flutter's Gaussian shadow mask.
@@ -184,21 +184,16 @@ class _RenderGlassShadow extends RenderProxyBox {
 
 @internal
 void drawGlassShape(Canvas canvas, LiquidShape shape, Rect rect, Paint paint) {
+  final radius = Radius.circular(shape.cornerRadius);
   switch (shape) {
-    case LiquidRoundedSuperellipse(:final borderRadius):
+    case LiquidRoundedSuperellipse():
       canvas.drawRSuperellipse(
-        RSuperellipse.fromRectAndRadius(
-          rect,
-          Radius.circular(borderRadius),
-        ),
+        RSuperellipse.fromRectAndRadius(rect, radius),
         paint,
       );
     case LiquidOval():
       canvas.drawOval(rect, paint);
-    case LiquidRoundedRectangle(:final borderRadius):
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(borderRadius)),
-        paint,
-      );
+    case LiquidRoundedRectangle():
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), paint);
   }
 }

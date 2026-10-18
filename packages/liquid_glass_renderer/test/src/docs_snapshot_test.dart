@@ -86,8 +86,8 @@ void _docsSnapshot({
   );
 }
 
-final _clearGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 0);
-final _softGlass = LiquidGlassSettings.ios27ToolbarLight(frost: 8);
+final _clearGlass = LiquidGlassSettings.ios27RegularLight(frost: 0);
+final _softGlass = LiquidGlassSettings.ios27RegularLight(frost: 8);
 const _exampleShadow = BoxShadow(
   color: Color.from(alpha: 0.03, red: 0, green: 0, blue: 0),
   offset: Offset(0, 6),

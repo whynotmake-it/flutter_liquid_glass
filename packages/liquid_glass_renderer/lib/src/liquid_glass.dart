@@ -58,9 +58,8 @@ class LiquidGlass extends StatefulWidget {
     this.shadows = const [],
     this.appearance,
     super.key,
-  }) : grouped = false,
-       blendGroupLink = null,
-       ownLayerConfig = null,
+  }) : _grouped = false,
+       _ownLayerConfig = null,
        _auto = false;
 
   /// Creates a new [LiquidGlass] that automatically renders on a parent
@@ -88,9 +87,8 @@ class LiquidGlass extends StatefulWidget {
     this.clipBehavior = Clip.hardEdge,
     this.shadows = const [],
     this.appearance,
-  }) : grouped = true,
-       blendGroupLink = null,
-       ownLayerConfig = (
+  }) : _grouped = true,
+       _ownLayerConfig = (
          settings: settings,
          fake: fake,
          useBackdropGroup: useBackdropGroup,
@@ -108,11 +106,10 @@ class LiquidGlass extends StatefulWidget {
     required this.shape,
     super.key,
     this.clipBehavior = Clip.hardEdge,
-    this.blendGroupLink,
     this.shadows = const [],
     this.appearance,
-  }) : ownLayerConfig = null,
-       grouped = true,
+  }) : _ownLayerConfig = null,
+       _grouped = true,
        _auto = false;
 
   /// Creates a new [LiquidGlass] that creates its own [LiquidGlassLayer].
@@ -133,16 +130,15 @@ class LiquidGlass extends StatefulWidget {
     BackdropKey? backdropKey,
     super.key,
     this.clipBehavior = Clip.hardEdge,
-    this.blendGroupLink,
     this.shadows = const [],
     this.appearance,
-  }) : ownLayerConfig = (
+  }) : _ownLayerConfig = (
          settings: settings,
          fake: fake,
          useBackdropGroup: useBackdropGroup,
          backdropKey: backdropKey,
        ),
-       grouped = false,
+       _grouped = false,
        _auto = false;
 
   /// The child of this widget.
@@ -162,20 +158,11 @@ class LiquidGlass extends StatefulWidget {
   /// Defaults to [Clip.hardEdge], so [child] is clipped to the glass shape.
   final Clip clipBehavior;
 
-  /// Whether this glass is part of a blend group.
-  final bool grouped;
-
-  /// The link to this glass's blend group if it is part of one.
-  final GlassGroupLink? blendGroupLink;
+  /// Whether this glass joins the nearest [LiquidGlassBlendGroup].
+  final bool _grouped;
 
   /// The settings for this glass if it is supposed to create its own layer.
-  final ({
-    LiquidGlassSettings settings,
-    bool fake,
-    bool useBackdropGroup,
-    BackdropKey? backdropKey,
-  })?
-  ownLayerConfig;
+  final _OwnLayerConfig? _ownLayerConfig;
 
   /// The list of shadows to paint.
   ///
@@ -232,7 +219,7 @@ class _LiquidGlassState extends State<LiquidGlass> {
       return _buildGlass(context);
     }
 
-    if (widget.ownLayerConfig case final config?) {
+    if (widget._ownLayerConfig case final config?) {
       return LiquidGlassLayer(
         settings: config.settings,
         defaultAppearance: widget.appearance,
@@ -243,7 +230,7 @@ class _LiquidGlassState extends State<LiquidGlass> {
       );
     }
 
-    if (!widget.grouped &&
+    if (!widget._grouped &&
         _nearestLiquidGlassBoundary(context) ==
             _LiquidGlassAncestorBoundary.glass) {
       final scope = LiquidGlassRenderScope.of(context);
@@ -298,8 +285,8 @@ class _LiquidGlassState extends State<LiquidGlass> {
       );
     }
 
-    final groupLink = widget.grouped
-        ? widget.blendGroupLink ?? LiquidGlassBlendGroup.maybeOf(context)
+    final groupLink = widget._grouped
+        ? LiquidGlassBlendGroup.maybeOf(context)
         : null;
     return _buildContent(context, groupLink, appearance);
   }
@@ -362,6 +349,13 @@ class _LiquidGlassState extends State<LiquidGlass> {
 }
 
 enum _LiquidGlassAncestorBoundary { none, glass, layer }
+
+typedef _OwnLayerConfig = ({
+  LiquidGlassSettings settings,
+  bool fake,
+  bool useBackdropGroup,
+  BackdropKey? backdropKey,
+});
 
 class _RawLiquidGlass extends SingleChildRenderObjectWidget {
   const _RawLiquidGlass({

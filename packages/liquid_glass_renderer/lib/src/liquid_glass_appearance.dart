@@ -1,24 +1,31 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
+import 'package:meta/meta.dart';
 
 /// Lightweight color and materialization controls for one glass shape.
 ///
 /// Optical geometry and surface lighting belong to the containing
-/// `LiquidGlassLayer`. These values may vary between shapes without requiring
-/// another backdrop capture.
-class LiquidGlassAppearance with Equatable {
+/// `LiquidGlassLayer`. These values may differ between shapes that share a
+/// layer.
+///
+/// Colors and color transfers are display-referred. The defaults of the
+/// unnamed constructor may be retuned before 1.0; the version-named presets
+/// (`ios27*`) track Apple's appearance on that OS version.
+final class LiquidGlassAppearance with Equatable {
   /// Creates a per-shape glass appearance.
+  ///
+  /// The defaults may be retuned before 1.0.
   const LiquidGlassAppearance({
     this.tint = const Color.fromARGB(0, 255, 255, 255),
-    this.saturation = 1,
-    this.transmissionGamma = 1,
-    this.vibrancy = 0,
     this.visibility = 1,
     this.colorModel = const LiquidGlassColorModel.direct(),
   });
 
   /// Restores an appearance produced by [toJson].
+  ///
+  /// The JSON schema is experimental and may change between releases.
+  @experimental
   factory LiquidGlassAppearance.fromJson(Map<String, Object?> json) {
     double number(String key, double fallback) =>
         (json[key] as num?)?.toDouble() ?? fallback;
@@ -26,22 +33,17 @@ class LiquidGlassAppearance with Equatable {
     final colorModel = LiquidGlassColorModel.fromJson(json['colorModel']);
     return LiquidGlassAppearance(
       tint: tint is num ? Color(tint.toInt()) : const Color(0x00FFFFFF),
-      saturation: number('saturation', 1),
-      transmissionGamma: number('transmissionGamma', 1),
-      vibrancy: number('vibrancy', 0),
       visibility: number('visibility', 1),
       colorModel: colorModel,
     );
   }
 
-  /// The fitted light iOS 27 regular-material appearance.
+  /// The fitted light iOS 27 regular-material appearance (`Glass.regular`,
+  /// which Apple also uses for toolbars and `.glass` buttons).
   const LiquidGlassAppearance.ios27RegularLight({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
+  }) : colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.light,
        );
 
@@ -49,10 +51,7 @@ class LiquidGlassAppearance with Equatable {
   const LiquidGlassAppearance.ios27RegularDark({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
+  }) : colorModel = const LiquidGlassColorModel.ios27(
          brightness: Brightness.dark,
        );
 
@@ -71,114 +70,46 @@ class LiquidGlassAppearance with Equatable {
           visibility: visibility,
         );
 
-  /// The fitted light iOS 27 toolbar appearance.
-  const LiquidGlassAppearance.ios27ToolbarLight({
-    this.tint = const Color(0x00007AFF),
-    this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
-         brightness: Brightness.light,
-       );
-
-  /// The fitted dark iOS 27 toolbar appearance.
-  const LiquidGlassAppearance.ios27ToolbarDark({
-    this.tint = const Color(0x00007AFF),
-    this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27(
-         brightness: Brightness.dark,
-       );
-
-  /// Creates the fitted iOS 27 toolbar appearance for [brightness].
-  factory LiquidGlassAppearance.ios27Toolbar({
-    required Brightness brightness,
-    Color tint = const Color(0x00007AFF),
-    double visibility = 1,
-  }) => brightness == Brightness.dark
-      ? LiquidGlassAppearance.ios27ToolbarDark(
-          tint: tint,
-          visibility: visibility,
-        )
-      : LiquidGlassAppearance.ios27ToolbarLight(
-          tint: tint,
-          visibility: visibility,
-        );
-
   /// The fitted iOS 27 `Glass.clear` appearance, identical in light and dark.
   const LiquidGlassAppearance.ios27Clear({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
-  }) : saturation = 1,
-       transmissionGamma = 1,
-       vibrancy = 0,
-       colorModel = const LiquidGlassColorModel.ios27Clear();
+  }) : colorModel = const LiquidGlassColorModel.ios27Clear();
 
   /// Material tint; alpha controls how strongly it mixes with the backdrop.
   final Color tint;
-
-  /// Saturation applied to transmitted backdrop content.
-  ///
-  /// With an iOS 27 [colorModel] this scales Apple's own chroma transfer, so
-  /// `1` is the platform face.
-  final double saturation;
-
-  /// Display-referred transfer applied to transmitted content.
-  ///
-  /// With an iOS 27 [colorModel] this is applied on top of Apple's luminance
-  /// transfer, so `1` is the platform face.
-  final double transmissionGamma;
-
-  /// Backdrop-aware chroma lift.
-  final double vibrancy;
 
   /// Shape materialization progress, conventionally from zero to one.
   final double visibility;
 
   /// The transfer model used to combine [tint] with the backdrop.
   ///
-  /// The iOS 27 models derive the accompanying tonal response automatically;
-  /// use [LiquidGlassColorModel.direct] with the other fields for unrestricted
-  /// manual control.
+  /// [LiquidGlassColorModel.direct] carries its own saturation, gamma and
+  /// vibrancy; the iOS 27 models derive the accompanying tonal response
+  /// automatically from their fitted parameters.
   final LiquidGlassColorModel colorModel;
 
   /// Returns a copy with the supplied appearance controls replaced.
   LiquidGlassAppearance copyWith({
     Color? tint,
-    double? saturation,
-    double? transmissionGamma,
-    double? vibrancy,
     double? visibility,
     LiquidGlassColorModel? colorModel,
   }) => LiquidGlassAppearance(
     tint: tint ?? this.tint,
-    saturation: saturation ?? this.saturation,
-    transmissionGamma: transmissionGamma ?? this.transmissionGamma,
-    vibrancy: vibrancy ?? this.vibrancy,
     visibility: visibility ?? this.visibility,
     colorModel: colorModel ?? this.colorModel,
   );
 
   /// Serializes this lightweight appearance for presets and tooling.
+  ///
+  /// The JSON schema is experimental and may change between releases.
+  @experimental
   Map<String, Object> toJson() => {
     'tint': tint.toARGB32(),
-    'saturation': saturation,
-    'transmissionGamma': transmissionGamma,
-    'vibrancy': vibrancy,
     'visibility': visibility,
     'colorModel': colorModel.toJson(),
   };
 
   @override
-  List<Object?> get props => [
-    tint,
-    saturation,
-    transmissionGamma,
-    vibrancy,
-    visibility,
-    colorModel,
-  ];
+  List<Object?> get props => [tint, visibility, colorModel];
 }

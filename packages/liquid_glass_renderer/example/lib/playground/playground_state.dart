@@ -111,7 +111,7 @@ class PlaygroundState {
   PlaygroundState({Brightness? brightness})
     : material = ValueNotifier(
         GlassMaterial.preset(
-          style: GlassStyle.toolbar,
+          style: GlassStyle.regular,
           brightness: brightness ?? Brightness.light,
         ),
       );

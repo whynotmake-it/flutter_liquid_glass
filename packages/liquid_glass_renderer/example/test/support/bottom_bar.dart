@@ -77,7 +77,7 @@ class LiquidGlassBottomBar extends StatefulWidget {
 class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
   @override
   Widget build(BuildContext context) {
-    final glassSettings = LiquidGlassSettings.ios27Toolbar(
+    final glassSettings = LiquidGlassSettings.ios27Regular(
       brightness: MediaQuery.platformBrightnessOf(context),
     );
     final content = LiquidGlassBlendGroup(

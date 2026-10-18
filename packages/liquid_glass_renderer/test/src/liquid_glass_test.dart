@@ -326,7 +326,9 @@ void main() {
                         ),
                         2 => const LiquidGlassAppearance(
                           tint: Color(0x804080FF),
-                          saturation: 1.5,
+                          colorModel: LiquidGlassColorModel.direct(
+                            saturation: 1.5,
+                          ),
                         ),
                         _ => null,
                       },
@@ -537,7 +539,7 @@ void main() {
                         width: 340,
                         height: 220,
                         child: LiquidGlassLayer(
-                          settings: LiquidGlassSettings.ios27ToolbarLight(
+                          settings: LiquidGlassSettings.ios27RegularLight(
                             frost: 0,
                           ),
                           child: LiquidGlassBlendGroup(
@@ -622,7 +624,7 @@ void main() {
                         // golden proves that the directional bevel follows
                         // the smooth-union SDF instead of a shape bounds box.
                         settings:
-                            LiquidGlassSettings.ios27ToolbarLight(
+                            LiquidGlassSettings.ios27RegularLight(
                               frost: 0,
                             ).copyWith(
                               highlight: 0,
@@ -1380,26 +1382,32 @@ Widget _appearanceBlendScene({
 }) {
   const white = LiquidGlassAppearance(
     tint: Color(0x70FFFFFF),
-    saturation: .9,
-    transmissionGamma: .92,
-    vibrancy: .1,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: .9,
+      transmissionGamma: .92,
+      vibrancy: .1,
+    ),
   );
   const blue = LiquidGlassAppearance(
     tint: Color(0xA02870FF),
-    saturation: 1.8,
-    transmissionGamma: .72,
-    vibrancy: .3,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: 1.8,
+      transmissionGamma: .72,
+      vibrancy: .3,
+    ),
   );
   const coral = LiquidGlassAppearance(
     tint: Color(0xA0FF6048),
-    saturation: 1.35,
-    transmissionGamma: .82,
-    vibrancy: .2,
+    colorModel: LiquidGlassColorModel.direct(
+      saturation: 1.35,
+      transmissionGamma: .82,
+      vibrancy: .2,
+    ),
   );
 
   return buildWithGridPaper(
     LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       defaultAppearance: white,
       child: LiquidGlassBlendGroup(
         blend: 44,
@@ -1444,13 +1452,13 @@ Widget _appearanceBlendScene({
 }
 
 Widget _transparentTintBlendScene() {
-  const toolbar = LiquidGlassAppearance.ios27ToolbarLight();
-  const red = LiquidGlassAppearance.ios27ToolbarLight(
+  const toolbar = LiquidGlassAppearance.ios27RegularLight();
+  const red = LiquidGlassAppearance.ios27RegularLight(
     tint: Color(0xA0FF3B30),
   );
   return buildWithGridPaper(
     LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27ToolbarLight(frost: 0),
+      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
       defaultAppearance: toolbar,
       child: const LiquidGlassBlendGroup(
         blend: 44,

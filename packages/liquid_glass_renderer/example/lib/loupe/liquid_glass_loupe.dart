@@ -118,7 +118,7 @@ class LiquidGlassLoupe extends StatelessWidget {
 
   /// The glass optics and lighting.
   ///
-  /// Its [LiquidGlassSettings.tintAmount] is ignored: the iOS 27 loupe is
+  /// Its `tintAmount` is ignored: the iOS 27 loupe is
   /// identical at every Liquid Glass slider position.
   final LiquidGlassSettings settings;
 

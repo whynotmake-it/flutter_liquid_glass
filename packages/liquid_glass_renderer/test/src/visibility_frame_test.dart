@@ -57,7 +57,9 @@ void main() {
                           tint: mode == 'tint'
                               ? Color.lerp(Colors.blue, Colors.red, value)!
                               : const Color(0x604080FF),
-                          saturation: mode == 'response' ? 1 + value : 1,
+                          colorModel: LiquidGlassColorModel.direct(
+                            saturation: mode == 'response' ? 1 + value : 1,
+                          ),
                         );
                         final children = Stack(
                           children: [

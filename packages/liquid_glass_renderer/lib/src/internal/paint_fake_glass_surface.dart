@@ -108,10 +108,7 @@ void paintFakeGlassSurface(
   );
   final faceEmission =
       appearance.colorModel
-          .faceTransfer(
-            size.shortestSide,
-            tintAmount: settings.effectiveTintAmount,
-          )
+          .faceTransfer(tintAmount: settings.effectiveTintAmount)
           ?.emission ??
       const Color(0x00000000);
   final shapeType = switch (shape) {
@@ -119,11 +116,7 @@ void paintFakeGlassSurface(
     LiquidRoundedRectangle() => 1.0,
     LiquidRoundedSuperellipse() => 2.0,
   };
-  final cornerRadius = switch (shape) {
-    LiquidOval() => 0.0,
-    LiquidRoundedRectangle(:final borderRadius) => borderRadius,
-    LiquidRoundedSuperellipse(:final borderRadius) => borderRadius,
-  };
+  final cornerRadius = shape.cornerRadius;
   final opticalThickness = settings.effectiveEdgeDistanceRange;
   shader.setFloatUniforms((uniforms) {
     uniforms
@@ -138,7 +131,6 @@ void paintFakeGlassSurface(
         GlassRim.highlightOppositeStrength * appearanceVisibility,
         settings.contourStrength *
             appearance.colorModel.contourScale(
-              size.shortestSide,
               settings.effectiveTintAmount,
             ) *
             appearanceVisibility,

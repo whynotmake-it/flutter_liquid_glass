@@ -28,13 +28,20 @@ class LiquidGlassBlendGroup extends StatefulWidget {
   /// The child widget containing liquid glass shapes.
   final Widget child;
 
-  /// Maximum number of shapes supported per layer.
+  /// Maximum number of glass shapes one [LiquidGlassLayer] renders.
+  ///
+  /// The limit counts every shape on the layer, grouped or standalone.
+  /// Shapes beyond it are not drawn; debug builds print a warning when that
+  /// happens. Split the glass across several layers if you need more.
+  ///
+  /// Currently 16; may increase in a future release.
   static const int maxShapesPerLayer = 16;
 
   /// Retrieves the [GlassGroupLink] from the nearest ancestor
   /// [LiquidGlassBlendGroup].
   ///
   /// Can be used by child shapes to register themselves for blending.
+  @internal
   static GlassGroupLink of(BuildContext context) {
     final inherited = _InheritedLiquidGlassBlendGroup.of(context);
     assert(inherited != null, 'No LiquidGlassBlendGroup found in context');
@@ -43,6 +50,7 @@ class LiquidGlassBlendGroup extends StatefulWidget {
 
   /// Retrieves the [GlassGroupLink] from the nearest ancestor
   /// [LiquidGlassBlendGroup], or null if none is found.
+  @internal
   static GlassGroupLink? maybeOf(BuildContext context) {
     final inherited = _InheritedLiquidGlassBlendGroup.of(context);
     return inherited?.link;

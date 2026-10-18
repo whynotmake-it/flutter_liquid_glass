@@ -1,12 +1,26 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:meta/meta.dart';
 
 /// Represents a shape that can be used by a [LiquidGlass] widget.
+///
+/// The set of shapes is closed and sealed: use [LiquidRoundedSuperellipse],
+/// [LiquidOval] or [LiquidRoundedRectangle]. `switch`es over a [LiquidShape]
+/// are exhaustive, and adding a shape in a future release is a compile-time
+/// error for them rather than a silent fall-through.
+///
+/// Every shape is also an [OutlinedBorder], so it can be used wherever Flutter
+/// accepts a [ShapeBorder]. The glass renderer ignores [side]; it is only
+/// painted when the shape is used as a regular border, for example in a
+/// [ShapeDecoration].
 sealed class LiquidShape extends OutlinedBorder with Equatable {
   const LiquidShape({super.side = BorderSide.none});
 
-  @protected
+  /// Corner radius in logical pixels; `0` for shapes without corners.
+  @internal
+  double get cornerRadius;
+
   OutlinedBorder get _equivalentOutlinedBorder;
 
   @override
@@ -37,8 +51,10 @@ sealed class LiquidShape extends OutlinedBorder with Equatable {
 /// Represents a squircle shape that can be used by a [LiquidGlass] widget.
 ///
 /// Works like a [RoundedSuperellipseBorder].
-class LiquidRoundedSuperellipse extends LiquidShape {
+final class LiquidRoundedSuperellipse extends LiquidShape {
   /// Creates a new [LiquidRoundedSuperellipse] with the given [borderRadius].
+  ///
+  /// The glass ignores [side]; see [LiquidShape].
   const LiquidRoundedSuperellipse({
     required this.borderRadius,
     super.side = BorderSide.none,
@@ -48,6 +64,10 @@ class LiquidRoundedSuperellipse extends LiquidShape {
   ///
   /// This is the radius of the corners of the squircle.
   final double borderRadius;
+
+  @internal
+  @override
+  double get cornerRadius => borderRadius;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
@@ -81,12 +101,18 @@ class LiquidRoundedSuperellipse extends LiquidShape {
 /// Represents an ellipse shape that can be used by a [LiquidGlass] widget.
 ///
 /// Works like an [OvalBorder].
-class LiquidOval extends LiquidShape {
+final class LiquidOval extends LiquidShape {
   /// Creates a new [LiquidOval] with the given [side].
+  ///
+  /// The glass ignores [side]; see [LiquidShape].
   const LiquidOval({super.side = BorderSide.none});
 
+  @internal
   @override
-  OutlinedBorder get _equivalentOutlinedBorder => const OvalBorder();
+  double get cornerRadius => 0;
+
+  @override
+  OutlinedBorder get _equivalentOutlinedBorder => OvalBorder(side: side);
 
   @override
   OutlinedBorder copyWith({BorderSide? side}) {
@@ -107,8 +133,10 @@ class LiquidOval extends LiquidShape {
 /// widget.
 ///
 /// Works like a [RoundedRectangleBorder].
-class LiquidRoundedRectangle extends LiquidShape {
+final class LiquidRoundedRectangle extends LiquidShape {
   /// Creates a new [LiquidRoundedRectangle] with the given [borderRadius].
+  ///
+  /// The glass ignores [side]; see [LiquidShape].
   const LiquidRoundedRectangle({
     required this.borderRadius,
     super.side = BorderSide.none,
@@ -118,6 +146,10 @@ class LiquidRoundedRectangle extends LiquidShape {
   ///
   /// This is the radius of the corners of the rounded rectangle.
   final double borderRadius;
+
+  @internal
+  @override
+  double get cornerRadius => borderRadius;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedRectangleBorder(

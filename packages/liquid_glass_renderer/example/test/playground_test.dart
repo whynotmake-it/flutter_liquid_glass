@@ -16,16 +16,16 @@ void main() {
   group('GlassMaterial', () {
     test('presets follow brightness only where Apple does', () {
       final light = GlassMaterial.preset(
-        style: GlassStyle.toolbar,
+        style: GlassStyle.regular,
         brightness: Brightness.light,
       );
       expect(
         light.settings,
-        withTestFrost(LiquidGlassSettings.ios27ToolbarLight()),
+        withTestFrost(LiquidGlassSettings.ios27RegularLight()),
       );
       expect(
         light.withBrightness(Brightness.dark).settings,
-        withTestFrost(LiquidGlassSettings.ios27ToolbarDark()),
+        withTestFrost(LiquidGlassSettings.ios27RegularDark()),
       );
 
       final clear = GlassMaterial.preset(
@@ -41,7 +41,6 @@ void main() {
     test('the Liquid Glass slider keeps edits and owns the blur', () {
       for (final (style, frost) in [
         (GlassStyle.clear, LiquidGlassSettings.ios27ClearFrost(1)),
-        (GlassStyle.toolbar, LiquidGlassSettings.ios27RegularFrost(1)),
         (GlassStyle.regular, LiquidGlassSettings.ios27RegularFrost(1)),
       ]) {
         final preset = GlassMaterial.preset(
@@ -78,7 +77,7 @@ void main() {
 
     test('reset restores the preset at the current slider position', () {
       final material = GlassMaterial.preset(
-        style: GlassStyle.toolbar,
+        style: GlassStyle.regular,
         brightness: Brightness.dark,
       ).withTintAmount(0.5).withSettings(const LiquidGlassSettings());
 
@@ -88,7 +87,7 @@ void main() {
       expect(
         reset.settings,
         withTestFrost(
-          LiquidGlassSettings.ios27Toolbar(
+          LiquidGlassSettings.ios27Regular(
             brightness: Brightness.dark,
             tintAmount: 0.5,
           ),

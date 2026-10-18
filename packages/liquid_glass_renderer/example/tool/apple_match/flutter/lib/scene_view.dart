@@ -1,3 +1,6 @@
+// The harness drives the experimental JSON and color-model API on purpose.
+// ignore_for_file: experimental_member_use
+
 import 'package:flutter/material.dart';
 
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -94,12 +97,31 @@ LiquidGlassAppearance matchGlassAppearance(
       : clear
       ? const LiquidGlassColorModel.ios27Clear()
       : defaults.colorModel;
+  // The direct model carries saturation, gamma and vibrancy; the iOS 27 models
+  // carry the whole transfer in their fitted parameters. A file that pairs a
+  // stale direct-model fit with an adaptive model is rejected rather than
+  // silently rendering a different look than the reference.
+  final directFit =
+      settings.containsKey('saturation') ||
+      settings.containsKey('transmissionGamma') ||
+      settings.containsKey('vibrancy');
+  if (directFit && colorModel != const LiquidGlassColorModel.direct()) {
+    throw ArgumentError.value(
+      modelName,
+      'settings',
+      'direct-model saturation/transmissionGamma/vibrancy with an adaptive '
+          'colorModel',
+    );
+  }
   return LiquidGlassAppearance(
     tint: tint,
-    saturation: number('saturation', defaults.saturation),
-    transmissionGamma: number('transmissionGamma', defaults.transmissionGamma),
-    vibrancy: number('vibrancy', defaults.vibrancy),
-    colorModel: colorModel,
+    colorModel: directFit
+        ? LiquidGlassColorModel.direct(
+            saturation: number('saturation', 1),
+            transmissionGamma: number('transmissionGamma', 1),
+            vibrancy: number('vibrancy', 0),
+          )
+        : colorModel,
   );
 }
 

@@ -66,7 +66,7 @@ void main() {
           child: LiquidGlassLoupe(
             link: LiquidGlassLoupeLink(),
             settings: LiquidGlassLoupe.defaultSettings.copyWith(tintAmount: 1),
-            appearance: const LiquidGlassAppearance.ios27ToolbarLight(),
+            appearance: const LiquidGlassAppearance.ios27RegularLight(),
           ),
         ),
       ),

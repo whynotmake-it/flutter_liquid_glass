@@ -34,7 +34,10 @@ void main() {
   );
 
   const appearances = {
-    'direct': LiquidGlassAppearance(tint: Color(0x604080FF), saturation: 1.5),
+    'direct': LiquidGlassAppearance(
+      tint: Color(0x604080FF),
+      colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
+    ),
     'ios27 light': LiquidGlassAppearance.ios27RegularLight(),
     'ios27 dark': LiquidGlassAppearance.ios27RegularDark(),
   };

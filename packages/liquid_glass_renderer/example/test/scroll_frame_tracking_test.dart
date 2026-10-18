@@ -29,9 +29,9 @@ void main() {
             CupertinoApp(
               home: LiquidGlassLayer(
                 fake: fake,
-                settings: LiquidGlassSettings.ios27ToolbarLight(),
+                settings: LiquidGlassSettings.ios27RegularLight(),
                 defaultAppearance:
-                    const LiquidGlassAppearance.ios27ToolbarLight(),
+                    const LiquidGlassAppearance.ios27RegularLight(),
                 child: ScrollingGlass(blended: blended),
               ),
             ),

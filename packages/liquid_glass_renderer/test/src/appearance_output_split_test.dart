@@ -202,13 +202,19 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
       });
       await check('tint to general', () {
         appearances = [
-          const LiquidGlassAppearance(tint: Color(0x906030FF), saturation: 0.4),
+          const LiquidGlassAppearance(
+            tint: Color(0x906030FF),
+            colorModel: LiquidGlassColorModel.direct(saturation: 0.4),
+          ),
           ...appearances.skip(1),
         ];
       });
       await check('general appearance', () {
         appearances = [
-          const LiquidGlassAppearance(tint: Color(0x906030FF), saturation: 1.6),
+          const LiquidGlassAppearance(
+            tint: Color(0x906030FF),
+            colorModel: LiquidGlassColorModel.direct(saturation: 1.6),
+          ),
           ...appearances.skip(1),
         ];
       });
@@ -264,7 +270,10 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
       );
       await check('appearance after translation', () {
         appearances = [
-          const LiquidGlassAppearance(tint: Color(0x60FF8030), vibrancy: 0.3),
+          const LiquidGlassAppearance(
+            tint: Color(0x60FF8030),
+            colorModel: LiquidGlassColorModel.direct(vibrancy: 0.3),
+          ),
           ...appearances.skip(1),
         ];
       });
@@ -307,7 +316,9 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
           appearances = [
             LiquidGlassAppearance(
               tint: const Color(0x906030FF),
-              saturation: general ? 0.4 : 1,
+              colorModel: LiquidGlassColorModel.direct(
+                saturation: general ? 0.4 : 1,
+              ),
             ),
             ...appearances.skip(1),
           ];

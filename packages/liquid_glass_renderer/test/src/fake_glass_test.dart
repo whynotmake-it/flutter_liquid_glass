@@ -122,7 +122,7 @@ void main() {
                 ),
                 appearance: LiquidGlassAppearance(
                   tint: Color.fromARGB(128, 0, 0, 255),
-                  saturation: 1.5,
+                  colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
                 ),
                 shape: LiquidRoundedSuperellipse(borderRadius: 40),
                 child: SizedBox.square(dimension: 300),
@@ -340,8 +340,8 @@ Widget _comparisonSurface({
   return Center(
     child: LiquidGlassLayer(
       fake: fake,
-      settings: LiquidGlassSettings.ios27Toolbar(brightness: brightness),
-      defaultAppearance: LiquidGlassAppearance.ios27Toolbar(
+      settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
+      defaultAppearance: LiquidGlassAppearance.ios27Regular(
         brightness: brightness,
       ),
       child: const LiquidGlassBlendGroup(
