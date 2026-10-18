@@ -47,9 +47,10 @@ prerelease; APIs and rendering may still change.
   so unconfigured glass looks different from `0.2.x`. These defaults may be
   retuned before 1.0; the `ios27*` presets track iOS 27.
 - **A smaller, closed public API.**
-  - `LiquidShape` is an `abstract final class` and `LiquidOval`,
-    `LiquidRoundedRectangle` and `LiquidRoundedSuperellipse` are `final`:
-    shapes can't be subclassed or switched over exhaustively. The glass
+  - `LiquidShape` is `sealed`; `LiquidOval`, `LiquidRoundedRectangle` and
+    `LiquidRoundedSuperellipse` are `final`: the set of shapes is closed and
+    `switch`es over a `LiquidShape` are exhaustive, so adding a shape later is
+    a compile-time error rather than silently falling through. The glass
     ignores a shape's `side`.
   - `LiquidGlassSettings`, `LiquidGlassAppearance` and `LgrLogs` are `final`.
   - `LiquidGlass.grouped` and `LiquidGlass.withOwnLayer` no longer take

@@ -3,26 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:meta/meta.dart';
 
-/// The geometric primitive behind a [LiquidShape].
-@internal
-enum LiquidShapeKind { roundedSuperellipse, oval, roundedRectangle }
-
 /// Represents a shape that can be used by a [LiquidGlass] widget.
 ///
-/// The set of shapes is closed: use [LiquidRoundedSuperellipse], [LiquidOval]
-/// or [LiquidRoundedRectangle]. More shapes may be added in future releases,
-/// so code should not assume these are the only ones.
+/// The set of shapes is closed and sealed: use [LiquidRoundedSuperellipse],
+/// [LiquidOval] or [LiquidRoundedRectangle]. `switch`es over a [LiquidShape]
+/// are exhaustive, and adding a shape in a future release is a compile-time
+/// error for them rather than a silent fall-through.
 ///
 /// Every shape is also an [OutlinedBorder], so it can be used wherever Flutter
 /// accepts a [ShapeBorder]. The glass renderer ignores [side]; it is only
 /// painted when the shape is used as a regular border, for example in a
 /// [ShapeDecoration].
-abstract final class LiquidShape extends OutlinedBorder with Equatable {
+sealed class LiquidShape extends OutlinedBorder with Equatable {
   const LiquidShape({super.side = BorderSide.none});
-
-  /// Which primitive the renderer draws for this shape.
-  @internal
-  LiquidShapeKind get kind;
 
   /// Corner radius in logical pixels; `0` for shapes without corners.
   @internal
@@ -74,10 +67,6 @@ final class LiquidRoundedSuperellipse extends LiquidShape {
 
   @internal
   @override
-  LiquidShapeKind get kind => LiquidShapeKind.roundedSuperellipse;
-
-  @internal
-  @override
   double get cornerRadius => borderRadius;
 
   @override
@@ -120,10 +109,6 @@ final class LiquidOval extends LiquidShape {
 
   @internal
   @override
-  LiquidShapeKind get kind => LiquidShapeKind.oval;
-
-  @internal
-  @override
   double get cornerRadius => 0;
 
   @override
@@ -161,10 +146,6 @@ final class LiquidRoundedRectangle extends LiquidShape {
   ///
   /// This is the radius of the corners of the rounded rectangle.
   final double borderRadius;
-
-  @internal
-  @override
-  LiquidShapeKind get kind => LiquidShapeKind.roundedRectangle;
 
   @internal
   @override

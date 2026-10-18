@@ -7,7 +7,6 @@ import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
-import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 
 /// Extra logical pixels required for the portion of the contour that lies
 /// outside the shape's nominal bounds.
@@ -115,10 +114,10 @@ void paintFakeGlassSurface(
           )
           ?.emission ??
       const Color(0x00000000);
-  final shapeType = switch (shape.kind) {
-    LiquidShapeKind.oval => 0.0,
-    LiquidShapeKind.roundedRectangle => 1.0,
-    LiquidShapeKind.roundedSuperellipse => 2.0,
+  final shapeType = switch (shape) {
+    LiquidOval() => 0.0,
+    LiquidRoundedRectangle() => 1.0,
+    LiquidRoundedSuperellipse() => 2.0,
   };
   final cornerRadius = shape.cornerRadius;
   final opticalThickness = settings.effectiveEdgeDistanceRange;
