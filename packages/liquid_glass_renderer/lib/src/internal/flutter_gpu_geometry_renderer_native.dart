@@ -86,7 +86,7 @@ class FlutterGpuGeometryRenderer {
           materialGradientFragmentShader == null ||
           materialTintGradientFragmentShader == null) {
         throw StateError(
-          'LiquidGlass requires Flutter GPU. Run with Flutter 3.47 or newer '
+          'LiquidGlass requires Flutter GPU. Run with Flutter 3.44 '
           'and enable Flutter GPU for the target platform.',
         );
       }
@@ -425,8 +425,9 @@ class FlutterGpuGeometryRenderer {
       matteScale: scale,
     );
 
-    final uniformView = _hostBufferForUniformSize(_uniformSize)
-        .emplace(_uniformData);
+    final uniformView = _hostBufferForUniformSize(
+      _uniformSize,
+    ).emplace(_uniformData);
 
     if (writeMatte) {
       assert(() {
