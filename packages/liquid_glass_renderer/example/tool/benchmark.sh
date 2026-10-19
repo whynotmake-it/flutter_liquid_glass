@@ -70,6 +70,9 @@ command -v "$FLUTTER_BIN" >/dev/null || { echo "flutter is required" >&2; exit 1
 command -v "$DART_BIN" >/dev/null || { echo "dart is required" >&2; exit 1; }
 command -v xcrun >/dev/null || { echo "Xcode command-line tools are required" >&2; exit 1; }
 
+export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
+export PATH="$SCRIPT_DIR/apple_match/compat/bin:$PATH"
+
 if [[ -d "$RESULT_DIR" ]]; then
   if [[ -n "$(ls -A "$RESULT_DIR")" && "$OVERWRITE_RESULTS" != "1" ]]; then
     echo "Benchmark result directory is not empty: $RESULT_DIR" >&2
