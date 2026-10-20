@@ -36,6 +36,7 @@ final class LiquidGlassSettings with Equatable {
     this.contourDirectionality = 0.77,
     this.bevelShadowStrength = 0.036,
     this.tintAmount = 0.0,
+    this.lightDirection = const Offset(0, 1),
   }) : frost = frost ?? _minBlurPassSigma,
        _frostIsFloorEligible = frost == null;
 
@@ -57,6 +58,7 @@ final class LiquidGlassSettings with Equatable {
     this.contourDirectionality = 0.77,
     this.bevelShadowStrength = 0.036,
     this.tintAmount = 0.0,
+    this.lightDirection = const Offset(0, 1),
     bool floorEligible = false,
   }) : _frostIsFloorEligible = floorEligible;
 
@@ -90,6 +92,10 @@ final class LiquidGlassSettings with Equatable {
         defaults.bevelShadowStrength,
       ),
       tintAmount: number('tintAmount', defaults.tintAmount),
+      lightDirection: Offset(
+        number('lightDirectionX', defaults.lightDirection.dx),
+        number('lightDirectionY', defaults.lightDirection.dy),
+      ),
     );
   }
 
@@ -364,6 +370,16 @@ final class LiquidGlassSettings with Equatable {
   /// from the same position ([ios27RegularFrost], [ios27ClearFrost]).
   final double tintAmount;
 
+  /// Direction the light travels across the screen, with y pointing down.
+  ///
+  /// The default `Offset(0, 1)` lights the glass from the top, as on iOS 27.
+  /// The glint sits on both walls along this axis, and the inner bevel
+  /// shadow falls on the wall that faces the light. Design tools such as
+  /// Figma give a light angle instead: a light at `degrees` clockwise from
+  /// the top travels along `Offset(-sin(radians), cos(radians))`. The length
+  /// is ignored; a zero offset keeps the default.
+  final Offset lightDirection;
+
   /// Whether [frost] came from the default constructor's default or a
   /// preset's floored path, so the renderer may raise it to the device's
   /// Impeller downsampling point. An explicitly passed [frost] clears it.
@@ -422,6 +438,13 @@ final class LiquidGlassSettings with Equatable {
   @internal
   double get effectiveEdgeDistanceRange => math.max(12, refractionHeight);
 
+  /// [lightDirection] as a unit vector; the default for a zero offset.
+  @internal
+  Offset get effectiveLightDirection {
+    final length = lightDirection.distance;
+    return length > 0 ? lightDirection / length : const Offset(0, 1);
+  }
+
   /// Width of the dark border in logical pixels; `0` without a border.
   @internal
   double get contourWidth => contourStrength > 0 ? GlassRim.contourWidth : 0;
@@ -439,6 +462,7 @@ final class LiquidGlassSettings with Equatable {
     double? contourDirectionality,
     double? bevelShadowStrength,
     double? tintAmount,
+    Offset? lightDirection,
   }) => LiquidGlassSettings._(
     refractionHeight: refractionHeight ?? this.refractionHeight,
     refractionAmount: refractionAmount ?? this.refractionAmount,
@@ -453,6 +477,7 @@ final class LiquidGlassSettings with Equatable {
     contourDirectionality: contourDirectionality ?? this.contourDirectionality,
     bevelShadowStrength: bevelShadowStrength ?? this.bevelShadowStrength,
     tintAmount: tintAmount ?? this.tintAmount,
+    lightDirection: lightDirection ?? this.lightDirection,
   );
 
   /// Serializes the public material vector for example presets and tooling.
@@ -471,6 +496,8 @@ final class LiquidGlassSettings with Equatable {
     'contourDirectionality': contourDirectionality,
     'bevelShadowStrength': bevelShadowStrength,
     'tintAmount': tintAmount,
+    'lightDirectionX': lightDirection.dx,
+    'lightDirectionY': lightDirection.dy,
   };
 
   @override
@@ -486,6 +513,7 @@ final class LiquidGlassSettings with Equatable {
     contourDirectionality,
     bevelShadowStrength,
     tintAmount,
+    lightDirection,
     _frostIsFloorEligible,
   ];
 }

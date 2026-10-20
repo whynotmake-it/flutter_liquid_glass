@@ -11,7 +11,9 @@
     "contourStrength",
     "contourDirectionality",
     "bevelShadowStrength",
-    "tintAmount"
+    "tintAmount",
+    "lightDirectionX",
+    "lightDirectionY"
   ],
   "appearance": [
     "tint",

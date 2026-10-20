@@ -137,6 +137,7 @@ void main() {
       contourDirectionality: .5,
       bevelShadowStrength: .03,
       tintAmount: .3,
+      lightDirection: const Offset(.6, .8),
     );
     expect(LiquidGlassSettings.fromJson(original.toJson()), original);
   });
