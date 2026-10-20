@@ -24,9 +24,10 @@ class BottomBarTab {
 /// can merge with neighboring bar segments. The loupe renders in its own
 /// small glass layer, mounted only while it is visible, because it has to
 /// refract the capsule and the icons painted beneath it. Like Apple's, it
-/// shows the bar a little smaller through its `backdropShrink`, and the
-/// tinted icons under it are scaled up by the same amount so they keep their
-/// size.
+/// shows the bar a little smaller through its `backdropShrink`. The selected
+/// tab's tint stays in the backdrop so the lens distorts it too; its source
+/// mask covers the lens's larger sampling region, and the untinted row is
+/// repainted outside the lens so that source mask never leaks.
 ///
 /// The drag and motion follow the original example bottom bar: pointer
 /// positions from a horizontal drag, an interactive spring while dragging,
@@ -47,7 +48,6 @@ class LoupeTabBar extends StatefulWidget {
     this.tint,
     this.tintBrightness,
     this.loupeSettings = defaultLoupeSettings,
-    this.loupeIconScale = 1.1,
     super.key,
   }) : assert(tabs.length > 0, 'A tab bar needs at least one tab.');
 
@@ -89,12 +89,6 @@ class LoupeTabBar extends StatefulWidget {
   ///
   /// Its `backdropShrink` is how much smaller the bar looks inside the loupe.
   final LiquidGlassSettings loupeSettings;
-
-  /// How much larger the tinted icons in the loupe look than the others.
-  ///
-  /// Grows in with the loupe, so the resting platter's icons keep their
-  /// size.
-  final double loupeIconScale;
 
   /// A clear, unfrosted lens like the iOS 27 tab bar's: it shows the bar
   /// 14% smaller and bends and splits the colors only in a 3–4 pt band along
@@ -186,7 +180,6 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     jelly: _jelly,
     tabCount: widget.tabs.length,
     backdropShrink: widget.loupeSettings.backdropShrink,
-    iconScale: widget.loupeIconScale,
   );
   late final _barTransform = Listenable.merge([_press, _stretch]);
   final _showLoupe = ValueNotifier(false);
@@ -228,8 +221,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     super.didUpdateWidget(oldWidget);
     _selection
       ..tabCount = widget.tabs.length
-      ..backdropShrink = widget.loupeSettings.backdropShrink
-      ..iconScale = widget.loupeIconScale;
+      ..backdropShrink = widget.loupeSettings.backdropShrink;
     if (widget.selectedIndex != oldWidget.selectedIndex) {
       _selected = widget.selectedIndex;
       if (!_held) _moveTo(_selected);
@@ -512,6 +504,15 @@ class _LoupeTabBarState extends State<LoupeTabBar>
                   if (widget.fake) loupe,
                   bar,
                   if (!widget.fake) loupe,
+                  // Hide the tint source mask's spill outside the lens. This
+                  // paints after the loupe, so it cannot change the backdrop
+                  // the lens samples. Without a visible loupe the source mask
+                  // does not spill, so skip the duplicate row entirely.
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _showLoupe,
+                    builder: (context, show, _) =>
+                        show ? _buildTintCover(label) : const SizedBox.shrink(),
+                  ),
                 ],
               ),
             ),
@@ -532,24 +533,16 @@ class _LoupeTabBarState extends State<LoupeTabBar>
       children: [
         CustomPaint(painter: TabPlatterPainter(_selection, layers: platter)),
         ClipPath(
-          clipper: TabSelectionClipper(_selection, inverse: true),
+          clipper: TabSelectionClipper(_selection, inverse: true, source: true),
           child: _buildRow(label, semantics: true),
         ),
         IgnorePointer(
           child: ExcludeSemantics(
             child: ClipPath(
-              clipper: TabSelectionClipper(_selection),
-              child: ListenableTransform(
-                listenable: _selection.listenable,
-                transform: (size) => scaleAbout(
-                  _selection.rect(size).center,
-                  _selection.tintScale,
-                ),
-                child: _buildRow(
-                  tint,
-                  foregrounds: vibrantTintPaints(tint, tintBrightness),
-                  magnify: true,
-                ),
+              clipper: TabSelectionClipper(_selection, source: true),
+              child: _buildRow(
+                tint,
+                foregrounds: vibrantTintPaints(tint, tintBrightness),
               ),
             ),
           ),
@@ -558,24 +551,38 @@ class _LoupeTabBarState extends State<LoupeTabBar>
     );
   }
 
+  /// Repaints the untinted row over the tint source mask's spill outside the
+  /// lens.
+  ///
+  /// The tint lives in the backdrop so the lens distorts it. To fill the lens
+  /// after its [LiquidGlassSettings.backdropShrink], its source mask is larger
+  /// than the lens; that larger mask would otherwise show tint around the
+  /// loupe. This cover is painted after the lens and clipped to the lens
+  /// shape, so it hides the spill without touching what the lens samples.
+  Widget _buildTintCover(Color label) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ExcludeSemantics(
+          child: Padding(
+            padding: _padding,
+            child: ClipPath(
+              clipper: TabSelectionClipper(_selection, inverse: true),
+              child: _buildRow(label),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRow(
     Color color, {
     bool semantics = false,
     List<Paint>? foregrounds,
-    bool magnify = false,
   }) {
-    Widget item(BottomBarTab tab) {
-      final child = RepaintBoundary(
-        child: _TabItem(tab: tab, color: color, foregrounds: foregrounds),
-      );
-      if (!magnify) return child;
-      return ListenableTransform(
-        listenable: _press,
-        transform: (size) =>
-            scaleAbout(size.center(Offset.zero), _selection.iconGrowth),
-        child: child,
-      );
-    }
+    Widget item(BottomBarTab tab) => RepaintBoundary(
+      child: _TabItem(tab: tab, color: color, foregrounds: foregrounds),
+    );
 
     return Row(
       children: [
@@ -623,7 +630,7 @@ class _LoupeTabBarState extends State<LoupeTabBar>
                         visibility: visibility,
                       ),
                       shape: const LiquidRoundedSuperellipse(
-                        borderRadius: 64,
+                        borderRadius: TabSelection.loupeCornerRadius,
                       ),
                       child: const SizedBox.expand(),
                     ),
