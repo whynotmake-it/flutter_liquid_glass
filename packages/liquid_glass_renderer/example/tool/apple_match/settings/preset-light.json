@@ -1,0 +1,15 @@
+{
+  "refractionHeight": 20,
+  "refractionAmount": 60,
+  "refractionFitsShape": true,
+  "backdropShrink": 0,
+  "dispersion": 0,
+  "highlight": 0.6,
+  "contourStrength": 0.43,
+  "contourDirectionality": 0.77,
+  "bevelShadowStrength": 0.036,
+  "tintAmount": 0,
+  "colorModel": "ios27Light",
+  "shadowAlpha": 0,
+  "contactShadowAlpha": 0
+}

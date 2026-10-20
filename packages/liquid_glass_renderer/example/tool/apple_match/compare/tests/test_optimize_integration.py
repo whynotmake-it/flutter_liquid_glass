@@ -38,7 +38,11 @@ class OnlineLoopSmokeTests(unittest.TestCase):
         scene = load_scene(scene_path)
         probes = probe_ids(scene)
         reference_dir = (
-            ROOT / "references" / "ios27-iphone17pro-light" / scene["id"]
+            ROOT
+            / "references"
+            / "ios27-iphone17pro-reduce-motion-off"
+            / "slider-000"
+            / scene["id"]
         )
         baseline = json.loads(
             (ROOT / "settings/baseline.json").read_text()

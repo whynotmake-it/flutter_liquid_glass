@@ -663,21 +663,66 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     shader.setFloat(52, blurPassSigma > 0 ? 1 : 0);
     // Float index 61, after the geometry/material texture sizes: the three
     // adaptive color-model slots (six vec4 each), zero-filled when fewer
-    // than three distinct models are in use.
+    // than three distinct models are in use. The size response is pre-blended
+    // into these curves; the shader has no size uniform.
+    final sizeProgress = _colorSizeProgress;
     shader.setFloatUniforms(initialIndex: 61, (value) {
       value.setFloats([
         for (var i = 0; i < 3; i++)
           ...i < colorModels.length
-              ? colorModels[i].toShaderParameters()
-              : GlassColorParameters.ios27Light.toShaderParameters(),
+              ? colorModels[i].toShaderParameters(
+                  sizeProgress: sizeProgress,
+                )
+              : GlassColorParameters.ios27Light.toShaderParameters(
+                  sizeProgress: sizeProgress,
+                ),
       ]);
     });
   }
 
+  /// Logical short side of the smallest live shape, measured when geometry is
+  /// bound. Used by the blur and the color model's small-size response.
+  /// Groups use their smallest shape; a mixed-size group has one layer-wide
+  /// size, like the blur.
+  ///
+  /// Starts at the largest fitted size so a pre-paint effect-bounds query
+  /// over-allocates rather than clips the blur on its first frame.
+  double _shapeShortSide = 150;
+
+  double get _colorSizeProgress {
+    final t = ((118 - _shapeShortSide) / 55).clamp(0.0, 1.0);
+    return t * t;
+  }
+
+  double _measureShapeShortSide() {
+    double? shortest;
+    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        if (shape.appearance.visibility <= 0) continue;
+        // shapeBounds is already in the geometry's local space.
+        final side = MatrixUtils.transformRect(
+          geometryToLayer,
+          shape.shapeBounds,
+        ).shortestSide;
+        if (side <= 0) continue;
+        shortest = shortest == null ? side : min(shortest, side);
+      }
+    }
+    return shortest == null ? 150 : max(1, shortest);
+  }
+
   /// Sigma of the separate backdrop blur pass; `0` when there is none.
+  ///
+  /// This is the unscaled toolbar-size value; painting uses
+  /// [_frostSigmaForCurrentShapes], which applies the shape-size response.
   double get blurPassSigma => _frostSigma;
 
   double get _frostSigma => settings.frostSigmaAt(devicePixelRatio);
+
+  double _frostSigmaForCurrentShapes() => settings.frostSigmaAt(
+    devicePixelRatio,
+    shapeShortSide: _shapeShortSide,
+  );
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -1007,6 +1052,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   Rect _prepareGeometryAppearance(Rect boundingBox) {
+    final measuredShortSide = _measureShapeShortSide();
+    if (measuredShortSide != _shapeShortSide) {
+      _shapeShortSide = measuredShortSide;
+      // The color-model curves are pre-blended in the common uniforms, which
+      // otherwise only refresh when settings or appearances change.
+      _updateShaderSettings();
+    }
     final usedShapeAppearances = _usesShapeAppearances;
     final usedTintOnlyAppearance = _usesTintOnlyAppearance;
     final appearances = [
@@ -1225,12 +1277,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   // retained clips between this layer and its shapes, and the clips above
   // this layer up to its pass. The texture is transparent outside it.
   ImageFilter? _cachedFilter;
+  double? _filterFrostSigma;
 
   ImageFilter _updateShaderFilter() {
     final inputsChanged = takeShaderInputsChanged();
-    if (_cachedFilter != null && !inputsChanged) return _cachedFilter!;
+    final frostSigma = _frostSigmaForCurrentShapes();
+    if (_cachedFilter != null &&
+        !inputsChanged &&
+        frostSigma == _filterFrostSigma) {
+      return _cachedFilter!;
+    }
     final shader = ImageFilter.shader(renderShader);
-    final frostSigma = blurPassSigma;
     final filter = frostSigma > 0
         ? ImageFilter.compose(
             inner: ImageFilter.blur(
@@ -1242,6 +1299,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           )
         : shader;
     _cachedFilter = filter;
+    _filterFrostSigma = frostSigma;
     return filter;
   }
 
@@ -1421,9 +1479,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// content revealed on the face. A `LiquidGlassCapture` must contain this
   /// reach or the filter samples its own edge.
   double backdropSamplingReach(Rect material) {
-    final blur = blurPassSigma > 0
-        ? blurPassSigma * 3 + 1 / devicePixelRatio
-        : 0.0;
+    final frostSigma = _frostSigmaForCurrentShapes();
+    final blur = frostSigma > 0 ? frostSigma * 3 + 1 / devicePixelRatio : 0.0;
     final displacement =
         settings.effectiveDisplacementScale *
         (1 + settings.dispersion.abs() * 0.5);
