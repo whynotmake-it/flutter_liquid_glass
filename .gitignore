@@ -33,3 +33,6 @@ pubspec_overrides.yaml
 
 # Local agent session state
 .pi-glla/
+
+# Impeeler GPU cost reports
+.impeeler/

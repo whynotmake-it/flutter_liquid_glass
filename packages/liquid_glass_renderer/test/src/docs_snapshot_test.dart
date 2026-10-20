@@ -78,7 +78,6 @@ void _docsSnapshot({
     },
     settings: const SnaptestSettings(
       blockText: false,
-      renderImages: true,
       renderShadows: true,
       pathPrefix: '.snaptest/docs/',
     ),
