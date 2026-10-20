@@ -44,9 +44,10 @@ dev_dependencies:
   alchemist: ^0.12.1
   flutter_test:
     sdk: flutter
+  impeeler: 0.1.0-dev.2
   lintervention: ^0.3.1
   mocktail: ^1.0.3
-  snaptest: ^0.2.3
+  snaptest: 1.0.0-dev.5
 
 flutter:
   uses-material-design: true
