@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
 
 void main() {
   test('the default constructor is the light iOS 27 regular glass', () {
@@ -16,7 +17,7 @@ void main() {
     final clear = LiquidGlassSettings.ios27Clear();
 
     expect(clear.refractionHeight, 20);
-    expect(clear.refractionAmount, 60);
+    expect(clear.refractionAmount, 50);
     expect(clear.refractionFitsShape, isFalse);
     expect(clear.frost, 0);
     expect(LiquidGlassSettings.ios27Clear(frost: 0).frost, 0);
@@ -56,13 +57,13 @@ void main() {
   });
 
   test('iOS 27 regular glass blurs along the fitted slider curve', () {
-    // 2 pt at Clear, 6.1 at the middle tick, full frost at Tinted.
+    // 4.5 pt at Clear, 6.9 at the middle tick, full frost at Tinted.
     for (final (position, sigma) in [
-      (0.0, 2.0),
-      (.25, 3.49),
-      (.5, 6.1),
-      (.75, 10.06),
-      (1.0, 16.58),
+      (0.0, 4.5),
+      (.25, 5.57),
+      (.5, 6.88),
+      (.75, 11.35),
+      (1.0, 18.71),
     ]) {
       expect(
         LiquidGlassSettings.ios27RegularFrost(position),
@@ -81,12 +82,49 @@ void main() {
         expect(toolbar.tintAmount, position);
       }
     }
-    expect(const LiquidGlassSettings().frost, 2.1);
-    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(2, 1e-9));
-    expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(16.58, .01));
+    expect(const LiquidGlassSettings().frost, 4.5);
+    expect(LiquidGlassSettings.ios27RegularFrost(-1), closeTo(4.5, 1e-9));
+    expect(LiquidGlassSettings.ios27RegularFrost(2), closeTo(18.71, .01));
     expect(
       LiquidGlassSettings.ios27RegularLight(tintAmount: 1, frost: 2).frost,
       2,
+    );
+  });
+
+  test('omitted JSON frost keeps the size response', () {
+    final omitted = LiquidGlassSettings.fromJson(const {'tintAmount': 0});
+    expect(omitted.frost, 4.5);
+    expect(
+      omitted.frostSigmaAt(3, shapeShortSide: 63),
+      closeTo(2.1, 1e-9),
+    );
+    final explicit = LiquidGlassSettings.fromJson(const {'frost': 4.5});
+    expect(
+      explicit.frostSigmaAt(3, shapeShortSide: 63),
+      closeTo(4.5, 1e-9),
+    );
+  });
+
+  test('the adaptive color model packs six vec4 slots', () {
+    expect(
+      GlassColorParameters.ios27Light.toShaderParameters().length,
+      GlassColorParameters.shaderParameterFloatCount,
+    );
+    expect(GlassColorParameters.shaderParameterFloatCount, 24);
+    expect(GlassColorParameters.ios27Light.transmittanceAtSmallSize, isNull);
+    expect(GlassColorParameters.ios27Clear.transmittanceAtSmallSize, isNull);
+    expect(
+      GlassColorParameters.ios27Dark.transmittanceAtSmallSize,
+      const GlassColorCurve(0.600, 0.298),
+    );
+    expect(
+      GlassColorParameters.ios27Dark.luminanceLiftAtSmallSize,
+      const GlassColorCurve.constant(0),
+    );
+    final json = GlassColorParameters.ios27Dark.toJson();
+    expect(
+      GlassColorParameters.fromJson(json),
+      GlassColorParameters.ios27Dark,
     );
   });
 
@@ -189,16 +227,15 @@ void main() {
       expect(downsamples(baseSigma, 3), isTrue);
     });
 
-    test('the default and regular presets are floored per device', () {
-      for (final (deviceScale, expected, downsampled) in [
-        // Below 2x the floor is capped at the 2x value (2.9); a
-        // full-resolution blur is cheap there, so it need not downsample.
-        (1.0, 2.9, false),
-        (1.5, 2.9, false),
-        (2.0, 5.8 / 2, true),
-        (2.625, 5.8 / 2.625, true),
-        // 3x iPhones keep today's frost: 5.8 / 3 < 2.1.
-        (3.0, baseSigma, true),
+    test('the default and regular presets keep their fitted frost', () {
+      for (final (deviceScale, downsampled) in [
+        // The fitted 4.5 pt is already past the downsample gate at 1.5x and
+        // above, so the device floor never raises it.
+        (1.0, false),
+        (1.5, true),
+        (2.0, true),
+        (2.625, true),
+        (3.0, true),
       ]) {
         for (final settings in [
           const LiquidGlassSettings(),
@@ -207,7 +244,7 @@ void main() {
         ]) {
           expect(
             settings.frostSigmaAt(deviceScale),
-            closeTo(expected, 1e-9),
+            closeTo(4.5, 1e-9),
             reason: '$settings at $deviceScale',
           );
           expect(
@@ -217,6 +254,37 @@ void main() {
           );
         }
       }
+    });
+
+    test('preset frost follows the glass size', () {
+      final preset = LiquidGlassSettings.ios27RegularLight();
+      // Fitted at toolbar size.
+      expect(preset.frostSigmaAt(3, shapeShortSide: 94), closeTo(4.5, 1e-9));
+      // Smaller glass is diffused much less; the preset floor keeps it
+      // visible.
+      expect(
+        preset.frostSigmaAt(3, shapeShortSide: 63),
+        closeTo(2.1, 1e-9),
+      );
+      // Larger glass is diffused more: 8 pt at 150 pt.
+      expect(preset.frostSigmaAt(3, shapeShortSide: 150), closeTo(8, 1e-9));
+      // The floor wins on very small glass.
+      expect(preset.frostSigmaAt(3, shapeShortSide: 10), closeTo(2.1, 1e-9));
+      // Below 3x the device floor raises the small endpoint so Impeller still
+      // downsamples the blur.
+      expect(preset.frostSigmaAt(2, shapeShortSide: 63), closeTo(2.9, 1e-9));
+      // Clear glass at slider 0 stays blur-free at every size.
+      expect(
+        LiquidGlassSettings.ios27Clear().frostSigmaAt(3, shapeShortSide: 150),
+        0,
+      );
+      // An explicit frost is the caller's and ignores the size response.
+      expect(
+        LiquidGlassSettings.ios27RegularLight(
+          frost: 7,
+        ).frostSigmaAt(3, shapeShortSide: 63),
+        7,
+      );
     });
 
     test('ios27Clear stays blur-free at slider 0', () {
@@ -255,7 +323,7 @@ void main() {
       final preset = LiquidGlassSettings.ios27RegularLight();
       // Copying another field keeps the preset's floor.
       final changed = preset.copyWith(refractionAmount: 42);
-      expect(changed.frostSigmaAt(2), closeTo(2.9, 1e-9));
+      expect(changed.frostSigmaAt(2), closeTo(4.5, 1e-9));
       // Passing frost makes it the caller's value.
       final explicit = preset.copyWith(frost: 1);
       expect(explicit.frostSigmaAt(2), 1.0);
@@ -269,7 +337,7 @@ void main() {
       );
       // Same frost, but the explicit one is not floor-eligible.
       expect(
-        const LiquidGlassSettings(frost: 2.1),
+        const LiquidGlassSettings(frost: 4.5),
         isNot(const LiquidGlassSettings()),
       );
     });

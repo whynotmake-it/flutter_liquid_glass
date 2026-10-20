@@ -104,7 +104,20 @@ bash flutter/host_capture.sh
 ```
 
 `flutter/capture.sh` does the same on the pinned simulator; use it to confirm
-a host result before trusting it. For the example app's bottom bar:
+a host result before trusting it.
+
+`settings/preset-{light,dark,clear}.json` map the shipped presets onto the
+harness. They omit `frost`, so the capture keeps the preset's device- and
+size-dependent blur; adding an explicit `frost` pins it for a one-axis scan.
+`fit_sweep.py` renders and scores a JSON array of named settings in one
+`flutter test` process through `flutter/test/sweep_capture_test.dart`, which
+avoids the per-candidate process startup when fitting a new axis:
+
+```sh
+compare/.venv/bin/python fit_sweep.py   --scene scenes/toolbar_capsule.json   --reference references/ios27-iphone17pro-reduce-motion-off/slider-000/toolbar_capsule   --sweep /tmp/sweep.json --out out/fit/toolbar
+```
+
+For the example app's bottom bar:
 
 ```sh
 cd ../..   # example/

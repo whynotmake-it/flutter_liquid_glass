@@ -10,8 +10,9 @@ import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
 void main() {
-  // FakeGlass may stay SDR (Skia needs premultiplied color within alpha);
-  // RealGlass keeps the glint's headroom above white.
+  // FakeGlass keeps premultiplied color within alpha where the surface is
+  // translucent; an opaque surface carries the glint's headroom above white
+  // like RealGlass.
   Future<List<double>> fakeGlassRed(Color backdrop) async {
     final program = await ui.FragmentProgram.fromAsset(
       ShaderKeys.fakeGlassSurface,
@@ -46,7 +47,7 @@ void main() {
     ];
   }
 
-  test('FakeGlass glint reaches but never exceeds SDR white', () async {
+  test('FakeGlass glint reaches SDR white', () async {
     const width = 120;
     final overWhite = await fakeGlassRed(Colors.white);
     // The first covered row along the top wall carries the glint peak.
@@ -56,6 +57,13 @@ void main() {
     final overBlack = await fakeGlassRed(Colors.black);
     expect(overBlack[60], greaterThan(overBlack[30 * width + 60] + 0.1));
     expect(overBlack.reduce(math.max), lessThanOrEqualTo(1.0 + 1e-3));
+  });
+
+  test('FakeGlass keeps opaque headroom unclamped', () {
+    final source = File(
+      'lib/assets/shaders/fake_glass_surface.frag',
+    ).readAsStringSync();
+    expect(source, contains('if (litAlpha < 0.999)'));
   });
 
   test('RealGlass never caps the lit glint at SDR white', () {

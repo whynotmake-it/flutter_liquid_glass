@@ -418,6 +418,7 @@ class RenderFakeGlass extends RenderProxyBox {
       settings,
       appearance,
       deviceScale: devicePixelRatio,
+      shapeShortSide: size.shortestSide,
     )!;
     assert(() {
       debugRegisterBackdropCapture(this, backdropKey);

@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart'
-    show sliderKeyframes;
+    show GlassColorCurve, sliderKeyframes;
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 
 void main() {
@@ -81,26 +81,50 @@ void main() {
     final lightFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.light,
     ).faceTransfer()!;
-    expect(lightFace.lift, .13);
-    expect(lightFace.chromaGain, 1.17);
-    expect(lightFace.transmittance, closeTo(.592, 1e-9));
+    expect(lightFace.lift, .216);
+    expect(lightFace.chromaGain, 1.169);
+    expect(lightFace.transmittance, closeTo(.5994, 1e-9));
     final darkFace = const LiquidGlassColorModel.ios27(
       brightness: Brightness.dark,
     ).faceTransfer()!;
-    expect(darkFace.lift, 1);
-    expect(darkFace.chromaGain, 1.02);
+    expect(darkFace.lift, 1.166);
+    expect(darkFace.chromaGain, 1.01);
     expect(darkFace.emission.r, closeTo(32 / 255, 1e-9));
   });
 
-  test('dark regular glass transmittance is size-independent', () {
+  test('dark regular glass tracks the large and small transmittance', () {
     const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
-    // The small-side (0.597, 0.295) and large-side (0.447, 0.195) fits are
-    // averaged into their equal-weight midpoint; one curve serves every size.
-    expect(dark.faceTransfer()!.transmittance, closeTo(0.522, 1e-9));
+    expect(dark.faceTransfer()!.transmittance, closeTo(0.4525, 1e-9));
     expect(
       dark.faceTransfer(tintAmount: 1)!.transmittance,
-      closeTo(0.245, 1e-9),
+      closeTo(0.2086, 1e-9),
     );
+    final parameters = dark.parameters!;
+    expect(
+      parameters.transmittanceAtSmallSize,
+      const GlassColorCurve(0.600, 0.298),
+    );
+    expect(
+      parameters.luminanceLiftAtSmallSize,
+      const GlassColorCurve.constant(0),
+    );
+  });
+
+  test('dark glass blends to its small-size material', () {
+    const dark = LiquidGlassColorModel.ios27(brightness: Brightness.dark);
+    final small = dark.faceTransfer(sizeProgress: 1)!;
+    expect(small.transmittance, closeTo(.600, 1e-9));
+    expect(small.lift, 0);
+    expect(small.chromaGain, 1);
+    final toolbar = dark.faceTransfer(sizeProgress: .19)!;
+    expect(toolbar.transmittance, closeTo(.4805, .002));
+    expect(toolbar.lift, closeTo(.944, .01));
+
+    final packed = dark.parameters!.toShaderParameters(sizeProgress: 1);
+    expect(packed[5], closeTo(.600, 1e-9)); // transmittance.clear
+    expect(packed[8], closeTo(0, 1e-9)); // luminanceLift.clear
+    expect(packed[10], closeTo(1, 1e-9)); // chromaGain.clear
+    expect(dark.parameters!.toShaderParameters(), hasLength(24));
   });
 
   test('the Liquid Glass slider interpolates face density linearly', () {
@@ -112,8 +136,8 @@ void main() {
     // and interpolates linearly instead.
     double lightDensity(double position) =>
         light.faceTransfer(tintAmount: position)!.transmittance;
-    expect(lightDensity(0), closeTo(.592, .006));
-    expect(lightDensity(1), closeTo(.290, .006));
+    expect(lightDensity(0), closeTo(.5994, .006));
+    expect(lightDensity(1), closeTo(.2742, .006));
     for (final position in const [.25, .45, .5, .55, .75]) {
       expect(
         lightDensity(position),
@@ -124,9 +148,12 @@ void main() {
         reason: 'light ${position * 100}%',
       );
     }
-    // The dark density also interpolates the averaged endpoint linearly.
-    expect(dark.faceTransfer()!.transmittance, closeTo(.522, .01));
-    expect(dark.faceTransfer(tintAmount: 1)!.transmittance, closeTo(.245, .01));
+    // The dark density also interpolates its endpoint linearly.
+    expect(dark.faceTransfer()!.transmittance, closeTo(.4525, .01));
+    expect(
+      dark.faceTransfer(tintAmount: 1)!.transmittance,
+      closeTo(.2086, .01),
+    );
     double darkDensity(double position) =>
         dark.faceTransfer(tintAmount: position)!.transmittance;
     for (final position in const [.25, .5, .75]) {

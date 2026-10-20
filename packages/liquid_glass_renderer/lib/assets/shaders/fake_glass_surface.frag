@@ -207,14 +207,17 @@ void main() {
   litPremultiplied =
       litPremultiplied * (1.0 - glint) + glintTarget * glint;
   litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
-  // FakeGlass stays SDR, as Skia needs: premultiplied color never exceeds
-  // alpha. Where the glint's emission would, the glass covers that much more
-  // of the backdrop, so the composite reaches SDR white but never exceeds it.
-  litPremultiplied = min(litPremultiplied, vec3(1.0));
-  litAlpha = max(
-    litAlpha,
-    max(max(litPremultiplied.r, litPremultiplied.g), litPremultiplied.b)
-  );
+  // Where the surface is translucent, keep premultiplied color within alpha
+  // as Skia needs: the glint covers that much more of the backdrop instead
+  // of exceeding SDR white. An opaque surface may carry the glint's headroom
+  // above SDR white through to an extended-range framebuffer, like RealGlass.
+  if (litAlpha < 0.999) {
+    litPremultiplied = min(litPremultiplied, vec3(1.0));
+    litAlpha = max(
+      litAlpha,
+      max(max(litPremultiplied.r, litPremultiplied.g), litPremultiplied.b)
+    );
+  }
   float alpha = litAlpha * materialCoverage + exteriorContourAlpha;
   fragColor = vec4(
     max(litPremultiplied * materialCoverage, vec3(0.0)),
