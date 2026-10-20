@@ -31,7 +31,7 @@ final class LiquidGlassSettings with Equatable {
     this.backdropShrink = 0.0,
     double? frost,
     this.dispersion = 0.0,
-    this.highlight = 1.0,
+    this.highlight = 0.6,
     this.contourStrength = 0.43,
     this.contourDirectionality = 0.77,
     this.bevelShadowStrength = 0.036,
@@ -52,7 +52,7 @@ final class LiquidGlassSettings with Equatable {
     this.backdropShrink = 0.0,
     this.frost = _minBlurPassSigma,
     this.dispersion = 0.0,
-    this.highlight = 1.0,
+    this.highlight = 0.6,
     this.contourStrength = 0.43,
     this.contourDirectionality = 0.77,
     this.bevelShadowStrength = 0.036,
@@ -136,7 +136,6 @@ final class LiquidGlassSettings with Equatable {
   }) => LiquidGlassSettings._(
     frost: frost ?? _ios27RegularBlur(tintAmount),
     floorEligible: frost == null,
-    highlight: 0.8,
     contourStrength: 0.88,
     contourDirectionality: 1,
     tintAmount: tintAmount,
@@ -167,7 +166,6 @@ final class LiquidGlassSettings with Equatable {
     contourDirectionality: 1,
     bevelShadowStrength: 0,
     tintAmount: tintAmount,
-    highlight: .6,
   );
 
   /// Creates fitted iOS 27 regular glass settings for [brightness].
@@ -342,9 +340,10 @@ final class LiquidGlassSettings with Equatable {
   ///
   /// The glint recolors the face instead of adding white: it pulls the lit
   /// material toward a target brighter than SDR white carrying the face's own
-  /// chroma amplified, so glass over color glints in that color. `1` is the
-  /// strength of the light iOS 27 regular preset; the dark regular and clear
-  /// presets dim it to `0.8` and `0.6`.
+  /// chroma amplified, so glass over color glints in that color. The light,
+  /// dark and clear presets all use `0.6`: the reference rim is a soft, low
+  /// plateau, and higher values overexpose the first pixel inside the
+  /// silhouette.
   final double highlight;
 
   /// Peak absorption of the dark border just outside the silhouette, which

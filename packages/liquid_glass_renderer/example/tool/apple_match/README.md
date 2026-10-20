@@ -165,7 +165,7 @@ stay in the dedicated tools (`rim_report.py`, `zoom_atlas.py`,
 
 ```sh
 PYTHONPATH=compare compare/.venv/bin/python zoom_atlas.py --zoom 5 --stage lighting \
-  --reference references/ios27-iphone17pro-light/toolbar_capsule \
+  --reference references/ios27-iphone17pro-reduce-motion-off/slider-000/toolbar_capsule \
   --candidate out/candidates/baseline --scene scenes/toolbar_capsule.json \
   --output out/atlas-lighting.png --title "toolbar, lighting"
 ```

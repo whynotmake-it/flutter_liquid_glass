@@ -13,31 +13,24 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IOS_27_UDID:?Set IOS_27_UDID to the pinned iOS 27 simulator UDID}"
-# REDUCE_MOTION=1 reproduces the historical references. Reduce Motion also
-# removes Liquid Glass lensing, so REDUCE_MOTION=0 captures the full effect
-# and relies on CAPTURE_SETTLE_SECONDS (plus the frame-stability gate in
-# reference_provenance.py) to exclude launch and materialization animation.
-: "${REDUCE_MOTION:=1}"
-case "$REDUCE_MOTION" in
-  1) REDUCE_MOTION_DEFAULT=YES
-     if (( LOUPE )); then
-       : "${REFERENCE_SET:=ios27-iphone17pro-light}"
-       : "${CAPTURE_SETTLE_SECONDS:=1.8}"
-       : "${LOUPE_CAPTURE_DELAY:=1.5}"
-     else
-       : "${REFERENCE_SET:=ios27-iphone17pro-ground-truth-v2/slider-000}"
-       : "${CAPTURE_SETTLE_SECONDS:=1}"
-     fi ;;
-  0) REDUCE_MOTION_DEFAULT=NO
-     : "${CAPTURE_SETTLE_SECONDS:=4}"
-     if (( LOUPE )); then
-       : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/loupe}"
-       : "${LOUPE_CAPTURE_DELAY:=2.5}"
-     else
-       : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/slider-000}"
-     fi ;;
-  *) echo "REDUCE_MOTION must be 0 or 1" >&2; exit 2 ;;
-esac
+# Reduce Motion removes Liquid Glass lensing, so the pinned references are
+# captured with it off and rely on CAPTURE_SETTLE_SECONDS (plus the
+# frame-stability gate in reference_provenance.py) to exclude launch and
+# materialization animation. The historical Reduce Motion captures were
+# deleted: their stronger diffusion does not describe the shipping effect.
+: "${REDUCE_MOTION:=0}"
+if [[ "$REDUCE_MOTION" != 0 ]]; then
+  echo "Reduce Motion references are not kept; capture with REDUCE_MOTION=0" >&2
+  exit 2
+fi
+REDUCE_MOTION_DEFAULT=NO
+: "${CAPTURE_SETTLE_SECONDS:=4}"
+if (( LOUPE )); then
+  : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/loupe}"
+  : "${LOUPE_CAPTURE_DELAY:=2.5}"
+else
+  : "${REFERENCE_SET:=ios27-iphone17pro-reduce-motion-off/slider-000}"
+fi
 : "${CAPTURE_FRAMES:=3}"
 : "${LIQUID_GLASS_TINT_CONTROL_METHOD:=simctl defaults write com.apple.UIKit UIViewGlassTintAmount}"
 if (( LOUPE )); then

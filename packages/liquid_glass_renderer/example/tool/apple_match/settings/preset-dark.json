@@ -4,7 +4,7 @@
   "refractionFitsShape": true,
   "backdropShrink": 0,
   "dispersion": 0,
-  "highlight": 0.8,
+  "highlight": 0.6,
   "contourStrength": 0.88,
   "contourDirectionality": 1,
   "bevelShadowStrength": 0.036,

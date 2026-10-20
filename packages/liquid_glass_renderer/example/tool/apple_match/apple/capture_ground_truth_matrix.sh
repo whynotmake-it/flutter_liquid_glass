@@ -33,7 +33,7 @@ MATRIX=(
 for entry in "${MATRIX[@]}"; do
   IFS='|' read -r slider scene <<<"$entry"
   percent="$(python3 -c 'import sys; print(f"{round(float(sys.argv[1]) * 100):03d}")' "$slider")"
-  reference_set="ios27-iphone17pro-ground-truth-v2/slider-${percent}"
+  reference_set="ios27-iphone17pro-reduce-motion-off/slider-${percent}"
   destination="$ROOT/references/$reference_set/$scene"
   scene_path="$ROOT/scenes/$scene.json"
   if [[ -d "$destination" ]]; then
@@ -72,4 +72,4 @@ for entry in "${MATRIX[@]}"; do
 done
 
 python3 "$ROOT/audit_ground_truth.py" \
-  --reference-root "$ROOT/references/ios27-iphone17pro-ground-truth-v2"
+  --reference-root "$ROOT/references/ios27-iphone17pro-reduce-motion-off"

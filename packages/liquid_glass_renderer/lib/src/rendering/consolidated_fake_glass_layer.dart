@@ -407,6 +407,18 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           appearance: shape.appearance,
           devicePixelRatio: devicePixelRatio,
         );
+        if (settings.highlight * shape.appearance.visibility > 0) {
+          paintFakeGlassSurface(
+            canvas,
+            shader: shader,
+            size: shape.renderObject.size,
+            shape: shape.shape,
+            settings: settings,
+            appearance: shape.appearance,
+            devicePixelRatio: devicePixelRatio,
+            highlightOnly: true,
+          );
+        }
         canvas.restore();
       }
     }

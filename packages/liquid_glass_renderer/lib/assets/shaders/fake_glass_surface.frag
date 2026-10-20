@@ -46,8 +46,17 @@ uniform vec4 uRseSemiAxisAndRadii;
 // strongly while regular glass brightens mostly the transmitted chroma.
 uniform float uGlintFaceGain;
 uniform float uGlintVibrancy;
+// 1 when drawing only the additive highlight pass. FakeGlass paints the
+// surface first and adds the glint in a second draw so the highlight can
+// exceed the surface's premultiplied alpha (and SDR white) without clamping
+// the translucent face.
+uniform float uHighlightsOnly;
 
 const vec3 LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
+// The reference rim's peak is lower than a source-over mix of the same glint
+// target. The additive pass only adds light, so scale it to the measured
+// profile instead of replacing the face.
+const float kAdditiveHighlightScale = 0.75;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -100,6 +109,49 @@ void main() {
   // liquid_glass_final_render_core.glsl): a one-sided exterior border and a
   // glint line anchored at the silhouette.
   float tangency = abs(dot(normal, vec2(-lightDirection.y, lightDirection.x)));
+
+  float glintWidth = max(
+    uHighlightWidth > 0.0 ? uHighlightWidth : uContourWidth,
+    0.001
+  );
+  float glintProfile =
+      clamp(1.0 - inward / glintWidth, 0.0, 1.0) +
+      0.21 * clamp(1.0 - inward / (glintWidth * 4.0), 0.0, 1.0);
+  float wrapExponent = exp2(2.0 - 4.0 * clamp(uHighlightWrap, 0.0, 1.0));
+  float lobe = pow(max(1.0 - tangency, 0.0), wrapExponent);
+  float returnWeight = facing >= 0.0
+      ? 1.0
+      : clamp(uOppositeHighlight, 0.0, 1.0);
+  float glint = clamp(
+    max(uHighlight, 0.0) * 0.252 * lobe * returnWeight * glintProfile,
+    0.0,
+    1.0
+  );
+
+  float tintAlpha = uTint.a;
+  // The glint adds a bright target on top of the lit face. Without backdrop
+  // access FakeGlass approximates the face with the surface tint plus
+  // emission; only RealGlass amplifies the true backdrop chroma under the
+  // glint and keeps the headroom above white.
+  vec3 faceProxy = uTint.rgb * tintAlpha + uFaceEmission;
+  vec3 glintTarget = vec3(uGlintLuminance) +
+      uGlintFaceGain * faceProxy +
+      uGlintVibrancy * (faceProxy - vec3(dot(faceProxy, LUMA_WEIGHTS)));
+  float materialCoverage = uExteriorOnly > 0.5
+      ? 0.0
+      : clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
+  if (uHighlightsOnly > 0.5) {
+    // Additive pass: emit only the glint's light. Alpha stays zero so the
+    // destination face keeps its own coverage; RGB is premultiplied by the
+    // glint weight (not by alpha) and may exceed one on an extended-range
+    // target.
+    fragColor = vec4(
+      max(glintTarget, vec3(0.0)) * glint * materialCoverage *
+          kAdditiveHighlightScale,
+      0.0
+    );
+    return;
+  }
   // The border is box-filtered over one physical pixel, split at the
   // silhouette, so a sub-pixel border does not alias into a dotted line.
   float outwardPixels = distance / uPixelSize;
@@ -159,34 +211,6 @@ void main() {
     0.0,
     1.0
   );
-
-  float glintWidth = max(
-    uHighlightWidth > 0.0 ? uHighlightWidth : uContourWidth,
-    0.001
-  );
-  float glintProfile =
-      clamp(1.0 - inward / glintWidth, 0.0, 1.0) +
-      0.21 * clamp(1.0 - inward / (glintWidth * 4.0), 0.0, 1.0);
-  float wrapExponent = exp2(2.0 - 4.0 * clamp(uHighlightWrap, 0.0, 1.0));
-  float lobe = pow(max(1.0 - tangency, 0.0), wrapExponent);
-  float returnWeight = facing >= 0.0
-      ? 1.0
-      : clamp(uOppositeHighlight, 0.0, 1.0);
-  float glint = clamp(
-    max(uHighlight, 0.0) * 0.252 * lobe * returnWeight * glintProfile,
-    0.0,
-    1.0
-  );
-
-  float tintAlpha = uTint.a;
-  // The glint pulls the lit face toward a bright target. Without backdrop
-  // access FakeGlass approximates the face with the surface tint plus
-  // emission and pulls toward it with source-over of an emissive target;
-  // only RealGlass amplifies the true backdrop chroma under the glint and
-  // keeps the headroom above white.
-  float materialCoverage = uExteriorOnly > 0.5
-      ? 0.0
-      : clamp(0.5 - distance / uPixelSize, 0.0, 1.0);
   float backdropAbsorption = 1.0 -
       (1.0 - backdropContourAbsorption) * (1.0 - bevelShadow);
   float materialAlpha = 1.0 - (1.0 - tintAlpha) *
@@ -200,17 +224,9 @@ void main() {
       uFaceEmission * bevelShadow * (1.0 - tintAlpha) *
           (1.0 - backdropContourAbsorption);
   float litAlpha = materialAlpha;
-  vec3 faceProxy = uTint.rgb * tintAlpha + uFaceEmission;
-  vec3 glintTarget = vec3(uGlintLuminance) +
-      uGlintFaceGain * faceProxy +
-      uGlintVibrancy * (faceProxy - vec3(dot(faceProxy, LUMA_WEIGHTS)));
-  litPremultiplied =
-      litPremultiplied * (1.0 - glint) + glintTarget * glint;
-  litAlpha = 1.0 - (1.0 - litAlpha) * (1.0 - glint);
-  // Where the surface is translucent, keep premultiplied color within alpha
-  // as Skia needs: the glint covers that much more of the backdrop instead
-  // of exceeding SDR white. An opaque surface may carry the glint's headroom
-  // above SDR white through to an extended-range framebuffer, like RealGlass.
+  // Keep the surface's premultiplied color within alpha as Skia needs. The
+  // separate additive highlight pass carries the glint, including headroom
+  // above SDR white on an extended-range target.
   if (litAlpha < 0.999) {
     litPremultiplied = min(litPremultiplied, vec3(1.0));
     litAlpha = max(
