@@ -1,3 +1,24 @@
+## 1.0.0-dev.1
+
+A rendering release with no public API changes.
+
+- Tighten the iOS 27 material fit: light/dark color transfer and the frost
+  size response now follow the pinned captures from 63 pt controls through
+  150 pt material cards. Small-size transmittance/lift/chroma are pre-blended
+  on the CPU, so the shader needs no extra uniform slot.
+- Use the measured soft glint plateau (`0.6`) instead of overexposing the
+  first pixel inside the silhouette, and make the merged-shape glint match the
+  same rim profile.
+- Damp refracted displacement by the blended SDF gradient length at matte
+  bake time, removing the over-bright caustic at concave merged seams without
+  adding a per-frame pass.
+- Draw FakeGlass highlights in a separate additive pass. The glint adds light
+  instead of replacing the translucent face and can keep extended-range
+  headroom on EDR targets; the pass exits before contour/bevel work.
+- Remove the Reduce Motion reference captures and point the harness at the
+  motion-off set. Drop brittle tests that asserted tuned defaults, exact
+  color constants, shader source strings, or uniform packing.
+
 ## 1.0.0-dev.0
 
 > Note: This release has breaking changes.
