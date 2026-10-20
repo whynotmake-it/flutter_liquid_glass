@@ -22,6 +22,8 @@
   "highlight": 0.25,
   "contourStrength": 0.2,
   "contourDirectionality": 0.77,
+  "lightDirectionX": 0.0,
+  "lightDirectionY": 1.0,
   "bevelShadowStrength": 0.04,
   "shadowLuminance": 32,
   "shadowAlpha": 0.0,

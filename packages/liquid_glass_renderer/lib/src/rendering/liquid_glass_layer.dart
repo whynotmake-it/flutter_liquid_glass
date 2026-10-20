@@ -610,9 +610,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           1 - settings.effectiveBackdropShrink,
           appearance.colorModel.saturation,
         ])
-        ..setOffset(
-          const Offset(0, 1),
-        )
+        ..setOffset(settings.effectiveLightDirection)
         ..setColor(const Color.fromARGB(255, 255, 255, 255))
         ..setColor(
           Color.fromARGB(

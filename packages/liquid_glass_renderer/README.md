@@ -336,6 +336,18 @@ just outside the silhouette (`contourDirectionality` concentrates it where the
 glint fades), and `bevelShadowStrength` is the faint inner shadow the rim casts
 on the face. The defaults and presets set all of them.
 
+The light comes from the top by default. `lightDirection` is the direction the
+light travels, with y pointing down, so `Offset(0, 1)` is the top light. Design
+tools give an angle instead: a light at `degrees` clockwise from the top
+travels along `Offset(-sin(radians), cos(radians))`. Figma's −45° is a light
+from the top-left:
+
+```dart
+LiquidGlassSettings.ios27RegularLight().copyWith(
+  lightDirection: const Offset(0.7071, 0.7071), // Figma light angle −45°
+)
+```
+
 ### HDR
 
 The glint aims at a color brighter than SDR white. Full glass writes that value

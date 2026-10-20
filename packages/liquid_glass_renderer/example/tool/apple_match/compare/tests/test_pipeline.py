@@ -174,6 +174,7 @@ class MetricTests(unittest.TestCase):
 
     def test_rejects_settings_not_wired_to_live_renderer(self):
         validate_settings({"frost": 6.0, "shapeProfile": "roundedRectangle"})
+        validate_settings({"lightDirectionX": 0.6, "lightDirectionY": 0.8})
         with self.assertRaisesRegex(ValueError, "not wired"):
             validate_settings({"frost": 6.0, "faceFill": 0.2})
         with self.assertRaisesRegex(ValueError, "shapeProfile"):
