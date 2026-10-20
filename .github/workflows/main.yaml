@@ -49,6 +49,39 @@ jobs:
         run: melos run test-without-goldens
 
 
+  matte_order_validator:
+    name: Matte-Order Validator
+    # The validator test rasterizes the real glass shader and captures it, so
+    # it runs on the macOS image that supports Impeller shader filters rather
+    # than the Linux test job.
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: 🔧 Get dependencies
+        working-directory: packages/liquid_glass_renderer/example
+        run: flutter pub get
+
+      - name: 🩷 Run matte-order validator test
+        working-directory: packages/liquid_glass_renderer/example
+        run: >-
+          flutter test --enable-impeller --enable-flutter-gpu
+          --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true
+          test/matte_order_validation_test.dart
+
+
   skia_build:
     name: Skia Build Check
     # Web is a Skia-only target: its build fails if a pubspec shader cannot

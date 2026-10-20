@@ -32,6 +32,10 @@ class FlutterGpuGeometryRenderer {
   static int debugAllocatedTextureCount = 0;
   static int debugDroppedTextureCount = 0;
 
+  /// The validator is native-only; matches the native compile-time gate.
+  static const bool validateMatteOrder = false;
+  static int debugMatteSerialSkew = 0;
+
   /// Nothing is ever deferred on the web.
   static void flushPendingSubmissions() {}
   static int debugBatchedSubmitCount = 0;
@@ -62,6 +66,7 @@ class FlutterGpuGeometryRenderer {
     int height,
     int textureWidth,
     int textureHeight,
+    int serial,
   })
   render({
     required int width,

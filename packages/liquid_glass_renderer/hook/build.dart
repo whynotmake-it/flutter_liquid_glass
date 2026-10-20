@@ -19,8 +19,33 @@ const _runtimeEffectShaders = [
   'liquid_glass_final_render_tint',
 ];
 
+/// Validation variants of the same core, loaded only under
+/// `LIQUID_GLASS_VALIDATE_MATTE_ORDER`.
+///
+/// They are compiled only when a build opts in through the
+/// `validate_matte_order` hook user-define (see below). A published package
+/// dependency never sees that define, so a consumer's build ships the shipped
+/// shaders and nothing else.
+const _validationRuntimeEffectShaders = [
+  'liquid_glass_final_render_validate',
+  'liquid_glass_final_render_material_validate',
+  'liquid_glass_final_render_tint_validate',
+];
+
+/// Hook user-define that opts a build into the matte-order validator.
+///
+/// It is read from the pubspec of the workspace root that builds this package
+/// (for this repo, `example/pubspec.yaml`), so it applies only to the example
+/// app and the CI runs that build it. A consumer app that depends on the
+/// published package does not define it, so the validation shaders and their
+/// stamp bundle are not compiled and do not end up in the app bundle. The flag
+/// is `LIQUID_GLASS_VALIDATE_MATTE_ORDER` on the Dart side.
+const _validateMatteOrderDefine = 'validate_matte_order';
+
 void main(List<String> args) async {
   await build(args, (input, output) async {
+    final withMatteOrderValidator =
+        input.userDefines[_validateMatteOrderDefine] == true;
     await buildShaderBundleJson(
       buildInput: input,
       buildOutput: output,
@@ -31,17 +56,39 @@ void main(List<String> args) async {
       glesLanguageVersion: 300,
       assetMode: ShaderBundleAssetMode.dataAssetsIfAvailable,
     );
-    await _buildRuntimeEffects(input, output);
+    if (withMatteOrderValidator) {
+      // The validation-only vertex/stamp bundle. Its own manifest keeps the
+      // serial stamp out of the production bundle, so a shipped geometry
+      // shader bundle is byte-identical whether or not the validator exists.
+      await buildShaderBundleJson(
+        buildInput: input,
+        buildOutput: output,
+        manifestFileName: 'liquid_glass_renderer_validate.shaderbundle.json',
+        includeDirectories: [
+          input.packageRoot.resolve('lib/assets/shaders/gpu/'),
+        ],
+        glesLanguageVersion: 300,
+        assetMode: ShaderBundleAssetMode.dataAssetsIfAvailable,
+      );
+    }
+    await _buildRuntimeEffects(
+      input,
+      output,
+      extraShaders: withMatteOrderValidator
+          ? _validationRuntimeEffectShaders
+          : const [],
+    );
   });
 }
 
-/// Compiles each shader in [_runtimeEffectShaders] to
+/// Compiles each shader in [_runtimeEffectShaders] and [extraShaders] to
 /// `build/shaderbundles/<name>.iplr`, an Impeller runtime-effect library
 /// covering every backend except SkSL.
 Future<void> _buildRuntimeEffects(
   BuildInput input,
-  BuildOutputBuilder output,
-) async {
+  BuildOutputBuilder output, {
+  required List<String> extraShaders,
+}) async {
   final packageRoot = input.packageRoot;
   final shadersDirectory = packageRoot.resolve('lib/assets/shaders/');
   final outputDirectory = Directory.fromUri(
@@ -55,7 +102,7 @@ Future<void> _buildRuntimeEffects(
       help.exitCode == 0 && impellerCHelpSupportsDepfile(help.stdout as String);
   final shaderLibDirectory = impellercExec.resolve('./shader_lib');
 
-  for (final name in _runtimeEffectShaders) {
+  for (final name in [..._runtimeEffectShaders, ...extraShaders]) {
     final source = shadersDirectory.resolve('$name.frag');
     final outFile = outputDirectory.uri.resolve('$name.iplr');
     final spirv = File('${outFile.toFilePath()}.spirv');

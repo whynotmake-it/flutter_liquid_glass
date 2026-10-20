@@ -26,7 +26,8 @@ refer to `example/tool/results/pixel10-2026-09-30.md` unless noted.
 ### Rewriting a texture one frame after it was replaced (`reuseAfterFrames = 1`)
 
 - **Decision:** one frame is enough; the matte-order validator
-  (`LIQUID_GLASS_VALIDATE_MATTE_ORDER`, stamp shader, `uMatteSerial`) is gone.
+  (`LIQUID_GLASS_VALIDATE_MATTE_ORDER`) now exists permanently and runs in CI
+  on macOS.
 - **Evidence:** 0 magenta frames and 0 magenta pixels in all 20 scene runs
   (section 6.14, step 1). Metal captured 480–860 frames per scene, Pixel
   93–296. Scenes: `resizeAnimated`, sheet, `largeResize`, 5 pills,
@@ -34,6 +35,10 @@ refer to `example/tool/results/pixel10-2026-09-30.md` unless noted.
   stretch, pill stretch.
 - **Reasoning** (engine frame pipeline and queue ordering): doc comment on
   `FlutterGpuGeometryRenderer.reuseAfterFrames`.
+- **Permanent check:** `tool/matte_order_check.sh` (macOS Metal) and
+  `example/test/matte_order_validation_test.dart` (host, negative and positive
+  cases) fail when any captured frame samples a matte rewritten out of order.
+  The Pixel/Vulkan case stays manual; see `example/tool/README.md`.
 
 ### Deferred geometry submission (`LIQUID_GLASS_BATCH_GEOMETRY_SUBMISSIONS`)
 

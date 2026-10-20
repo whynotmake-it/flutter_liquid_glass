@@ -23,6 +23,21 @@ abstract class ShaderKeys {
   static final liquidGlassTintRender =
       '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_tint.iplr';
 
+  /// Validation variants of the three render shaders, loaded only under
+  /// `LIQUID_GLASS_VALIDATE_MATTE_ORDER`.
+  static final liquidGlassRenderValidate =
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_validate.iplr';
+
+  static final liquidGlassMaterialRenderValidate =
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_material_validate.iplr';
+
+  static final liquidGlassTintRenderValidate =
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_tint_validate.iplr';
+
+  /// Vertex and serial-stamp shaders for the matte-order validator.
+  static final String gpuGeometryValidateBundle =
+      '${_shadersRoot}build/shaderbundles/liquid_glass_renderer_validate.shaderbundle';
+
   static final fakeGlassSurface =
       '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';
 
