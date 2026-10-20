@@ -1,1 +1,18 @@
-{"refractionHeight":20.0,"refractionAmount":60.0,"refractionFitsShape":true,"backdropShrink":0.0,"frost":2.0,"dispersion":0.0,"highlight":1.0,"contourStrength":0.43,"contourDirectionality":0.77,"bevelShadowStrength":0.036,"tintAmount":0.0,"tintRed":0,"tintGreen":122,"tintBlue":255,"tintAlpha":0.0,"saturation":1.0,"transmissionGamma":1.0,"vibrancy":0.0,"colorModel":"ios27Light"}
+{
+  "refractionHeight": 20.0,
+  "refractionAmount": 60.0,
+  "refractionFitsShape": true,
+  "backdropShrink": 0.0,
+  "frost": 2.0,
+  "dispersion": 0.0,
+  "highlight": 0.6,
+  "contourStrength": 0.43,
+  "contourDirectionality": 0.77,
+  "bevelShadowStrength": 0.036,
+  "tintAmount": 0.0,
+  "tintRed": 0,
+  "tintGreen": 122,
+  "tintBlue": 255,
+  "tintAlpha": 0.0,
+  "colorModel": "ios27Light"
+}

@@ -1,10 +1,10 @@
 {
-  "renderer": "liquid_glass_renderer HEAD 5983f5b",
+  "renderer": "liquid_glass_renderer HEAD 68e6229e9 (main, PR #242)",
   "flutter_sdk": "3.47.1 stable (revision 6655482ec0)",
   "host": "macOS / Darwin 27, arm64, Impeller",
   "logical_size": "402x874 pt at 3x = 1206x2622 px (iPhone 17 Pro logical size)",
   "device_note": "No physical-device screenshots in these figures; all captures are host renders under macOS Impeller in SDR.",
-  "frozen": "Source PNGs are frozen after each capture. This request added real-shadow hero captures, explicitly calibrated the merge blend radius, and later re-rendered the toolbar figure with a scene-specific host fit at the user's request; earlier capture inputs and other figures were not recomputed. Display compositions use the frozen frames.",
+  "frozen": "Source PNGs are frozen after each capture. This revision was re-rendered after the iOS 27 highlight and merged-seam changes landed on main: hero captures, cover, and both comparison raw inputs use the 0.6 glint. Display compositions use the frozen frames.",
   "figures": {
     "playground.png": {
       "status": "superseded: earlier grid capture with widget-test shadows; not used in article",
@@ -13,11 +13,11 @@
     "capture-pass.png": "illustrative schematic; not a numeric pass budget",
     "toolbar-comparison.jpg": {
       "type": "comparison composite",
-      "flutter_source": "packages/liquid_glass_renderer/example/tool/apple_match/flutter/test/host_capture_test.dart, probes A/C/D in separate processes; scene tool/apple_match/scenes/toolbar_capsule.json unmodified; settings toolbar-settings.json (shipped ios27Light material with geometry override and explicit exterior shadow, verbatim copy in this directory)",
+      "flutter_source": "packages/liquid_glass_renderer/example/tool/apple_match/flutter/test/host_capture_test.dart, probes A/C/D in separate processes; scene tool/apple_match/scenes/toolbar_capsule.json unmodified; settings toolbar-settings.json (shipped ios27Light material with a 2.0 pt frost pin, geometry override and explicit exterior shadow, verbatim copy in this directory)",
       "geometry_override": "shapeWidth 224.0, shapeHeight 94.0 pt to match the reference button's visible bounds",
       "shadow": "explicit black drop shadow from authored source settings: alpha 0.06, luminance 0, blur radius 12 pt, offset (0,6) pt, spread 0; not recomputed",
-      "probes": "C/D: frozen host captures in out/shadow-audit/shadow-06-12-6; A: captured for this update into the same directory",
-      "raw": "fitted inputs raw/toolbar-fitted-{A,C,D}.png; original published inputs archived at raw/toolbar-original-{A,C,D}.png (preserved from /tmp/liquid-glass-blog-captures/regular)",
+      "probes": "A/C/D refreshed from one host capture run after the 0.6 glint landed",
+      "raw": "refreshed inputs raw/toolbar-fitted-{A,C,D}.png; original published inputs archived at raw/toolbar-original-{A,C,D}.png (preserved from /tmp/liquid-glass-blog-captures/regular)",
       "selection": "scene-specific macOS host fit; no simulator validation; not a universal default",
       "apple_source": "packages/liquid_glass_renderer/example/tool/apple_match/references/ios27-iphone17pro-reduce-motion-off/slider-000/toolbar_capsule/{A,C,D}.png; retained historical SDR references",
       "crop": [
@@ -27,7 +27,8 @@
         1518
       ],
       "diff": "per-channel absolute RGB difference |a-b|, not amplified; no registration or color adjustment",
-      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels"
+      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels",
+      "settings_revision": "0.6 glint, current main"
     },
     "merge-comparison.jpg": {
       "type": "comparison composite",
@@ -41,9 +42,10 @@
         1479
       ],
       "diff": "per-channel absolute RGB difference |a-b|, not amplified; no registration or color adjustment",
-      "frozen_inputs": "raw/merge-blend32-{A,C,D}.png (new candidate); raw/merge-comparison-blend40.png (archived previous published figure); control captures /tmp/liquid-glass-blog-captures/clear-merge never rerun",
+      "frozen_inputs": "raw/merge-blend32-{A,C,D}.png refreshed after the 0.6 glint and seam damping; raw/merge-comparison-blend40.png archived previous published figure",
       "diagnostics": "merge-blend-diagnostics.json: one-scene local RGB error and visible-response diagnostics, not a perceptual or global score; merge-bridge-variants.png: frozen black-probe bridge crops for visual comparison.",
-      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels"
+      "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels",
+      "settings_revision": "0.6 glint, current main"
     },
     "hero-controls.jpg": {
       "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
@@ -55,7 +57,8 @@
         "controls-light (photos)",
         "controls-dark (night)"
       ],
-      "transform": "full screens downscaled into phone bezels"
+      "transform": "full screens downscaled into phone bezels",
+      "revision": "re-rendered on current main"
     },
     "hero-blend.jpg": {
       "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
@@ -72,7 +75,8 @@
         352,
         381,
         580
-      ]
+      ],
+      "revision": "re-rendered on current main"
     },
     "hero-colors.jpg": {
       "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
@@ -88,7 +92,8 @@
         292,
         366,
         612
-      ]
+      ],
+      "revision": "re-rendered on current main"
     },
     "hero-loupe.jpg": {
       "harness": "packages/liquid_glass_renderer/example/test/blog_figures_test.dart (playground scenes as in readme_screenshots_test.dart, backdrop scrolled so the glass sits over one photo; real MaskFilter shadows)",
@@ -104,7 +109,8 @@
         40,
         402,
         408
-      ]
+      ],
+      "revision": "re-rendered on current main"
     },
     "cover.jpg": {
       "steps": "example/tool/blog_cover.py background -> example/test/blog_cover_test.dart (renders the glass over it) -> example/tool/blog_cover.py overlay",

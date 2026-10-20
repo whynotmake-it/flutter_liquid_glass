@@ -14,9 +14,6 @@
   "tintGreen": 122,
   "tintBlue": 255,
   "tintAlpha": 0.0,
-  "saturation": 1.0,
-  "transmissionGamma": 1.0,
-  "vibrancy": 0.0,
   "colorModel": "ios27Clear",
   "blend": 32
 }
