@@ -13,8 +13,8 @@
     "capture-pass.png": "illustrative schematic; not a numeric pass budget",
     "toolbar-comparison.jpg": {
       "type": "comparison composite",
-      "flutter_source": "packages/liquid_glass_renderer/example/tool/apple_match/flutter/test/host_capture_test.dart, probes A/C/D in separate processes; scene tool/apple_match/scenes/toolbar_capsule.json unmodified; settings toolbar-settings.json (shipped ios27Light material with a 2.0 pt frost pin, geometry override and explicit exterior shadow, verbatim copy in this directory)",
-      "geometry_override": "shapeWidth 224.0, shapeHeight 94.0 pt to match the reference button's visible bounds",
+      "flutter_source": "packages/liquid_glass_renderer/example/tool/apple_match/flutter/test/host_capture_test.dart, probes A/C/D in separate processes; scene tool/apple_match/scenes/toolbar_capsule.json unmodified; settings toolbar-settings.json (shipped ios27Light material with the shipped size-dependent frost, geometry override and explicit exterior shadow, verbatim copy in this directory)",
+      "geometry_override": "shapeWidth 224.5, shapeHeight 94.0 pt, superellipse profile, centered; matches the harness fit and the reference cap response",
       "shadow": "explicit black drop shadow from authored source settings: alpha 0.06, luminance 0, blur radius 12 pt, offset (0,6) pt, spread 0; not recomputed",
       "probes": "A/C/D refreshed from one host capture run after the 0.6 glint landed",
       "raw": "refreshed inputs raw/toolbar-fitted-{A,C,D}.png; original published inputs archived at raw/toolbar-original-{A,C,D}.png (preserved from /tmp/liquid-glass-blog-captures/regular)",
@@ -28,7 +28,7 @@
       ],
       "diff": "per-channel absolute RGB difference |a-b|, not amplified; no registration or color adjustment",
       "composition": "example/tool/compose_blog_figures.py: same crop on both sides, rounded tiles, row and column labels",
-      "settings_revision": "0.6 glint, current main"
+      "settings_revision": "shipped size-dependent frost, 0.6 glint, superellipse fit, current main"
     },
     "merge-comparison.jpg": {
       "type": "comparison composite",
