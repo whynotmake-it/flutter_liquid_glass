@@ -46,9 +46,9 @@ void main() {
         isTrue,
       );
       expect(first.debugHostBufferBlockLength, greaterThan(0));
-      final library = (await gpu.ShaderLibrary.fromAsset(
+      final library = gpu.ShaderLibrary.fromAsset(
         ShaderKeys.gpuGeometryShaderBundle,
-      ))!;
+      )!;
       final size = library['GeometryFragment']!
           .getUniformSlot('GeometryUniforms')
           .sizeInBytes!;

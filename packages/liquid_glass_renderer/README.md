@@ -44,7 +44,7 @@ private material APIs.
 
 ## Requirements
 
-- Flutter 3.47 or newer.
+- Flutter 3.44 (experimental compatibility branch).
 - Impeller and Flutter GPU for full glass. Pass `--enable-flutter-gpu` to
   `flutter run`, or turn it on in the app: `FLTEnableFlutterGPU` in
   `Info.plist` (iOS, macOS) and the
