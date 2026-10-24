@@ -11,7 +11,13 @@ const _width = 200;
 const _height = 160;
 
 void main() {
-  final binding = SubmittedSceneBinding()
+  runVisibilityFadeTests(SubmittedSceneBinding());
+}
+
+/// Shared host/device workload; the device binding must capture submitted
+/// scenes (see [SubmittedSceneCapture]).
+void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
+  final binding = (testBinding as SubmittedSceneCapture)
     ..captureWidth = _width
     ..captureHeight = _height;
 
@@ -54,6 +60,11 @@ void main() {
               ..physicalSize = Size(_width.toDouble(), _height.toDouble())
               ..devicePixelRatio = 1;
             addTearDown(tester.view.reset);
+            // flutter_tester renders a seeded pass of real glass wrongly (see
+            // `pinPlainBackdropPath`); a device runs the production defaults.
+            if (binding.isFlutterTester && !fake && frost > 0) {
+              pinPlainBackdropPath();
+            }
             final visibility = ValueNotifier<double>(1);
             addTearDown(visibility.dispose);
 
@@ -117,6 +128,9 @@ void main() {
 
             final full = await deviationAt(1);
             expect(full, greaterThan(0));
+            if (!binding.isFlutterTester && frost > 0) {
+              expect(seededPasses(tester), isNotEmpty, reason: 'seeds are on');
+            }
             expect(
               await deviationAt(0.5) / full,
               inInclusiveRange(0.25, 0.75),

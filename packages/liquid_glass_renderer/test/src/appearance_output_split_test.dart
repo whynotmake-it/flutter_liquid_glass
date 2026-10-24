@@ -8,6 +8,7 @@ import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 
+import 'gpu_test_helpers.dart';
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
 
@@ -20,6 +21,10 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
   final sceneCapture = (binding as SubmittedSceneCapture)
     ..captureWidth = 240
     ..captureHeight = 180;
+  // flutter_tester renders a native seed's pass wrong and differently from
+  // run to run (see `pinPlainBackdropPath`); a device runs the production
+  // defaults.
+  if (sceneCapture.isFlutterTester) setUp(pinPlainBackdropPath);
 
   for (final retained in [false, true]) {
     testWidgets('appearance outputs split (retained=$retained)', (
@@ -114,11 +119,19 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
         return bytes;
       }
 
-      Future<Uint8List> matteBytes() => read(
-        layer.debugGeometryImage!,
-        layer.debugGeometryMatteBounds.width.round(),
-        layer.debugGeometryMatteBounds.height.round(),
-      );
+      // The geometry field's lattice: one texel per matte scale pixels, and
+      // one past the far edge.
+      Future<Uint8List> matteBytes() async {
+        final image = layer.debugGeometryImage!;
+        final field = (await tester.runAsync(() => readGeometryField(image)))!;
+        final scale = layer.matteScale;
+        return fieldRegion(
+          field,
+          image.width,
+          layer.debugGeometryMatteBounds.width.round() ~/ scale + 1,
+          layer.debugGeometryMatteBounds.height.round() ~/ scale + 1,
+        ).buffer.asUint8List();
+      }
 
       Future<Uint8List?> materialBytes() async {
         final image = layer.debugMaterialImage;

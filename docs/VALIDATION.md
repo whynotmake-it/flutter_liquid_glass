@@ -99,15 +99,6 @@ replaced `_ShaderInputSnapshot`, and the removal of the identity
   ≤0.03% ones above plus the intended look change). Regenerating them on
   macos-26 is in `TODO.md`.
 
-## Found while validating
-
-- **Capture plus fractional fade with a border or inner shadow.** With
-  `contourStrength` or `bevelShadowStrength` above 0, `real_opacity` and
-  `real_fade_transition` render differently with and without a
-  `LiquidGlassCapture` (max channel diff 255 for the border, 63 for the inner
-  shadow; limit 4). It reproduces on the committed branch (`72859eea1`), so it
-  predates the cleanup; the old defaults had both off. Tracked in `TODO.md`.
-
 ## Implementation summaries
 
 <!-- Summaries from the agents that implemented each piece go here. -->

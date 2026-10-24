@@ -7,6 +7,7 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 import 'shared.dart';
 
 void main() {
+  setUp(pinPlainBackdropPath);
   // 6 device px of frost at 3x: nonzero, so the filter composes a blur
   // pass.
   const blurred = LiquidGlassSettings(highlight: 0);

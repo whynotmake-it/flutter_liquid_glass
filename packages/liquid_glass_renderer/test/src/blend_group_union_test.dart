@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 
+import 'gpu_test_helpers.dart';
+
 const _width = 256;
 const _height = 128;
 const _centerY = 64.0;
@@ -92,14 +94,15 @@ void main() {
       refractionAmount: 30,
       offsetX: 0,
       offsetY: 0,
+      matteScale: testMatteScale,
     );
-    final bytes = (await result.image.toByteData())!;
-    // Channel B stores the companded signed inward distance around 0.5.
+    final field = await readGeometryField(result.image);
+    // The field's first channel is the signed inward distance.
     return [
       for (var y = 0; y < _height; y++)
         [
           for (var x = 0; x < _width; x++)
-            bytes.getUint8((y * result.width + x) * 4 + 2) >= 128,
+            fieldInwardAt(field, result.textureWidth, x, y) >= 0,
         ],
     ];
   }

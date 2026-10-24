@@ -16,23 +16,6 @@ disposing a temporary `FlutterGpuGeometryRenderer`.
 shrink after sustained smaller use landed in #228 and was reverted in #229;
 revisit with a Pixel A/B against the numbers in `VALIDATION.md`.
 
-## Bugs
-
-### Border and inner shadow change under `LiquidGlassCapture` in a fade
-
-Inside a fractional `Opacity` or `FadeTransition`, a layer with
-`contourStrength` or `bevelShadowStrength` above 0 renders differently with
-and without a `LiquidGlassCapture` around it. Reproduces on `72859eea1`.
-
-Repro: remove the `contourStrength: 0` and `bevelShadowStrength: 0` lines in
-`test/src/capture_scenes.dart` and run
-`test/src/liquid_glass_capture_real_opacity_test.dart` and
-`liquid_glass_capture_real_fade_transition_test.dart` (max channel diff 255
-with the border, 63 with only the inner shadow; limit 4). Suspect: the seeded
-opacity pass origin (`GlassCompositionProbe.seededPassOrigin`) or the capture
-region not covering the contour outset. Check on a device too, since some fade
-cases are known flutter_tester mis-renders.
-
 ## Refactors
 
 ### Let the active frame state own the matte

@@ -140,6 +140,52 @@ ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassAppearance appearance, {
   double deviceScale = 1,
   double? shapeShortSide,
+}) => fakeGlassBackdropFilterParts(
+  settings,
+  appearance,
+  deviceScale: deviceScale,
+  shapeShortSide: shapeShortSide,
+)?.full;
+
+/// A fake glass backdrop filter and its blur-free variant, for a pass that
+/// has already blurred its backdrop.
+@internal
+typedef FakeGlassFilterParts = ({
+  ImageFilter full,
+  ImageFilter withoutBlur,
+  double sigma,
+});
+
+double _fakeGlassSizeProgress(double? shapeShortSide) {
+  final sizeT = shapeShortSide == null
+      ? 0.0
+      : ((118 - shapeShortSide.clamp(63.0, 118.0)) / 55).clamp(0.0, 1.0);
+  return sizeT * sizeT;
+}
+
+/// The only ways a shape's short side changes the filter
+/// [fakeGlassBackdropFilterParts] builds: its blur sigma and its size
+/// progress. Equal inputs build an equal filter, so a filter can be kept
+/// while a shape animates through sizes that do not change either (most of
+/// the range, since both saturate).
+@internal
+({double frost, double sizeProgress}) fakeGlassFilterInputs(
+  LiquidGlassSettings settings, {
+  double deviceScale = 1,
+  double? shapeShortSide,
+}) => (
+  frost: settings.frostSigmaAt(deviceScale, shapeShortSide: shapeShortSide),
+  sizeProgress: _fakeGlassSizeProgress(shapeShortSide),
+);
+
+/// Like [fakeGlassBackdropFilter], also returning the filter without its blur
+/// (just the color transfer) and the blur's logical sigma.
+@internal
+FakeGlassFilterParts? fakeGlassBackdropFilterParts(
+  LiquidGlassSettings settings,
+  LiquidGlassAppearance appearance, {
+  double deviceScale = 1,
+  double? shapeShortSide,
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
@@ -155,10 +201,7 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
-  final sizeT = shapeShortSide == null
-      ? 0.0
-      : ((118 - shapeShortSide.clamp(63.0, 118.0)) / 55).clamp(0.0, 1.0);
-  final sizeProgress = sizeT * sizeT;
+  final sizeProgress = _fakeGlassSizeProgress(shapeShortSide);
   final faceTransfer = colorModel.faceTransfer(
     tintAmount: settings.effectiveTintAmount,
     sizeProgress: sizeProgress,
@@ -195,7 +238,7 @@ ImageFilter? fakeGlassBackdropFilter(
           )
         : null;
   }
-  return switch ((blur, colorTransfer)) {
+  final full = switch ((blur, colorTransfer)) {
     (final blur?, final colorTransfer?) => ImageFilter.compose(
       inner: blur,
       outer: colorTransfer,
@@ -204,4 +247,20 @@ ImageFilter? fakeGlassBackdropFilter(
     (null, final colorTransfer?) => colorTransfer,
     (null, null) => null,
   };
+  if (full == null) return null;
+  return (
+    full: full,
+    withoutBlur: colorTransfer ?? fakeGlassIdentityFilter,
+    sigma: frost,
+  );
 }
+
+/// The filter [FakeGlassFilterParts.withoutBlur] is for a glass that is only a
+/// blur: nothing is left to do once the pass has blurred its backdrop.
+@internal
+const ImageFilter fakeGlassIdentityFilter = ColorFilter.matrix(<double>[
+  1, 0, 0, 0, 0, //
+  0, 1, 0, 0, 0, //
+  0, 0, 1, 0, 0, //
+  0, 0, 0, 1, 0, //
+]);

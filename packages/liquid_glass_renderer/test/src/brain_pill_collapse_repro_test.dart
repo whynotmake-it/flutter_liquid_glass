@@ -5,28 +5,18 @@
 //     bouncy animation.
 //  B. A real `LiquidGlassLayer` keeps its child mounted when async Flutter
 //     GPU initialization finishes.
-//  C. `RenderLiquidGlassCapture` updates its capture region for paint-only
-//     changes (visibility, translation) inside the layer's RepaintBoundary,
-//     so shadows are never clipped.
-//  D. The combined collapse scene: child state survives and every frame's
-//     capture covers the pill while it overshoots visibility 1.
-import 'dart:io';
-import 'dart:ui' as ui;
+//  C. The combined collapse scene: child state survives while the pill
+//     overshoots visibility 1.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 
-import 'capture_scenes.dart';
 import 'shared.dart';
-import 'submitted_scene_binding.dart';
 
 void main() {
-  final binding = SubmittedSceneBinding();
-
   setUp(_Probe.created.clear);
 
   const shape = LiquidRoundedSuperellipse(borderRadius: 20);
@@ -194,228 +184,25 @@ void main() {
     );
   });
 
-  group('C. capture staleness', () {
-    const pillShadows = [
-      BoxShadow(color: Color(0x1A000000), blurRadius: 30),
-    ];
-
-    Widget cScene({required bool fake, required _CVars vars}) => framed(
-      LiquidGlassCapture(
-        child: SizedBox(
-          width: 300,
-          height: 200,
-          child: LiquidGlassLayer(
-            fake: fake,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Transform.translate(
-                offset: vars.offset,
-                child: LiquidGlass(
-                  shape: const LiquidRoundedSuperellipse(borderRadius: 22),
-                  shadows: pillShadows,
-                  appearance: const LiquidGlassAppearance().copyWith(
-                    visibility: vars.visibility,
-                  ),
-                  child: const SizedBox(width: 120, height: 44),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    Future<RenderLiquidGlassCapture> pumpCScene(
-      WidgetTester tester, {
-      required bool fake,
-      required _CVars vars,
-      required ValueSetter<StateSetter> stater,
-    }) async {
-      await tester.pumpWidget(
-        StatefulBuilder(
-          builder: (context, setState) {
-            stater(setState);
-            return cScene(fake: fake, vars: vars);
-          },
-        ),
-      );
-      await tester.pump();
-      return tester.renderObject<RenderLiquidGlassCapture>(
-        find.byType(LiquidGlassCapture),
-      );
-    }
-
+  group('C. clickup-like collapse scene', () {
     for (final fake in [false, true]) {
-      final label = fake ? 'fake' : 'real';
       testWidgets(
-        'C1 $label: visibility-only change refreshes captureRect',
-        (
-          tester,
-        ) async {
-          final vars = _CVars()..visibility = 0.05;
-          late StateSetter setState;
-          await pumpCScene(
-            tester,
-            fake: fake,
-            vars: vars,
-            stater: (s) => setState = s,
-          );
-          setState(() => vars.visibility = 1);
-          await tester.pump();
-          final capture = tester.renderObject<RenderLiquidGlassCapture>(
-            find.byType(LiquidGlassCapture),
-          );
-          final fresh = _freshRegion(capture);
-          expect(
-            _containsWithTolerance(capture.captureRect, fresh),
-            isTrue,
-            reason:
-                'captureRect ${capture.captureRect} does not contain fresh '
-                '$fresh after visibility ${vars.visibility}',
-          );
-        },
-        skip: !fake && skipProperGlassTests,
-      );
-
-      testWidgets(
-        'C2 $label: translation-only change refreshes captureRect',
-        (
-          tester,
-        ) async {
-          final vars = _CVars()..offset = const Offset(0, 40);
-          late StateSetter setState;
-          await pumpCScene(
-            tester,
-            fake: fake,
-            vars: vars,
-            stater: (s) => setState = s,
-          );
-          setState(() => vars.offset = Offset.zero);
-          await tester.pump();
-          final capture = tester.renderObject<RenderLiquidGlassCapture>(
-            find.byType(LiquidGlassCapture),
-          );
-          final fresh = _freshRegion(capture);
-          expect(
-            _containsWithTolerance(capture.captureRect, fresh),
-            isTrue,
-            reason:
-                'captureRect ${capture.captureRect} does not contain fresh '
-                '$fresh after translate to ${vars.offset}',
-          );
-        },
-        skip: !fake && skipProperGlassTests,
-      );
-    }
-  });
-
-  group('D. clickup-like collapse scene', () {
-    const pngFrames = {5, 10, 15, 20, 30};
-
-    for (final fake in [false, true]) {
-      final label = fake ? 'fake' : 'real';
-      testWidgets(
-        'D $label: pill collapse keeps state and coverage',
-        (
-          tester,
-        ) async {
+        'C ${fake ? 'fake' : 'real'}: pill collapse keeps state',
+        (tester) async {
           await tester.pumpWidget(_CollapseScene(fake: fake, open: false));
           await tester.pumpAndSettle();
           await tester.pumpWidget(_CollapseScene(fake: fake, open: true));
           await tester.pumpAndSettle();
           _Probe.created.clear();
           await tester.pumpWidget(_CollapseScene(fake: fake, open: false));
-
-          final rows = <String>[
-            'frame | vis | states | pillRect | captureRect | fresh | flags',
-          ];
-          final failures = <String>[];
           for (var frame = 0; frame < 50; frame++) {
-            final wantPng = pngFrames.contains(frame);
-            if (wantPng) {
-              binding
-                ..captureWidth = tester.view.physicalSize.width.round()
-                ..captureHeight = tester.view.physicalSize.height.round()
-                ..captureNextScene = true
-                ..scheduleFrame();
-            }
             await tester.pump(const Duration(milliseconds: 16));
-
-            final scene = tester.state<_CollapseSceneState>(
-              find.byType(_CollapseScene),
-            );
-            final capture = tester.renderObject<RenderLiquidGlassCapture>(
-              find.byType(LiquidGlassCapture),
-            );
-            final capGlobal = MatrixUtils.transformRect(
-              capture.getTransformTo(null),
-              capture.captureRect,
-            );
-            final fresh = _freshRegion(capture);
-            final freshGlobal = MatrixUtils.transformRect(
-              capture.getTransformTo(null),
-              fresh,
-            );
-            final pill = _pillBox(tester);
-            Rect? pillGlobal;
-            if (pill != null) {
-              pillGlobal = pill.localToGlobal(Offset.zero) & pill.size;
-            }
-
-            final flags = <String>[];
-            if (!_containsWithTolerance(capture.captureRect, fresh)) {
-              flags.add('STALE-CAPTURE');
-              failures.add(
-                'frame $frame: captureRect ${capture.captureRect} does not '
-                'contain fresh $fresh (local)',
-              );
-            }
-            if (scene.currentVisibility > 0.3 &&
-                pillGlobal != null &&
-                capGlobal.top > pillGlobal.top - 10) {
-              flags.add('NO-HEADROOM');
-            }
-            rows.add(
-              '${frame.toString().padLeft(5)} | '
-              '${scene.currentVisibility.toStringAsFixed(3).padLeft(6)} | '
-              '${_Probe.created.length.toString().padLeft(6)} | '
-              '${'${pillGlobal ?? '-'}'.padRight(24)} | '
-              '${'$capGlobal'.padRight(24)} | '
-              '${'$freshGlobal'.padRight(24)} | '
-              '${flags.join(',')}',
-            );
-
-            if (wantPng) {
-              try {
-                final image = await tester.runAsync(() => binding.captured!);
-                if (image != null) {
-                  final png = await tester.runAsync(
-                    () => image.toByteData(format: ui.ImageByteFormat.png),
-                  );
-                  final name =
-                      'd_${label}_frame${frame.toString().padLeft(2, '0')}';
-                  await tester.runAsync(() async {
-                    final file = File('/tmp/lg_repro/$name.png');
-                    await file.create(recursive: true);
-                    await file.writeAsBytes(png!.buffer.asUint8List());
-                  });
-                  image.dispose();
-                }
-              } catch (error) {
-                debugPrint('png capture frame $frame failed: $error');
-              }
-            }
           }
-          for (final row in rows) {
-            debugPrint(row);
-          }
-          if (_Probe.created.length != 1) {
-            failures.add(
-              'expected exactly one probe State across the collapse; '
-              'got ${_Probe.created.length}',
-            );
-          }
-          expect(failures, isEmpty, reason: failures.join('\n'));
+          expect(
+            _Probe.created,
+            hasLength(1),
+            reason: 'expected exactly one probe State across the collapse',
+          );
         },
         skip: !fake && skipProperGlassTests,
       );
@@ -444,13 +231,6 @@ class _ProbeState extends State<_Probe> {
   Widget build(BuildContext context) => const Text('probe');
 }
 
-/// Mutable inputs for the C scenes so `setState` can drive visibility and
-/// translation changes without rebuilding the whole harness.
-class _CVars {
-  double visibility = 1;
-  Offset offset = Offset.zero;
-}
-
 enum _AKind { grouped, plain, standaloneFake }
 
 enum _ALayer { real, fake, none }
@@ -468,47 +248,6 @@ enum _AConfig {
   final _ALayer layer;
 
   bool get grouped => kind == _AKind.grouped;
-}
-
-/// The capture region `RenderLiquidGlassCapture._computeRegion` would compute
-/// right now: layout box plus every descendant glass layer's effect bounds.
-Rect _freshRegion(RenderLiquidGlassCapture capture) {
-  var region = Offset.zero & capture.size;
-  for (final layer in glassLayersBelow(capture)) {
-    final bounds = layer.effectBounds;
-    if (bounds == null) continue;
-    region = region.expandToInclude(
-      MatrixUtils.transformRect(
-        (layer as RenderObject).getTransformTo(capture),
-        bounds,
-      ),
-    );
-  }
-  return region;
-}
-
-bool _containsWithTolerance(
-  Rect outer,
-  Rect inner, {
-  double tolerance = 1,
-}) =>
-    inner.left >= outer.left - tolerance &&
-    inner.top >= outer.top - tolerance &&
-    inner.right <= outer.right + tolerance &&
-    inner.bottom <= outer.bottom + tolerance;
-
-/// The render box of the pill's glass shape, or null while the pill is
-/// absent from the tree.
-RenderBox? _pillBox(WidgetTester tester) {
-  final elements = find.byKey(const ValueKey('pill')).evaluate();
-  if (elements.isEmpty) return null;
-  var node = elements.first.findRenderObject();
-  while (node != null &&
-      node is! RenderLiquidGlass &&
-      node is! RenderFakeGlass) {
-    node = node.parent;
-  }
-  return node is RenderBox ? node : null;
 }
 
 const _toolbarAppearance = LiquidGlassAppearance.ios27RegularLight();
@@ -540,77 +279,74 @@ class _CollapseSceneState extends State<_CollapseScene> {
       child: Center(
         child: SizedBox(
           width: 360,
-          child: LiquidGlassCapture(
-            child: LiquidGlassLayer(
-              fake: widget.fake,
-              defaultAppearance: _toolbarAppearance,
-              child: LiquidGlassBlendGroup(
-                blend: 7,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 64),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        switchInCurve: Curves.easeOutBack,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) =>
-                            SlideTransition(
-                              position:
-                                  Tween(
-                                    begin: const Offset(0, 1),
-                                    end: Offset.zero,
-                                  ).animate(
-                                    animation,
-                                  ),
-                              child: AnimatedBuilder(
-                                animation: animation,
-                                builder: (_, c) {
-                                  currentVisibility = animation.value;
-                                  return LiquidGlass.grouped(
-                                    shape: const LiquidRoundedSuperellipse(
-                                      borderRadius: 22,
-                                    ),
-                                    shadows: _pillShadows,
-                                    appearance: _toolbarAppearance.copyWith(
-                                      visibility: animation.value,
-                                    ),
-                                    child: c!,
-                                  );
-                                },
-                                child: child,
-                              ),
+          child: LiquidGlassLayer(
+            fake: widget.fake,
+            defaultAppearance: _toolbarAppearance,
+            child: LiquidGlassBlendGroup(
+              blend: 7,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 64),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      switchInCurve: Curves.easeOutBack,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) => SlideTransition(
+                        position:
+                            Tween(
+                              begin: const Offset(0, 1),
+                              end: Offset.zero,
+                            ).animate(
+                              animation,
                             ),
-                        child: widget.open
-                            ? const SizedBox.shrink(key: ValueKey('empty'))
-                            : const KeyedSubtree(
-                                key: ValueKey('pill'),
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 11,
-                                  ),
-                                  child: _Probe(),
-                                ),
+                        child: AnimatedBuilder(
+                          animation: animation,
+                          builder: (_, c) {
+                            currentVisibility = animation.value;
+                            return LiquidGlass.grouped(
+                              shape: const LiquidRoundedSuperellipse(
+                                borderRadius: 22,
                               ),
-                      ),
-                    ),
-                    LiquidGlass.grouped(
-                      shape: const LiquidRoundedSuperellipse(
-                        borderRadius: 28,
-                      ),
-                      child: AnimatedSize(
-                        duration: const Duration(milliseconds: 550),
-                        curve: Curves.easeOut,
-                        child: SizedBox(
-                          width: 300,
-                          height: widget.open ? 256 : 56,
+                              shadows: _pillShadows,
+                              appearance: _toolbarAppearance.copyWith(
+                                visibility: animation.value,
+                              ),
+                              child: c!,
+                            );
+                          },
+                          child: child,
                         ),
                       ),
+                      child: widget.open
+                          ? const SizedBox.shrink(key: ValueKey('empty'))
+                          : const KeyedSubtree(
+                              key: ValueKey('pill'),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 11,
+                                ),
+                                child: _Probe(),
+                              ),
+                            ),
                     ),
-                  ],
-                ),
+                  ),
+                  LiquidGlass.grouped(
+                    shape: const LiquidRoundedSuperellipse(
+                      borderRadius: 28,
+                    ),
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 550),
+                      curve: Curves.easeOut,
+                      child: SizedBox(
+                        width: 300,
+                        height: widget.open ? 256 : 56,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

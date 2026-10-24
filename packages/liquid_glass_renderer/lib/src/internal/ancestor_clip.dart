@@ -54,14 +54,10 @@ Rect? paintClipOfAncestor(RenderObject ancestor, RenderObject child) {
 /// Intersection of the paint clips above [node], in [node]'s coordinates, or
 /// `null` when nothing above it clips.
 ///
-/// Walks once to the root, stopping after an ancestor for which [stopAt]
-/// returns true. The root view is skipped: its bounds are the screen, which
-/// is the texture edge. Clips under a rotation or skew are skipped too, as
-/// their bounding box would overstate what they keep.
-Rect? localPaintClipAbove(
-  RenderObject node, {
-  bool Function(RenderObject ancestor)? stopAt,
-}) {
+/// Walks once to the root. The root view is skipped: its bounds are the
+/// screen, which is the texture edge. Clips under a rotation or skew are
+/// skipped too, as their bounding box would overstate what they keep.
+Rect? localPaintClipAbove(RenderObject node) {
   Rect? result;
   var toAncestor = Matrix4.identity();
   var child = node;
@@ -74,19 +70,19 @@ Rect? localPaintClipAbove(
     ancestor.applyPaintTransform(child, step);
     toAncestor = step..multiply(toAncestor);
     final clip = paintClipOfAncestor(ancestor, child);
-    if (clip != null && _isRectilinear(toAncestor)) {
+    if (clip != null && isRectilinearTransform(toAncestor)) {
       final toNode = Matrix4.tryInvert(toAncestor);
       if (toNode != null) {
         final local = MatrixUtils.transformRect(toNode, clip);
         result = result?.intersect(local) ?? local;
       }
     }
-    if (stopAt?.call(ancestor) ?? false) break;
   }
   return result;
 }
 
-bool _isRectilinear(Matrix4 transform) {
+/// Whether [transform] only scales and translates, so it maps rects to rects.
+bool isRectilinearTransform(Matrix4 transform) {
   final m = transform.storage;
   const epsilon = 1e-9;
   return m[1].abs() < epsilon &&
@@ -106,6 +102,31 @@ Rect? screenClipAbove(RenderObject node) {
     child = ancestor, ancestor = ancestor.parent
   ) {
     final clip = clipOfAncestor(ancestor, child);
+    if (clip == null) continue;
+    final screenClip = MatrixUtils.transformRect(
+      ancestor.getTransformTo(null),
+      clip,
+    );
+    result = result?.intersect(screenClip) ?? screenClip;
+  }
+  return result;
+}
+
+/// Intersection of every clip that is actually painted above [node], in screen
+/// coordinates, or `null` when nothing above it clips.
+///
+/// Like [screenClipAbove], but a viewport only counts while its content
+/// overflows ([paintClipOfAncestor]), matching the clip layers the framework
+/// pushes, which is what Impeller derives a pass's coverage from.
+Rect? screenPaintClipAbove(RenderObject node) {
+  Rect? result;
+  var child = node;
+  for (
+    var ancestor = child.parent;
+    ancestor != null;
+    child = ancestor, ancestor = ancestor.parent
+  ) {
+    final clip = paintClipOfAncestor(ancestor, child);
     if (clip == null) continue;
     final screenClip = MatrixUtils.transformRect(
       ancestor.getTransformTo(null),

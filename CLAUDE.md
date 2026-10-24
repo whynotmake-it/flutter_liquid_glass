@@ -87,9 +87,10 @@ The liquid glass effect works by capturing and distorting background pixels thro
 4. **Geometry Rendering** (`lib/src/internal/render_liquid_glass_geometry.dart`): Renders glass shape geometry into textures for shader processing. Caches geometry to avoid re-rendering on every frame.
 
 5. **Shader Pipeline** (`lib/src/shaders.dart` and `lib/assets/shaders/`):
-   - `gpu/geometry_fragment.glsl` (Flutter GPU): renders every shape of a layer into the matte
+   - `gpu/geometry_fragment.glsl` (Flutter GPU): renders every shape of a layer into the geometry field: a smooth RGBA16F lattice of one texel per 2 or 4 matte pixels (R inward edge distance, GB optical normal scaled by the refraction shortening factor, A half short side). There is no full-resolution packed matte: the final shader interpolates the field through the sampler's hardware bilinear filter (one fetch, a second only across creases) and rebuilds the antialiased edge, the bevel displacement and the rim inputs per pixel
    - `gpu/material_gradient_fragment.glsl` (Flutter GPU): low-resolution per-shape appearance map
    - `liquid_glass_final_render{,_material,_tint}.frag`: the backdrop pass (refraction, frost, lighting, color). NOT listed in `pubspec.yaml`'s `flutter.shaders` (they can't compile to SkSL, which fails Skia/web builds) — `hook/build.dart` compiles them to `build/shaderbundles/*.iplr` via impellerc instead
+   - The matte scale (`lib/src/matte_scale_flag.dart`) is chosen per layer from its device pixel ratio: 4 at 2 or more, else 2 (also under `flutter test`); `LIQUID_GLASS_MATTE_SCALE=2|4` forces one. The scale is the `uLowResMatte` uniform, so the final shaders are the same for both. Pixel 10: 4x saves 41% GPU on moving blended shapes, 24% on a resizing sheet.
    - `fake_glass_surface.frag`, `fake_glass_backdrop_edge.frag`: FakeGlass
 
 ### Key Components
@@ -99,6 +100,7 @@ The liquid glass effect works by capturing and distorting background pixels thro
 - **FakeGlass** (`lib/src/fake_glass.dart`): Lightweight alternative using backdrop filters instead of shaders
 - **GlassGlow** (`lib/src/glass_glow.dart`): Touch-responsive glow effects
 - **LiquidStretch** (`lib/src/stretch.dart`): Squash and stretch animations
+- **Native seed** (`liquidGlassNativeSeed` none|identity|blur; on where Impeller renders, off under `flutter test`): each glass paints its backdrop filter inside a small pass (`SeededBackdropPassLayer`, `lib/src/internal/backdrop_seed.dart`) seeded by an identity or plain-blur backdrop filter that Impeller crops to the pass rect, so the glass shader runs over the pass instead of the whole backdrop. Seeds whose reads nothing painted in between can have changed share one `BackdropKey` (one backdrop read-back) automatically (`_canShareSeed`, `_paintedBetween`, per-frame `_LayerBounds`: painted content is unbounded unless a real clip layer fences it, and a glass's own picture is bounded by what its pass changes); a glass with a `BackdropGroup` / explicit `backdropKey` keeps that key. `LiquidGlassCapture` is a deprecated no-op
 
 ### Performance Considerations
 
@@ -134,6 +136,26 @@ Do not regenerate on a different macOS version — the references then fail on t
 
 All tests must use the `--enable-impeller` flag since Skia is not supported.
 
+### Device Tests (seeded passes)
+
+flutter_tester renders a natively seeded pass of real glass wrongly (wrong and
+different from run to run, see `pinPlainBackdropPath` in `test/src/shared.dart`),
+so the host runs of the tests that compare captured pixels pin the plain path.
+Macs render the same scenes exactly like the plain path (Metal), and
+`example/integration_test/*_device_test.dart` runs them there with the
+production defaults (the seeds are on whenever it is not flutter_tester):
+
+```bash
+cd packages/liquid_glass_renderer/example
+flutter drive --driver=test_driver/backdrop_seed_driver.dart \
+  --target=integration_test/native_seed_parity_device_test.dart -d macos \
+  --enable-impeller --enable-flutter-gpu
+```
+
+Run the `native_seed_parity`, `visibility_frame`, `visibility_fade`,
+`opacity_composition_bounds` and `appearance_output_split` device tests after
+changing `backdrop_seed.dart`.
+
 ### Test Structure
 - Tests are in `packages/*/test/` directories
 - Test config: `dart_test.yaml` at root and package level
@@ -155,7 +177,7 @@ Set `debugPaintLiquidGlassGeometry = true` (exported from `liquid_glass_renderer
 
 Shader source files are in `packages/liquid_glass_renderer/lib/assets/shaders/`:
 - Main shader files: `*.frag`
-- Shared utilities: `*.glsl` (`render.glsl`, `liquid_glass_final_render_core.glsl`, `fake_glass_shape.glsl`; Flutter GPU includes in `gpu/`: `sdf.glsl`, `material_sdf.glsl`, `displacement_encoding.glsl`)
+- Shared utilities: `*.glsl` (`render.glsl`, `liquid_glass_final_render_core.glsl`, `fake_glass_shape.glsl`; Flutter GPU includes in `gpu/`: `sdf.glsl`, `material_sdf.glsl`)
 - Flutter GPU shaders are listed in `liquid_glass_renderer.shaderbundle.json` and built by `hook/build.dart`
 
 `fake_glass_surface.frag` is a pubspec shader compiled by the Flutter tool (it supports SkSL for Skia/web). The `liquid_glass_final_render*` shaders are compiled by `hook/build.dart` into `build/shaderbundles/*.iplr` for all Impeller runtime stages and loaded via `FragmentProgram.fromAsset`. Edit `.frag` files and run `flutter run` to hot reload changes (though shaders typically require full restart).

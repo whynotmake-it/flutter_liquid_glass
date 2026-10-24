@@ -8,6 +8,7 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 import 'shared.dart';
 
 void main() {
+  setUp(pinPlainBackdropPath);
   Widget glass({required bool fake}) => LiquidGlassLayer(
     fake: fake,
     useBackdropGroup: true,

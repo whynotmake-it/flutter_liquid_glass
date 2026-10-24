@@ -11,21 +11,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
+import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
+/// Marks the render object of a glass layer.
 @internal
-abstract interface class LiquidGlassLayerRenderObject {
-  /// Everything this layer paints or samples, in its own coordinates, or
-  /// `null` while it has no shapes: the material plus contour, the backdrop
-  /// reach of its blur and refraction, and its exterior shadows. A
-  /// `LiquidGlassCapture` sizes itself to the union of these. Reads layout and
-  /// cached shape data only; it never polls or rebuilds geometry.
-  Rect? get effectBounds;
-}
+abstract interface class LiquidGlassLayerRenderObject {}
 
 /// What a glass layer's last painted frame committed to the retained layer
 /// tree.
@@ -81,28 +77,6 @@ Rect expandForGlassShadows(
     }
   }
   return result;
-}
-
-/// Union of the geometry bounds registered with [link], in layer space, with
-/// the shapes and transforms needed to grow it. Pure: no polling, no rebuild.
-@internal
-(Rect, List<(List<ShapeGeometry>, Matrix4)>)? gatherGlassGeometryBounds(
-  GeometryRenderLink link,
-  RenderObject layer,
-) {
-  Rect? bounds;
-  final shapes = <(List<ShapeGeometry>, Matrix4)>[];
-  for (final geometryRo in link.shapes) {
-    if (!geometryRo.attached || !geometryRo.hasSize) continue;
-    final (geometryBounds, geometryShapes, _) = geometryRo.gatherShapeData();
-    if (geometryShapes.isEmpty) continue;
-    final toLayer = geometryRo.getTransformTo(layer);
-    final inLayer = MatrixUtils.transformRect(toLayer, geometryBounds);
-    bounds = bounds?.expandToInclude(inLayer) ?? inLayer;
-    shapes.add((geometryShapes, toLayer));
-  }
-  if (bounds == null) return null;
-  return (bounds, shapes);
 }
 
 bool _debugWarnedOpacityBetweenShapeAndLayer = false;
@@ -305,6 +279,42 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   @visibleForTesting
   Offset get debugCompositorTranslation => _effectTranslation;
+
+  /// Places the seeded pass around a backdrop effect clipped to
+  /// [innerLayerRect] (in the layer coordinates it is painted in, [paintOffset]
+  /// from this object's), whose blur reads [reach] past that clip.
+  ///
+  /// Inside a seeded fractional-opacity pass the effect already renders in a
+  /// pass that starts at the enclosing clips, so no extra pass is placed.
+  /// Neither is one without a blur to crop or with native seeds off (see
+  /// [liquidGlassNativeSeed]).
+  ///
+  /// A large pass is sized by [sizing] (this object's own by default), which
+  /// keeps it from changing size on every bucket step; each effect painting
+  /// its own pass needs its own.
+  @protected
+  BackdropPassPlan planBackdropPass(
+    Rect innerLayerRect,
+    Offset paintOffset,
+    double reach, {
+    BackdropPassSizing? sizing,
+  }) =>
+      liquidGlassNativeSeed == LiquidGlassNativeSeed.none ||
+          reach <= 0 ||
+          compositionProbeSeeding
+      ? BackdropPassPlan.unsupported
+      : planSeededBackdropPass(
+          owner: this,
+          innerLayerRect: innerLayerRect,
+          paintOffset: paintOffset,
+          translation: _effectTranslation,
+          reach: reach,
+          devicePixelRatio: devicePixelRatio,
+          ownerClip: retainedClipBounds,
+          sizing: sizing ?? _passSizing,
+        );
+
+  final _passSizing = BackdropPassSizing();
 
   /// Moves all layer-owned painting without recording it again.
   @protected
@@ -792,18 +802,6 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   Iterable<(List<ShapeGeometry>, Matrix4)> _shadowSources() =>
       shapesWithGeometry.map((entry) => (entry.$2.shapes, entry.$3));
 
-  @override
-  Rect? get effectBounds {
-    final gathered = gatherGlassGeometryBounds(link, this);
-    if (gathered == null) return null;
-    final (bounds, shapes) = gathered;
-    final material = bounds.inflate(materialOutset);
-    return expandForGlassShadows(
-      material.inflate(effectSamplingReach(material)),
-      shapes,
-    );
-  }
-
   /// Draws every committed shape's exterior shadows into [canvas] at
   /// [offset], then cuts the shape silhouettes back out so interior fills
   /// do not darken the glass. Both passes scale with shape visibility.
@@ -826,7 +824,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     if (!useNativeOuterBlur) {
-      canvas.saveLayer(effectPaintBounds, Paint());
+      // The layer only bounds what it holds, and the shadows are painted inside
+      // effectPaintBounds, so growing it to pixel buckets changes no pixel;
+      // an animated shape would otherwise give every frame a render target of
+      // a new size, which Impeller cannot reuse.
+      canvas.saveLayer(
+        effectPaintBounds.expandToPixelBuckets(devicePixelRatio),
+        Paint(),
+      );
     }
 
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {

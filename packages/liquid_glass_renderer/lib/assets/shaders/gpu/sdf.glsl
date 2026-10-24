@@ -354,20 +354,20 @@ vec2 sceneBoundsOutsideSquared(vec2 p, int numShapes) {
     return vec2(lowerBoundSquared, smoothingBudget);
 }
 
-// A single shape is never blended, so it skips the exact-corner gradient.
-SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
+// The shape's sample for a distance the caller already has (the solved one,
+// or an upper bound that is provably as good as it for the caller).
+SceneSample getShapeSampleWithDistance(
+    int index,
+    vec2 p,
+    bool blended,
+    float shapeDistance
+) {
     int baseIndex = index * 3;
     vec4 primitive = uShapeData[baseIndex];
     vec4 inverseBasis = uShapeData[baseIndex + 1];
     vec4 placement = uShapeData[baseIndex + 2];
     SceneSample resultSample;
-    resultSample.distance = getShapeDistance(
-        index,
-        p,
-        primitive,
-        inverseBasis,
-        placement
-    );
+    resultSample.distance = shapeDistance;
     // The placement scale is the same scale applied to the signed distance,
     // so this is the shape's local half-minor extent in scene pixels. Keeping
     // it beside the SDF avoids a second traversal and lets optical spread be
@@ -394,6 +394,54 @@ SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
     resultSample.normal = gradients.xy;
     resultSample.opticalNormal = gradients.zw;
     return resultSample;
+}
+
+// Upper bound for a rounded superellipse's signed distance that skips its
+// iterative solver, for early-outs where only "deep inside" matters. The
+// circular rounded rectangle of the same radius lies inside the superellipse
+// except for a sliver near each corner (up to ~0.042 r, measured over
+// aspect ratios and radii against the shader's own 6-step solve), so its
+// distance plus a margin of 0.08 r + 1 pixel never underestimates the
+// solved distance. Returns 1e9 when there is no bound.
+float roundedSuperellipseDistanceUpperBound(
+    int index,
+    vec2 p,
+    out bool hasBound
+) {
+    int baseIndex = index * 3;
+    vec4 primitive = uShapeData[baseIndex];
+    vec4 inverseBasis = uShapeData[baseIndex + 1];
+    vec4 placement = uShapeData[baseIndex + 2];
+    vec4 degrees = uRseData[baseIndex];
+    // A zero RSE payload (corner radius ~0) takes sdfSquircle's box branch.
+    hasBound = primitive.x == 1.0 && placement.z > 0.0 &&
+        primitive.w > 1e-2 && degrees.x >= 2.0 && degrees.y >= 2.0;
+    if (!hasBound) {
+        return 1e9;
+    }
+    vec2 delta = p - placement.xy;
+    vec2 localPoint = vec2(
+        inverseBasis.x * delta.x + inverseBasis.y * delta.y,
+        inverseBasis.z * delta.x + inverseBasis.w * delta.y
+    );
+    vec2 halfSize = primitive.yz * 0.5;
+    float radius = min(primitive.w, min(halfSize.x, halfSize.y));
+    return (sdfRRect(localPoint, halfSize, primitive.w) +
+        0.08 * radius + 1.0) * placement.z;
+}
+
+// A single shape is never blended, so it skips the exact-corner gradient.
+SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
+    int baseIndex = index * 3;
+    vec4 primitive = uShapeData[baseIndex];
+    vec4 inverseBasis = uShapeData[baseIndex + 1];
+    vec4 placement = uShapeData[baseIndex + 2];
+    return getShapeSampleWithDistance(
+        index,
+        p,
+        blended,
+        getShapeDistance(index, p, primitive, inverseBasis, placement)
+    );
 }
 
 SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {

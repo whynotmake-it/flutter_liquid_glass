@@ -44,6 +44,17 @@ Widget _scene(double width, {Key? key}) {
 RenderLiquidGlassLayer _layer(WidgetTester tester) =>
     tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
 
+/// The top-left [width] x [height] lattice of a geometry field [image].
+Future<Float32List> _fieldRegion(
+  WidgetTester tester,
+  ui.Image image,
+  int width,
+  int height,
+) async {
+  final field = (await tester.runAsync(() => readGeometryField(image)))!;
+  return fieldRegion(field, image.width, width, height);
+}
+
 /// The top-left [width] x [height] texels of [image], as RGBA bytes.
 Future<Uint8List> _subRect(
   WidgetTester tester,
@@ -177,8 +188,11 @@ void runGeometryTextureReuseTests() {
       );
       final layer = _layer(tester);
       final matteSize = layer.debugGeometryMatteBounds.size * 3;
-      final width = matteSize.width.round();
-      final height = matteSize.height.round();
+      // The matte is a lattice of one texel per matte scale pixels, and one
+      // past the far edge.
+      final scale = layer.matteScale;
+      final width = matteSize.width.round() ~/ scale + 1;
+      final height = matteSize.height.round() ~/ scale + 1;
       final (textureWidth, textureHeight) =
           layer.gpuGeometryRenderer!.debugMatteTextureSize!;
       expect(textureWidth * textureHeight, greaterThan(width * height));
@@ -198,14 +212,14 @@ void runGeometryTextureReuseTests() {
         reusedMaterialImage.width * reusedMaterialImage.height,
         greaterThan(materialWidth * materialHeight),
       );
-      final reused = await _subRect(tester, reusedImage, width, height);
+      final reused = await _fieldRegion(tester, reusedImage, width, height);
       final reusedMaterial = await _subRect(
         tester,
         reusedMaterialImage,
         materialWidth,
         materialHeight,
       );
-      final freshMatte = await _subRect(
+      final freshMatte = await _fieldRegion(
         tester,
         fresh.debugGeometryImage!,
         width,

@@ -20,6 +20,8 @@ export 'src/liquid_shape.dart'
         LiquidRoundedSuperellipse,
         LiquidShape;
 export 'src/logging.dart' show LgrLogs;
+export 'src/native_seed_flag.dart'
+    show LiquidGlassNativeSeed, liquidGlassNativeSeed;
 export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
 export 'src/stretch.dart'
     show LiquidStretch, OffsetResistanceExtension, RawLiquidStretch;

@@ -1,13 +1,27 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
-// Geometry pass, run with Flutter GPU: renders the signed distance field of
-// every shape in a layer into the layer's matte (12-bit surface normal angle,
-// signed edge distance and 12-bit displacement, packed by
-// displacement_encoding.glsl). Normals are analytic; corner normals come from
-// a 1.5x corner radius, and refraction uses a quarter-circle bevel that can
-// fit the shape.
+// Geometry pass, run with Flutter GPU. It renders a smooth field on a coarse
+// lattice, one texel per `scale` (2 or 4) matte pixels, which the final pass
+// interpolates through the sampler's hardware bilinear filtering and turns back
+// into crisp edges, normals and displacement (see liquid_glass_final_render_core.glsl).
+//
+// The target is RGBA16F; every channel is a smooth function of position
+// (apart from the creases deep inside a shape, which nothing reads), so it
+// interpolates well:
+//   R: signed inward edge distance in matte pixels, positive inside. Linear
+//      across a straight edge, so the interpolated silhouette is exact there.
+//   G, B: the optical surface normal (unit, with the geometry pass's rounded
+//      corners) scaled by sqrt(clamp(|gradient|, 0, 1)), the factor that
+//      shortens refraction where the distance field does (smooth-union
+//      bridges, stretched shapes). The final pass recovers the direction by
+//      interpolating and normalizing, and the factor by interpolating the
+//      lengths.
+//   A: the half short side of the shape (blended like the distance in a
+//      group), which sets the bevel profile.
+// Everything else the full matte stores (refraction displacement, antialiased
+// coverage, the exterior contour support) is a function of these, so the final
+// pass evaluates it per pixel instead of reading it quantized.
 
-// The matte packs 12-bit integer codes; fp16 cannot represent them exactly.
 precision highp float;
 
 #define MAX_SHAPES 16
@@ -22,10 +36,12 @@ layout(std140) uniform GeometryUniforms {
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
     vec4 uShapeBounds[MAX_SHAPES];
+    // x: matte pixels per lattice texel. Appended after the members the other
+    // geometry shaders declare, so their layout is a prefix of this one.
+    vec4 uLowRes;
 } geometryUniforms;
 
 #define uOffset geometryUniforms.uOffset
-#define uTextureSize geometryUniforms.uTextureSize
 #define uOpticalProps geometryUniforms.uOpticalProps
 #define uContourProps geometryUniforms.uContourProps
 #define uNumShapes (uOpticalProps.w)
@@ -33,102 +49,50 @@ layout(std140) uniform GeometryUniforms {
 #define uRseData geometryUniforms.uRseData
 #define uShapeBounds geometryUniforms.uShapeBounds
 
-#include "displacement_encoding.glsl"
-
-// Included after uShapeData so the SDF helpers can read the uniform directly.
 #include "sdf.glsl"
 
-float uRefractionHeight = uOpticalProps.x;
-float uEdgeDistanceRange = uOpticalProps.z;
-float uRefractionAmount = uTextureSize.y;
-float uRefractionFitsShape = uTextureSize.x;
-float uContourExtent = uContourProps.x;
 out vec4 fragColor;
 
+// Texels no shape can reach hold this inward distance: far outside, and still
+// a finite fp16. The renderer clears the texture to the same value so it can
+// shade only the occupied part. Keep in sync with kLowResFarInward there.
+const float kFarInward = -4096.0;
+// Inward distances saturate here, well inside fp16 range, so a hidden shape's
+// 1e9 distance cannot become an infinity that poisons interpolation.
+const float kInwardLimit = 16000.0;
+// Matte pixels from a pixel's corner to its center.
+const float kLatticePhase = 0.5;
+
 void main() {
-    // Flutter 3.47's Impeller backends expose the same render-target
-    // orientation, including Flutter GPU passes on GLES.
-    vec2 fragCoord = gl_FragCoord.xy + uOffset;
+    float scale = geometryUniforms.uLowRes.x;
+    // Lattice texel (i, j) sits on the center of matte pixel (i, j) * scale,
+    // so the lattice texels are evaluated where the full matte would be, and
+    // a shape centered on a pixel corner is never sampled at its exact axis
+    // (the superellipse solver is degenerate there). One more texel than
+    // `size / scale` covers the far edge. Keep kLatticePhase in sync with the
+    // final shader.
+    vec2 position = (gl_FragCoord.xy - 0.5) * scale + uOffset + kLatticePhase;
 
-    // Most of a shared layer's matte can be empty when spatially separate
-    // groups reuse one backdrop, and a single shape's texture is padded to
-    // its size bucket. Reject those pixels with the matte-space boxes before
-    // running Flutter's iterative superellipse/ellipse solvers.
-    vec2 outsideBounds = sceneBoundsOutsideSquared(
-        fragCoord,
-        int(uNumShapes)
-    );
-    float emptyThreshold = uContourExtent + 2.0 + outsideBounds.y;
-    if (outsideBounds.x > emptyThreshold * emptyThreshold) {
-        fragColor = vec4(0.0);
-        return;
-    }
-    SceneSample scene = sceneSample(fragCoord, int(uNumShapes));
-    float sd = scene.distance;
-
-    // Match Flutter 3.47's centered signed-distance antialiasing: the
-    // coverage transition is half a physical pixel on either side of the
-    // mathematical boundary, rather than a fixed two-pixel fade entirely
-    // inside the shape. This keeps the contour position independent of scale.
-    // Analytic gradient rather than dFdx/dFdy of the distance, which many
-    // GPUs share across a 2x2 quad (see getShapeGradients).
-    float dx = scene.opticalNormal.x;
-    float dy = scene.opticalNormal.y;
-    float pixelSize = length(scene.opticalNormal);
-    float fade = clamp(uOpticalProps.y, 0.0, 1.0) * max(pixelSize, 1e-4);
-    float materialAlpha = 1.0 - smoothstep(-fade, fade, sd);
-    // Keep geometry alive only as far as the final pass can draw an attached
-    // contour. The final shader reconstructs material AA from the signed SDF,
-    // so expanding this support does not expand the glass body itself.
-    float contourSupport = 1.0 - smoothstep(
-        max(uContourExtent - fade, 0.0),
-        uContourExtent,
-        sd
-    );
-    float effectSupport = max(materialAlpha, contourSupport);
-    if (effectSupport < 0.01) {
-        fragColor = vec4(0.0);
+    // Beyond the contour and the interpolation footprint (two lattice cells)
+    // nothing is visible, and the distance is only ever compared against
+    // thresholds nearer than that. The box distance bounds the shape distance
+    // from below.
+    vec2 outsideBounds = sceneBoundsOutsideSquared(position, int(uNumShapes));
+    float reach = uContourProps.x + 2.0 * scale + 2.0 + outsideBounds.y;
+    if (outsideBounds.x > reach * reach) {
+        fragColor = vec4(kFarInward, 0.0, 0.0, 0.0);
         return;
     }
 
-    vec2 surfaceGradient = vec2(dx, dy);
-    float surfaceGradientLength = length(surfaceGradient);
-    vec2 surfaceNormal = surfaceGradientLength > 0.0001
-        ? surfaceGradient / surfaceGradientLength
+    SceneSample scene = sceneSample(position, int(uNumShapes));
+    float gradientLength = length(scene.opticalNormal);
+    vec2 normal = gradientLength > 0.0001
+        ? scene.opticalNormal / gradientLength
         : vec2(0.0);
-
-    // A flat face with a quarter-circle bevel: only the bevel refracts, and
-    // its displacement joins the undisplaced face with zero slope. The
-    // exterior half of the AA ramp keeps the silhouette's displacement.
-    float bevel;
-    float amount;
-    if (uRefractionFitsShape > 0.5) {
-        // iOS 27 regular glass: the bevel spans at most half of the half
-        // short side and the rim samples no deeper than the center line.
-        bevel = min(uRefractionHeight, 0.5 * scene.halfMinor);
-        amount = min(uRefractionAmount, scene.halfMinor);
-    } else {
-        // Clear glass keeps its lens until the bevel would pass the center
-        // line, then scales the whole lens so displacement never flips there.
-        float lensScale = min(
-            1.0,
-            scene.halfMinor / max(uRefractionHeight, 0.001)
-        );
-        bevel = uRefractionHeight * lensScale;
-        amount = uRefractionAmount * lensScale;
-    }
-    float bevelX = 1.0 - clamp(max(-sd, 0.0) / max(bevel, 0.001), 0.0, 1.0);
-    float displacementMagnitude = bevel > 0.001
-        ? -amount * (1.0 - sqrt(1.0 - bevelX * bevelX)) *
-            sqrt(clamp(surfaceGradientLength, 0.0, 1.0))
-        : 0.0;
-
-    fragColor = encodeDisplacementData(
-        surfaceNormal,
-        displacementMagnitude,
-        max(uRefractionAmount, 0.001),
-        -sd,
-        4.0 * uEdgeDistanceRange,
-        uContourExtent
+    float refractionScale = sqrt(clamp(gradientLength, 0.0, 1.0));
+    fragColor = vec4(
+        clamp(-scene.distance, -kInwardLimit, kInwardLimit),
+        normal * refractionScale,
+        scene.halfMinor
     );
 }
