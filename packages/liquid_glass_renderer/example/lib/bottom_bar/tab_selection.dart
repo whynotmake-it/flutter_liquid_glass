@@ -2,15 +2,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:liquid_glass_renderer_example/bottom_bar/listenable_transform.dart';
 import 'package:motor/motor.dart';
 
 /// Where the selection indicator of a tab bar is and how far it has turned
 /// from the resting platter into the loupe.
 ///
-/// Everything that follows the indicator (the platter, the tint mask, the
-/// tint's shrink compensation and the loupe itself) reads these controllers
-/// at paint or layout time through [listenable], so moving the indicator
-/// never rebuilds a widget.
+/// Everything that follows the indicator (the platter, the tint mask and the
+/// loupe itself) reads these controllers at paint or layout time through
+/// [listenable], so moving the indicator never rebuilds a widget.
 class TabSelection {
   TabSelection({
     required this.position,
@@ -18,7 +18,6 @@ class TabSelection {
     required this.jelly,
     required this.tabCount,
     required this.backdropShrink,
-    this.iconScale = 1,
   });
 
   /// Center of the indicator in tab indices, fractional while it moves.
@@ -37,10 +36,6 @@ class TabSelection {
   /// The loupe's `LiquidGlassSettings.backdropShrink`.
   double backdropShrink;
 
-  /// How much larger the tinted icons look in the loupe than the others,
-  /// on top of undoing [backdropShrink].
-  double iconScale;
-
   late final Listenable listenable = Listenable.merge([position, press, jelly]);
 
   /// How far the resting platter reaches past its slot on each side: the
@@ -50,6 +45,10 @@ class TabSelection {
   /// How far the loupe reaches past the platter on each side: a 97 × 73 pt
   /// loupe over the 77 × 54 pt platter of iOS 27.
   static const loupeOutset = Size(10, 9.5);
+
+  /// Corner radius of the loupe's lens. The tint mask uses the same shape so
+  /// its edge lands exactly on the lens rim instead of leaking past it.
+  static const loupeCornerRadius = 64.0;
 
   double get _pressAmount => math.max(press.value, 0);
 
@@ -107,46 +106,72 @@ class TabSelection {
     );
   }
 
-  /// The tint mask within a tab row of [size]: [rect] grown by [tintScale],
-  /// so that through the loupe's shrunk backdrop its edge lands on the
-  /// loupe's rim.
-  Rect maskRect(Size size) {
-    final rect = this.rect(size);
+  /// The tint mask: the loupe's lens shape in tab-row coordinates.
+  ///
+  /// Built from the same resting rect, corner radius and jelly transform as
+  /// the loupe's own glass, so the tint is clipped to exactly the aperture
+  /// the lens shows instead of leaking in the corners.
+  Path maskPath(Size size) {
+    final rect = restingRect(size);
+    final path = Path()
+      ..addRSuperellipse(
+        RSuperellipse.fromRectAndRadius(
+          rect,
+          const Radius.circular(loupeCornerRadius),
+        ),
+      );
+    final (:x, :y) = jellyScale;
+    if (x == 1 && y == 1) return path;
 
-    return Rect.fromCenter(
-      center: rect.center,
-      width: rect.width,
-      height: rect.height,
-    ).inflate(2);
+    final center = rect.center;
+    final transform = Matrix4.identity()
+      ..translateByDouble(center.dx, center.dy, 0, 1)
+      ..scaleByDouble(x, y, 1, 1)
+      ..translateByDouble(-center.dx, -center.dy, 0, 1);
+    return path.transform(transform.storage);
   }
 
-  RSuperellipse maskRSuperellipse(Size size) {
+  /// The source region the lens samples through its tint mask.
+  ///
+  /// The lens shrinks the backdrop by [tintScale] at visibility `v`, so the
+  /// tint has to exist over a larger source region for the lens to show it
+  /// all the way to the rim. This is the lens shape expanded about its center
+  /// by that factor, before the jelly transform (which is an output-space
+  /// transform).
+  Path sourceMaskPath(Size size) {
+    final rect = restingRect(size);
+    final path = Path()
+      ..addRSuperellipse(
+        RSuperellipse.fromRectAndRadius(
+          rect,
+          const Radius.circular(loupeCornerRadius),
+        ),
+      );
+    final scale = tintScale;
+    if (scale == 1) return path;
+    return path.transform(scaleAbout(rect.center, scale).storage);
+  }
+
+  /// Bounds of [maskPath], for clip culling.
+  Rect maskRect(Size size) => rect(size);
+
+  /// Bounds of [sourceMaskPath], for clip culling.
+  Rect sourceMaskRect(Size size) {
     final rect = maskRect(size);
-    return RSuperellipse.fromRectAndRadius(
-      rect,
-      Radius.circular(rect.shortestSide / 2),
+    final scale = tintScale;
+    return Rect.fromCenter(
+      center: rect.center,
+      width: rect.width * scale,
+      height: rect.height * scale,
     );
   }
 
-  /// Scale about the loupe center that the loupe's shrunk backdrop undoes,
-  /// so the tinted icons under it keep the size and place of the others.
-  ///
-  /// The glass samples the backdrop at `1 + (1 / (1 - shrink) - 1) * v`
-  /// times the distance from its center at visibility `v`.
+  /// How much larger than the lens the tint source must be so the lens's
+  /// shrunk backdrop still sees tint at its rim.
   double get tintScale {
     final shrink = backdropShrink.clamp(0.0, .75);
     final visibility = press.value.clamp(0.0, 1.0);
     return 1 + (1 / (1 - shrink) - 1) * visibility;
-  }
-
-  /// Scale of each tinted icon about its own center, [iconScale] once the
-  /// loupe is up.
-  ///
-  /// Scaling about the loupe center instead would move the icons with the
-  /// loupe.
-  double get iconGrowth {
-    final visibility = press.value.clamp(0.0, 1.0);
-    return 1 + (iconScale - 1) * visibility;
   }
 }
 
@@ -156,18 +181,26 @@ class TabSelection {
 /// indicator and once in the tint clipped inside it, so the tint follows the
 /// indicator's edge instead of switching per icon.
 class TabSelectionClipper extends CustomClipper<Path> {
-  TabSelectionClipper(this.selection, {this.inverse = false})
-    : super(reclip: selection.listenable);
+  TabSelectionClipper(
+    this.selection, {
+    this.inverse = false,
+    this.source = false,
+  }) : super(reclip: selection.listenable);
 
   final TabSelection selection;
   final bool inverse;
+
+  /// Whether to clip to the tint's source mask instead of the lens shape.
+  final bool source;
 
   /// Room for content that the bar's own scale pushes past the row.
   static const _overflow = 24.0;
 
   @override
   Path getClip(Size size) {
-    final path = Path()..addRSuperellipse(selection.maskRSuperellipse(size));
+    final path = source
+        ? selection.sourceMaskPath(size)
+        : selection.maskPath(size);
     if (!inverse) return path;
     return path
       ..addRect((Offset.zero & size).inflate(_overflow))
@@ -177,11 +210,15 @@ class TabSelectionClipper extends CustomClipper<Path> {
   @override
   Rect getApproximateClipRect(Size size) => inverse
       ? (Offset.zero & size).inflate(_overflow)
+      : source
+      ? selection.sourceMaskRect(size)
       : selection.maskRect(size);
 
   @override
   bool shouldReclip(TabSelectionClipper oldClipper) =>
-      oldClipper.selection != selection || oldClipper.inverse != inverse;
+      oldClipper.selection != selection ||
+      oldClipper.inverse != inverse ||
+      oldClipper.source != source;
 }
 
 /// The resting selection platter. It fades out as the loupe takes over.

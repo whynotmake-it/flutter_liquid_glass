@@ -15,8 +15,8 @@ export 'package:liquid_glass_renderer_example/bottom_bar/loupe_tab_bar.dart'
 /// distance so the segments stay apart; pulling one toward another stretches
 /// it across the gap and they merge.
 ///
-/// Tab bar interaction details (the loupe, masked tint and icon scale) are
-/// informed by `GlassTabBar` in
+/// Tab bar interaction details (the loupe and masked tint) are informed by
+/// `GlassTabBar` in
 /// [liquid_glass_widgets](https://github.com/sdegenaar/liquid_glass_widgets)
 /// by Sebastian Degenaar, reimplemented here on paint-time listenables.
 class IosBottomBar extends StatelessWidget {
