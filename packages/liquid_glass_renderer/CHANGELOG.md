@@ -1,3 +1,10 @@
+## 1.0.0-dev.2
+
+ - **FIX**(liquid_glass_renderer): decode exterior edge distance without a ternary on Mali Vulkan (#246).
+
+    On Mali GPUs under Vulkan (Pixel 8 / Tensor G3, Pixel 9 Pro / Tensor G4), the ternary in decodeSignedEdgeDistance returns 0 for an empty matte texel (B = 0) instead of -exteriorRange. Every pixel of the filter bounds outside the shape then passes the early return with materialAlpha 0.5 and renders as half-covered material: tint, contour and bevel shadow fill the whole bounding rectangle. Metal and Impeller OpenGL ES render correctly. Selecting the range with step()/mix() decodes correctly on all three.
+
+
 ## 1.0.0-dev.1
 
 A rendering release with no public API changes.
