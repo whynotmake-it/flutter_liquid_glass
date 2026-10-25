@@ -1,3 +1,9 @@
+## 1.0.0-dev.1
+
+- Require `liquid_glass_renderer` 1.0.0-dev.1 for the refined iOS 27 color
+  transfer, glint, merged-shape seams, and additive FakeGlass highlights.
+  No widget API changes.
+
 ## 1.0.0-dev.0
 
 - Adopt the redesigned `liquid_glass_renderer` 1.0 prerelease API and Flutter

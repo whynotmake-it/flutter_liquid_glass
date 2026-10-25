@@ -98,6 +98,7 @@ void paintFakeGlassSurface(
   required LiquidGlassAppearance appearance,
   required double devicePixelRatio,
   bool exteriorOnly = false,
+  bool highlightOnly = false,
 }) {
   final appearanceVisibility = appearance.visibility.clamp(0.0, 1.0);
   final surfaceTint = appearance.colorModel.approximateSurfaceTint(
@@ -159,14 +160,22 @@ void paintFakeGlassSurface(
             : _noSuperellipse,
       )
       ..setFloat(appearance.colorModel.fakeGlintFaceGain)
-      ..setFloat(appearance.colorModel.fakeGlintVibrancy);
+      ..setFloat(appearance.colorModel.fakeGlintVibrancy)
+      ..setFloat(highlightOnly ? 1 : 0);
   });
   final contourOutset = fakeGlassSurfaceOutset(settings);
+  final paint = Paint()..shader = shader;
+  if (highlightOnly) {
+    // Add light on top of the surface instead of replacing it. A translucent
+    // FakeGlass surface can then exceed its premultiplied face (and SDR white
+    // on an extended-range target) without raising the surface's alpha.
+    paint.blendMode = BlendMode.plus;
+  }
   canvas.drawRect(
     fakeGlassSurfaceQuad(
-      (Offset.zero & size).inflate(contourOutset),
+      (Offset.zero & size).inflate(highlightOnly ? 0 : contourOutset),
       canvas.getTransform(),
     ),
-    Paint()..shader = shader,
+    paint,
   );
 }

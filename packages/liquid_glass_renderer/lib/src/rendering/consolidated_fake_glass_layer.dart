@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -112,6 +113,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   final Map<LiquidGlassShapeRenderObject, _SeparateBackdropLayers>
   _separateBackdropLayers = {};
   ImageFilter? _cachedFilter;
+  double? _cachedFilterShortSide;
 
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
@@ -176,24 +178,62 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
   // One extra logical pixel covers the kernel's rounding at any DPR.
   @override
-  double effectSamplingReach(Rect material) =>
-      _hasBlur ? settings.frostSigmaAt(devicePixelRatio) * 3 + 1 : 0.0;
+  double effectSamplingReach(Rect material) {
+    if (!_hasBlur) return 0;
+    final sigma = settings.frostSigmaAt(
+      devicePixelRatio,
+      shapeShortSide: _sharedShapeShortSide,
+    );
+    return sigma * 3 + 1;
+  }
+
+  /// Short side of the smallest shape the shared filter covers. The blur is
+  /// layer-wide, like RealGlass's.
+  double get _sharedShapeShortSide {
+    double? shortest;
+    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        if (_backdropClass(shape.appearance) != 2) continue;
+        // shapeBounds is already in the geometry's local space.
+        final side = MatrixUtils.transformRect(
+          geometryToLayer,
+          shape.shapeBounds,
+        ).shortestSide;
+        if (side <= 0) continue;
+        shortest = shortest == null ? side : math.min(shortest, side);
+      }
+    }
+    return shortest ?? 150;
+  }
+
+  ImageFilter _sharedBackdropFilter() {
+    final shortSide = _sharedShapeShortSide;
+    final cached = _cachedFilter;
+    if (cached != null && _cachedFilterShortSide == shortSide) return cached;
+    final filter = _buildBackdropFilter();
+    _cachedFilter = filter;
+    _cachedFilterShortSide = shortSide;
+    return filter;
+  }
 
   @override
   void onDevicePixelRatioChanged() {
     _cachedFilter = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onSettingsChanged(LiquidGlassSettings old) {
     _cachedFilter = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onAppearanceChanged() {
     _cachedFilter = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 
@@ -295,7 +335,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
       var paintedBackdrop = sharedBackdropActive;
       if (sharedBackdropActive) {
         final backdropLayer = (_backdropLayer.layer ??= BackdropFilterLayer())
-          ..filter = _cachedFilter ??= _buildBackdropFilter()
+          ..filter = _sharedBackdropFilter()
           ..blendMode = BlendMode.srcOver
           ..backdropKey = _effectiveBackdropKey;
         assert(() {
@@ -367,6 +407,18 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           appearance: shape.appearance,
           devicePixelRatio: devicePixelRatio,
         );
+        if (settings.highlight * shape.appearance.visibility > 0) {
+          paintFakeGlassSurface(
+            canvas,
+            shader: shader,
+            size: shape.renderObject.size,
+            shape: shape.shape,
+            settings: settings,
+            appearance: shape.appearance,
+            devicePixelRatio: devicePixelRatio,
+            highlightOnly: true,
+          );
+        }
         canvas.restore();
       }
     }
@@ -393,6 +445,10 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           settings,
           shape.appearance,
           deviceScale: devicePixelRatio,
+          shapeShortSide: MatrixUtils.transformRect(
+            geometryToLayer,
+            shape.shapeBounds,
+          ).shortestSide,
         );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
@@ -471,6 +527,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
       settings,
       defaultAppearance.copyWith(visibility: 1),
       deviceScale: devicePixelRatio,
+      shapeShortSide: _sharedShapeShortSide,
     )!;
   }
 

@@ -418,6 +418,7 @@ class RenderFakeGlass extends RenderProxyBox {
       settings,
       appearance,
       deviceScale: devicePixelRatio,
+      shapeShortSide: size.shortestSide,
     )!;
     assert(() {
       debugRegisterBackdropCapture(this, backdropKey);
@@ -559,6 +560,18 @@ class RenderFakeGlass extends RenderProxyBox {
       appearance: appearance,
       devicePixelRatio: devicePixelRatio,
     );
+    if (settings.highlight * appearance.visibility > 0) {
+      paintFakeGlassSurface(
+        canvas,
+        shader: shader,
+        size: size,
+        shape: shape,
+        settings: settings,
+        appearance: appearance,
+        devicePixelRatio: devicePixelRatio,
+        highlightOnly: true,
+      );
+    }
     canvas.restore();
   }
 }

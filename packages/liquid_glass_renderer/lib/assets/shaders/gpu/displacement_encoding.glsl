@@ -104,7 +104,13 @@ float decodeSignedEdgeDistance(
 ) {
     float centeredDistance = (encoded.b - 0.5) * 2.0;
     float normalizedMagnitude = centeredDistance * centeredDistance;
-    return centeredDistance >= 0.0
-        ? normalizedMagnitude * inwardRange
-        : -normalizedMagnitude * exteriorRange;
+    // Selected with step()/mix() rather than a ternary: on Mali GPUs under
+    // Vulkan (Pixel 8, Pixel 9 Pro) the ternary form decodes an empty matte
+    // texel (B = 0) as 0 instead of -exteriorRange, so every pixel of the
+    // filter bounds outside the shape renders as half-covered material.
+    return normalizedMagnitude * mix(
+        -exteriorRange,
+        inwardRange,
+        step(0.0, centeredDistance)
+    );
 }

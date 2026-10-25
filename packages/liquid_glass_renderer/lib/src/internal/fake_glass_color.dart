@@ -139,11 +139,15 @@ ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassSettings settings,
   LiquidGlassAppearance appearance, {
   double deviceScale = 1,
+  double? shapeShortSide,
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
   final colorModel = appearance.colorModel;
-  final frost = settings.frostSigmaAt(deviceScale);
+  final frost = settings.frostSigmaAt(
+    deviceScale,
+    shapeShortSide: shapeShortSide,
+  );
   final blur = frost != 0
       ? ImageFilter.blur(
           sigmaX: frost,
@@ -151,8 +155,13 @@ ImageFilter? fakeGlassBackdropFilter(
           tileMode: TileMode.mirror,
         )
       : null;
+  final sizeT = shapeShortSide == null
+      ? 0.0
+      : ((118 - shapeShortSide.clamp(63.0, 118.0)) / 55).clamp(0.0, 1.0);
+  final sizeProgress = sizeT * sizeT;
   final faceTransfer = colorModel.faceTransfer(
     tintAmount: settings.effectiveTintAmount,
+    sizeProgress: sizeProgress,
   );
   final ColorFilter? colorTransfer;
   if (faceTransfer != null) {

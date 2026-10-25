@@ -232,11 +232,12 @@ The slider changes three things, each along a curve fitted to Apple's glass:
 - **Wash.** The iOS 27 color model makes its neutral wash more opaque, and
   dark glass denser.
 - **Border.** The dark border gets stronger.
-- **Blur.** The presets derive `frost` from the slider.
-  `LiquidGlassSettings.ios27RegularFrost(tintAmount)` gives 2, 6.1 and
-  16.6 pt at 0, 0.5 and 1; `ios27ClearFrost(tintAmount)` gives 0.35, 1.28 and
-  16.4 pt, growing at one rate up to the middle tick and at twice that rate
-  beyond it. Pass `frost` to override.
+- **Blur.** The presets derive `frost` from the slider and scale the
+  toolbar-size value by the glass's short side.
+  `LiquidGlassSettings.ios27RegularFrost(tintAmount)` gives 4.5, 6.9 and
+  18.7 pt at 0, 0.5 and 1 at toolbar size; `ios27ClearFrost(tintAmount)` gives
+  0.35, 1.28 and 16.4 pt, growing at one rate up to the middle tick and at
+  twice that rate beyond it. Pass `frost` to override.
 
 The glint doesn't change. The direct color model ignores `tintAmount`, and
 `tintAmount` never changes an explicit `frost`.
@@ -364,7 +365,9 @@ renders into:
   the full range.
 - **Android**: 8-bit surfaces, so the glint is SDR.
 
-`FakeGlass` draws a neutral glint within SDR white.
+`FakeGlass` writes the same glint headroom into an opaque surface. It reaches
+above SDR white on the same extended-range surfaces; elsewhere it clamps to
+white like the real renderer.
 
 ## Visibility
 
@@ -481,7 +484,8 @@ Best practices:
   downsample factor from the blur's device-space size and only starts
   downsampling above roughly 5.8 device pixels, so very small blurs can cost
   more than moderate ones. Preset and default `frost` is raised to that point
-  per device, capped at the 2x value; an explicit `frost` is used as given.
+  per device and scaled by the glass's short side; an explicit `frost` is used
+  as given.
 - **For low power, don't sample the backdrop.** `FakeGlass` pays the same copy
   and blur as full glass. When the device or power state calls for it, draw an
   opaque surface instead.

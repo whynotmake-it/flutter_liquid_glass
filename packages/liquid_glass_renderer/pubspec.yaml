@@ -1,6 +1,6 @@
 name: liquid_glass_renderer
 description: An iOS 27-style liquid glass renderer for Flutter.
-version: 1.0.0-dev.0
+version: 1.0.0-dev.1
 
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_renderer
@@ -44,9 +44,10 @@ dev_dependencies:
   alchemist: ^0.12.1
   flutter_test:
     sdk: flutter
+  impeeler: 0.1.0-dev.2
   lintervention: ^0.3.1
   mocktail: ^1.0.3
-  snaptest: ^0.2.3
+  snaptest: 1.0.0-dev.5
 
 flutter:
   uses-material-design: true

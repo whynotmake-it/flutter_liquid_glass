@@ -42,6 +42,8 @@ Future<({double top, double left})> _fakeGlassWalls(
     settings: settings,
     appearance: const LiquidGlassAppearance(),
     devicePixelRatio: 1,
+    // The glint is its own additive pass since 1.0.0-dev.1.
+    highlightOnly: true,
   );
   final picture = recorder.endRecording();
   final image = picture.toImageSync(_size.width.toInt(), _size.height.toInt());
@@ -110,6 +112,14 @@ void main() {
     );
   });
 
+  test('lightDirection survives a JSON round trip', () {
+    const original = LiquidGlassSettings(lightDirection: Offset(.6, .8));
+    expect(
+      LiquidGlassSettings.fromJson(original.toJson()).lightDirection,
+      original.lightDirection,
+    );
+  });
+
   test('FakeGlass moves the glint with lightDirection', () async {
     final top = await _fakeGlassWalls(
       LiquidGlassSettings.ios27RegularLight(frost: 0),
@@ -119,8 +129,9 @@ void main() {
         frost: 0,
       ).copyWith(lightDirection: _fromLeft),
     );
-    expect(top.top, greaterThan(top.left + 40));
-    expect(left.left, greaterThan(left.top + 40));
+    // The soft glint plateau of 1.0.0-dev.1 peaks at about 36 here.
+    expect(top.top, greaterThan(top.left + 20));
+    expect(left.left, greaterThan(left.top + 20));
   });
 
   testWidgets(

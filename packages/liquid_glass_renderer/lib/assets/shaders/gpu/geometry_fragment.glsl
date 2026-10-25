@@ -119,7 +119,8 @@ void main() {
     }
     float bevelX = 1.0 - clamp(max(-sd, 0.0) / max(bevel, 0.001), 0.0, 1.0);
     float displacementMagnitude = bevel > 0.001
-        ? -amount * (1.0 - sqrt(1.0 - bevelX * bevelX))
+        ? -amount * (1.0 - sqrt(1.0 - bevelX * bevelX)) *
+            sqrt(clamp(surfaceGradientLength, 0.0, 1.0))
         : 0.0;
 
     fragColor = encodeDisplacementData(

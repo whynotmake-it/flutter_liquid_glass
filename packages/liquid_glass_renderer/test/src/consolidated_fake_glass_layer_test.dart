@@ -730,8 +730,9 @@ void main() {
           output[channel],
           // The matrix replaces the luminance self-screen by its
           // least-squares line, which is exact at midtones and within
-          // lift / 6 of the curve at black and white.
-          closeTo(entry.value[channel], 5),
+          // lift / 6 of the curve at black and white (6.6 levels for the
+          // fitted light lift of .216).
+          closeTo(entry.value[channel], 6),
           reason: '${entry.key} channel $channel',
         );
       }
