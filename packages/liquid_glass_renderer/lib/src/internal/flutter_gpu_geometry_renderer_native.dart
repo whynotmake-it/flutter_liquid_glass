@@ -8,6 +8,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
+import 'package:liquid_glass_renderer/src/shaders.dart';
+
 /// Renders the liquid glass geometry SDF shader using flutter_gpu.
 ///
 /// Each output keeps a current texture and one spare. Textures grow as needed;
@@ -51,6 +53,7 @@ class FlutterGpuGeometryRenderer {
   static const double _geometryAaHalfWidth = 0.5;
 
   static Future<FlutterGpuGeometryRenderer> fromAsset(String assetKey) async {
+    if (validateMatteOrder) await _ensureStampShaders();
     final cachedResources = _resolvedAssetResources[assetKey];
     if (cachedResources != null) {
       try {
@@ -246,6 +249,10 @@ class FlutterGpuGeometryRenderer {
   final _TextureRing _mattes = _TextureRing();
   final _TextureRing _materials = _TextureRing();
 
+  /// Identifies the latest matte for [validateMatteOrder]. Incremented on each
+  /// matte render and stamped into a texel below the matte.
+  int _serial = 0;
+
   /// Actual output draws, separate from calls that only retire a material map.
   @visibleForTesting
   int debugMatteDrawCount = 0;
@@ -263,7 +270,14 @@ class FlutterGpuGeometryRenderer {
   /// With [writeMatte] false, retain the current matte and only replace (or
   /// retire) the material output. The caller must verify that geometry,
   /// raster dimensions and optical settings still match the encoded matte.
-  ({ui.Image image, int width, int height, int textureWidth, int textureHeight})
+  ({
+    ui.Image image,
+    int width,
+    int height,
+    int textureWidth,
+    int textureHeight,
+    int serial,
+  })
   render({
     required int width,
     required int height,
@@ -290,6 +304,8 @@ class FlutterGpuGeometryRenderer {
     }(), 'Track geometry submissions in debug builds.');
     final matteWidth = _bucketDimension(width);
     final matteHeight = _bucketDimension(height);
+    // The order check stores the serial one row below the matte.
+    final matteRows = validateMatteOrder ? matteHeight + 1 : matteHeight;
     final (viewWidth, viewHeight) = _viewCapacity();
 
     _ensureFrameCounter();
@@ -298,6 +314,7 @@ class FlutterGpuGeometryRenderer {
       'A material-only update requires an existing matte.',
     );
     if (writeMatte) {
+      if (validateMatteOrder) _serial = (_serial + 1) & 0xFFFFFF;
       if (_texture != null) {
         // Release our handle; earlier submitted scenes hold their own.
         _image?.dispose();
@@ -314,7 +331,7 @@ class FlutterGpuGeometryRenderer {
       final matte = _mattes.next(
         _completedFrames,
         width: matteWidth,
-        height: matteHeight,
+        height: matteRows,
         maxWidth: viewWidth,
         maxHeight: viewHeight,
       );
@@ -412,6 +429,7 @@ class FlutterGpuGeometryRenderer {
             ..bindVertexBuffer(_vertexBufferView);
       _restrictTo(geometryPass, _texture!, matteWidth, matteHeight);
       geometryPass.draw(4);
+      if (validateMatteOrder) _stampSerial(geometryPass, row: matteHeight);
       _submitOrDefer(geometryCommandBuffer);
     }
     if (writeMaterials) {
@@ -446,6 +464,7 @@ class FlutterGpuGeometryRenderer {
       height: matteHeight,
       textureWidth: _texture!.width,
       textureHeight: _texture!.height,
+      serial: _serial,
     );
   }
 
@@ -463,6 +482,74 @@ class FlutterGpuGeometryRenderer {
     pass
       ..setViewport(gpu.Viewport(width: width, height: height))
       ..setScissor(gpu.Scissor(width: width, height: height));
+  }
+
+  /// Writes [_serial] into the texel at (0, [row]) for [validateMatteOrder].
+  ///
+  /// The validation bundle supplies its own vertex and stamp shaders; a
+  /// renderer built without it (the flag is off) never draws a stamp.
+  void _stampSerial(gpu.RenderPass pass, {required int row}) {
+    final shaders = _stampShaders;
+    if (shaders == null) return;
+    final stamp = _stampResources ??= _StampResources(shaders);
+    final data = ByteData(stamp.uniformSize)
+      ..setFloat32(0, ((_serial >> 16) & 0xFF) / 255, Endian.host)
+      ..setFloat32(4, ((_serial >> 8) & 0xFF) / 255, Endian.host)
+      ..setFloat32(8, (_serial & 0xFF) / 255, Endian.host)
+      ..setFloat32(12, 1, Endian.host);
+    // Harness-only, so a buffer per stamp keeps it out of the shared
+    // per-frame uniform budget.
+    final buffer = gpu.gpuContext.createDeviceBufferWithCopy(data);
+    // Bindings outlive a draw; the geometry uniforms would shadow the stamp.
+    pass
+      ..clearBindings()
+      ..bindPipeline(stamp.pipeline)
+      ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
+      ..bindUniform(
+        stamp.slot,
+        gpu.BufferView(
+          buffer,
+          offsetInBytes: 0,
+          lengthInBytes: buffer.sizeInBytes,
+        ),
+      )
+      ..bindVertexBuffer(_vertexBufferView)
+      ..setViewport(gpu.Viewport(y: row, width: 1, height: 1))
+      ..setScissor(gpu.Scissor(y: row, width: 1, height: 1))
+      ..draw(4);
+  }
+
+  /// Harness-only render-order check.
+  ///
+  /// Each matte carries its render serial one texel row below the matte, and
+  /// the final shader paints magenta where the matte it samples carries a
+  /// different serial than the frame's uniforms, i.e. where a texture was
+  /// rewritten before a frame that reads it was rasterized.
+  static const bool validateMatteOrder = bool.fromEnvironment(
+    'LIQUID_GLASS_VALIDATE_MATTE_ORDER',
+  );
+
+  /// Added to the serial the final shader expects, so tests can prove that a
+  /// mismatch paints magenta. Test-only.
+  static int debugMatteSerialSkew = 0;
+
+  static _StampShaders? _stampShaders;
+  static Future<_StampShaders?>? _stampShadersFuture;
+  static _StampResources? _stampResources;
+
+  /// Loads the validation-only vertex/stamp bundle once, when the flag is set.
+  static Future<void> _ensureStampShaders() async {
+    if (_stampShaders != null) return;
+    _stampShadersFuture ??= () async {
+      final library = await gpu.ShaderLibrary.fromAsset(
+        ShaderKeys.gpuGeometryValidateBundle,
+      );
+      final vertex = library?['GeometryVertex'];
+      final fragment = library?['MatteSerialStampFragment'];
+      if (vertex == null || fragment == null) return null;
+      return (vertex: vertex, fragment: fragment);
+    }();
+    _stampShaders = await _stampShadersFuture;
   }
 
   /// Largest view in physical pixels, the cap for texture growth.
@@ -880,6 +967,25 @@ final class _TextureRing {
       ),
     );
   }
+}
+
+typedef _StampShaders = ({gpu.Shader vertex, gpu.Shader fragment});
+
+/// Pipeline and uniform slot for the serial stamp of
+/// [FlutterGpuGeometryRenderer.validateMatteOrder].
+final class _StampResources {
+  _StampResources(_StampShaders shaders)
+    : pipeline = gpu.gpuContext.createRenderPipeline(
+        shaders.vertex,
+        shaders.fragment,
+      ),
+      slot = shaders.fragment.getUniformSlot('StampUniforms') {
+    uniformSize = slot.sizeInBytes ?? 16;
+  }
+
+  final gpu.RenderPipeline pipeline;
+  final gpu.UniformSlot slot;
+  late final int uniformSize;
 }
 
 class _SharedGeometryResources {

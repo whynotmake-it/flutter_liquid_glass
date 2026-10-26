@@ -25,11 +25,19 @@ Future<void> precacheLiquidGlass() {
   final shaders = Future.wait<void>([
     MultiShaderBuilder.precacheShaders([ShaderKeys.fakeGlassSurface]),
     if (!kIsWeb && ui.ImageFilter.isShaderFilterSupported)
-      MultiShaderBuilder.precacheShaders([
-        ShaderKeys.liquidGlassRender,
-        ShaderKeys.liquidGlassMaterialRender,
-        ShaderKeys.liquidGlassTintRender,
-      ]),
+      MultiShaderBuilder.precacheShaders(
+        FlutterGpuGeometryRenderer.validateMatteOrder
+            ? [
+                ShaderKeys.liquidGlassRenderValidate,
+                ShaderKeys.liquidGlassMaterialRenderValidate,
+                ShaderKeys.liquidGlassTintRenderValidate,
+              ]
+            : [
+                ShaderKeys.liquidGlassRender,
+                ShaderKeys.liquidGlassMaterialRender,
+                ShaderKeys.liquidGlassTintRender,
+              ],
+      ),
   ]);
   return Future.wait<void>([
     shaders,

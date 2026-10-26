@@ -72,6 +72,7 @@ void main() {
         int height,
         int textureWidth,
         int textureHeight,
+        int serial,
       })
       render(int size) => renderer.render(
         width: size,

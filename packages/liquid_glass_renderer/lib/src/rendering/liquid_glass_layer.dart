@@ -321,11 +321,17 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         child: InheritedGeometryRenderLink(
           link: _link,
           child: MultiShaderBuilder(
-            assetKeys: [
-              ShaderKeys.liquidGlassRender,
-              ShaderKeys.liquidGlassMaterialRender,
-              ShaderKeys.liquidGlassTintRender,
-            ],
+            assetKeys: FlutterGpuGeometryRenderer.validateMatteOrder
+                ? [
+                    ShaderKeys.liquidGlassRenderValidate,
+                    ShaderKeys.liquidGlassMaterialRenderValidate,
+                    ShaderKeys.liquidGlassTintRenderValidate,
+                  ]
+                : [
+                    ShaderKeys.liquidGlassRender,
+                    ShaderKeys.liquidGlassMaterialRender,
+                    ShaderKeys.liquidGlassTintRender,
+                  ],
             (context, shaders, child) {
               return _RawShapes(
                 defaultRenderShader: shaders[0],
@@ -827,6 +833,15 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   ui.Image? _materialImage;
   bool _ownsGeometryImages = false;
 
+  /// Serial of the matte in [_geometryImage], for the matte-order validator.
+  /// Zero and unused unless [FlutterGpuGeometryRenderer.validateMatteOrder].
+  int _matteSerial = 0;
+
+  /// Float index of the core's trailing `uMatteSerial`, present only in the
+  /// validation shader variants. It is the last uniform by design, so every
+  /// shipped uniform keeps its index.
+  static const int _matteSerialUniformIndex = 158;
+
   /// The bounding box of the geometry matte in the coordinate space of the
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
@@ -911,6 +926,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         _geometryTextureSize = result.textureSize;
         _materialTextureSize = result.materialTextureSize;
         _materialCenterInMatte = result.materialCenter;
+        _matteSerial = result.matteSerial;
         _setShapeAppearances(result.appearances);
         _rememberEncodedGeometry(bounds);
       }
@@ -940,6 +956,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     }
     _geometryImage = null;
     _materialImage = null;
+    _matteSerial = 0;
   }
 
   void _rememberEncodedGeometry(Rect bounds) {
@@ -1028,6 +1045,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             _geometryTextureSize = gpuResult.textureSize;
             _materialTextureSize = gpuResult.materialTextureSize;
             _materialCenterInMatte = gpuResult.materialCenter;
+            _matteSerial = gpuResult.matteSerial;
             _setShapeAppearances(gpuResult.appearances);
             _rememberEncodedGeometry(geometryBounds);
           }
@@ -1142,6 +1160,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _boundMaterialImage = _materialImage;
       _boundMatteBounds = _geometryMatteBounds;
       _shaderInputsChanged = true;
+    }
+    if (FlutterGpuGeometryRenderer.validateMatteOrder) {
+      activeRenderShader.setFloat(
+        _matteSerialUniformIndex,
+        ((_matteSerial + FlutterGpuGeometryRenderer.debugMatteSerialSkew) &
+                0xFFFFFF)
+            .toDouble(),
+      );
     }
   }
 
@@ -1744,6 +1770,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           null => const Size(1, 1),
         },
         appearances: appearances,
+        matteSerial: result.serial,
         matteBounds: writeMatte
             ? Rect.fromLTWH(
                 boundsInMatteSpace.left,
@@ -1769,6 +1796,7 @@ typedef _GpuGeometryFrame = ({
   Rect matteBounds,
   Offset materialCenter,
   List<LiquidGlassAppearance> appearances,
+  int matteSerial,
 });
 
 (bool, bool, LiquidGlassAppearance?) _classifyShapeAppearances(

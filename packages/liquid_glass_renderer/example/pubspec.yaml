@@ -28,3 +28,13 @@ flutter:
 
   assets:
     - assets/backdrops/
+
+# Opts this example (and the CI that builds it) into the package's matte-order
+# validator: the hook then also compiles the validation shaders and their stamp
+# bundle. It is read from the workspace root, so consumers of the published
+# package never set it and never ship those assets. The Dart side is gated by
+# --dart-define=LIQUID_GLASS_VALIDATE_MATTE_ORDER=true.
+hooks:
+  user_defines:
+    liquid_glass_renderer:
+      validate_matte_order: true
