@@ -8,7 +8,13 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
-/// Renders the liquid glass geometry SDF shader using flutter_gpu.
+/// The edge distance stored in low-res matte texels that are far away from
+/// every shape. Must match `kFarInward` in `geometry_fragment.glsl`.
+@internal
+const double kLowResFarInward = -4096;
+
+/// Renders the liquid glass low-res matte (see `geometry_fragment.glsl`)
+/// using flutter_gpu.
 ///
 /// Each output keeps a current texture and one spare. Textures grow as needed;
 /// rendering uses only the top-left area, with shader UVs adjusted to match.
@@ -28,6 +34,7 @@ class FlutterGpuGeometryRenderer {
     _pipeline = resources.pipeline;
     _materialGradientPipeline = resources.materialGradientPipeline;
     _materialTintGradientPipeline = resources.materialTintGradientPipeline;
+    _offsetULowRes = resources.offsetULowRes;
     _uniformSlot = resources.uniformSlot;
     _uniformSize = resources.uniformSize;
     _offsetUOffset = resources.offsetUOffset;
@@ -188,6 +195,7 @@ class FlutterGpuGeometryRenderer {
   late final gpu.RenderPipeline _pipeline;
   late final gpu.RenderPipeline _materialGradientPipeline;
   late final gpu.RenderPipeline _materialTintGradientPipeline;
+  late final int _offsetULowRes;
 
   @visibleForTesting
   Object get debugPipelineIdentity => _pipeline;
@@ -243,7 +251,10 @@ class FlutterGpuGeometryRenderer {
   /// the matte size, as in the final shader.
   ui.Image? get materialImage => _materialImage;
 
-  final _TextureRing _mattes = _TextureRing();
+  // The low-res matte is RGBA16F; the material maps are RGBA8.
+  final _TextureRing _mattes = _TextureRing(
+    format: gpu.PixelFormat.r16g16b16a16Float,
+  );
   final _TextureRing _materials = _TextureRing();
 
   /// Actual output draws, separate from calls that only retire a material map.
@@ -253,12 +264,15 @@ class FlutterGpuGeometryRenderer {
   @visibleForTesting
   int debugMaterialDrawCount = 0;
 
-  /// Renders a new geometry matte and returns it as a [ui.Image].
+  /// Renders a new low-res matte and returns it as a [ui.Image].
   ///
-  /// The matte fills the top-left `width` x `height` of the image, which is
-  /// `textureWidth` x `textureHeight`. The returned image is a non-owning
-  /// wrapper — do NOT dispose it. Its texture is written again
-  /// [reuseAfterFrames] frames after a later render replaces it.
+  /// The low-res matte has one texel for every [matteScale] x [matteScale]
+  /// (2 or 4) block of matte pixels, plus one extra row and column for the
+  /// far edge. It fills the top-left of the image, which is `textureWidth` x
+  /// `textureHeight`. `width` and `height` are the matte's size in pixels.
+  /// The returned image is a non-owning wrapper — do NOT dispose it. Its
+  /// texture is written again [reuseAfterFrames] frames after a later render
+  /// replaces it.
   ///
   /// With [writeMatte] false, retain the current matte and only replace (or
   /// retire) the material output. The caller must verify that geometry,
@@ -282,7 +296,13 @@ class FlutterGpuGeometryRenderer {
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
     List<double> boundsData = const <double>[],
+    required int matteScale,
   }) {
+    assert(
+      matteScale == 2 || matteScale == 4,
+      'The matte scale must be 2 or 4.',
+    );
+    final scale = matteScale;
     assert(() {
       debugRenderCount++;
       _debugTotalRenderCount++;
@@ -309,14 +329,16 @@ class FlutterGpuGeometryRenderer {
           return true;
         }(), 'Track replaced geometry textures in debug builds.');
       }
-      // The shader writes every pixel of the sub-rect; the rest of the texture
+      // The shader writes every texel of the sub-rect; the rest of the texture
       // is undefined and never sampled, so no clear or copy is needed.
+      // The low-res matte has a texel on both edges of the matte, so it
+      // needs one more texel than width / scale in each direction.
       final matte = _mattes.next(
         _completedFrames,
-        width: matteWidth,
-        height: matteHeight,
-        maxWidth: viewWidth,
-        maxHeight: viewHeight,
+        width: matteWidth ~/ scale + 1,
+        height: matteHeight ~/ scale + 1,
+        maxWidth: viewWidth ~/ scale + 1,
+        maxHeight: viewHeight ~/ scale + 1,
       );
       _texture = matte.texture;
       _renderTarget = matte.renderTarget;
@@ -393,6 +415,7 @@ class FlutterGpuGeometryRenderer {
       rseData: rseData,
       appearanceData: appearanceData,
       boundsData: boundsData,
+      matteScale: scale,
     );
 
     final uniformView = _hostBufferForUniformSize(_uniformSize)
@@ -404,13 +427,15 @@ class FlutterGpuGeometryRenderer {
         return true;
       }(), 'Track matte draws in debug builds.');
       final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
+      final passWidth = matteWidth ~/ scale + 1;
+      final passHeight = matteHeight ~/ scale + 1;
       final geometryPass =
           geometryCommandBuffer.createRenderPass(_renderTarget!)
             ..bindPipeline(_pipeline)
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
             ..bindVertexBuffer(_vertexBufferView);
-      _restrictTo(geometryPass, _texture!, matteWidth, matteHeight);
+      _restrictTo(geometryPass, _texture!, passWidth, passHeight);
       geometryPass.draw(4);
       _submitOrDefer(geometryCommandBuffer);
     }
@@ -644,8 +669,13 @@ class FlutterGpuGeometryRenderer {
     required List<double> rseData,
     required List<double> appearanceData,
     required List<double> boundsData,
+    int matteScale = 0,
   }) {
     final floatData = _uniformData.buffer.asFloat32List();
+
+    // Only the geometry pass has this uniform. It comes after the ones the
+    // material passes share.
+    if (matteScale > 0) floatData[_offsetULowRes ~/ 4] = matteScale.toDouble();
 
     final uOffsetIndex = _offsetUOffset ~/ 4;
     floatData[uOffsetIndex] = offsetX;
@@ -783,6 +813,11 @@ final class _RingTexture {
 /// Capacity grows in 1.5x steps, capped at the view unless a render needs more.
 /// A second spare avoids allocations when a frame renders twice.
 final class _TextureRing {
+  _TextureRing({this.format = gpu.PixelFormat.r8g8b8a8UNormInt});
+
+  /// Pixel format of the textures; the appearance maps are RGBA8.
+  final gpu.PixelFormat format;
+
   static const int _maxSpares = 2;
 
   _RingTexture? _current;
@@ -867,7 +902,7 @@ final class _TextureRing {
     return math.max(needed, math.min(stepped, limit));
   }
 
-  static _RingTexture _allocate(int width, int height) {
+  _RingTexture _allocate(int width, int height) {
     assert(() {
       FlutterGpuGeometryRenderer.debugAllocatedTextureCount++;
       return true;
@@ -877,6 +912,7 @@ final class _TextureRing {
         gpu.StorageMode.devicePrivate,
         width,
         height,
+        format: format,
       ),
     );
   }
@@ -901,8 +937,12 @@ class _SharedGeometryResources {
       vertexShader,
       materialTintGradientFragmentShader,
     );
+    // The material passes use the same uniforms as the geometry pass, minus
+    // the last one (the matte scale), so one buffer layout works for all of
+    // them.
     uniformSlot = fragmentShader.getUniformSlot('GeometryUniforms');
     uniformSize = uniformSlot.sizeInBytes ?? 0;
+    offsetULowRes = uniformSlot.getMemberOffsetInBytes('uLowRes') ?? 0;
     offsetUOffset = uniformSlot.getMemberOffsetInBytes('uOffset') ?? 0;
     offsetUTextureSize =
         uniformSlot.getMemberOffsetInBytes('uTextureSize') ?? 0;
@@ -935,6 +975,7 @@ class _SharedGeometryResources {
   late final gpu.RenderPipeline pipeline;
   late final gpu.RenderPipeline materialGradientPipeline;
   late final gpu.RenderPipeline materialTintGradientPipeline;
+  late final int offsetULowRes;
   late final gpu.UniformSlot uniformSlot;
   late final int uniformSize;
   late final int offsetUOffset;

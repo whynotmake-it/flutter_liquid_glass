@@ -1,8 +1,8 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
 //
 // Final rendering pass for liquid glass with pre-computed geometry
-// This shader reads displacement data from a pre-computed texture and applies
-// the liquid glass effect efficiently
+// This shader reads the low-res matte (edge distance, surface direction, half
+// the shorter side) and applies the liquid glass effect efficiently
 
 // Refraction is evaluated in global filter coordinates. Keep the affine
 // mapping and sub-pixel displacement in high precision on GLES; mediump turns
@@ -10,8 +10,13 @@
 precision highp float;
 
 #include <flutter/runtime_effect.glsl>
-#include "gpu/displacement_encoding.glsl"
 #include "render.glsl"
+
+// The geometry texture is the low-res matte: one RGBA16F texel for every
+// uLowResMatte.x x uLowResMatte.x block of matte pixels (see
+// gpu/geometry_fragment.glsl). The renderer binds it with linear filtering, so
+// one read blends the four nearest texels. The edge, surface direction and
+// refraction are computed from that for each pixel.
 
 uniform vec2 uSize;
 uniform vec2 uGeometryOffset;
@@ -40,8 +45,8 @@ uniform float uBlurFade;
 // Outside it the filter input is transparent or clamped, so displaced samples
 // are mirrored back in at its edge.
 uniform vec4 uBackdropBounds;
-// The matte fills the top-left of a texture that only grows: sub-rect size
-// over texture size. uGeometrySize is the sub-rect in device px.
+// No longer used; kept so the uniforms below stay at the same float indices.
+// uGeometrySize is the matte's size in device px.
 uniform vec2 uGeometryUVScale;
 // Texel size of the material map's texture; the map fills its top-left.
 uniform vec2 uMaterialTextureSize;
@@ -59,13 +64,21 @@ uniform vec2 uMaterialTextureSize;
 //   +5: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
 uniform vec4 uColorModelParams[18];
 
+// Declared last (float index 133).
+//   uLowResMatte:  how many matte pixels one low-res matte texel covers in
+//                  each direction, then the texture's size in texels.
+//   uLowResOptics: refraction height in px, and whether refraction fits the
+//                  shape. These two set the bevel.
+uniform vec4 uLowResMatte;
+uniform vec2 uLowResOptics;
+
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
 }
 
 float uDisplacementScale = uOpticalProps.x;
 float uDispersion = uOpticalProps.y;
-// Rim lighting depth; the matte encodes edge distance up to 4x this.
+// Rim lighting depth.
 float uThickness = uOpticalProps.z;
 float uLightIntensity = uLightConfig.x;
 float uBackdropScale = uLightConfig.y;
@@ -90,7 +103,7 @@ float uHighlightOppositeStrength = uLightingShapeConfig.w;
 
 // The fitted/default CA range is below the pixel response of the backdrop
 // sampler: the pinned three-scene scan found no score or decoded-image gain
-// through |CA| = .01. Bound the fast path by the maximum encoded displacement,
+// through |CA| = .01. Bound the fast path by the maximum displacement,
 // rather than by CA alone, so a large-refraction surface does not silently lose
 // visible dispersion. The threshold is a conservative quarter-pixel total
 // red-to-blue spread (an eighth pixel on either side of green).
@@ -226,13 +239,6 @@ vec4 colorModelSharesOf(float code) {
     );
 }
 
-float contourExtent() {
-    return max(
-        kContourCoverageFeather,
-        uContourOffset + uEdgeWidth + kContourCoverageFeather
-    );
-}
-
 // The dark border starts at the silhouette (shifted outward by
 // contourOffset) and fades linearly outward over contourWidth. It is often
 // narrower than a pixel, so it is box-filtered over the same one-pixel
@@ -316,6 +322,37 @@ vec2 mirrorIntoBackdrop(vec2 sourceOffset, vec2 matteCoord) {
         mirrored - sampleMatte,
         uFilterToMatteBasis
     );
+}
+
+// How far inside the edge, in device px, the rim lighting and the border can
+// reach. Deeper pixels get no rim light and no border, so their color is the
+// base color. It depends only on settings, not on the pixel. An effect whose
+// strength is zero adds nothing. It may be larger than the real reach, never
+// smaller.
+float rimReach() {
+    float reach = -1.0e9;
+    if (uLightIntensity > 0.0) {
+        // glintProfile reaches zero at glintWidth * kGlintBleedReach.
+        float glintWidth = max(
+            uHighlightWidth > 0.0 ? uHighlightWidth : uEdgeWidth,
+            0.001
+        );
+        reach = max(reach, glintWidth * kGlintBleedReach);
+    }
+    if (gContourAlpha > 0.0 && uEdgeWidth > 0.0) {
+        // contourCoverage is zero on both sides of the silhouette from here.
+        reach = max(reach, 0.5 - uContourOffset);
+    }
+    if (uBevelShadowStrength >= 0.001) {
+        // The band is gone once inward - shift >= depth; the shift is at most
+        // the offset. A small margin keeps smoothstep exactly saturated.
+        reach = max(
+            reach,
+            (max(uBevelShadowDepth, 0.001) + max(uBevelShadowOffset, 0.0)) *
+                1.001 + 0.01
+        );
+    }
+    return reach;
 }
 
 vec3 applySpecularHighlights(
@@ -476,6 +513,68 @@ vec3 applySpecularHighlights(
 }
 
 
+// A blended surface direction shorter than this comes from texels on both
+// sides of a thin shape's center line, which point in opposite directions.
+// Stored directions are almost always about 1 long.
+const float kMinBlendedNormalLength = 0.5;
+
+// The surface direction (xy) and refraction strength (z) at this pixel. The
+// texture stores the direction with its length set to the strength, so after
+// blending, the direction of the vector is the surface direction and its
+// length the strength. Near a sharp corner the length comes out a little
+// short, because the blended directions differ.
+// On the center line of a thin shape the texels on either side point in
+// opposite directions and cancel out, so the blended direction means nothing.
+// There, read the nearest texel instead. That extra read only happens on a
+// line one or two pixels wide.
+vec3 lowResNormalFiltered(vec4 lowResTexel, vec2 texelCoord) {
+    vec2 sum = lowResTexel.yz;
+    float sumLength = length(sum);
+    if (sumLength < kMinBlendedNormalLength) {
+        vec2 nearestUV =
+            (floor(texelCoord + 0.5) + 0.5) / uLowResMatte.yz;
+        sum = texture(uGeometryTexture, nearestUV).yz;
+        sumLength = length(sum);
+    }
+    return vec3(
+        sumLength > 0.0001 ? sum / sumLength : vec2(0.0),
+        sumLength
+    );
+}
+
+// How far the backdrop is shifted at this pixel, in px, toward the inside of
+// the shape. The glass is flat in the middle with a rounded (quarter-circle)
+// bevel at the edge, and the bevel gets narrower on smaller shapes.
+float lowResDisplacementMagnitude(
+    float inward,
+    float halfMinor,
+    float shortening
+) {
+    float refractionHeight = uLowResOptics.x;
+    float refractionAmount = max(uDisplacementScale, 0.001);
+    float bevel;
+    float amount;
+    if (uLowResOptics.y > 0.5) {
+        // iOS 27 regular glass: the bevel is at most a quarter of the
+        // shorter side, and the edge never shifts the backdrop past the
+        // shape's center line.
+        bevel = min(refractionHeight, 0.5 * halfMinor);
+        amount = min(refractionAmount, halfMinor);
+    } else {
+        // Clear glass keeps its bevel until it would reach past the center
+        // line. Then the whole bevel shrinks, so the shift never changes
+        // direction there.
+        float lensScale = min(1.0, halfMinor / max(refractionHeight, 0.001));
+        bevel = refractionHeight * lensScale;
+        amount = refractionAmount * lensScale;
+    }
+    float bevelX = 1.0 - clamp(max(inward, 0.0) / max(bevel, 0.001), 0.0, 1.0);
+    float magnitude = bevel > 0.001
+        ? amount * (1.0 - sqrt(1.0 - bevelX * bevelX)) * shortening
+        : 0.0;
+    return clamp(magnitude, 0.0, refractionAmount);
+}
+
 void main() {
     // Map image-filter fragment coordinates back into the layer-local geometry
     // matte. Apple Metal surfaces expose global filter coordinates, while
@@ -498,9 +597,17 @@ void main() {
         return;
     }
 
-    vec4 geometryData = texture(
+    // This pixel's position in low-res matte texels. Texel (i, j) was
+    // computed at the center of matte pixel (i * scale, j * scale)
+    // (kPixelCenter in geometry_fragment.glsl).
+    vec2 lowResTexelCoord =
+        (matteCoord - uGeometryOffset - 0.5) / uLowResMatte.x;
+    // One read, which blends the four nearest texels. Reads past the edge of
+    // the texture repeat its last texel, and the texture has one extra texel
+    // past the last matte pixel.
+    vec4 lowResTexel = texture(
         uGeometryTexture,
-        geometryUV * uGeometryUVScale
+        (lowResTexelCoord + 0.5) / uLowResMatte.yz
     );
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
@@ -628,11 +735,9 @@ void main() {
     #endif
 
     float maxDisplacement = max(uDisplacementScale, 0.001);
-    float signedEdgeDistance = decodeSignedEdgeDistance(
-        geometryData,
-        4.0 * max(uThickness, 1.0),
-        contourExtent()
-    );
+    // Positive inside. It is a smooth value rather than a rounded byte, so
+    // the antialiased edge below stays one pixel wide at any matte scale.
+    float signedEdgeDistance = lowResTexel.x;
     // Box-filtered coverage of one physical pixel, as Core Animation
     // rasterizes the silhouette: a pixel-aligned edge stays hard, so the
     // glint's first row is not diluted by a wider feather.
@@ -644,10 +749,30 @@ void main() {
         fragColor = vec4(0.0);
         return;
     }
-    vec2 displacement =
-        decodeDisplacement(geometryData, maxDisplacement) *
-        appearanceVisibility;
-    vec2 surfaceNormal = decodeSurfaceNormal(geometryData);
+    // The surface direction is only computed where something uses it: the
+    // bevel, for refraction, and the rim lighting near the edge.
+    vec2 surfaceNormal = vec2(0.0);
+    bool hasSurfaceNormal = false;
+    vec2 displacement = vec2(0.0);
+    // The bevel is never wider than the refraction height, so deeper pixels
+    // have no refraction and skip this.
+    if (signedEdgeDistance < uLowResOptics.x) {
+        float lowResHalfMinor = lowResTexel.w;
+        vec3 lowResSurface = lowResNormalFiltered(
+            lowResTexel,
+            lowResTexelCoord
+        );
+        float magnitude = lowResDisplacementMagnitude(
+            signedEdgeDistance,
+            lowResHalfMinor,
+            lowResSurface.z
+        );
+        if (magnitude > 0.0) {
+            surfaceNormal = lowResSurface.xy;
+            hasSurfaceNormal = true;
+            displacement = surfaceNormal * (-magnitude) * appearanceVisibility;
+        }
+    }
 
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
@@ -748,13 +873,15 @@ void main() {
         transmittedColor *= 1.0 - materialTint.a;
         baseColor = materialColor + transmittedColor;
         baseColor = applySaturation(baseColor, uSaturation);
-        float chroma = max(max(baseColor.r, baseColor.g), baseColor.b) -
-            min(min(baseColor.r, baseColor.g), baseColor.b);
-        baseColor = clamp(
-            baseColor + vec3(chroma * max(uVibrancy, 0.0)),
-            0.0,
-            1.0
-        );
+        if (uVibrancy > 0.0) {
+            float chroma = max(max(baseColor.r, baseColor.g), baseColor.b) -
+                min(min(baseColor.r, baseColor.g), baseColor.b);
+            baseColor = clamp(
+                baseColor + vec3(chroma * max(uVibrancy, 0.0)),
+                0.0,
+                1.0
+            );
+        }
     }
     if (directShare < 1.0) {
         // Apple's public tint is not a flat source-over wash. Its documented
@@ -829,14 +956,16 @@ void main() {
             0.0,
             1.0
         );
-        float neutralChroma =
-            max(max(neutralBase.r, neutralBase.g), neutralBase.b) -
-            min(min(neutralBase.r, neutralBase.g), neutralBase.b);
-        neutralBase = clamp(
-            neutralBase + vec3(neutralChroma * max(uVibrancy, 0.0)),
-            0.0,
-            1.0
-        );
+        if (uVibrancy > 0.0) {
+            float neutralChroma =
+                max(max(neutralBase.r, neutralBase.g), neutralBase.b) -
+                min(min(neutralBase.r, neutralBase.g), neutralBase.b);
+            neutralBase = clamp(
+                neutralBase + vec3(neutralChroma * max(uVibrancy, 0.0)),
+                0.0,
+                1.0
+            );
+        }
         vec3 ios27Base = neutralBase;
         if (materialTint.a >= 0.001) {
             ios27Base = mix(
@@ -856,12 +985,29 @@ void main() {
     // Reconstruct the original material silhouette from the signed SDF. The
     // geometry alpha is only an expanded support mask, allowing the attached
     // contour to sit outside without turning those pixels into glass.
-    vec3 litColor = applySpecularHighlights(
-        baseColor,
-        transmittedColor,
-        signedEdgeDistance,
-        surfaceNormal
-    );
+    // Deeper than rimReach() there is no rim light and no border, so the
+    // color is the base color and all of this is skipped.
+    vec3 litColor = baseColor;
+    float externalContourAlpha = 0.0;
+    if (signedEdgeDistance < rimReach()) {
+        if (!hasSurfaceNormal) {
+            surfaceNormal = lowResNormalFiltered(
+                lowResTexel,
+                lowResTexelCoord
+            ).xy;
+        }
+        litColor = applySpecularHighlights(
+            baseColor,
+            transmittedColor,
+            signedEdgeDistance,
+            surfaceNormal
+        );
+        externalContourAlpha =
+            contourCoverage(signedEdgeDistance).x *
+            gContourAlpha *
+            contourDirection(surfaceNormal) *
+            appearanceVisibility;
+    }
     // The lit material (face, tint, saturation, lighting and in-material
     // contour) cross-fades to the refracted backdrop, whose refraction
     // scales with visibility. Fading the output rather than each parameter
@@ -874,11 +1020,6 @@ void main() {
     // alpha fade, so it always scales with visibility.
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
-    float externalContourAlpha =
-        contourCoverage(signedEdgeDistance).x *
-        gContourAlpha *
-        contourDirection(surfaceNormal) *
-        appearanceVisibility;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
         uContourColor.rgb * externalContourAlpha;

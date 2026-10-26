@@ -23,6 +23,7 @@ import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_settings.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
+import 'package:liquid_glass_renderer/src/matte_scale_flag.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
@@ -297,6 +298,10 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
     final gpuRenderer = _gpuGeometryRenderer;
     final useFake =
         widget.fake || !shaderFiltersSupported || gpuRenderer == null;
+    // Each layer picks its own matte scale from its device pixel ratio.
+    final matteScale = resolveMatteScale(
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
     if (useFake) {
       if (!widget.fake && !shaderFiltersSupported && kDebugMode) {
         _logDebugFallback(
@@ -336,6 +341,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 defaultAppearance: defaultAppearance,
                 link: _link,
                 gpuGeometryRenderer: gpuRenderer,
+                matteScale: matteScale,
                 child: child!,
               );
             },
@@ -400,6 +406,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required Widget super.child,
     required this.link,
     this.gpuGeometryRenderer,
+    this.matteScale = 2,
   });
 
   final FragmentShader defaultRenderShader;
@@ -410,6 +417,10 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final LiquidGlassAppearance defaultAppearance;
   final GeometryRenderLink link;
   final FlutterGpuGeometryRenderer? gpuGeometryRenderer;
+
+  /// How many matte pixels one low-res matte texel covers in each direction
+  /// (see `liquidGlassMatteScale`).
+  final int matteScale;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -423,6 +434,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       defaultAppearance: defaultAppearance,
       link: link,
       gpuGeometryRenderer: gpuGeometryRenderer,
+      matteScale: matteScale,
     );
   }
 
@@ -437,7 +449,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..settings = settings
       ..defaultAppearance = defaultAppearance
       ..backdropKey = backdropKey
-      ..gpuGeometryRenderer = gpuGeometryRenderer;
+      ..gpuGeometryRenderer = gpuGeometryRenderer
+      ..matteScale = matteScale;
   }
 }
 
@@ -459,13 +472,26 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     required super.defaultAppearance,
     required super.link,
     this._gpuGeometryRenderer,
-  }) {
+    int matteScale = 2,
+  }) : _matteScale = matteScale {
     _updateShaderSettings();
   }
 
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
+
+  /// How many matte pixels one low-res matte texel covers in each direction:
+  /// 2 or 4 (see `liquidGlassMatteScale`). The final shaders work for both,
+  /// because the scale is passed in as a uniform.
+  int _matteScale;
+  int get matteScale => _matteScale;
+  set matteScale(int value) {
+    if (_matteScale == value) return;
+    _matteScale = value;
+    needsGeometryUpdate = true;
+    markNeedsPaint();
+  }
 
   bool _debugWarnedShapeLimit = false;
 
@@ -1070,6 +1096,18 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     syncCoordinateMapping();
     final activeRenderShader = renderShader;
     activeRenderShader
+      // Float index 133, after the shared uniforms: the matte scale and the
+      // texture size, then the two values that set the bevel.
+      ..setFloatUniforms(initialIndex: 133, (value) {
+        value.setFloats([
+          _matteScale.toDouble(),
+          _geometryTextureSize.width,
+          _geometryTextureSize.height,
+          0,
+          settings.effectiveRefractionHeight * devicePixelRatio,
+          settings.refractionFitsShape ? 1 : 0,
+        ]);
+      })
       ..setFloatUniforms(initialIndex: 2, (value) {
         value
           ..setOffset(_geometryMatteBounds.topLeft * devicePixelRatio)
@@ -1101,10 +1139,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         geometryImage,
         filterQuality: FilterQuality.low,
       )
-      // Nearest: the matte packs 12-bit normal angle and displacement codes
-      // across byte boundaries, which filtering between texels would mix.
-      ..setImageSampler(1, geometryImage);
-    if (_materialImage case final materialImage?) {
+      // Linear filtering: the shader relies on each read blending the four
+      // nearest texels of the low-res matte.
+      ..setImageSampler(1, geometryImage, filterQuality: FilterQuality.low);
+    if (_materialImage case final materialImage? when _usesShapeAppearances) {
       if (_usesTintOnlyAppearance) {
         activeRenderShader.setImageSampler(
           2,
@@ -1117,9 +1155,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           ..setImageSampler(3, materialImage, filterQuality: FilterQuality.low);
       }
     }
-    if (!identical(geometryImage, _boundGeometryImage) ||
+    if (!identical(activeRenderShader, _boundRenderShader) ||
+        !identical(geometryImage, _boundGeometryImage) ||
         !identical(_materialImage, _boundMaterialImage) ||
         _geometryMatteBounds != _boundMatteBounds) {
+      _boundRenderShader = activeRenderShader;
       _boundGeometryImage = geometryImage;
       _boundMaterialImage = _materialImage;
       _boundMatteBounds = _geometryMatteBounds;
@@ -1127,6 +1167,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     }
   }
 
+  FragmentShader? _boundRenderShader;
   ui.Image? _boundGeometryImage;
   ui.Image? _boundMaterialImage;
   Rect? _boundMatteBounds;
@@ -1416,7 +1457,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         ..scale(1 / devicePixelRatio)
         ..drawImageRect(
           geometryImage,
-          Offset.zero & bounds.size * devicePixelRatio,
+          Offset.zero & bounds.size * devicePixelRatio / _matteScale.toDouble(),
           (offset * devicePixelRatio) & bounds.size * devicePixelRatio,
           Paint()..blendMode = BlendMode.src,
         )
@@ -1711,6 +1752,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             : const <double>[],
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,
+        matteScale: _matteScale,
       );
       _needsMaterialUpdate = false;
       return (
