@@ -663,36 +663,24 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     shader.setFloat(52, blurPassSigma > 0 ? 1 : 0);
     // Float index 61, after the geometry/material texture sizes: the three
     // adaptive color-model slots (six vec4 each), zero-filled when fewer
-    // than three distinct models are in use. The size response is pre-blended
-    // into these curves; the shader has no size uniform.
-    final sizeProgress = _colorSizeProgress;
+    // than three distinct models are in use.
     shader.setFloatUniforms(initialIndex: 61, (value) {
       value.setFloats([
         for (var i = 0; i < 3; i++)
           ...i < colorModels.length
-              ? colorModels[i].toShaderParameters(
-                  sizeProgress: sizeProgress,
-                )
-              : GlassColorParameters.ios27Light.toShaderParameters(
-                  sizeProgress: sizeProgress,
-                ),
+              ? colorModels[i].toShaderParameters()
+              : GlassColorParameters.ios27Light.toShaderParameters(),
       ]);
     });
   }
 
   /// Logical short side of the smallest live shape, measured when geometry is
-  /// bound. Used by the blur and the color model's small-size response.
-  /// Groups use their smallest shape; a mixed-size group has one layer-wide
-  /// size, like the blur.
+  /// bound. Used by the blur's size response. Groups use their smallest
+  /// shape; a mixed-size group has one layer-wide blur.
   ///
   /// Starts at the largest fitted size so a pre-paint effect-bounds query
   /// over-allocates rather than clips the blur on its first frame.
   double _shapeShortSide = 150;
-
-  double get _colorSizeProgress {
-    final t = ((118 - _shapeShortSide) / 55).clamp(0.0, 1.0);
-    return t * t;
-  }
 
   double _measureShapeShortSide() {
     double? shortest;
@@ -1052,13 +1040,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   Rect _prepareGeometryAppearance(Rect boundingBox) {
-    final measuredShortSide = _measureShapeShortSide();
-    if (measuredShortSide != _shapeShortSide) {
-      _shapeShortSide = measuredShortSide;
-      // The color-model curves are pre-blended in the common uniforms, which
-      // otherwise only refresh when settings or appearances change.
-      _updateShaderSettings();
-    }
+    _shapeShortSide = _measureShapeShortSide();
     final usedShapeAppearances = _usesShapeAppearances;
     final usedTintOnlyAppearance = _usesTintOnlyAppearance;
     final appearances = [

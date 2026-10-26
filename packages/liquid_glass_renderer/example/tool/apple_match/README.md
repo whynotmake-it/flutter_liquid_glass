@@ -192,6 +192,12 @@ corner, rim, face and highlight.
 The shipped values live in the renderer's presets; archived fits are retained
 for history only.
 
+Color models are fit once for every control size. Apple's dark material
+differs between small and large controls, but the renderer has no size
+response on purpose: the fit that scores best per scene made a shape's look
+depend on its neighbours (see `MODEL_DESIGN.md`, fit protocol step 4). Fit
+files with `*AtSmallSize` keys still load; those keys are ignored.
+
 ## On-device A/B
 
 `lib/glint_ab_main.dart` shows iOS's own glass (a `UIGlassEffect` platform
