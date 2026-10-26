@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -7,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
+import 'package:liquid_glass_renderer/src/liquid_glass_field.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 /// The edge distance stored in low-res matte texels that are far away from
@@ -37,6 +39,12 @@ class FlutterGpuGeometryRenderer {
     _materialGradientPipeline = resources.materialGradientPipeline;
     _materialTintGradientPipeline = resources.materialTintGradientPipeline;
     _offsetULowRes = resources.offsetULowRes;
+    _fieldPipeline = resources.fieldPipeline;
+    _fieldUniformSlot = resources.fieldUniformSlot;
+    _fieldTextureSlot = resources.fieldTextureSlot;
+    _fieldUniformSize = resources.fieldUniformSize;
+    _fieldOffsets = resources.fieldOffsets;
+    _fieldUniformData = ByteData(_fieldUniformSize);
     _uniformSlot = resources.uniformSlot;
     _uniformSize = resources.uniformSize;
     _offsetUOffset = resources.offsetUOffset;
@@ -81,10 +89,12 @@ class FlutterGpuGeometryRenderer {
           library?['MaterialGradientFragment'];
       final materialTintGradientFragmentShader =
           library?['MaterialTintGradientFragment'];
+      final fieldFragmentShader = library?['GeometryFieldFragment'];
       if (vertexShader == null ||
           fragmentShader == null ||
           materialGradientFragmentShader == null ||
-          materialTintGradientFragmentShader == null) {
+          materialTintGradientFragmentShader == null ||
+          fieldFragmentShader == null) {
         throw StateError(
           'LiquidGlass requires Flutter GPU. Run with Flutter 3.47 or newer '
           'and enable Flutter GPU for the target platform.',
@@ -95,6 +105,7 @@ class FlutterGpuGeometryRenderer {
         fragmentShader: fragmentShader,
         materialGradientFragmentShader: materialGradientFragmentShader,
         materialTintGradientFragmentShader: materialTintGradientFragmentShader,
+        fieldFragmentShader: fieldFragmentShader,
       );
     }();
     try {
@@ -198,6 +209,13 @@ class FlutterGpuGeometryRenderer {
   late final gpu.RenderPipeline _materialGradientPipeline;
   late final gpu.RenderPipeline _materialTintGradientPipeline;
   late final int _offsetULowRes;
+  late final gpu.RenderPipeline _fieldPipeline;
+  late final gpu.UniformSlot _fieldUniformSlot;
+  late final gpu.UniformSlot _fieldTextureSlot;
+  late final int _fieldUniformSize;
+  late final _FieldUniformOffsets _fieldOffsets;
+  late final ByteData _fieldUniformData;
+  final _FieldTextures _fieldTextures = _FieldTextures();
 
   @visibleForTesting
   Object get debugPipelineIdentity => _pipeline;
@@ -283,6 +301,10 @@ class FlutterGpuGeometryRenderer {
   /// With [writeMatte] false, retain the current matte and only replace (or
   /// retire) the material output. The caller must verify that geometry,
   /// raster dimensions and optical settings still match the encoded matte.
+  ///
+  /// With a [field], the matte encodes the body the field describes instead
+  /// of the shapes, at [fieldScale] device pixels per logical pixel of the
+  /// field; the material output still reads the shapes.
   ({ui.Image image, int width, int height, int textureWidth, int textureHeight})
   render({
     required int width,
@@ -304,6 +326,8 @@ class FlutterGpuGeometryRenderer {
     List<double> rseLowerData = const <double>[],
     List<double> boundsData = const <double>[],
     required int matteScale,
+    LiquidGlassField? field,
+    double fieldScale = 1,
   }) {
     assert(
       matteScale == 2 || matteScale == 4,
@@ -437,6 +461,15 @@ class FlutterGpuGeometryRenderer {
         return true;
       }(), 'Track matte draws in debug builds.');
       final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
+      gpu.Texture? fieldTexture;
+      try {
+        fieldTexture = field == null
+            ? null
+            : _uploadField(field, geometryCommandBuffer);
+      } on Object {
+        geometryCommandBuffer.submit();
+        rethrow;
+      }
       // Only texels near a shape hold anything but "far outside". When those
       // are a small part of the low-res matte, clear the texture to "far
       // outside" and draw just that part. The clear writes the same value the
@@ -454,14 +487,26 @@ class FlutterGpuGeometryRenderer {
         height: matteHeight,
         scale: scale,
       );
-      final geometryPass =
-          geometryCommandBuffer.createRenderPass(
-              drawRect == null ? _renderTarget! : _clearingRenderTarget!,
-            )
-            ..bindPipeline(_pipeline)
-            ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
-            ..bindUniform(_uniformSlot, uniformView)
-            ..bindVertexBuffer(_vertexBufferView);
+      final geometryPass = geometryCommandBuffer.createRenderPass(
+        drawRect == null ? _renderTarget! : _clearingRenderTarget!,
+      )..setPrimitiveType(gpu.PrimitiveType.triangleStrip);
+      if (field != null) {
+        _packFieldUniformData(field, fieldScale, fieldTexture!);
+        geometryPass
+          ..bindPipeline(_fieldPipeline)
+          ..bindUniform(
+            _fieldUniformSlot,
+            _hostBufferForUniformSize(
+              _fieldUniformSize,
+            ).emplace(_fieldUniformData),
+          )
+          ..bindTexture(_fieldTextureSlot, fieldTexture);
+      } else {
+        geometryPass
+          ..bindPipeline(_pipeline)
+          ..bindUniform(_uniformSlot, uniformView);
+      }
+      geometryPass.bindVertexBuffer(_vertexBufferView);
       _restrictTo(geometryPass, _texture!, passWidth, passHeight);
       if (drawRect != null) {
         geometryPass.setScissor(
@@ -577,6 +622,67 @@ class FlutterGpuGeometryRenderer {
       return null;
     }
     return _PixelRect(tx0, ty0, tx1 - tx0, ty1 - ty0);
+  }
+
+  /// The texture holding [field], its copy recorded on [geometry] where a
+  /// copy may precede the geometry pass on one command buffer, else on a
+  /// command buffer of its own submitted ahead of it.
+  gpu.Texture _uploadField(
+    LiquidGlassField field,
+    gpu.CommandBuffer geometry,
+  ) {
+    final held = _fieldTextures.held(field, _completedFrames);
+    if (held != null) return held;
+    if (_uploadsShareCommandBuffer) {
+      return _fieldTextures.upload(field, _completedFrames, geometry);
+    }
+    final upload = gpu.gpuContext.createCommandBuffer();
+    try {
+      final texture = _fieldTextures.upload(field, _completedFrames, upload);
+      _submitOrDefer(upload);
+      return texture;
+    } on Object {
+      upload.submit();
+      rethrow;
+    }
+  }
+
+  // A copy recorded before a render pass on the same command buffer is
+  // encoded ahead of it on Vulkan and GLES. Metal opens a blit encoder when
+  // the copy is recorded and closes it only on submit, so the render pass's
+  // encoder would nest: there the copy gets its own command buffer,
+  // submitted first.
+  static final bool _uploadsShareCommandBuffer =
+      !(Platform.isIOS || Platform.isMacOS);
+
+  /// Writes the field pass's uniforms: the matte offset and scale the shape
+  /// pass packed, and the field's frame in device pixels.
+  void _packFieldUniformData(
+    LiquidGlassField field,
+    double fieldScale,
+    gpu.Texture texture,
+  ) {
+    final from = _uniformData.buffer.asFloat32List();
+    final to = _fieldUniformData.buffer.asFloat32List();
+    void copy(int fromOffset, int toOffset, int count) {
+      for (var i = 0; i < count; i++) {
+        to[toOffset ~/ 4 + i] = from[fromOffset ~/ 4 + i];
+      }
+    }
+
+    final offsets = _fieldOffsets;
+    copy(_offsetULowRes, offsets.lowRes, 4);
+    copy(_offsetUOffset, offsets.offset, 2);
+    final frame = offsets.fieldFrame ~/ 4;
+    to[frame] = field.origin.dx * fieldScale;
+    to[frame + 1] = field.origin.dy * fieldScale;
+    to[frame + 2] = field.step * fieldScale;
+    to[frame + 3] = fieldScale;
+    final size = offsets.fieldSize ~/ 4;
+    to[size] = field.cols.toDouble();
+    to[size + 1] = field.rows.toDouble();
+    to[size + 2] = 1 / texture.width;
+    to[size + 3] = 1 / texture.height;
   }
 
   /// Limits [pass] to the top-left [width] x [height] of [texture].
@@ -871,6 +977,7 @@ class FlutterGpuGeometryRenderer {
   void releaseOutput() {
     _mattes.release();
     _materials.release();
+    _fieldTextures.release();
     _renderTarget = null;
     _clearingRenderTarget = null;
     _image?.dispose();
@@ -1069,6 +1176,7 @@ class _SharedGeometryResources {
     required gpu.Shader fragmentShader,
     required gpu.Shader materialGradientFragmentShader,
     required gpu.Shader materialTintGradientFragmentShader,
+    required gpu.Shader fieldFragmentShader,
   }) {
     pipeline = gpu.gpuContext.createRenderPipeline(
       vertexShader,
@@ -1081,6 +1189,21 @@ class _SharedGeometryResources {
     materialTintGradientPipeline = gpu.gpuContext.createRenderPipeline(
       vertexShader,
       materialTintGradientFragmentShader,
+    );
+    fieldPipeline = gpu.gpuContext.createRenderPipeline(
+      vertexShader,
+      fieldFragmentShader,
+    );
+    fieldUniformSlot = fieldFragmentShader.getUniformSlot('FieldUniforms');
+    fieldTextureSlot = fieldFragmentShader.getUniformSlot('uField');
+    fieldUniformSize = fieldUniformSlot.sizeInBytes ?? 0;
+    int field(String name) =>
+        fieldUniformSlot.getMemberOffsetInBytes(name) ?? 0;
+    fieldOffsets = (
+      lowRes: field('uLowRes'),
+      offset: field('uOffset'),
+      fieldFrame: field('uFieldFrame'),
+      fieldSize: field('uFieldSize'),
     );
     // The material passes use the same uniforms as the geometry pass, minus
     // the last one (the matte scale), so one buffer layout works for all of
@@ -1121,6 +1244,11 @@ class _SharedGeometryResources {
   late final gpu.RenderPipeline materialGradientPipeline;
   late final gpu.RenderPipeline materialTintGradientPipeline;
   late final int offsetULowRes;
+  late final gpu.RenderPipeline fieldPipeline;
+  late final gpu.UniformSlot fieldUniformSlot;
+  late final gpu.UniformSlot fieldTextureSlot;
+  late final int fieldUniformSize;
+  late final _FieldUniformOffsets fieldOffsets;
   late final gpu.UniformSlot uniformSlot;
   late final int uniformSize;
   late final int offsetUOffset;
@@ -1134,4 +1262,124 @@ class _SharedGeometryResources {
   late final int offsetShapeBounds;
   late final gpu.DeviceBuffer vertexBuffer;
   late final gpu.BufferView vertexBufferView;
+}
+
+/// Byte offsets of the field pass's uniform members.
+typedef _FieldUniformOffsets = ({
+  int lowRes,
+  int offset,
+  int fieldFrame,
+  int fieldSize,
+});
+
+/// The float textures a renderer uploads its fields into, reused: a body
+/// whose field changes every frame - a menu opening - reuses its textures
+/// instead of creating one per frame. A field fills the top-left of its
+/// texture; the field pass reads only that region. The samples are copied
+/// in by a command recorded on the caller's command buffer. At most four
+/// textures survive; command buffers in flight retain theirs.
+///
+/// A slot is rewritten only three frames after its last use: the CPU
+/// overwrites its staging buffer at once, which nothing orders behind a copy
+/// from it the GPU may not have run yet, and Impeller keeps up to two frames
+/// in flight besides the one being built (its Vulkan swapchain's
+/// kMaxFramesInFlight).
+final class _FieldTextures {
+  static const int _reuseAfterFrames = 3;
+  static const int _maxTextures = 4;
+  static const int _bucket = 16;
+  static const int _bytesPerNode = 16;
+
+  final List<_FieldTexture> _textures = [];
+
+  static int _capacity(int nodes) => (nodes + _bucket - 1) ~/ _bucket * _bucket;
+
+  /// The texture already holding [field], marked as used in [frame], or
+  /// null.
+  gpu.Texture? held(LiquidGlassField field, int frame) {
+    for (final entry in _textures) {
+      if (identical(entry.samples, field.samples) &&
+          entry.cols == field.cols &&
+          entry.rows == field.rows) {
+        entry.frame = frame;
+        return entry.texture;
+      }
+    }
+    return null;
+  }
+
+  /// A texture holding [field], its samples copied into it by a command
+  /// recorded on [commands]; called when no texture [held] it.
+  gpu.Texture upload(
+    LiquidGlassField field,
+    int frame,
+    gpu.CommandBuffer commands,
+  ) {
+    _FieldTexture? slot;
+    for (final entry in _textures) {
+      if (entry.texture.width >= field.cols &&
+          entry.texture.height >= field.rows &&
+          frame - entry.frame >= _reuseAfterFrames) {
+        slot = entry;
+        break;
+      }
+    }
+    if (slot == null) {
+      final width = _capacity(field.cols);
+      final height = _capacity(field.rows);
+      slot = _FieldTexture(
+        gpu.gpuContext.createTexture(
+          gpu.StorageMode.devicePrivate,
+          width,
+          height,
+          format: gpu.PixelFormat.r32g32b32a32Float,
+          enableRenderTargetUsage: false,
+        ),
+        gpu.gpuContext.createDeviceBuffer(
+          gpu.StorageMode.hostVisible,
+          width * height * _bytesPerNode,
+        ),
+      );
+      if (_textures.length >= _maxTextures) {
+        // The one used longest ago: a field held every frame keeps its own.
+        _textures.remove(
+          _textures.reduce((a, b) => a.frame <= b.frame ? a : b),
+        );
+      }
+      _textures.add(slot);
+    }
+    final bytes = ByteData.sublistView(
+      field.samples,
+      0,
+      field.cols * field.rows * 4,
+    );
+    slot.buffer.overwrite(bytes);
+    commands.copyBufferToTexture(
+      gpu.BufferView(
+        slot.buffer,
+        offsetInBytes: 0,
+        lengthInBytes: bytes.lengthInBytes,
+      ),
+      gpu.TextureRegion(slot.texture, width: field.cols, height: field.rows),
+    );
+    slot
+      ..samples = field.samples
+      ..cols = field.cols
+      ..rows = field.rows
+      ..frame = frame;
+    return slot.texture;
+  }
+
+  void release() => _textures.clear();
+}
+
+final class _FieldTexture {
+  _FieldTexture(this.texture, this.buffer);
+
+  final gpu.Texture texture;
+  final gpu.DeviceBuffer buffer;
+  Float32List? samples;
+  int cols = 0;
+  int rows = 0;
+  int frame = 0;
 }
