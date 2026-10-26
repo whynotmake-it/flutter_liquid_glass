@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 
 import 'shared.dart';
 
@@ -28,8 +30,11 @@ class _Pills extends StatelessWidget {
     ),
   );
 
+  // The layer's own appearance is dark too, so FakeGlass paints its fully
+  // visible pills with one shared filter, and a fading one with its own.
   Widget _layer(List<Widget> pills) => LiquidGlassLayer(
     fake: fake,
+    defaultAppearance: _appearance,
     settings: LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
     child: Stack(children: pills),
   );
@@ -108,4 +113,61 @@ void main() {
       skip: !fake && skipProperGlassTests,
     );
   }
+
+  test('the FakeGlass filter does not change with the size of the shape', () {
+    final settings = LiquidGlassSettings.ios27Regular(
+      brightness: Brightness.dark,
+    );
+    String colorOf(double shortSide) {
+      final filter = fakeGlassBackdropFilter(
+        settings,
+        _Pills._appearance,
+        deviceScale: _dpr,
+        shapeShortSide: shortSide,
+      ).toString();
+      // The blur still follows the layer's size; the color must not.
+      return filter.substring(filter.indexOf('ColorFilter'));
+    }
+
+    expect(colorOf(40), colorOf(140));
+  });
+
+  // A fully visible FakeGlass shape is painted with the layer's shared
+  // filter; once it starts to fade it gets a filter of its own, which must
+  // blur like the shared one did.
+  testWidgets('a FakeGlass shape keeps its blur when it starts to fade', (
+    tester,
+  ) async {
+    tester.view
+      ..devicePixelRatio = _dpr
+      ..physicalSize = _scene * _dpr;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: _Pills(fake: true),
+      ),
+    );
+    await tester.pump();
+    final layers = tester
+        .renderObjectList<RenderConsolidatedFakeGlassLayer>(
+          find.byType(ConsolidatedFakeGlassLayer),
+        )
+        .toList();
+    double sigmaOf(BackdropFilterLayer layer) => double.parse(
+      RegExp(r'blur\(([\d.]+),').firstMatch(layer.filter.toString())!.group(1)!,
+    );
+    // The middle layer: the 140 pt pill fading next to a 40 pt pill.
+    final fading = layers[1];
+    expect(fading.debugSeparateBackdropLayers, hasLength(1));
+    expect(
+      sigmaOf(fading.debugSeparateBackdropLayers.single),
+      sigmaOf(fading.debugBackdropFilterLayer!),
+    );
+    // And the same blur as the first layer's fully visible pills.
+    expect(
+      sigmaOf(fading.debugSeparateBackdropLayers.single),
+      sigmaOf(layers[0].debugBackdropFilterLayer!),
+    );
+  });
 }
