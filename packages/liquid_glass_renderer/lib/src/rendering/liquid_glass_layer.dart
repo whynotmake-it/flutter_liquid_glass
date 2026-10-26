@@ -98,7 +98,30 @@ class LiquidGlassLayer extends StatefulWidget {
     this.backdrop = const LiquidGlassBackdrop.read(),
     this.glow,
     super.key,
-  });
+  }) : live = null;
+
+  /// Creates a [LiquidGlassLayer] whose settings, field and glow follow
+  /// [frame].
+  ///
+  /// Every notification writes the new frame straight into the layer's
+  /// render object; nothing rebuilds. Widgets below that read the settings
+  /// from the tree (`LiquidGlassSettings.of`, a nested [LiquidGlass] that
+  /// opens its own layer) see those of the frame the layer last built with.
+  /// A layer that draws fake glass, or whose shaders are still loading,
+  /// rebuilds on every notification.
+  const LiquidGlassLayer.live({
+    required ValueListenable<LiquidGlassLayerFrame> frame,
+    required this.child,
+    this.defaultAppearance,
+    this.fake = false,
+    this.useBackdropGroup = false,
+    this.backdropKey,
+    this.backdrop = const LiquidGlassBackdrop.read(),
+    super.key,
+  }) : live = frame,
+       settings = const LiquidGlassSettings(),
+       field = null,
+       glow = null;
 
   /// The subtree in which you should include at least one [LiquidGlass] widget.
   ///
@@ -171,6 +194,10 @@ class LiquidGlassLayer extends StatefulWidget {
   /// layer whose retained filter reads the backdrop does not repaint.
   final LiquidGlassGlow? glow;
 
+  /// The frames of a layer made with [LiquidGlassLayer.live], or null for
+  /// one that uses [settings], [field] and [glow].
+  final ValueListenable<LiquidGlassLayerFrame>? live;
+
   /// Whether there is a [LiquidGlassLayer] in the widget tree above the given
   /// [context].
   static bool existsIn(BuildContext context, {bool watch = true}) {
@@ -200,6 +227,27 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   // Fake and real subtrees never coexist, so one key keeps the user's subtree
   // alive across a renderer swap without ever being mounted twice.
   final _childKey = GlobalKey(debugLabel: 'LiquidGlassLayer.child');
+
+  // The real layer's render object, which a live frame is written into.
+  final _shapesKey = GlobalKey(debugLabel: 'LiquidGlassLayer.shapes');
+
+  LiquidGlassSettings get _settings =>
+      widget.live?.value.settings ?? widget.settings;
+  LiquidGlassField? get _field => widget.live?.value.field ?? widget.field;
+  LiquidGlassGlow? get _glow => widget.live?.value.glow ?? widget.glow;
+
+  void _onLiveFrame() {
+    final layer = _shapesKey.currentContext?.findRenderObject();
+    if (layer is! RenderLiquidGlassLayer) {
+      setState(() {});
+      return;
+    }
+    final frame = widget.live!.value;
+    layer
+      ..settings = frame.settings
+      ..field = frame.field
+      ..glow = frame.glow;
+  }
 
   void _logDebugFallback(String message) {
     if (!kDebugMode || _loggedFallback) return;
@@ -253,11 +301,16 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
   void initState() {
     super.initState();
     _tryCreateCachedGpuGeometryRenderer();
+    widget.live?.addListener(_onLiveFrame);
   }
 
   @override
   void didUpdateWidget(covariant LiquidGlassLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.live, widget.live)) {
+      oldWidget.live?.removeListener(_onLiveFrame);
+      widget.live?.addListener(_onLiveFrame);
+    }
     if (oldWidget.fake && !widget.fake) {
       _tryCreateCachedGpuGeometryRenderer();
     }
@@ -281,6 +334,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
   @override
   void dispose() {
+    widget.live?.removeListener(_onLiveFrame);
     _gpuGeometryRenderer?.dispose();
     for (final renderer in _retiredGpuGeometryRenderers) {
       renderer.dispose();
@@ -338,14 +392,14 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
       return _buildFakeLayer(
         backdropKey: backdropKey,
         defaultAppearance: defaultAppearance,
-        settings: widget.settings,
+        settings: _settings,
         child: KeyedSubtree(key: _childKey, child: widget.child),
       );
     }
 
     return RepaintBoundary(
       child: LiquidGlassRenderScope(
-        settings: widget.settings,
+        settings: _settings,
         defaultAppearance: defaultAppearance,
         backdropKey: backdropKey,
         child: InheritedGeometryRenderLink(
@@ -358,14 +412,15 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
             ],
             (context, shaders, child) {
               return _RawShapes(
+                key: _shapesKey,
                 defaultRenderShader: shaders[0],
                 materialRenderShader: shaders[1],
                 tintRenderShader: shaders[2],
                 backdropKey: backdropKey,
-                field: widget.field,
+                field: _field,
                 solidBackdrop: solidColorOf(widget.backdrop),
-                glow: widget.glow,
-                settings: widget.settings,
+                glow: _glow,
+                settings: _settings,
                 defaultAppearance: defaultAppearance,
                 link: _link,
                 gpuGeometryRenderer: gpuRenderer,
@@ -438,6 +493,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.link,
     this.gpuGeometryRenderer,
     this.matteScale = 2,
+    super.key,
   });
 
   final FragmentShader defaultRenderShader;
@@ -493,6 +549,26 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..solidBackdrop = solidBackdrop
       ..glow = glow;
   }
+}
+
+/// One frame of a live [LiquidGlassLayer]: what it shades with.
+@immutable
+class LiquidGlassLayerFrame {
+  /// Describes one frame of a layer.
+  const LiquidGlassLayerFrame({
+    this.settings = const LiquidGlassSettings(),
+    this.field,
+    this.glow,
+  });
+
+  /// See [LiquidGlassLayer.settings].
+  final LiquidGlassSettings settings;
+
+  /// See [LiquidGlassLayer.field].
+  final LiquidGlassField? field;
+
+  /// See [LiquidGlassLayer.glow].
+  final LiquidGlassGlow? glow;
 }
 
 /// The real glass layer: renders the shared shape geometry into a GPU matte

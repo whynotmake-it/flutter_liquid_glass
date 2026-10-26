@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 export 'src/fake_glass.dart' show FakeGlass;
 export 'src/glass_glow.dart' show GlassGlow, GlassGlowLayer;
 export 'src/internal/glass_drag_builder.dart' show GestureMode;
-export 'src/liquid_glass.dart' show LiquidGlass;
+export 'src/liquid_glass.dart' show LiquidGlass, LiquidGlassShapeFrame;
 export 'src/liquid_glass_appearance.dart' show LiquidGlassAppearance;
 export 'src/liquid_glass_backdrop.dart' show LiquidGlassBackdrop;
 export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
@@ -23,7 +23,8 @@ export 'src/liquid_shape.dart'
         LiquidRoundedSuperellipse,
         LiquidShape;
 export 'src/logging.dart' show LgrLogs;
-export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
+export 'src/rendering/liquid_glass_layer.dart'
+    show LiquidGlassLayer, LiquidGlassLayerFrame;
 export 'src/stretch.dart'
     show LiquidStretch, OffsetResistanceExtension, RawLiquidStretch;
 
