@@ -978,6 +978,27 @@ void main() {
         expect(outline.width, closeTo(100, 1));
         expect(outline.height, closeTo(40, 1));
       });
+
+      testWidgets('keeps the shared filter object while an animated size does '
+          'not change its inputs', (tester) async {
+        // Short sides above 118 logical pixels saturate the size progress, and
+        // a regular blur's sigma does not depend on size there.
+        final filters = <ui.ImageFilter?>[];
+        for (final height in [150.0, 160.0, 170.0]) {
+          await pump(
+            tester,
+            Stack(
+              children: [
+                backdrop,
+                pill(fake: true, left: 20, top: 20, width: 200, height: height),
+              ],
+            ),
+          );
+          filters.add(_filters(tester).firstOrNull?.filter);
+        }
+        expect(filters.first, isNotNull);
+        expect(filters.every((f) => identical(f, filters.first)), isTrue);
+      });
     });
 
     group('a fake glass sheet that grows from the bottom of the screen', () {
