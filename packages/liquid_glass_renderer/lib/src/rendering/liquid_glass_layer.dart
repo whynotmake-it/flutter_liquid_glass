@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_shaders/flutter_shaders.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
@@ -95,6 +96,7 @@ class LiquidGlassLayer extends StatefulWidget {
     this.backdropKey,
     this.field,
     this.backdrop = const LiquidGlassBackdrop.read(),
+    this.glow,
     super.key,
   });
 
@@ -160,6 +162,14 @@ class LiquidGlassLayer extends StatefulWidget {
   /// Where the glass takes what it shows through: read behind the layer by
   /// default, or a backdrop the caller knows. See [LiquidGlassBackdrop].
   final LiquidGlassBackdrop backdrop;
+
+  /// The glow a finger raises on one of this layer's shapes, or null for
+  /// none.
+  ///
+  /// The widget that owns the glass computes it each frame. A new glow
+  /// changes only the final pass's uniforms: no geometry pass runs, and a
+  /// layer whose retained filter reads the backdrop does not repaint.
+  final LiquidGlassGlow? glow;
 
   /// Whether there is a [LiquidGlassLayer] in the widget tree above the given
   /// [context].
@@ -354,6 +364,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 backdropKey: backdropKey,
                 field: widget.field,
                 solidBackdrop: solidColorOf(widget.backdrop),
+                glow: widget.glow,
                 settings: widget.settings,
                 defaultAppearance: defaultAppearance,
                 link: _link,
@@ -420,6 +431,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.backdropKey,
     required this.field,
     required this.solidBackdrop,
+    required this.glow,
     required this.settings,
     required this.defaultAppearance,
     required Widget super.child,
@@ -435,6 +447,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final LiquidGlassField? field;
 
   final Color? solidBackdrop;
+  final LiquidGlassGlow? glow;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance defaultAppearance;
   final GeometryRenderLink link;
@@ -459,7 +472,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
         matteScale: matteScale,
       )
       ..field = field
-      ..solidBackdrop = solidBackdrop;
+      ..solidBackdrop = solidBackdrop
+      ..glow = glow;
   }
 
   @override
@@ -476,7 +490,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..gpuGeometryRenderer = gpuGeometryRenderer
       ..matteScale = matteScale
       ..field = field
-      ..solidBackdrop = solidBackdrop;
+      ..solidBackdrop = solidBackdrop
+      ..glow = glow;
   }
 }
 
@@ -716,6 +731,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // Float index 144: uSolidBackdrop's alpha; 0 reads the backdrop. A
     // paint over a solid sets it only while it records.
     shader.setFloat(144, 0);
+    _writeGlow(shader);
     // Float index 61, after the geometry/material texture sizes: the three
     // adaptive color-model slots (six vec4 each), zero-filled when fewer
     // than three distinct models are in use.
@@ -778,6 +794,40 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   bool get _drawsOverSolid => (_solidBackdrop?.a ?? 0) == 1;
+
+  /// See [LiquidGlassLayer.glow].
+  LiquidGlassGlow? get glow => _glow;
+  LiquidGlassGlow? _glow;
+  set glow(LiquidGlassGlow? value) {
+    if (_glow == value) return;
+    _glow = value;
+    // Only the glow's uniforms change. A retained pass takes them in a new
+    // filter, without painting the layer and its shapes.
+    _writeGlow(renderShader);
+    _shaderInputsChanged = true;
+    if (!_refreshRetainedFilter()) markNeedsPaint();
+  }
+
+  // Float index 145: uGlowSpot, uGlowBox and uGlowShape.
+  void _writeGlow(FragmentShader shader) {
+    final glow = LiquidGlassGlow.uniformsOf(_glow, devicePixelRatio);
+    for (var i = 0; i < glow.length; i++) {
+      shader.setFloat(145 + i, glow[i]);
+    }
+  }
+
+  /// Hands the final pass's current uniforms to the retained filter layer
+  /// and schedules a frame to composite it; false when there is no
+  /// retained pass to update, so the layer has to paint.
+  bool _refreshRetainedFilter() {
+    final layer = _shaderHandle.layer;
+    if (layer == null || !attached || drawableEmpty || !hasReusableGeometry) {
+      return false;
+    }
+    _bindFilter(layer);
+    SchedulerBinding.instance.ensureVisualUpdate();
+    return true;
+  }
 
   /// See [LiquidGlassLayer.field].
   LiquidGlassField? get field => _field;

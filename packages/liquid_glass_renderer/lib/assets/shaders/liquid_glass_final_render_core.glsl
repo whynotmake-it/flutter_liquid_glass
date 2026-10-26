@@ -11,6 +11,7 @@ precision highp float;
 
 #include <flutter/runtime_effect.glsl>
 #include "render.glsl"
+#include "glass_glow.glsl"
 
 // The geometry texture is the low-res matte: one RGBA16F texel for every
 // uLowResMatte.x x uLowResMatte.x block of matte pixels (see
@@ -78,6 +79,12 @@ uniform vec2 uBackdropShrinkAxis;
 // instead of a backdrop filter: every backdrop read returns it. Alpha 0 reads
 // the backdrop. Float index 141.
 uniform vec4 uSolidBackdrop;
+// The touch glow of one lit shape (glass_glow.glsl), float index 145: the
+// spot, the lit shape's box and its corner radius and wash. All zero draws
+// no glow.
+uniform vec4 uGlowSpot;
+uniform vec4 uGlowBox;
+uniform vec4 uGlowShape;
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -1043,6 +1050,25 @@ void main() {
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
+#if !SHAPE_APPEARANCE
+    // Over everything the glass shows, under the content. Skipped in the
+    // per-shape appearance variant, whose registers it would spill on
+    // Mali GPUs. The matte coordinate is derived again, so no register
+    // holds it across the shading.
+    if (uGlowSpot.w > 0.0 || uGlowShape.y > 0.0) {
+        vec2 glowCoord = FlutterFragCoord().xy;
+        finalColor = applyGlassGlow(
+            finalColor,
+            vec2(
+                dot(uFilterToMatteBasis.xy, glowCoord),
+                dot(uFilterToMatteBasis.zw, glowCoord)
+            ) + uFilterToMatteOffset,
+            uGlowSpot,
+            uGlowBox,
+            uGlowShape
+        );
+    }
+#endif
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
         uContourColor.rgb * externalContourAlpha;
 
