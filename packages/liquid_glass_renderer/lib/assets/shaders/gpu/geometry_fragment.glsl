@@ -30,7 +30,9 @@ layout(std140) uniform GeometryUniforms {
     vec4 uOpticalProps;
     vec4 uContourProps;
     vec4 uShapeData[MAX_SHAPES * 3];
-    vec4 uRseData[MAX_SHAPES * 3];
+    // Each shape's three rows, then from MAX_SHAPES * 3 each pair's
+    // bottom-half rows (sdf.glsl).
+    vec4 uRseData[MAX_SHAPES * 6];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
     vec4 uShapeBounds[MAX_SHAPES];
