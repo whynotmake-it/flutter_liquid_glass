@@ -323,25 +323,6 @@ vec2 mirrorIntoBackdrop(vec2 sourceOffset, vec2 matteCoord) {
     );
 }
 
-// Transmitted part of the untinted adaptive face for one backdrop color.
-vec3 neutralTransmissionOf(
-    vec3 backdrop,
-    float backdropLuminance,
-    vec2 faceTransfer,
-    float neutralAlpha
-) {
-    float lifted = clamp(
-        backdropLuminance *
-            (1.0 + faceTransfer.x * (1.0 - backdropLuminance)),
-        0.0,
-        1.0
-    );
-    float transmittedLuminance = pow(lifted, max(uTransmissionGamma, 0.01));
-    return vec3(transmittedLuminance * (1.0 - neutralAlpha)) +
-        (backdrop - vec3(backdropLuminance)) *
-            (faceTransfer.y * uSaturation);
-}
-
 // Distance inward from the silhouette, in device px, beyond which
 // applySpecularHighlights and the contour contribute exactly nothing, so the
 // lit color is the base color and the exterior border is absent. Every term
@@ -951,12 +932,19 @@ void main() {
             washSum.a / adaptiveShare
         );
         vec2 faceTransfer = transferSum / adaptiveShare;
-        vec3 neutralTransmission = neutralTransmissionOf(
-            refractColor.rgb,
-            backdropLuminance,
-            faceTransfer,
-            neutralTint.a
+        float transmittedLuminance = pow(
+            clamp(
+                backdropLuminance *
+                    (1.0 + faceTransfer.x * (1.0 - backdropLuminance)),
+                0.0,
+                1.0
+            ),
+            max(uTransmissionGamma, 0.01)
         );
+        vec3 neutralTransmission =
+            vec3(transmittedLuminance * (1.0 - neutralTint.a)) +
+            (refractColor.rgb - vec3(backdropLuminance)) *
+                (faceTransfer.y * uSaturation);
         vec3 neutralBase = clamp(
             neutralTint.rgb * neutralTint.a + neutralTransmission,
             0.0,

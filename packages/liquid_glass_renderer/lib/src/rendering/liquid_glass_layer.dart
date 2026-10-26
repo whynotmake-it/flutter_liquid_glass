@@ -1113,28 +1113,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   // changed geometry frame can be prepared without invoking child paint.
   void _bindGeometryShader(ui.Image geometryImage) {
     syncCoordinateMapping();
-    final shader = renderShader;
-    _writeGeometryInputs(shader, geometryImage, _materialImage);
-    if (!identical(shader, _boundRenderShader) ||
-        !identical(geometryImage, _boundGeometryImage) ||
-        !identical(_materialImage, _boundMaterialImage) ||
-        _geometryMatteBounds != _boundMatteBounds) {
-      _boundRenderShader = shader;
-      _boundGeometryImage = geometryImage;
-      _boundMaterialImage = _materialImage;
-      _boundMatteBounds = _geometryMatteBounds;
-      _shaderInputsChanged = true;
-    }
-  }
-
-  /// Writes the geometry and material inputs of [shader]: where the matte
-  /// lies, its size, and its samplers.
-  void _writeGeometryInputs(
-    FragmentShader shader,
-    ui.Image geometryImage,
-    ui.Image? materialImage,
-  ) {
-    shader
+    final activeRenderShader = renderShader;
+    activeRenderShader
       // Float index 133, after the shared uniforms: the lattice spacing and
       // texture size, then what the bevel profile needs.
       ..setFloatUniforms(initialIndex: 133, (value) {
@@ -1181,18 +1161,28 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       // The geometry field is smooth; the shader interpolates it in the
       // sampler (hardware bilinear).
       ..setImageSampler(1, geometryImage, filterQuality: FilterQuality.low);
-    if (materialImage != null && _usesShapeAppearances) {
+    if (_materialImage case final materialImage? when _usesShapeAppearances) {
       if (_usesTintOnlyAppearance) {
-        shader.setImageSampler(
+        activeRenderShader.setImageSampler(
           2,
           materialImage,
           filterQuality: FilterQuality.low,
         );
       } else {
-        shader
+        activeRenderShader
           ..setImageSampler(2, materialImage)
           ..setImageSampler(3, materialImage, filterQuality: FilterQuality.low);
       }
+    }
+    if (!identical(activeRenderShader, _boundRenderShader) ||
+        !identical(geometryImage, _boundGeometryImage) ||
+        !identical(_materialImage, _boundMaterialImage) ||
+        _geometryMatteBounds != _boundMatteBounds) {
+      _boundRenderShader = activeRenderShader;
+      _boundGeometryImage = geometryImage;
+      _boundMaterialImage = _materialImage;
+      _boundMatteBounds = _geometryMatteBounds;
+      _shaderInputsChanged = true;
     }
   }
 
