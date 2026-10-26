@@ -482,13 +482,17 @@ final class LiquidGlassColorModel with Equatable {
   }) : parameters = null;
 
   /// The fitted iOS 27-style tonal response for [brightness].
-  const LiquidGlassColorModel.ios27({required Brightness brightness})
-    : parameters = brightness == Brightness.dark
-          ? GlassColorParameters.ios27Dark
-          : GlassColorParameters.ios27Light,
-      saturation = 1,
-      transmissionGamma = 1,
-      vibrancy = 0;
+  ///
+  /// [transmissionGamma] bends the fitted luminance transfer relative to
+  /// Apple's face, which is `1`; above `1` the glass transmits darker.
+  const LiquidGlassColorModel.ios27({
+    required Brightness brightness,
+    this.transmissionGamma = 1,
+  }) : parameters = brightness == Brightness.dark
+           ? GlassColorParameters.ios27Dark
+           : GlassColorParameters.ios27Light,
+       saturation = 1,
+       vibrancy = 0;
 
   /// iOS 27 `Glass.clear`, identical in light and dark appearance.
   const LiquidGlassColorModel.ios27Clear()
@@ -497,8 +501,8 @@ final class LiquidGlassColorModel with Equatable {
       transmissionGamma = 1,
       vibrancy = 0;
 
-  /// Restores a model written by [toJson]: a preset name or a parameter map
-  /// (see [GlassColorParameters.fromJson]).
+  /// Restores a model written by [toJson] (see
+  /// [GlassColorParameters.fromJson] for the parameter map).
   ///
   /// The parameter map exposes the model's internal constants. Its schema is
   /// experimental and may change between releases.
@@ -511,6 +515,16 @@ final class LiquidGlassColorModel with Equatable {
       brightness: Brightness.dark,
     ),
     'ios27Clear' => const LiquidGlassColorModel.ios27Clear(),
+    {'ios27Light': final Map<String, Object?> light} =>
+      LiquidGlassColorModel.ios27(
+        brightness: Brightness.light,
+        transmissionGamma: _number(light['transmissionGamma'], 1),
+      ),
+    {'ios27Dark': final Map<String, Object?> dark} =>
+      LiquidGlassColorModel.ios27(
+        brightness: Brightness.dark,
+        transmissionGamma: _number(dark['transmissionGamma'], 1),
+      ),
     'direct' => const LiquidGlassColorModel.direct(),
     {'direct': final Map<String, Object?> direct} =>
       LiquidGlassColorModel.direct(
@@ -539,7 +553,9 @@ final class LiquidGlassColorModel with Equatable {
 
   /// Display-referred transfer applied to transmitted content.
   ///
-  /// Only the direct model reads this; the iOS 27 models are always `1`.
+  /// The direct model applies it per channel and
+  /// [LiquidGlassColorModel.ios27] to its fitted luminance transfer; the
+  /// other fitted models are always `1`.
   final double transmissionGamma;
 
   /// Backdrop-aware chroma lift.
@@ -547,7 +563,9 @@ final class LiquidGlassColorModel with Equatable {
   /// Only the direct model reads this; the iOS 27 models are always `0`.
   final double vibrancy;
 
-  /// Identifier (or parameter map) used by appearance preset JSON.
+  /// The model as appearance preset JSON: a preset name, a preset name mapped
+  /// to the model's adjustments (`{'ios27Dark': {'transmissionGamma': g}}`, or
+  /// the direct model's saturation, gamma and vibrancy), or a parameter map.
   ///
   /// The schema is experimental and may change between releases.
   @experimental
@@ -559,11 +577,17 @@ final class LiquidGlassColorModel with Equatable {
         'vibrancy': vibrancy,
       },
     },
-    GlassColorParameters.ios27Light => 'ios27Light',
-    GlassColorParameters.ios27Dark => 'ios27Dark',
+    GlassColorParameters.ios27Light => _presetJson('ios27Light'),
+    GlassColorParameters.ios27Dark => _presetJson('ios27Dark'),
     GlassColorParameters.ios27Clear => 'ios27Clear',
     final params => params.toJson(),
   };
+
+  Object _presetJson(String name) => transmissionGamma == 1
+      ? name
+      : {
+          name: {'transmissionGamma': transmissionGamma},
+        };
 
   /// The untinted face, or `null` when transmitted content is composited per
   /// channel (the direct model).
