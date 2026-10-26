@@ -14,5 +14,9 @@
     "MaterialTintGradientFragment": {
         "type": "fragment",
         "file": "lib/assets/shaders/gpu/material_tint_gradient_fragment.glsl"
+    },
+    "GeometryFieldFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/geometry_field_fragment.glsl"
     }
 }

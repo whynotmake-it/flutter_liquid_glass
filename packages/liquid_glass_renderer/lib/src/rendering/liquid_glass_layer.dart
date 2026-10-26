@@ -92,6 +92,7 @@ class LiquidGlassLayer extends StatefulWidget {
     this.fake = false,
     this.useBackdropGroup = false,
     this.backdropKey,
+    this.field,
     super.key,
   });
 
@@ -146,6 +147,13 @@ class LiquidGlassLayer extends StatefulWidget {
   /// repeated backdrop captures. Effects that overlap should use different
   /// keys because Flutter treats a shared key as a single backdrop filter.
   final BackdropKey? backdropKey;
+
+  /// The distance field of the one body this layer's shapes form, when the
+  /// caller has fused them already.
+  ///
+  /// The layer then shades the body the field describes instead of its
+  /// shapes' outlines and blend groups. See [LiquidGlassField].
+  final LiquidGlassField? field;
 
   /// Whether there is a [LiquidGlassLayer] in the widget tree above the given
   /// [context].
@@ -338,6 +346,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 materialRenderShader: shaders[1],
                 tintRenderShader: shaders[2],
                 backdropKey: backdropKey,
+                field: widget.field,
                 settings: widget.settings,
                 defaultAppearance: defaultAppearance,
                 link: _link,
@@ -402,6 +411,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.materialRenderShader,
     required this.tintRenderShader,
     required this.backdropKey,
+    required this.field,
     required this.settings,
     required this.defaultAppearance,
     required Widget super.child,
@@ -414,6 +424,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
   final BackdropKey? backdropKey;
+  final LiquidGlassField? field;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance defaultAppearance;
   final GeometryRenderLink link;
@@ -436,7 +447,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       link: link,
       gpuGeometryRenderer: gpuGeometryRenderer,
       matteScale: matteScale,
-    );
+    )..field = field;
   }
 
   @override
@@ -451,7 +462,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..defaultAppearance = defaultAppearance
       ..backdropKey = backdropKey
       ..gpuGeometryRenderer = gpuGeometryRenderer
-      ..matteScale = matteScale;
+      ..matteScale = matteScale
+      ..field = field;
   }
 }
 
@@ -738,6 +750,16 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     devicePixelRatio,
     shapeShortSide: _shapeShortSide,
   );
+
+  /// See [LiquidGlassLayer.field].
+  LiquidGlassField? get field => _field;
+  LiquidGlassField? _field;
+  set field(LiquidGlassField? value) {
+    if (_field == value) return;
+    _field = value;
+    needsGeometryUpdate = true;
+    markNeedsPaint();
+  }
 
   List<double> _appearanceLookupData(
     List<LiquidGlassAppearance> appearances,
@@ -1953,6 +1975,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         offsetX: boundsInMatteSpace.left * devicePixelRatio,
         offsetY: boundsInMatteSpace.top * devicePixelRatio,
         matteScale: _matteScale,
+        field: _field,
+        fieldScale: devicePixelRatio,
       );
       _needsMaterialUpdate = false;
       return (

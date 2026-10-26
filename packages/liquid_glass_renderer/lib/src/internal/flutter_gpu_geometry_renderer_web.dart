@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:liquid_glass_renderer/src/liquid_glass_field.dart';
 import 'package:meta/meta.dart';
 
 /// Web stand-in for the Flutter GPU geometry renderer.
@@ -83,6 +84,8 @@ class FlutterGpuGeometryRenderer {
     List<double> rseLowerData = const <double>[],
     List<double> boundsData = const <double>[],
     required int matteScale,
+    LiquidGlassField? field,
+    double fieldScale = 1,
   }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}
