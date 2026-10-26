@@ -74,6 +74,10 @@ uniform vec2 uLowResOptics;
 // Half of the segment backdropShrink shrinks about, in matte device px from
 // the material center; zero shrinks about the center itself. Float index 139.
 uniform vec2 uBackdropShrinkAxis;
+// The opaque color the glass is shaded over when it is drawn as a paint
+// instead of a backdrop filter: every backdrop read returns it. Alpha 0 reads
+// the backdrop. Float index 141.
+uniform vec4 uSolidBackdrop;
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -806,13 +810,17 @@ void main() {
             appearanceVisibility;
     }
     vec4 refractColor;
-    // Skip two texture reads only when the maximum channel separation is
-    // subpixel. The uniform predicate stays coherent across the layer and the
-    // displacement bound keeps this optimization valid for either CA sign.
-    if (
+    if (uSolidBackdrop.a > 0.5) {
+        // Refracting, frosting or splitting a uniform color returns it.
+        refractColor = vec4(uSolidBackdrop.rgb, 1.0);
+    } else if (
         abs(uDispersion) * maxDisplacement <=
         kDispersionSubpixelThreshold
     ) {
+        // Skip two texture reads only when the maximum channel separation is
+        // subpixel. The uniform predicate stays coherent across the layer and
+        // the displacement bound keeps this optimization valid for either CA
+        // sign.
         vec2 sourceOffset = backdropScaleOffset + displacement;
         vec2 refractedUV;
         if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
