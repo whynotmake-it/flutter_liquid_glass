@@ -6,6 +6,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 import '../../test/src/capture_scenes.dart';
+import '../../test/src/shared.dart';
 
 /// Runs every capture scene on a real GPU, where a process can render any
 /// number of captures. Checks what flutter_tester cannot: the fake reference
@@ -17,12 +18,17 @@ import '../../test/src/capture_scenes.dart';
 /// wider than on the host; the mean bound still catches a shifted matte or a
 /// clipped halo (hundreds of codes over whole regions).
 ///
+/// The reference without a capture is the plain path: outside a capture glass
+/// is seeded (see `SeededBackdropPassLayer`), whose parity with the plain path
+/// is native_seed_parity_device_test.dart.
+///
 ///   flutter test --enable-impeller -d macos \
 ///     integration_test/liquid_glass_capture_test.dart
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(LiquidGlass.precache);
+  setUp(pinPlainBackdropPath);
 
   for (final fake in [true, false]) {
     for (final scene in captureScenes) {

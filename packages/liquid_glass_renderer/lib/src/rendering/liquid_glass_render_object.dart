@@ -11,11 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
 @internal
@@ -306,6 +308,48 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
 
   @visibleForTesting
   Offset get debugCompositorTranslation => _effectTranslation;
+
+  /// Places the seeded pass around a backdrop effect clipped to
+  /// [innerLayerRect] (in the layer coordinates it is painted in, [paintOffset]
+  /// from this object's), whose blur reads [reach] past that clip.
+  ///
+  /// Inside a seeded fractional-opacity pass the effect already renders in a
+  /// pass that starts at the enclosing clips, so no extra pass is placed.
+  /// Neither is one without a blur to crop or where seeds are off (see
+  /// [seedsBackdrop]).
+  ///
+  /// A large pass is sized by [sizing] (this object's own by default), which
+  /// keeps it from changing size on every bucket step; each effect painting
+  /// its own pass needs its own.
+  @protected
+  BackdropPassPlan planBackdropPass(
+    Rect innerLayerRect,
+    Offset paintOffset,
+    double reach, {
+    BackdropPassSizing? sizing,
+  }) => !seedsBackdrop || reach <= 0 || compositionProbeSeeding
+      ? BackdropPassPlan.unsupported
+      : planSeededBackdropPass(
+          owner: this,
+          innerLayerRect: innerLayerRect,
+          paintOffset: paintOffset,
+          translation: _effectTranslation,
+          reach: reach,
+          devicePixelRatio: devicePixelRatio,
+          ownerClip: retainedClipBounds,
+          sizing: sizing ?? _passSizing,
+        );
+
+  final _passSizing = BackdropPassSizing();
+
+  /// Whether this glass paints its backdrop effects in seeded passes (see
+  /// [SeededBackdropPassLayer.enabled]), which it does except inside a
+  /// [LiquidGlassCapture], whose own pass already holds the backdrop the glass
+  /// reads.
+  @protected
+  bool get seedsBackdrop =>
+      SeededBackdropPassLayer.enabled &&
+      RenderLiquidGlassCapture.enclosing(this) == null;
 
   /// Moves all layer-owned painting without recording it again.
   @protected

@@ -81,6 +81,30 @@ scripts:
     run: melos run test-without-goldens:select --no-select
     description: Run all tests in this project without golden tests.
 
+  test:defaults:select:
+    # The production value of the optimization `flutter test` otherwise
+    # defaults off (see `impellerDefaults`), so the suite also runs the way an
+    # app's release build does. Tests that need the plain backdrop path pin it
+    # with `pinPlainBackdropPath`. The geometry matte needs no define: the
+    # low-res matte is the only matte, and `flutter test` uses it too, with the
+    # scale picked per layer from its device pixel ratio (4 at 2 or more, else
+    # 2).
+    run: >-
+      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
+      --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
+      --dart-define=LIQUID_GLASS_SEED_PASSES=true
+    exec:
+      failFast: true
+      concurrency: 1
+    packageFilters:
+      dirExists: test
+    description: Run `flutter test` without goldens, with every LIQUID_GLASS_* default at its production value.
+
+  test:defaults:
+    run: melos run test:defaults:select --no-select
+    description: Run all tests without goldens, with the production defaults.
+
   update-goldens:select:
     # Exit 79 means the package has no tests matching the golden tag.
     run: >-

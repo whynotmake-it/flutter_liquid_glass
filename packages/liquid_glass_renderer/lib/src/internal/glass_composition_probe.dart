@@ -13,7 +13,7 @@ import 'package:meta/meta.dart';
 /// and refracts what is actually behind it.
 @internal
 class GlassCompositionProbe {
-  final _layer = LayerHandle<_OpacitySeedLayer>();
+  final _layer = LayerHandle<OpacitySeedLayer>();
 
   static const _identity = ColorFilter.matrix(<double>[
     1, 0, 0, 0, 0, //
@@ -32,7 +32,7 @@ class GlassCompositionProbe {
     PaintingContextCallback painter, {
     required RenderObject owner,
   }) {
-    final layer = _layer.layer ??= _OpacitySeedLayer()..filter = _identity;
+    final layer = _layer.layer ??= OpacitySeedLayer()..filter = _identity;
     syncOpacity(owner);
     context.pushLayer(layer, painter, offset);
   }
@@ -84,7 +84,8 @@ class GlassCompositionProbe {
   void dispose() => _layer.layer = null;
 }
 
-class _OpacitySeedLayer extends BackdropFilterLayer {
+@internal
+class OpacitySeedLayer extends BackdropFilterLayer {
   bool _seeded = false;
   bool get seeded => _seeded;
   set seeded(bool value) {
