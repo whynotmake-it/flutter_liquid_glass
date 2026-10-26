@@ -8,7 +8,8 @@ import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_paramete
 
 import 'gpu_test_helpers.dart';
 
-// Exactness of the geometry pass.
+// Exactness of the geometry pass, which draws only the part of the low-res
+// matte near the shapes and clears the rest.
 //
 // Renders a spread of sheets, pills, ovals and blend groups at the matte scale
 // of a dpr 3 layer (4) and checks the low-res matte: rules any correct matte
@@ -79,20 +80,12 @@ final _scenes = <_Scene>[
         fits: fits,
         contourExtent: 6,
       ),
-  const _Scene(
-    'rrect_sheet',
-    500,
-    400,
-    [_Shape(3, 450, 350, 40, 250, 200)],
-    contourExtent: 6,
-  ),
-  const _Scene(
-    'oval_wide',
-    600,
-    300,
-    [_Shape(2, 560, 260, 0, 300, 150)],
-    contourExtent: 6,
-  ),
+  const _Scene('rrect_sheet', 500, 400, [
+    _Shape(3, 450, 350, 40, 250, 200),
+  ], contourExtent: 6),
+  const _Scene('oval_wide', 600, 300, [
+    _Shape(2, 560, 260, 0, 300, 150),
+  ], contourExtent: 6),
   const _Scene(
     'circle',
     300,
@@ -101,24 +94,9 @@ final _scenes = <_Scene>[
     refractionHeight: 60,
     refractionAmount: 180,
   ),
-  const _Scene(
-    'stretched_sheet',
-    520,
-    420,
-    [
-      _Shape(
-        1,
-        300,
-        200,
-        50,
-        260,
-        210,
-        scale: 1.2,
-        basis: [0.8, 0.1, -0.1, 0.9],
-      ),
-    ],
-    contourExtent: 6,
-  ),
+  const _Scene('stretched_sheet', 520, 420, [
+    _Shape(1, 300, 200, 50, 260, 210, scale: 1.2, basis: [0.8, 0.1, -0.1, 0.9]),
+  ], contourExtent: 6),
   _Scene(
     'blend5_pills',
     900,
@@ -132,13 +110,9 @@ final _scenes = <_Scene>[
     refractionAmount: 120,
     contourExtent: 6,
   ),
-  const _Scene(
-    'small_pill_in_large_texture',
-    1000,
-    1000,
-    [_Shape(1, 150, 60, 30, 400.5, 250.25)],
-    contourExtent: 6,
-  ),
+  const _Scene('small_pill_in_large_texture', 1000, 1000, [
+    _Shape(1, 150, 60, 30, 400.5, 250.25),
+  ], contourExtent: 6),
   const _Scene(
     'offset_pill',
     900,
@@ -163,13 +137,10 @@ final _scenes = <_Scene>[
     refractionAmount: 120,
     contourExtent: 6,
   ),
-  const _Scene(
-    'far_apart_sheets',
-    1200,
-    1200,
-    [_Shape(1, 380, 300, 50, 230, 190), _Shape(1, 300, 260, 60, 950, 980)],
-    contourExtent: 6,
-  ),
+  const _Scene('far_apart_sheets', 1200, 1200, [
+    _Shape(1, 380, 300, 50, 230, 190),
+    _Shape(1, 300, 260, 60, 950, 980),
+  ], contourExtent: 6),
   _Scene(
     'blend_overlap_sheets',
     800,
@@ -251,34 +222,30 @@ void main() {
     timeout: const Timeout(Duration(minutes: 5)),
   );
 
-  test(
-    'a circle\'s low-res matte holds its exact distance, whatever part the '
-    'pass draws',
-    () async {
-      final renderer = await createGeometryRenderer();
-      final scene = _scenes.firstWhere((scene) => scene.name == 'circle');
-      final (field, textureWidth, _) = await _renderMatte(renderer, scene);
-      const radius = 130.0;
-      const center = 150.0;
-      var checked = 0;
-      var worst = 0.0;
-      for (var j = 0; j <= scene.height ~/ 4; j++) {
-        for (var i = 0; i <= scene.width ~/ 4; i++) {
-          // Texel (i, j) is computed at the center of matte pixel
-          // (i * 4, j * 4).
-          final dx = i * 4 + 0.5 - center;
-          final dy = j * 4 + 0.5 - center;
-          final inward = radius - math.sqrt(dx * dx + dy * dy);
-          // Far from the edge, the matte only holds "far outside".
-          if (inward.abs() > 12) continue;
-          final value = field[(j * textureWidth + i) * 4];
-          worst = math.max(worst, (value - inward).abs());
-          checked++;
-        }
+  test('a circle\'s low-res matte holds its exact distance, whatever part the '
+      'pass draws', () async {
+    final renderer = await createGeometryRenderer();
+    final scene = _scenes.firstWhere((scene) => scene.name == 'circle');
+    final (field, textureWidth, _) = await _renderMatte(renderer, scene);
+    const radius = 130.0;
+    const center = 150.0;
+    var checked = 0;
+    var worst = 0.0;
+    for (var j = 0; j <= scene.height ~/ 4; j++) {
+      for (var i = 0; i <= scene.width ~/ 4; i++) {
+        // Texel (i, j) is computed at the center of matte pixel
+        // (i * 4, j * 4).
+        final dx = i * 4 + 0.5 - center;
+        final dy = j * 4 + 0.5 - center;
+        final inward = radius - math.sqrt(dx * dx + dy * dy);
+        // Far from the edge, the matte only holds "far outside".
+        if (inward.abs() > 12) continue;
+        final value = field[(j * textureWidth + i) * 4];
+        worst = math.max(worst, (value - inward).abs());
+        checked++;
       }
-      expect(checked, greaterThan(100));
-      expect(worst, lessThan(0.05));
-    },
-    skip: _expectFallback,
-  );
+    }
+    expect(checked, greaterThan(100));
+    expect(worst, lessThan(0.05));
+  }, skip: _expectFallback);
 }
