@@ -676,6 +676,24 @@ void main() {
       expect(first.debugSeedKey, isNot(second.debugSeedKey));
     });
 
+    testWidgets('a picture beside a pass it does not belong to keeps seeds '
+        'apart', (tester) async {
+      liquidGlassNativeSeed = LiquidGlassNativeSeed.blur;
+      // A pass outside any glass's effect layer, then, in the same parent, a
+      // picture over the second glass.
+      await _pump(
+        tester,
+        _scene([
+          _at(100, 100, const _StrayPictureBesidePass(strayTop: 300)),
+          _at(100, 400, _glass(fake: true)),
+        ]),
+      );
+      final [first, second] = _passes(tester);
+      expect(first.parent, same(_parentOfPicture(first)));
+      expect(second.debugSeedKey, isNotNull);
+      expect(second.debugSeedKey, isNot(first.debugSeedKey));
+    });
+
     testWidgets("the caller's own key is used, with alternating filters", (
       tester,
     ) async {
@@ -1222,4 +1240,88 @@ void main() {
       });
     });
   });
+}
+
+ContainerLayer? _parentOfPicture(Layer pass) {
+  for (var c = pass.nextSibling; c != null; c = c.nextSibling) {
+    if (c is PictureLayer) return c.parent;
+  }
+  return null;
+}
+
+/// Pushes a seeded pass straight into its parent's layer, as no glass does,
+/// then paints a red box [strayTop] below it into the same parent.
+class _StrayPictureBesidePass extends LeafRenderObjectWidget {
+  const _StrayPictureBesidePass({required this.strayTop});
+
+  final double strayTop;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderStrayPictureBesidePass(strayTop);
+}
+
+class _RenderStrayPictureBesidePass extends RenderBox {
+  _RenderStrayPictureBesidePass(this.strayTop);
+
+  final double strayTop;
+  final _pass = SeededBackdropPassLayer();
+  final _key = BackdropKey();
+  static const _sigma = 8.0;
+  static const _withoutBlur = ui.ColorFilter.matrix(<double>[
+    0.9, 0, 0, 0, 0, //
+    0, 0.9, 0, 0, 0, //
+    0, 0, 0.9, 0, 0, //
+    0, 0, 0, 1, 0, //
+  ]);
+  late final _filter = BackdropFilterLayer(
+    filter: ui.ImageFilter.compose(
+      outer: _withoutBlur,
+      inner: ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma),
+    ),
+  );
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  void performLayout() => size = const Size(200, 64);
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final inner = offset & size;
+    _pass
+      ..apply(
+        planSeededBackdropPass(
+          owner: this,
+          innerLayerRect: inner,
+          paintOffset: offset,
+          translation: Offset.zero,
+          reach: _sigma * 3 + 1,
+          devicePixelRatio: 2,
+        ),
+        inner,
+      )
+      ..bindFilter(
+        _filter,
+        _key,
+        blur: const PassBlur(sigma: _sigma, withoutBlur: _withoutBlur),
+        automaticKey: true,
+      );
+    context
+      ..pushLayer(
+        _pass,
+        (context, offset) => context.pushClipRect(
+          true,
+          offset,
+          Offset.zero & size,
+          (context, offset) => context.pushLayer(_filter, (_, _) {}, offset),
+        ),
+        offset,
+      )
+      ..canvas.drawRect(
+        offset.translate(0, strayTop) & size,
+        Paint()..color = const Color(0xFFFF0000),
+      );
+  }
 }

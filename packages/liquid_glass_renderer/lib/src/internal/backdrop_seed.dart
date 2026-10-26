@@ -295,9 +295,13 @@ class _LayerBounds {
     switch (layer) {
       case PictureLayer(:final picture):
         if (picture == null) return nothing;
-        for (var c = layer.parent?.firstChild; c != null; c = c.nextSibling) {
-          if (c is SeededBackdropPassLayer && c.modifiedBounds != null) {
-            return c.modifiedBounds!.inflate(backdropOverflowMargin);
+        // Only a glass's own effect layer vouches for its pictures; anywhere
+        // else a picture beside a pass may be someone else's.
+        if (layer.parent is GlassEffectLayer) {
+          for (var c = layer.parent?.firstChild; c != null; c = c.nextSibling) {
+            if (c is SeededBackdropPassLayer && c.modifiedBounds != null) {
+              return c.modifiedBounds!.inflate(backdropOverflowMargin);
+            }
           }
         }
         return unbounded;
@@ -717,6 +721,14 @@ BackdropPassPlan planSeededBackdropPass({
     resizing: sizing?.resizing ?? false,
   );
 }
+
+/// The retained layer a glass paints its effect into, holding nothing but
+/// that glass's passes, shadows and surfaces.
+///
+/// Seed sharing bounds a picture here by the glass's pass; a picture beside
+/// a pass in any other layer stays unbounded.
+@internal
+class GlassEffectLayer extends OffsetLayer {}
 
 /// Parent of one native backdrop effect (a clip around a backdrop filter).
 ///
