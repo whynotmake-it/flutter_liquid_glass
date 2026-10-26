@@ -207,11 +207,8 @@ class _RenderGlassShadow extends RenderProxyBox {
 void drawGlassShape(Canvas canvas, LiquidShape shape, Rect rect, Paint paint) {
   final radius = Radius.circular(shape.cornerRadius);
   switch (shape) {
-    case LiquidRoundedSuperellipse():
-      canvas.drawRSuperellipse(
-        RSuperellipse.fromRectAndRadius(rect, radius),
-        paint,
-      );
+    case LiquidRoundedSuperellipse(:final radii):
+      canvas.drawRSuperellipse(radii.toRSuperellipse(rect), paint);
     case LiquidOval():
       canvas.drawOval(rect, paint);
     case LiquidRoundedRectangle():

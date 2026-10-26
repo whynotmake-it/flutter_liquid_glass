@@ -42,9 +42,9 @@ class OptimizedClip extends StatelessWidget {
     }
     return switch (shape) {
       null => child,
-      LiquidRoundedSuperellipse(:final borderRadius) => ClipRSuperellipse(
+      LiquidRoundedSuperellipse(:final radii) => ClipRSuperellipse(
         clipBehavior: clipBehavior,
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius: radii,
         child: child,
       ),
       LiquidRoundedRectangle(:final borderRadius) => ClipRRect(

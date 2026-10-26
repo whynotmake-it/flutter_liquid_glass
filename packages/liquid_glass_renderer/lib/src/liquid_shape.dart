@@ -17,7 +17,9 @@ import 'package:meta/meta.dart';
 sealed class LiquidShape extends OutlinedBorder with Equatable {
   const LiquidShape({super.side = BorderSide.none});
 
-  /// Corner radius in logical pixels; `0` for shapes without corners.
+  /// Corner radius in logical pixels, the top corners' when a
+  /// [LiquidRoundedSuperellipse] has a bottom radius of its own; `0` for
+  /// shapes without corners.
   @internal
   double get cornerRadius;
 
@@ -50,39 +52,62 @@ sealed class LiquidShape extends OutlinedBorder with Equatable {
 
 /// Represents a squircle shape that can be used by a [LiquidGlass] widget.
 ///
-/// Works like a [RoundedSuperellipseBorder].
+/// Works like a [RoundedSuperellipseBorder], with one radius for all four
+/// corners, or one for the two top corners and another for the two bottom
+/// ones, like a floating iOS sheet (38 pt on top, 54 pt below on an iPhone 16
+/// Pro).
 final class LiquidRoundedSuperellipse extends LiquidShape {
-  /// Creates a new [LiquidRoundedSuperellipse] with the given [borderRadius].
+  /// Creates a new [LiquidRoundedSuperellipse] with corners of
+  /// [borderRadius], or with the two bottom ones of [bottomRadius] when it is
+  /// given.
   ///
   /// The glass ignores [side]; see [LiquidShape].
   const LiquidRoundedSuperellipse({
     required this.borderRadius,
+    this.bottomRadius,
     super.side = BorderSide.none,
   });
 
-  /// The radius of the squircle.
-  ///
-  /// This is the radius of the corners of the squircle.
+  /// The radius of the squircle's corners, of its two top corners when
+  /// [bottomRadius] is given.
   final double borderRadius;
+
+  /// The radius of the two bottom corners, or `null` for [borderRadius].
+  final double? bottomRadius;
+
+  /// Whether every corner has the same radius.
+  @internal
+  bool get isUniform => effectiveBottomRadius == borderRadius;
+
+  /// The radius of the two bottom corners.
+  @internal
+  double get effectiveBottomRadius => bottomRadius ?? borderRadius;
+
+  /// The four corners, for Flutter's clips and paths of the same outline.
+  @internal
+  BorderRadius get radii => BorderRadius.vertical(
+    top: Radius.circular(borderRadius),
+    bottom: Radius.circular(effectiveBottomRadius),
+  );
 
   @internal
   @override
   double get cornerRadius => borderRadius;
 
   @override
-  OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
-    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-    side: side,
-  );
+  OutlinedBorder get _equivalentOutlinedBorder =>
+      RoundedSuperellipseBorder(borderRadius: radii, side: side);
 
   @override
   LiquidRoundedSuperellipse copyWith({
     BorderSide? side,
     double? borderRadius,
+    double? bottomRadius,
   }) {
     return LiquidRoundedSuperellipse(
       side: side ?? this.side,
       borderRadius: borderRadius ?? this.borderRadius,
+      bottomRadius: bottomRadius ?? this.bottomRadius,
     );
   }
 
@@ -90,12 +115,13 @@ final class LiquidRoundedSuperellipse extends LiquidShape {
   ShapeBorder scale(double t) {
     return LiquidRoundedSuperellipse(
       borderRadius: borderRadius * t,
+      bottomRadius: bottomRadius == null ? null : bottomRadius! * t,
       side: side.scale(t),
     );
   }
 
   @override
-  List<Object?> get props => [...super.props, borderRadius];
+  List<Object?> get props => [...super.props, borderRadius, bottomRadius];
 }
 
 /// Represents an ellipse shape that can be used by a [LiquidGlass] widget.

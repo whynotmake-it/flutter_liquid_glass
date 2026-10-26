@@ -87,125 +87,130 @@ void main() {
       final name =
           '${fake ? "fake" : "real"} '
           'ownLayer=$ownLayer';
-      testWidgets('sliver nested glass matches static destination $name', (
-        tester,
-      ) async {
-        tester.view
-          ..physicalSize = const Size(420, 440)
-          ..devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
+      testWidgets(
+        'sliver nested glass matches static destination $name',
+        (
+          tester,
+        ) async {
+          tester.view
+            ..physicalSize = const Size(420, 440)
+            ..devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
 
-        Future<({Uint8List png, Uint8List rgba})> render(
-          double initial, {
-          required double destination,
-          bool scroll = false,
-        }) async {
-          final controller = ScrollController(initialScrollOffset: initial);
-          final key = GlobalKey();
-          await tester.pumpWidget(
-            _scene(
-              key: key,
-              controller: controller,
-              fake: fake,
-              ownLayer: ownLayer,
-            ),
-          );
-          for (var frame = 0; frame < 60; frame++) {
-            await tester.pump(const Duration(milliseconds: 16));
-            if (fake ||
-                tester
-                    .widgetList<LiquidGlassRenderScope>(
-                      find.byType(LiquidGlassRenderScope),
-                    )
-                    .every((scope) => !scope.consolidatesFakeBackdrop)) {
-              break;
-            }
-          }
-          if (!fake) {
-            final scopes = tester.widgetList<LiquidGlassRenderScope>(
-              find.byType(LiquidGlassRenderScope),
+          Future<({Uint8List png, Uint8List rgba})> render(
+            double initial, {
+            required double destination,
+            bool scroll = false,
+          }) async {
+            final controller = ScrollController(initialScrollOffset: initial);
+            final key = GlobalKey();
+            await tester.pumpWidget(
+              _scene(
+                key: key,
+                controller: controller,
+                fake: fake,
+                ownLayer: ownLayer,
+              ),
             );
-            expect(scopes, isNotEmpty);
-            expect(
-              scopes.every((scope) => !scope.consolidatesFakeBackdrop),
-              isTrue,
-              reason: 'Real-glass coverage must not use the fake fallback.',
-            );
-          }
-          binding.captured = null;
-          if (!scroll) {
-            binding
-              ..captureNextScene = true
-              ..scheduleFrame();
-          }
-          await tester.pump();
-          if (scroll) {
-            for (final offset in [30.0, 75.0, destination]) {
-              controller.jumpTo(offset);
-              if (offset == destination) {
-                binding
-                  ..captureNextScene = true
-                  ..scheduleFrame();
-              }
+            for (var frame = 0; frame < 60; frame++) {
               await tester.pump(const Duration(milliseconds: 16));
+              if (fake ||
+                  tester
+                      .widgetList<LiquidGlassRenderScope>(
+                        find.byType(LiquidGlassRenderScope),
+                      )
+                      .every((scope) => !scope.consolidatesFakeBackdrop)) {
+                break;
+              }
             }
-          }
-          final image = await tester.runAsync(() => binding.captured!);
-          final png = await tester.runAsync(
-            () => image!.toByteData(format: ui.ImageByteFormat.png),
-          );
-          final rgba = await tester.runAsync(image!.toByteData);
-          image.dispose();
-          await tester.pumpWidget(const SizedBox.shrink());
-          controller.dispose();
-          return (
-            png: png!.buffer.asUint8List(),
-            rgba: rgba!.buffer.asUint8List(),
-          );
-        }
-
-        for (final destination in [125.0, 280.0]) {
-          final reference = await render(
-            destination,
-            destination: destination,
-          );
-          final scrolled = await render(
-            0,
-            scroll: true,
-            destination: destination,
-          );
-          if (!fake && !ownLayer && destination == 280) {
-            const golden = 'goldens/nested_scroll_clipped_real.png';
-            await tester.runAsync(
-              () => expectMacOSGolden(reference.png, golden),
-            );
-            if (!autoUpdateGoldenFiles) {
-              await tester.runAsync(
-                () => expectMacOSGolden(scrolled.png, golden),
+            if (!fake) {
+              final scopes = tester.widgetList<LiquidGlassRenderScope>(
+                find.byType(LiquidGlassRenderScope),
+              );
+              expect(scopes, isNotEmpty);
+              expect(
+                scopes.every((scope) => !scope.consolidatesFakeBackdrop),
+                isTrue,
+                reason: 'Real-glass coverage must not use the fake fallback.',
               );
             }
-          }
-          final expected = reference.rgba;
-          final actual = scrolled.rgba;
-          var differentPixels = 0;
-          for (var i = 0; i < actual.length; i += 4) {
-            if (actual[i] != expected[i] ||
-                actual[i + 1] != expected[i + 1] ||
-                actual[i + 2] != expected[i + 2] ||
-                actual[i + 3] != expected[i + 3]) {
-              differentPixels++;
+            binding.captured = null;
+            if (!scroll) {
+              binding
+                ..captureNextScene = true
+                ..scheduleFrame();
             }
+            await tester.pump();
+            if (scroll) {
+              for (final offset in [30.0, 75.0, destination]) {
+                controller.jumpTo(offset);
+                if (offset == destination) {
+                  binding
+                    ..captureNextScene = true
+                    ..scheduleFrame();
+                }
+                await tester.pump(const Duration(milliseconds: 16));
+              }
+            }
+            final image = await tester.runAsync(() => binding.captured!);
+            final png = await tester.runAsync(
+              () => image!.toByteData(format: ui.ImageByteFormat.png),
+            );
+            final rgba = await tester.runAsync(image!.toByteData);
+            image.dispose();
+            await tester.pumpWidget(const SizedBox.shrink());
+            controller.dispose();
+            return (
+              png: png!.buffer.asUint8List(),
+              rgba: rgba!.buffer.asUint8List(),
+            );
           }
-          expect(
-            differentPixels,
-            0,
-            reason:
-                'A moved frame must equal an independently laid-out '
-                'static scene at $destination, including nested clips and '
-                'backdrop optics.',
-          );
-        }
-      }, skip: !fake && skipProperGlassTests, tags: 'golden');
+
+          for (final destination in [125.0, 280.0]) {
+            final reference = await render(
+              destination,
+              destination: destination,
+            );
+            final scrolled = await render(
+              0,
+              scroll: true,
+              destination: destination,
+            );
+            if (!fake && !ownLayer && destination == 280) {
+              const golden = 'goldens/nested_scroll_clipped_real.png';
+              await tester.runAsync(
+                () => expectMacOSGolden(reference.png, golden),
+              );
+              if (!autoUpdateGoldenFiles) {
+                await tester.runAsync(
+                  () => expectMacOSGolden(scrolled.png, golden),
+                );
+              }
+            }
+            final expected = reference.rgba;
+            final actual = scrolled.rgba;
+            var differentPixels = 0;
+            for (var i = 0; i < actual.length; i += 4) {
+              if (actual[i] != expected[i] ||
+                  actual[i + 1] != expected[i + 1] ||
+                  actual[i + 2] != expected[i + 2] ||
+                  actual[i + 3] != expected[i + 3]) {
+                differentPixels++;
+              }
+            }
+            expect(
+              differentPixels,
+              0,
+              reason:
+                  'A moved frame must equal an independently laid-out '
+                  'static scene at $destination, including nested clips and '
+                  'backdrop optics.',
+            );
+          }
+        },
+        skip: !fake && skipProperGlassTests,
+        tags: 'golden',
+      );
     }
   }
 }

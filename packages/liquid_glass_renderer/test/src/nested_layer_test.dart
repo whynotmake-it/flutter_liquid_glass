@@ -11,224 +11,259 @@ import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
 import 'shared.dart';
 
 void main() {
-  testWidgets('Layer -> Glass -> Glass paints shapes in tree order', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'Layer -> Glass -> Glass paints shapes in tree order',
+    (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final captureKey = GlobalKey();
+      final captureKey = GlobalKey();
 
-    await tester.pumpWidget(
-      _buildScene(
-        offset: Offset.zero,
-        captureKey: captureKey,
-      ),
-    );
-    await _pumpUntilAllGlassReady(tester);
-    await tester.pump();
+      await tester.pumpWidget(
+        _buildScene(
+          offset: Offset.zero,
+          captureKey: captureKey,
+        ),
+      );
+      await _pumpUntilAllGlassReady(tester);
+      await tester.pump();
 
-    final layers = tester.allRenderObjects
-        .whereType<RenderLiquidGlassLayer>()
-        .toSet()
-        .toList();
-    expect(layers, hasLength(2));
-    expect(
-      layers.expand((layer) => layer.link.shapes.map((shape) => shape.size)),
-      containsAllInOrder(const [Size(260, 180), Size(180, 120)]),
-      reason:
-          'Nested materials need ordered passes; siblings still share '
-          'a pass. Combining nested shapes would erase the inner material.',
-    );
+      final layers = tester.allRenderObjects
+          .whereType<RenderLiquidGlassLayer>()
+          .toSet()
+          .toList();
+      expect(layers, hasLength(2));
+      expect(
+        layers.expand((layer) => layer.link.shapes.map((shape) => shape.size)),
+        containsAllInOrder(const [Size(260, 180), Size(180, 120)]),
+        reason:
+            'Nested materials need ordered passes; siblings still share '
+            'a pass. Combining nested shapes would erase the inner material.',
+      );
 
-    await tester.pumpWidget(
-      _buildScene(
-        offset: const Offset(80, 42),
-        captureKey: captureKey,
-      ),
-    );
-    tester.binding.scheduleFrame();
-    await tester.pump();
+      await tester.pumpWidget(
+        _buildScene(
+          offset: const Offset(80, 42),
+          captureKey: captureKey,
+        ),
+      );
+      tester.binding.scheduleFrame();
+      await tester.pump();
 
-    final moved = await _capture(captureKey);
-    addTearDown(moved.dispose);
-    await expectMacOSGolden(moved, 'goldens/nested_layer_moved.png');
-  }, skip: skipProperGlassTests, tags: 'golden');
+      final moved = await _capture(captureKey);
+      addTearDown(moved.dispose);
+      await expectMacOSGolden(moved, 'goldens/nested_layer_moved.png');
+    },
+    skip: skipProperGlassTests,
+    tags: 'golden',
+  );
 
-  testWidgets('nested layer static destination matches the moved frame', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'nested layer static destination matches the moved frame',
+    (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildScene(
-        offset: const Offset(80, 42),
-        captureKey: captureKey,
-      ),
-    );
-    await _pumpUntilAllGlassReady(tester);
-    await tester.pump();
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildScene(
+          offset: const Offset(80, 42),
+          captureKey: captureKey,
+        ),
+      );
+      await _pumpUntilAllGlassReady(tester);
+      await tester.pump();
 
-    final image = await _capture(captureKey);
-    addTearDown(image.dispose);
-    await expectMacOSGolden(image, 'goldens/nested_layer_moved.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final image = await _capture(captureKey);
+      addTearDown(image.dispose);
+      await expectMacOSGolden(image, 'goldens/nested_layer_moved.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
-  testWidgets('inner layer follows a moving outer layer', (tester) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'inner layer follows a moving outer layer',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildLayerInLayerScene(
-        offset: Offset.zero,
-        captureKey: captureKey,
-      ),
-    );
-    await _pumpUntilAllGlassReady(tester);
-    await tester.pump();
-    expect(
-      tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().toSet(),
-      hasLength(2),
-    );
-    final initialInnerPaints = _nestedLayerPaintCount(tester);
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildLayerInLayerScene(
+          offset: Offset.zero,
+          captureKey: captureKey,
+        ),
+      );
+      await _pumpUntilAllGlassReady(tester);
+      await tester.pump();
+      expect(
+        tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().toSet(),
+        hasLength(2),
+      );
+      final initialInnerPaints = _nestedLayerPaintCount(tester);
 
-    await tester.pumpWidget(
-      _buildLayerInLayerScene(
-        offset: const Offset(80, 42),
-        captureKey: captureKey,
-      ),
-    );
-    tester.binding.scheduleFrame();
-    await tester.pump();
+      await tester.pumpWidget(
+        _buildLayerInLayerScene(
+          offset: const Offset(80, 42),
+          captureKey: captureKey,
+        ),
+      );
+      tester.binding.scheduleFrame();
+      await tester.pump();
 
-    expect(
-      _nestedLayerPaintCount(tester),
-      initialInnerPaints,
-      reason:
-          'A nested layer moving with its retained ancestor must only refresh '
-          'its frame-owned coordinates, not repaint its render object.',
-    );
+      expect(
+        _nestedLayerPaintCount(tester),
+        initialInnerPaints,
+        reason:
+            'A nested layer moving with its retained ancestor must only refresh '
+            'its frame-owned coordinates, not repaint its render object.',
+      );
 
-    final moved = await _capture(captureKey);
-    addTearDown(moved.dispose);
-    await expectMacOSGolden(moved, 'goldens/layer_in_layer_moved.png');
-  }, skip: skipProperGlassTests, tags: 'golden');
+      final moved = await _capture(captureKey);
+      addTearDown(moved.dispose);
+      await expectMacOSGolden(moved, 'goldens/layer_in_layer_moved.png');
+    },
+    skip: skipProperGlassTests,
+    tags: 'golden',
+  );
 
-  testWidgets('layer-in-layer static destination golden', (tester) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'layer-in-layer static destination golden',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildLayerInLayerScene(
-        offset: const Offset(80, 42),
-        captureKey: captureKey,
-      ),
-    );
-    await _pumpUntilAllGlassReady(tester);
-    await tester.pump();
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildLayerInLayerScene(
+          offset: const Offset(80, 42),
+          captureKey: captureKey,
+        ),
+      );
+      await _pumpUntilAllGlassReady(tester);
+      await tester.pump();
 
-    final image = await _capture(captureKey);
-    addTearDown(image.dispose);
-    await expectMacOSGolden(image, 'goldens/layer_in_layer_moved.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final image = await _capture(captureKey);
+      addTearDown(image.dispose);
+      await expectMacOSGolden(image, 'goldens/layer_in_layer_moved.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
-  testWidgets('nested scrolling layer follows its retained ancestor', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'nested scrolling layer follows its retained ancestor',
+    (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final controller = ScrollController();
-    addTearDown(controller.dispose);
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildScrollingScene(
-        controller: controller,
-        captureKey: captureKey,
-        fake: true,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildScrollingScene(
+          controller: controller,
+          captureKey: captureKey,
+          fake: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    controller.jumpTo(220);
-    await tester.pump();
-    tester.binding.scheduleFrame();
-    await tester.pump();
+      controller.jumpTo(220);
+      await tester.pump();
+      tester.binding.scheduleFrame();
+      await tester.pump();
 
-    final moved = await _capture(captureKey);
-    addTearDown(moved.dispose);
-    await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final moved = await _capture(captureKey);
+      addTearDown(moved.dispose);
+      await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
-  testWidgets('nested scrolling layer is correct on the first scroll frame', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'nested scrolling layer is correct on the first scroll frame',
+    (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final controller = ScrollController();
-    addTearDown(controller.dispose);
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildScrollingScene(
-        controller: controller,
-        captureKey: captureKey,
-        fake: true,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildScrollingScene(
+          controller: controller,
+          captureKey: captureKey,
+          fake: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    controller.jumpTo(220);
-    await tester.pump();
+      controller.jumpTo(220);
+      await tester.pump();
 
-    final moved = await _capture(captureKey);
-    addTearDown(moved.dispose);
-    await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final moved = await _capture(captureKey);
+      addTearDown(moved.dispose);
+      await expectMacOSGolden(moved, 'goldens/nested_scrolling_layer.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
-  testWidgets('nested scrolling layer static destination golden', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'nested scrolling layer static destination golden',
+    (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final controller = ScrollController(initialScrollOffset: 220);
-    addTearDown(controller.dispose);
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildScrollingScene(
-        controller: controller,
-        captureKey: captureKey,
-        fake: true,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      final controller = ScrollController(initialScrollOffset: 220);
+      addTearDown(controller.dispose);
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildScrollingScene(
+          controller: controller,
+          captureKey: captureKey,
+          fake: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
 
-    final image = await _capture(captureKey);
-    addTearDown(image.dispose);
-    await expectMacOSGolden(image, 'goldens/nested_scrolling_layer.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final image = await _capture(captureKey);
+      addTearDown(image.dispose);
+      await expectMacOSGolden(image, 'goldens/nested_scrolling_layer.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
   testWidgets('uniform scroll does not repaint consolidated fake layers', (
     tester,
@@ -282,28 +317,33 @@ void main() {
     }
   });
 
-  testWidgets('nested glass scroll static destination golden', (tester) async {
-    tester.view
-      ..physicalSize = const Size(500, 500)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'nested glass scroll static destination golden',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(500, 500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final controller = ScrollController(initialScrollOffset: 220);
-    addTearDown(controller.dispose);
-    final captureKey = GlobalKey();
-    await tester.pumpWidget(
-      _buildNestedGlassScrollingScene(
-        controller: controller,
-        captureKey: captureKey,
-      ),
-    );
-    await _pumpUntilAllGlassReady(tester);
-    await tester.pump();
+      final controller = ScrollController(initialScrollOffset: 220);
+      addTearDown(controller.dispose);
+      final captureKey = GlobalKey();
+      await tester.pumpWidget(
+        _buildNestedGlassScrollingScene(
+          controller: controller,
+          captureKey: captureKey,
+        ),
+      );
+      await _pumpUntilAllGlassReady(tester);
+      await tester.pump();
 
-    final image = await _capture(captureKey);
-    addTearDown(image.dispose);
-    await expectMacOSGolden(image, 'goldens/nested_glass_scrolling_real.png');
-  }, skip: skipGoldenTests, tags: 'golden');
+      final image = await _capture(captureKey);
+      addTearDown(image.dispose);
+      await expectMacOSGolden(image, 'goldens/nested_glass_scrolling_real.png');
+    },
+    skip: skipGoldenTests,
+    tags: 'golden',
+  );
 
   testWidgets(
     'nested glass is aligned on the first scroll frame without repainting',
