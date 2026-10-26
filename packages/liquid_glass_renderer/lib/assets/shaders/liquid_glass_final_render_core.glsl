@@ -71,6 +71,9 @@ uniform vec4 uColorModelParams[18];
 //                  shape. These two set the bevel.
 uniform vec4 uLowResMatte;
 uniform vec2 uLowResOptics;
+// Half of the segment backdropShrink shrinks about, in matte device px from
+// the material center; zero shrinks about the center itself. Float index 139.
+uniform vec2 uBackdropShrinkAxis;
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -777,17 +780,28 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // backdropShrink is one lens over the whole face, about the material
-        // center of the layer, uniform up to the silhouette. The bevel
+        // backdropShrink is one lens over the whole face, uniform up to the
+        // silhouette, about the nearest point of the segment
+        // +-uBackdropShrinkAxis through the material center. The bevel
         // displacement adds on top of it. It never enlarges: magnifiers
         // re-render their content instead (see the example's loupe).
-        vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
-            matteCoord - uMaterialCenter,
+        vec2 shrinkAnchor = uMaterialCenter;
+        float axisLengthSquared = dot(uBackdropShrinkAxis, uBackdropShrinkAxis);
+        if (axisLengthSquared > 0.0) {
+            shrinkAnchor += uBackdropShrinkAxis * clamp(
+                dot(matteCoord - uMaterialCenter, uBackdropShrinkAxis) /
+                    axisLengthSquared,
+                -1.0,
+                1.0
+            );
+        }
+        vec2 filterDeltaFromAnchor = filterDeltaFromMatteDelta(
+            matteCoord - shrinkAnchor,
             uFilterToMatteBasis
         );
         float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
-            filterDeltaFromCenter *
+            filterDeltaFromAnchor *
             (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
