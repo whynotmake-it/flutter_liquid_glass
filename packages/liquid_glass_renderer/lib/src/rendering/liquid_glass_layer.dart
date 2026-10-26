@@ -1272,8 +1272,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   // Resource binding is separate from recording/painting children so a
   // changed geometry frame can be prepared without invoking child paint.
+  // The coordinate mapping is written by the material paint
+  // (_syncMaterialFilter, or _paintOverSolid over a solid color) once this
+  // frame's material bounds are set; written here it would use the previous
+  // frame's.
   void _bindGeometryShader(ui.Image geometryImage) {
-    syncCoordinateMapping();
     final activeRenderShader = renderShader;
     activeRenderShader
       // Float index 133, after the shared uniforms: the matte scale and the
