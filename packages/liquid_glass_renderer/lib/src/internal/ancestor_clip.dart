@@ -54,14 +54,10 @@ Rect? paintClipOfAncestor(RenderObject ancestor, RenderObject child) {
 /// Intersection of the paint clips above [node], in [node]'s coordinates, or
 /// `null` when nothing above it clips.
 ///
-/// Walks once to the root, stopping after an ancestor for which [stopAt]
-/// returns true. The root view is skipped: its bounds are the screen, which
-/// is the texture edge. Clips under a rotation or skew are skipped too, as
-/// their bounding box would overstate what they keep.
-Rect? localPaintClipAbove(
-  RenderObject node, {
-  bool Function(RenderObject ancestor)? stopAt,
-}) {
+/// Walks once to the root. The root view is skipped: its bounds are the
+/// screen, which is the texture edge. Clips under a rotation or skew are
+/// skipped too, as their bounding box would overstate what they keep.
+Rect? localPaintClipAbove(RenderObject node) {
   Rect? result;
   var toAncestor = Matrix4.identity();
   var child = node;
@@ -81,7 +77,6 @@ Rect? localPaintClipAbove(
         result = result?.intersect(local) ?? local;
       }
     }
-    if (stopAt?.call(ancestor) ?? false) break;
   }
   return result;
 }
