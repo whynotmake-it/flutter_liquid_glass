@@ -846,6 +846,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
+  Size _materialSize = Size.zero;
   // The matte and material map fill the top-left of textures that only grow.
   Size _geometryTextureSize = Size.zero;
   Size _materialTextureSize = const Size(1, 1);
@@ -926,6 +927,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         _geometryTextureSize = result.textureSize;
         _materialTextureSize = result.materialTextureSize;
         _materialCenterInMatte = result.materialCenter;
+        _materialSize = bounds.size;
         _setShapeAppearances(result.appearances);
         _rememberEncodedGeometry(bounds);
       }
@@ -1043,6 +1045,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             _geometryTextureSize = gpuResult.textureSize;
             _materialTextureSize = gpuResult.materialTextureSize;
             _materialCenterInMatte = gpuResult.materialCenter;
+            _materialSize = geometryBounds.size;
             _setShapeAppearances(gpuResult.appearances);
             _rememberEncodedGeometry(geometryBounds);
           }
@@ -1116,6 +1119,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       })
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
+      })
+      // Float index 139, after the low-res matte: uBackdropShrinkAxis, along
+      // the glass's long side.
+      ..setFloatUniforms(initialIndex: 139, (value) {
+        final half =
+            settings.effectiveBackdropShrinkRim *
+            (_materialSize.longestSide - _materialSize.shortestSide) /
+            2 *
+            devicePixelRatio;
+        final alongX = _materialSize.width >= _materialSize.height;
+        value.setOffset(alongX ? Offset(half, 0) : Offset(0, half));
       })
       // Float index 57, after uBackdropBounds.
       ..setFloatUniforms(initialIndex: 57, (value) {
