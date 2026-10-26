@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/liquid_shape.dart';
 import 'package:meta/meta.dart';
 
@@ -29,7 +28,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
     required this.shape,
     required this.shadows,
     this.appearanceVisibility = 1,
-    this.devicePixelRatio = 1,
     super.child,
     super.key,
   });
@@ -39,9 +37,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
 
   /// Per-shape materialization progress.
   final double appearanceVisibility;
-
-  /// Pixel ratio the shadow layer's bounds are kept on stable buckets for.
-  final double devicePixelRatio;
 
   /// The list of shadows to paint.
   ///
@@ -57,7 +52,6 @@ class GlassShadow extends SingleChildRenderObjectWidget {
       shape: shape,
       shadows: shadows,
       visibility: appearanceVisibility,
-      devicePixelRatio: devicePixelRatio,
     );
   }
 
@@ -70,8 +64,7 @@ class GlassShadow extends SingleChildRenderObjectWidget {
     renderObject
       ..shape = shape
       ..shadows = shadows
-      ..visibility = appearanceVisibility
-      ..devicePixelRatio = devicePixelRatio;
+      ..visibility = appearanceVisibility;
   }
 }
 
@@ -80,7 +73,6 @@ class _RenderGlassShadow extends RenderProxyBox {
     required this._shape,
     required this._shadows,
     required double visibility,
-    required this._devicePixelRatio,
   }) : _visibility = visibility.clamp(0, 1);
 
   LiquidShape get shape => _shape;
@@ -96,14 +88,6 @@ class _RenderGlassShadow extends RenderProxyBox {
   set shadows(List<BoxShadow> value) {
     if (_shadows == value) return;
     _shadows = value;
-    markNeedsPaint();
-  }
-
-  double get devicePixelRatio => _devicePixelRatio;
-  double _devicePixelRatio;
-  set devicePixelRatio(double value) {
-    if (_devicePixelRatio == value) return;
-    _devicePixelRatio = value;
     markNeedsPaint();
   }
 
@@ -163,12 +147,7 @@ class _RenderGlassShadow extends RenderProxyBox {
                 ),
           );
         }
-        // Bounds only, so growing them to pixel buckets changes no pixel, but
-        // an animated shape no longer gets a new render target size per frame.
-        canvas.saveLayer(
-          layerBounds.expandToPixelBuckets(devicePixelRatio),
-          Paint(),
-        );
+        canvas.saveLayer(layerBounds, Paint());
       }
 
       for (final shadow in shadows) {

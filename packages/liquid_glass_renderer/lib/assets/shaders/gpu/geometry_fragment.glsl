@@ -54,8 +54,7 @@ layout(std140) uniform GeometryUniforms {
 out vec4 fragColor;
 
 // Texels no shape can reach hold this inward distance: far outside, and still
-// a finite fp16. The renderer clears the texture to the same value so it can
-// shade only the occupied part. Keep in sync with kLowResFarInward there.
+// a finite fp16. Keep in sync with kLowResFarInward in the renderer.
 const float kFarInward = -4096.0;
 // Inward distances saturate here, well inside fp16 range, so a hidden shape's
 // 1e9 distance cannot become an infinity that poisons interpolation.

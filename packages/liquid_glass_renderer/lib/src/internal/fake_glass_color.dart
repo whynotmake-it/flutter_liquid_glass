@@ -156,28 +156,6 @@ typedef FakeGlassFilterParts = ({
   double sigma,
 });
 
-double _fakeGlassSizeProgress(double? shapeShortSide) {
-  final sizeT = shapeShortSide == null
-      ? 0.0
-      : ((118 - shapeShortSide.clamp(63.0, 118.0)) / 55).clamp(0.0, 1.0);
-  return sizeT * sizeT;
-}
-
-/// The only ways a shape's short side changes the filter
-/// [fakeGlassBackdropFilterParts] builds: its blur sigma and its size
-/// progress. Equal inputs build an equal filter, so a filter can be kept
-/// while a shape animates through sizes that do not change either (most of
-/// the range, since both saturate).
-@internal
-({double frost, double sizeProgress}) fakeGlassFilterInputs(
-  LiquidGlassSettings settings, {
-  double deviceScale = 1,
-  double? shapeShortSide,
-}) => (
-  frost: settings.frostSigmaAt(deviceScale, shapeShortSide: shapeShortSide),
-  sizeProgress: _fakeGlassSizeProgress(shapeShortSide),
-);
-
 /// Like [fakeGlassBackdropFilter], also returning the filter without its blur
 /// (just the color transfer) and the blur's logical sigma.
 @internal
@@ -201,7 +179,10 @@ FakeGlassFilterParts? fakeGlassBackdropFilterParts(
           tileMode: TileMode.mirror,
         )
       : null;
-  final sizeProgress = _fakeGlassSizeProgress(shapeShortSide);
+  final sizeT = shapeShortSide == null
+      ? 0.0
+      : ((118 - shapeShortSide.clamp(63.0, 118.0)) / 55).clamp(0.0, 1.0);
+  final sizeProgress = sizeT * sizeT;
   final faceTransfer = colorModel.faceTransfer(
     tintAmount: settings.effectiveTintAmount,
     sizeProgress: sizeProgress,

@@ -8,8 +8,7 @@ import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_paramete
 
 import 'gpu_test_helpers.dart';
 
-// Exactness of the geometry pass, which draws only the part of the field the
-// shapes can reach and clears the rest.
+// Exactness of the geometry pass.
 //
 // Renders a spread of sheets, pills, ovals and blend groups at the matte scale
 // of a dpr 3 layer (4) and checks the geometry field: invariants that hold for

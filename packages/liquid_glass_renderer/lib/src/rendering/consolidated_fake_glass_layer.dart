@@ -117,7 +117,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   final Map<LiquidGlassShapeRenderObject, _SeparateBackdropLayers>
   _separateBackdropLayers = {};
   FakeGlassFilterParts? _cachedFilter;
-  ({double frost, double sizeProgress})? _cachedFilterInputs;
+  double? _cachedFilterShortSide;
 
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
@@ -211,41 +211,33 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   }
 
   FakeGlassFilterParts _sharedBackdropFilter() {
-    // Keyed on what the short side turns into (blur sigma, size progress), not
-    // on the short side: an animated scale changes it every frame, but the
-    // filter only when those do, and a new filter object is a new backdrop
-    // saveLayer paint.
-    final inputs = fakeGlassFilterInputs(
-      settings,
-      deviceScale: devicePixelRatio,
-      shapeShortSide: _sharedShapeShortSide,
-    );
+    final shortSide = _sharedShapeShortSide;
     final cached = _cachedFilter;
-    if (cached != null && _cachedFilterInputs == inputs) return cached;
+    if (cached != null && _cachedFilterShortSide == shortSide) return cached;
     final filter = _buildBackdropFilter();
     _cachedFilter = filter;
-    _cachedFilterInputs = inputs;
+    _cachedFilterShortSide = shortSide;
     return filter;
   }
 
   @override
   void onDevicePixelRatioChanged() {
     _cachedFilter = null;
-    _cachedFilterInputs = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onSettingsChanged(LiquidGlassSettings old) {
     _cachedFilter = null;
-    _cachedFilterInputs = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onAppearanceChanged() {
     _cachedFilter = null;
-    _cachedFilterInputs = null;
+    _cachedFilterShortSide = null;
     markNeedsCompositingBitsUpdate();
   }
 

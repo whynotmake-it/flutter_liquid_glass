@@ -183,7 +183,6 @@ class FakeGlass extends StatelessWidget {
       shape: shape,
       shadows: shadows,
       appearanceVisibility: appearance.visibility,
-      devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 1,
       child: clipped,
     );
   }

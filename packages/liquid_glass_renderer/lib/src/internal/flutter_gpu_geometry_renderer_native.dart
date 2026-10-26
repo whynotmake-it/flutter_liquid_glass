@@ -7,11 +7,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
-import 'package:vector_math/vector_math.dart' as vm;
 
 /// The inward distance of lattice texels no shape can reach in the geometry
-/// field. Must match `kFarInward` in `geometry_fragment.glsl`: the texture
-/// clears to it.
+/// field. Must match `kFarInward` in `geometry_fragment.glsl`.
 @internal
 const double kLowResFarInward = -4096;
 
@@ -237,7 +235,6 @@ class FlutterGpuGeometryRenderer {
   gpu.Texture? _texture;
   ui.Image? _image;
   gpu.RenderTarget? _renderTarget;
-  gpu.RenderTarget? _clearingRenderTarget;
   gpu.Texture? _materialTexture;
   ui.Image? _materialImage;
   gpu.RenderTarget? _materialRenderTarget;
@@ -254,11 +251,9 @@ class FlutterGpuGeometryRenderer {
   /// the matte size, as in the final shader.
   ui.Image? get materialImage => _materialImage;
 
-  // The geometry field is RGBA16F and clears to "far outside" (see
-  // [kLowResFarInward]); the material maps are RGBA8.
+  // The geometry field is RGBA16F; the material maps are RGBA8.
   final _TextureRing _mattes = _TextureRing(
     format: gpu.PixelFormat.r16g16b16a16Float,
-    clearValue: vm.Vector4(kLowResFarInward, 0, 0, 0),
   );
   final _TextureRing _materials = _TextureRing();
 
@@ -327,7 +322,6 @@ class FlutterGpuGeometryRenderer {
         _image?.dispose();
         _image = null;
         _renderTarget = null;
-        _clearingRenderTarget = null;
         _texture = null;
         assert(() {
           _debugActiveGeometryTextureCount--;
@@ -347,7 +341,6 @@ class FlutterGpuGeometryRenderer {
       );
       _texture = matte.texture;
       _renderTarget = matte.renderTarget;
-      _clearingRenderTarget = matte.clearingRenderTarget;
       _image = _texture!.asImage();
       assert(() {
         _debugActiveGeometryTextureCount++;
@@ -433,41 +426,15 @@ class FlutterGpuGeometryRenderer {
         return true;
       }(), 'Track matte draws in debug builds.');
       final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
-      // Only pixels within reach of a shape can be non-empty. When that is a
-      // small part of the matte, clear the texture and shade just that part
-      // (the clear equals the shader's own empty output).
       final passWidth = matteWidth ~/ scale + 1;
       final passHeight = matteHeight ~/ scale + 1;
-      final drawRect = _occupiedRect(
-        shapeData: shapeData,
-        boundsData: boundsData,
-        numShapes: numShapes,
-        offsetX: offsetX,
-        offsetY: offsetY,
-        contourExtent: contourExtent,
-        width: matteWidth,
-        height: matteHeight,
-        scale: scale,
-      );
       final geometryPass =
-          geometryCommandBuffer.createRenderPass(
-              drawRect == null ? _renderTarget! : _clearingRenderTarget!,
-            )
+          geometryCommandBuffer.createRenderPass(_renderTarget!)
             ..bindPipeline(_pipeline)
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
             ..bindVertexBuffer(_vertexBufferView);
       _restrictTo(geometryPass, _texture!, passWidth, passHeight);
-      if (drawRect != null) {
-        geometryPass.setScissor(
-          gpu.Scissor(
-            x: drawRect.left,
-            y: drawRect.top,
-            width: drawRect.width,
-            height: drawRect.height,
-          ),
-        );
-      }
       geometryPass.draw(4);
       _submitOrDefer(geometryCommandBuffer);
     }
@@ -504,73 +471,6 @@ class FlutterGpuGeometryRenderer {
       textureWidth: _texture!.width,
       textureHeight: _texture!.height,
     );
-  }
-
-  /// Lattice texels (of a field covering [width] x [height] matte pixels at
-  /// [scale]) that can hold anything but the empty value, or null to draw
-  /// everything.
-  ///
-  /// This is the geometry shader's own empty-texel test as a rectangle: a
-  /// texel farther from every shape's box than the contour extent, the
-  /// interpolation footprint and the largest smooth-union growth is written as
-  /// far outside. Without shape boxes nothing is proven, and a rectangle
-  /// covering most of the field is not worth a clear.
-  static _PixelRect? _occupiedRect({
-    required List<double> shapeData,
-    required List<double> boundsData,
-    required int numShapes,
-    required double offsetX,
-    required double offsetY,
-    required double contourExtent,
-    required int width,
-    required int height,
-    required int scale,
-  }) {
-    final count = math.min(numShapes, 16);
-    if (count <= 0 ||
-        boundsData.length < count * 4 ||
-        shapeData.length < count * 12) {
-      return null;
-    }
-    var smoothing = 0.0;
-    var left = double.infinity;
-    var top = double.infinity;
-    var right = -double.infinity;
-    var bottom = -double.infinity;
-    for (var i = 0; i < count; i++) {
-      final marker = shapeData[i * 12 + 11];
-      if (marker >= 0) smoothing += marker * 0.25;
-      left = math.min(left, boundsData[i * 4]);
-      top = math.min(top, boundsData[i * 4 + 1]);
-      right = math.max(right, boundsData[i * 4 + 2]);
-      bottom = math.max(bottom, boundsData[i * 4 + 3]);
-    }
-    if (!(left.isFinite && top.isFinite && right.isFinite && bottom.isFinite)) {
-      return null;
-    }
-    // One extra pixel absorbs the float rounding of the shader's comparison.
-    // The pass keeps two lattice cells of margin so that interpolation never
-    // reaches a cleared texel from a visible pixel.
-    final reach = contourExtent + 2 * scale + 2 + smoothing + 1;
-    final x0 = (left - reach - offsetX).floor().clamp(0, width);
-    final y0 = (top - reach - offsetY).floor().clamp(0, height);
-    final x1 = (right + reach - offsetX).ceil().clamp(0, width);
-    final y1 = (bottom + reach - offsetY).ceil().clamp(0, height);
-    // Lattice texels on the matte-pixel corners x0..x1 (inclusive), and one
-    // more on each side.
-    final tx0 = (x0 ~/ scale - 1).clamp(0, width ~/ scale);
-    final ty0 = (y0 ~/ scale - 1).clamp(0, height ~/ scale);
-    final tx1 = ((x1 + scale - 1) ~/ scale + 2).clamp(0, width ~/ scale + 1);
-    final ty1 = ((y1 + scale - 1) ~/ scale + 2).clamp(0, height ~/ scale + 1);
-    if (tx1 <= tx0 || ty1 <= ty0) return const _PixelRect(0, 0, 1, 1);
-    // A clear is a second full-texture write on some GPUs, but the field's
-    // texture is small, so restrict for a modest saving.
-    final textureWidth = width ~/ scale + 1;
-    final textureHeight = height ~/ scale + 1;
-    if ((tx1 - tx0) * (ty1 - ty0) > 0.9 * textureWidth * textureHeight) {
-      return null;
-    }
-    return _PixelRect(tx0, ty0, tx1 - tx0, ty1 - ty0);
   }
 
   /// Limits [pass] to the top-left [width] x [height] of [texture].
@@ -854,7 +754,6 @@ class FlutterGpuGeometryRenderer {
     _mattes.release();
     _materials.release();
     _renderTarget = null;
-    _clearingRenderTarget = null;
     _image?.dispose();
     _image = null;
     _materialRenderTarget = null;
@@ -888,37 +787,18 @@ class FlutterGpuGeometryRenderer {
   }
 }
 
-/// An integer pixel rectangle.
-final class _PixelRect {
-  const _PixelRect(this.left, this.top, this.width, this.height);
-  final int left;
-  final int top;
-  final int width;
-  final int height;
-}
-
 /// A texture and its render target.
 final class _RingTexture {
-  _RingTexture(this.texture, {vm.Vector4? clearValue})
-    : _clearValue = clearValue,
-      renderTarget = gpu.RenderTarget.singleColor(
+  _RingTexture(this.texture)
+    : renderTarget = gpu.RenderTarget.singleColor(
         gpu.ColorAttachment(
           texture: texture,
           loadAction: gpu.LoadAction.dontCare,
         ),
       );
 
-  final vm.Vector4? _clearValue;
-
   final gpu.Texture texture;
   final gpu.RenderTarget renderTarget;
-
-  /// Clears the whole texture to transparent black before drawing, for passes
-  /// that draw only part of it. Created on first use.
-  late final gpu.RenderTarget clearingRenderTarget =
-      gpu.RenderTarget.singleColor(
-        gpu.ColorAttachment(texture: texture, clearValue: _clearValue),
-      );
 
   /// Frame count when this texture was last replaced or released.
   int retiredFrame = 0;
@@ -932,16 +812,10 @@ final class _RingTexture {
 /// Capacity grows in 1.5x steps, capped at the view unless a render needs more.
 /// A second spare avoids allocations when a frame renders twice.
 final class _TextureRing {
-  _TextureRing({
-    this.format = gpu.PixelFormat.r8g8b8a8UNormInt,
-    this.clearValue,
-  });
+  _TextureRing({this.format = gpu.PixelFormat.r8g8b8a8UNormInt});
 
   /// Pixel format of the textures; the appearance maps are RGBA8.
   final gpu.PixelFormat format;
-
-  /// What a clearing render target clears to; transparent black when null.
-  final vm.Vector4? clearValue;
 
   static const int _maxSpares = 2;
 
@@ -1039,7 +913,6 @@ final class _TextureRing {
         height,
         format: format,
       ),
-      clearValue: clearValue,
     );
   }
 }
