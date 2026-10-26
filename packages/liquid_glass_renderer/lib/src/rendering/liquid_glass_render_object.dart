@@ -14,6 +14,7 @@ import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
+import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
@@ -826,7 +827,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     if (!useNativeOuterBlur) {
-      canvas.saveLayer(effectPaintBounds, Paint());
+      // The layer only bounds what it holds, and the shadows are painted inside
+      // effectPaintBounds, so growing it to pixel buckets changes no pixel;
+      // an animated shape would otherwise give every frame a render target of
+      // a new size, which Impeller cannot reuse.
+      canvas.saveLayer(
+        effectPaintBounds.expandToPixelBuckets(devicePixelRatio),
+        Paint(),
+      );
     }
 
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
