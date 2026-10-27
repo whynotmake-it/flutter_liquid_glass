@@ -730,8 +730,12 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   ) {
     final parameters = model.parameters;
     if (parameters == null) return 0;
+    // The slots hold the appearances' own parameter objects, so a model
+    // finds its slot by identity before a field-by-field comparison.
+    var index = slots.indexWhere((slot) => identical(slot, parameters));
+    if (index < 0) index = slots.indexOf(parameters);
     // Models beyond the third fold onto the first slot.
-    return (slots.indexOf(parameters).clamp(0, 2) + 1).toDouble();
+    return (index.clamp(0, 2) + 1).toDouble();
   }
 
   void _writeCommonShaderUniforms(
