@@ -14,17 +14,9 @@ final String _shadersRoot = !kIsWeb && isLocalTest
 abstract class ShaderKeys {
   const ShaderKeys._();
 
-  static final liquidGlassRender =
-      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render.iplr';
-
-  static final liquidGlassMaterialRender =
-      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_material.iplr';
-
-  static final liquidGlassTintRender =
-      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_tint.iplr';
-
-  static final liquidGlassAnalyticRender =
-      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_analytic.iplr';
+  /// The compiled final shader [name], a FinalShaderVariant's.
+  static String finalRender(String name) =>
+      '${_shadersRoot}build/shaderbundles/$name.iplr';
 
   static final fakeGlassSurface =
       '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';

@@ -41,9 +41,6 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         await tester.runAsync(
           () => MultiShaderBuilder.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
         final opacity = AnimationController(vsync: tester, value: 1);

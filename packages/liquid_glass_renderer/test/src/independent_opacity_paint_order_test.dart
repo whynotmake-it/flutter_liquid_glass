@@ -39,9 +39,6 @@ void runIndependentOpacityPaintOrderTests(SubmittedSceneCapture binding) {
           await tester.runAsync(
             () => MultiShaderBuilder.precacheShaders([
               ShaderKeys.fakeGlassSurface,
-              ShaderKeys.liquidGlassRender,
-              ShaderKeys.liquidGlassMaterialRender,
-              ShaderKeys.liquidGlassTintRender,
             ]),
           );
           final Widget layer = LiquidGlassLayer(

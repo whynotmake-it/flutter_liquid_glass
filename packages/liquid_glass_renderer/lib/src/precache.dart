@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:liquid_glass_renderer/src/internal/final_shader_variant.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
@@ -25,12 +26,7 @@ Future<void> precacheLiquidGlass() {
   final shaders = Future.wait<void>([
     MultiShaderBuilder.precacheShaders([ShaderKeys.fakeGlassSurface]),
     if (!kIsWeb && ui.ImageFilter.isShaderFilterSupported)
-      MultiShaderBuilder.precacheShaders([
-        ShaderKeys.liquidGlassRender,
-        ShaderKeys.liquidGlassMaterialRender,
-        ShaderKeys.liquidGlassTintRender,
-        ShaderKeys.liquidGlassAnalyticRender,
-      ]),
+      MultiShaderBuilder.precacheShaders(FinalShaderVariant.assetKeys),
   ]);
   return Future.wait<void>([
     shaders,

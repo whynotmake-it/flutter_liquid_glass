@@ -9,6 +9,16 @@
 // the coordinate subtraction into visible shimmer on large layers.
 precision highp float;
 
+// The color models a variant shades: every model, the direct model alone,
+// or one iOS 27 model in slot 0 alone. A variant that shades one family fits
+// in fewer registers (FinalShaderVariant).
+#define COLOR_MODELS_ALL 0
+#define COLOR_MODELS_DIRECT 1
+#define COLOR_MODELS_IOS27 2
+#ifndef COLOR_MODELS
+#define COLOR_MODELS COLOR_MODELS_ALL
+#endif
+
 #include <flutter/runtime_effect.glsl>
 #include "render.glsl"
 #include "glass_glow.glsl"
@@ -928,7 +938,14 @@ void main() {
     
     vec3 transmittedColor = vec3(0.0);
     vec3 baseColor = vec3(0.0);
+    #if COLOR_MODELS == COLOR_MODELS_IOS27
+    float directShare = 0.0;
+    #elif COLOR_MODELS == COLOR_MODELS_DIRECT
+    float directShare = 1.0;
+    #else
     float directShare = colorModelShares.x;
+    #endif
+    #if COLOR_MODELS != COLOR_MODELS_IOS27
     if (directShare > 0.0) {
         transmittedColor = pow(
             max(refractColor.rgb, vec3(0.0)),
@@ -948,6 +965,8 @@ void main() {
             );
         }
     }
+    #endif
+    #if COLOR_MODELS != COLOR_MODELS_DIRECT
     if (directShare < 1.0) {
         // Apple's public tint is not a flat source-over wash. Its documented
         // "range of tones" is selected from backdrop brightness, while tint
@@ -971,8 +990,13 @@ void main() {
             0.0,
             directShare * kGlintVibrancy
         );
+        #if COLOR_MODELS == COLOR_MODELS_IOS27
+        for (int slot = 0; slot < 1; slot++) {
+            float share = 1.0;
+        #else
         for (int slot = 0; slot < 3; slot++) {
             float share = colorModelShares[slot + 1];
+        #endif
             if (share <= 0.0) {
                 continue;
             }
@@ -1046,6 +1070,7 @@ void main() {
             directShare
         );
     }
+    #endif
 
     // Reconstruct the original material silhouette from the signed SDF. The
     // geometry alpha is only an expanded support mask, allowing the attached
