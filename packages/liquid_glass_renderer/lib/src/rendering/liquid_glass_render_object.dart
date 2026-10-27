@@ -201,6 +201,10 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   GeometryRenderLink get link => _link;
   set link(GeometryRenderLink value) {
     if (_link == value) return;
+    if (attached) {
+      _link.onMembershipChanged = null;
+      value.onMembershipChanged = markNeedsPaint;
+    }
     _link = value;
     markNeedsPaint();
   }
@@ -214,6 +218,21 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   ];
 
   List<RenderLiquidGlassGeometry> _lastPaintedShapes = const [];
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    // A glass or blend group that joins or leaves under a repaint boundary of
+    // its own repaints only that boundary. Real glass would otherwise learn of
+    // it in its compositing poll and draw it a frame late.
+    _link.onMembershipChanged = markNeedsPaint;
+  }
+
+  @override
+  void detach() {
+    _link.onMembershipChanged = null;
+    super.detach();
+  }
 
   LiquidGlassSettings _settings;
   LiquidGlassSettings get settings => _settings;
@@ -1072,12 +1091,16 @@ class GeometryRenderLink {
     }
   }
 
+  /// Called when a glass or a blend group registers with or leaves the layer.
+  VoidCallback? onMembershipChanged;
+
   void registerGeometry(
     RenderLiquidGlassGeometry renderObject,
   ) {
     if (_shapeGeometries.contains(renderObject)) return;
     _dirty = true;
     _shapeGeometries.add(renderObject);
+    onMembershipChanged?.call();
   }
 
   void markDirty() {
@@ -1087,6 +1110,7 @@ class GeometryRenderLink {
   void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
     if (_shapeGeometries.remove(renderObject)) {
       _dirty = true;
+      onMembershipChanged?.call();
     }
   }
 
