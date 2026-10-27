@@ -1,3 +1,63 @@
+## 1.0.0-dev.2
+
+ - **PERF**(liquid_glass_renderer): keep the FakeGlass filter while its blur holds (#250).
+
+    Key the consolidated layer's shared filter cache on the blur sigma the
+    layer's short side produces, not on the short side itself, so an animated
+    size that leaves the sigma alone keeps the filter object and its backdrop
+    saveLayer.
+
+ - **PERF**(liquid_glass_renderer): crop backdrop blurs with a seeded pass (#248).
+
+    Impeller crops a backdrop blur to where it is needed only when the blur is
+    the outermost filter, so a glass's compose(blur, shader) blurred the whole
+    backdrop. Paint each glass's filter inside a small pass seeded by a plain blur
+    (or an identity where Impeller would not crop the blur), and run only what
+    follows the blur over that pass.
+    
+    Seeded passes are on wherever Impeller renders, except under flutter test
+    (flutter_tester renders them wrongly) and inside a LiquidGlassCapture, whose
+    own pass already holds the backdrop. Every seed reads the backdrop for itself
+    unless the glass was given a backdrop key. Pass sizes are bucketed so
+    Impeller can reuse their render targets; the bucket sizes live in
+    PixelBuckets.
+
+ - **PERF**(liquid_glass_renderer): draw only the low-res matte near the shapes (#249).
+
+    When the texels near a shape are at most 90% of the low-res matte, clear
+    the texture to "far outside" and limit the geometry draw to those texels
+    with a scissor. The clear writes the same value the shader writes for a
+    texel far from every shape, so the matte doesn't change.
+
+ - **PERF**(liquid_glass_renderer): render the geometry matte at low resolution (#252).
+
+    The geometry pass now draws a low-res matte: one RGBA16F texel for every
+    4 x 4 block of matte pixels (2 x 2 below a device pixel ratio of 2). Each
+    texel holds the distance to the edge, the direction the surface faces
+    (shortened where refraction should be weaker) and half of the shape's
+    shorter side. The final shader reads it with linear filtering, which blends
+    the four nearest texels, and computes the antialiased edge, the refraction
+    and the rim lighting for each pixel. The geometry pass does about 16x less
+    work per change (4x at a scale of 2). The old full-resolution matte and
+    displacement_encoding.glsl are gone.
+    
+    The final shader also skips the surface direction, the rim lighting and
+    vibrancy wherever they would add nothing.
+    
+    Goldens of real glass are regenerated on macOS 27.0.1 (26A434).
+
+ - **PERF**(liquid_glass_renderer): keep shadow layer bounds on pixel buckets (#251).
+
+    Expand the shadow save layers' bounds to pixel buckets, so an animated
+    shape keeps one render target size instead of allocating a new one every
+    frame. The bounds only limit the layer, so no pixel changes.
+
+ - **FIX**(liquid_glass_renderer): keep a glass's look independent of the other shapes in its layer (#253).
+ - **FIX**(liquid_glass_renderer): decode exterior edge distance without a ternary on Mali Vulkan (#246).
+
+    On Mali GPUs under Vulkan (Pixel 8 / Tensor G3, Pixel 9 Pro / Tensor G4), the ternary in decodeSignedEdgeDistance returns 0 for an empty matte texel (B = 0) instead of -exteriorRange. Every pixel of the filter bounds outside the shape then passes the early return with materialAlpha 0.5 and renders as half-covered material: tint, contour and bevel shadow fill the whole bounding rectangle. Metal and Impeller OpenGL ES render correctly. Selecting the range with step()/mix() decodes correctly on all three.
+
+
 ## 1.0.0-dev.1
 
 A rendering release with no public API changes.
