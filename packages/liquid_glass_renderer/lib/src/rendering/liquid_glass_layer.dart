@@ -813,13 +813,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // unfrosted glass stays alpha-1 and cross-fades its material in the
     // shader, so both match the backdrop exactly at visibility 0.
     shader.setFloat(52, blurPassSigma > 0 ? 1 : 0);
-    // Float index 144: uSolidBackdrop's alpha; 0 reads the backdrop. A
-    // paint over a solid sets it only while it records.
-    shader.setFloat(144, 0);
+    // uSolidBackdrop's alpha; 0 reads the backdrop. A paint over a solid
+    // sets it only while it records.
+    shader.setFloat(_FinalUniforms.solidBackdrop + 3, 0);
     _writeGlow(shader);
-    // Float index 160: uBackdropOverlay's alpha; 0 lays no color over the
-    // backdrop. A paint over a cached copy sets it only while it records.
-    shader.setFloat(160, 0);
+    // uBackdropOverlay's alpha; 0 lays no color over the backdrop. A paint
+    // over a cached copy sets it only while it records.
+    shader.setFloat(_FinalUniforms.overlay + 3, 0);
     // Float index 61, after the geometry/material texture sizes: the three
     // adaptive color-model slots (six vec4 each), zero-filled when fewer
     // than three distinct models are in use.
@@ -932,11 +932,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (!_refreshRetainedFilter()) markNeedsPaint();
   }
 
-  // Float index 145: uGlowSpot, uGlowBox and uGlowShape.
   void _writeGlow(FragmentShader shader) {
     final glow = LiquidGlassGlow.uniformsOf(_glow, devicePixelRatio);
     for (var i = 0; i < glow.length; i++) {
-      shader.setFloat(145 + i, glow[i]);
+      shader.setFloat(_FinalUniforms.glow + i, glow[i]);
     }
   }
 
@@ -1351,9 +1350,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
       })
-      // Float index 139, after the low-res matte: uBackdropShrinkAxis, along
-      // the glass's long side.
-      ..setFloatUniforms(initialIndex: 139, (value) {
+      // uBackdropShrinkAxis, along the glass's long side.
+      ..setFloatUniforms(initialIndex: _FinalUniforms.shrinkAxis, (value) {
         final half =
             settings.effectiveBackdropShrinkRim *
             (_materialSize.longestSide - _materialSize.shortestSide) /
@@ -1842,10 +1840,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       ..setFloat(49, dpr)
       ..setFloat(50, -offset.dx * dpr)
       ..setFloat(51, -offset.dy * dpr)
-      ..setFloat(141, color.r)
-      ..setFloat(142, color.g)
-      ..setFloat(143, color.b)
-      ..setFloat(144, 1);
+      ..setFloat(_FinalUniforms.solidBackdrop, color.r)
+      ..setFloat(_FinalUniforms.solidBackdrop + 1, color.g)
+      ..setFloat(_FinalUniforms.solidBackdrop + 2, color.b)
+      ..setFloat(_FinalUniforms.solidBackdrop + 3, 1);
     context.canvas.drawRect(
       filterBounds.shift(offset),
       Paint()
@@ -1853,7 +1851,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         // The filter path clips its output to this rect with a hard edge.
         ..isAntiAlias = false,
     );
-    shader.setFloat(144, 0);
+    shader.setFloat(_FinalUniforms.solidBackdrop + 3, 0);
   }
 
   /// Drops native backdrop-filter state while this sample is idle.
@@ -1957,11 +1955,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     final shader = renderShader
       ..setFloat(0, image.width.toDouble())
       ..setFloat(1, image.height.toDouble())
-      // Float index 157: uBackdropOverlay.
-      ..setFloat(157, overlay.r)
-      ..setFloat(158, overlay.g)
-      ..setFloat(159, overlay.b)
-      ..setFloat(160, overlay.a)
+      ..setFloat(_FinalUniforms.overlay, overlay.r)
+      ..setFloat(_FinalUniforms.overlay + 1, overlay.g)
+      ..setFloat(_FinalUniforms.overlay + 2, overlay.b)
+      ..setFloat(_FinalUniforms.overlay + 3, overlay.a)
       ..setImageSampler(0, image, filterQuality: FilterQuality.low);
     final device = Rect.fromLTRB(
       logical.left * dpr,
@@ -1985,7 +1982,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // The shader snapshotted its uniforms and samplers with the rect. It
     // lets go of the copy, which the cache replaces or disposes, by binding
     // the matte again.
-    shader.setFloat(160, 0);
+    shader.setFloat(_FinalUniforms.overlay + 3, 0);
     if (_geometryImage case final matte?) {
       shader.setImageSampler(0, matte, filterQuality: FilterQuality.low);
     }
@@ -2412,4 +2409,20 @@ typedef _GpuGeometryFrame = ({
             appearance.colorModel == first.colorModel,
       );
   return (mixed, tintOnly, tintOnly || !mixed ? first : null);
+}
+
+/// Float indices of what the final shader declares after uLowResOptics: the
+/// optional effects' uEffects (liquid_glass_final_render_core.glsl).
+abstract final class _FinalUniforms {
+  /// uSolidBackdrop, four floats.
+  static const int solidBackdrop = 139;
+
+  /// uGlowSpot, uGlowBox and uGlowShape, twelve floats.
+  static const int glow = 143;
+
+  /// uBackdropShrinkAxis, two floats.
+  static const int shrinkAxis = 155;
+
+  /// uBackdropOverlay, four floats.
+  static const int overlay = 159;
 }

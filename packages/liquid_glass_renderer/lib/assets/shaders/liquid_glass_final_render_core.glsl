@@ -65,29 +65,35 @@ uniform vec2 uMaterialTextureSize;
 //   +5: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
 uniform vec4 uColorModelParams[18];
 
-// Declared last (float index 133).
+// Float index 133.
 //   uLowResMatte:  how many matte pixels one low-res matte texel covers in
 //                  each direction, then the texture's size in texels.
 //   uLowResOptics: refraction height in px, and whether refraction fits the
 //                  shape. These two set the bevel.
 uniform vec4 uLowResMatte;
 uniform vec2 uLowResOptics;
-// Half of the segment backdropShrink shrinks about, in matte device px from
-// the material center; zero shrinks about the center itself. Float index 139.
-uniform vec2 uBackdropShrinkAxis;
-// The opaque color the glass is shaded over when it is drawn as a paint
-// instead of a backdrop filter: every backdrop read returns it. Alpha 0 reads
-// the backdrop. Float index 141.
-uniform vec4 uSolidBackdrop;
-// The touch glow of one lit shape (glass_glow.glsl), float index 145: the
-// spot, the lit shape's box and its corner radius and wash. All zero draws
-// no glow.
-uniform vec4 uGlowSpot;
-uniform vec4 uGlowBox;
-uniform vec4 uGlowShape;
-// A color laid over the read backdrop at its alpha: the dimming between a
-// cached copy of the page and the glass. Float index 157.
-uniform vec4 uBackdropOverlay;
+// The inputs of the optional effects, in one declaration: impellerc gives
+// every uniform declaration its own Metal buffer slot, Metal has 31, and a
+// shader past them fails to compile on Metal alone (Vulkan and GLES accept
+// it). The analytic variant declares its shapes after these. From float
+// index 139:
+// [0] uSolidBackdrop: the opaque color the glass is shaded over when it is
+//     drawn as a paint instead of a backdrop filter; every backdrop read
+//     returns it. Alpha 0 reads the backdrop.
+// [1..3] the touch glow of one lit shape (glass_glow.glsl): the spot, the
+//     lit shape's box, its corner radius and wash. All zero draws no glow.
+// [4] xy uBackdropShrinkAxis: half of the segment backdropShrink shrinks
+//     about, in matte device px from the material center; zero shrinks
+//     about the center itself. zw unused.
+// [5] uBackdropOverlay: a color laid over the read backdrop at its alpha,
+//     the dimming between a cached copy of the page and the glass.
+uniform vec4 uEffects[6];
+#define uSolidBackdrop uEffects[0]
+#define uGlowSpot uEffects[1]
+#define uGlowBox uEffects[2]
+#define uGlowShape uEffects[3]
+#define uBackdropShrinkAxis uEffects[4].xy
+#define uBackdropOverlay uEffects[5]
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
