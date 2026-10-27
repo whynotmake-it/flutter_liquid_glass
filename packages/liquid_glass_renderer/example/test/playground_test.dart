@@ -110,6 +110,12 @@ void main() {
         contains('  dispersion: -0.06,\n'),
       ),
     );
+    expect(
+      settingsSource(
+        const LiquidGlassSettings(lightDirection: Offset(0.6, 0.8)),
+      ),
+      'const LiquidGlassSettings(\n  lightDirection: Offset(0.6, 0.8),\n)',
+    );
   });
 
   test('the dispersion track is fine near zero and reaches ±2', () {

@@ -145,7 +145,7 @@ void paintFakeGlassSurface(
         GlassRim.bevelShadowDirectionality,
         0, // bevel shadow size response
       ])
-      ..setOffset(const Offset(0, 1))
+      ..setOffset(settings.effectiveLightDirection)
       ..setFloat(1 / math.max(devicePixelRatio, 0.01))
       ..setFloat(exteriorOnly ? 1 : 0)
       ..setFloat(appearance.colorModel.fakeGlintLuminance)
