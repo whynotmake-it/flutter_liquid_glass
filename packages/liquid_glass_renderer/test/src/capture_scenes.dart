@@ -31,12 +31,14 @@ const captureScenes = <CaptureScene>[
     shadow: true,
     fade: CaptureFade.opacity,
     fakeReferenceOnHost: false,
+    realReferenceOnHost: false,
   ),
   CaptureScene(
     'fade_transition',
     shadow: true,
     fade: CaptureFade.transition,
     fakeReferenceOnHost: false,
+    realReferenceOnHost: false,
   ),
   CaptureScene('blend_group', blend: true, shadow: true),
   CaptureScene('dpr2', shadow: true, indicator: true, dpr: 2),
@@ -100,6 +102,7 @@ Future<void> expectCaptureKeepsTheLook(
   // renders fine afterwards.
   final captured = await render(capture: true);
   if (fake && !scene.fakeReferenceOnHost && !compareReference) return;
+  if (!fake && !scene.realReferenceOnHost && !compareReference) return;
   final reference = await render(capture: false);
   expectSameLook(
     captured,
@@ -167,6 +170,7 @@ class CaptureScene {
     this.fade = CaptureFade.none,
     this.dpr = 1,
     this.fakeReferenceOnHost = true,
+    this.realReferenceOnHost = true,
   });
 
   final String name;
@@ -182,6 +186,13 @@ class CaptureScene {
   /// inside a subpass, which flutter_tester paints black as the second one
   /// in a process; the macOS integration test compares those on a real GPU.
   final bool fakeReferenceOnHost;
+
+  /// Whether flutter_tester can render the uncaptured real reference after
+  /// the captured scene. Under `Opacity` the real shadows are
+  /// stencil-clipped to outside their silhouettes inside a subpass, which
+  /// flutter_tester paints black as the second one in a process; the macOS
+  /// integration test compares those on a real GPU.
+  final bool realReferenceOnHost;
 }
 
 Iterable<LiquidGlassLayerRenderObject> glassLayersBelow(RenderObject node) {
