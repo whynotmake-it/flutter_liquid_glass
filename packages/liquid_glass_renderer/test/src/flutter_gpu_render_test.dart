@@ -36,6 +36,7 @@ void main() {
         refractionHeight: 4,
         offsetX: 0,
         offsetY: 0,
+        matteScale: testMatteScale,
       );
 
       expect(
@@ -86,6 +87,7 @@ void main() {
         refractionHeight: 10,
         offsetX: 0,
         offsetY: 0,
+        matteScale: testMatteScale,
       );
 
       final first = render(33);
@@ -130,16 +132,16 @@ void main() {
         refractionHeight: 10,
         offsetX: 0,
         offsetY: 0,
+        matteScale: testMatteScale,
       );
-      final bytes = await result.image.toByteData();
-      expect(bytes, isNotNull);
+      final field = await readGeometryField(result.image);
 
-      int signedDistanceAt(int x, int y) =>
-          bytes!.getUint8((y * result.width + x) * 4 + 2);
+      double signedDistanceAt(int x, int y) =>
+          fieldInwardAt(field, result.textureWidth, x, y);
 
       expect(
         signedDistanceAt(10, 16),
-        0,
+        lessThan(0),
         reason: 'top row must stay narrow',
       );
       expect(
@@ -183,13 +185,13 @@ void main() {
           refractionHeight: 4,
           offsetX: i.isEven ? 0 : 1,
           offsetY: 0,
+          matteScale: testMatteScale,
         );
         finalImage = result.image;
       }
 
-      final bytes = await finalImage!.toByteData();
-      expect(bytes, isNotNull);
-      expect(bytes!.lengthInBytes, greaterThan(0));
+      final field = await readGeometryField(finalImage!);
+      expect(field.lengthInBytes, greaterThan(0));
     },
     skip: expectFallback,
   );
