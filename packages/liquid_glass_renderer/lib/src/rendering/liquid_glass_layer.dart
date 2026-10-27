@@ -97,6 +97,7 @@ class LiquidGlassLayer extends StatefulWidget {
     this.field,
     this.backdrop = const LiquidGlassBackdrop.read(),
     this.glow,
+    this.analyticGeometry = false,
     super.key,
   }) : live = null;
 
@@ -117,6 +118,7 @@ class LiquidGlassLayer extends StatefulWidget {
     this.useBackdropGroup = false,
     this.backdropKey,
     this.backdrop = const LiquidGlassBackdrop.read(),
+    this.analyticGeometry = false,
     super.key,
   }) : live = frame,
        settings = const LiquidGlassSettings(),
@@ -193,6 +195,26 @@ class LiquidGlassLayer extends StatefulWidget {
   /// changes only the final pass's uniforms: no geometry pass runs, and a
   /// layer whose retained filter reads the backdrop does not repaint.
   final LiquidGlassGlow? glow;
+
+  /// Whether the final pass works out this layer's shapes itself while they
+  /// change, instead of drawing them into the matte first.
+  ///
+  /// A frame shaded this way records and submits no geometry pass, which
+  /// cuts UI-thread time while a shape moves or resizes. The GPU pays
+  /// instead: the final shader works out the shapes at every pixel rather
+  /// than once per matte texel. For one small shape that costs next to
+  /// nothing; for several blended shapes or large glass it costs much more
+  /// GPU time and energy than the matte. Turn it on for small glass that
+  /// moves often on a busy UI thread, such as a slider thumb or a segmented
+  /// control's lens; leave it off for sheets and blend groups. Once the
+  /// shapes stop, the layer draws the matte and shades from it again.
+  ///
+  /// A layer with shapes that differ in appearance, a field (its own or a
+  /// live frame's), more than eight shapes or mostly empty space keeps the
+  /// matte either way.
+  ///
+  /// Defaults to false.
+  final bool analyticGeometry;
 
   /// The frames of a layer made with [LiquidGlassLayer.live], or null for
   /// one that uses [settings], [field] and [glow].
@@ -409,6 +431,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
               ShaderKeys.liquidGlassRender,
               ShaderKeys.liquidGlassMaterialRender,
               ShaderKeys.liquidGlassTintRender,
+              ShaderKeys.liquidGlassAnalyticRender,
             ],
             (context, shaders, child) {
               return _RawShapes(
@@ -416,11 +439,13 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 defaultRenderShader: shaders[0],
                 materialRenderShader: shaders[1],
                 tintRenderShader: shaders[2],
+                analyticRenderShader: shaders[3],
                 backdropKey: backdropKey,
                 backdropCache: backdropCacheOf(widget.backdrop),
                 field: _field,
                 solidBackdrop: solidColorOf(widget.backdrop),
                 glow: _glow,
+                analyticGeometry: widget.analyticGeometry,
                 settings: _settings,
                 defaultAppearance: defaultAppearance,
                 link: _link,
@@ -484,11 +509,13 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.defaultRenderShader,
     required this.materialRenderShader,
     required this.tintRenderShader,
+    required this.analyticRenderShader,
     required this.backdropKey,
     required this.backdropCache,
     required this.field,
     required this.solidBackdrop,
     required this.glow,
+    required this.analyticGeometry,
     required this.settings,
     required this.defaultAppearance,
     required Widget super.child,
@@ -501,12 +528,14 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
+  final FragmentShader analyticRenderShader;
   final BackdropKey? backdropKey;
   final LiquidGlassBackdropCache? backdropCache;
   final LiquidGlassField? field;
 
   final Color? solidBackdrop;
   final LiquidGlassGlow? glow;
+  final bool analyticGeometry;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance defaultAppearance;
   final GeometryRenderLink link;
@@ -523,6 +552,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
         defaultRenderShader: defaultRenderShader,
         materialRenderShader: materialRenderShader,
         tintRenderShader: tintRenderShader,
+        analyticRenderShader: analyticRenderShader,
         backdropKey: backdropKey,
         settings: settings,
         defaultAppearance: defaultAppearance,
@@ -533,7 +563,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..backdropCache = backdropCache
       ..field = field
       ..solidBackdrop = solidBackdrop
-      ..glow = glow;
+      ..glow = glow
+      ..analyticGeometry = analyticGeometry;
   }
 
   @override
@@ -552,7 +583,8 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..backdropCache = backdropCache
       ..field = field
       ..solidBackdrop = solidBackdrop
-      ..glow = glow;
+      ..glow = glow
+      ..analyticGeometry = analyticGeometry;
   }
 }
 
@@ -588,6 +620,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     required this.defaultRenderShader,
     required this.materialRenderShader,
     required this.tintRenderShader,
+    required this.analyticRenderShader,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
@@ -602,6 +635,67 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   final FragmentShader defaultRenderShader;
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
+  final FragmentShader analyticRenderShader;
+
+  /// Whether a frame whose geometry changes may shade the shapes
+  /// analytically (see [LiquidGlassLayer.analyticGeometry]): the final
+  /// shader evaluates them where each fragment is, so the frame encodes no
+  /// matte and submits no Flutter GPU pass. [debugAnalyticIneligibility]
+  /// names why a frame encoded a matte anyway. [analyticRestFrames] frames
+  /// after the geometry last changed, the layer encodes one matte and rests
+  /// on it, which is cheaper to shade.
+  bool analyticGeometry = false;
+
+  /// The most shapes an analytic frame evaluates (ANALYTIC_MAX_SHAPES).
+  static const int analyticMaxShapes = 8;
+
+  /// How many frames after its latest analytic frame the layer encodes a
+  /// matte to rest on.
+  static const int analyticRestFrames = 2;
+
+  /// The most shape tests an analytic frame spends where no shape is: the
+  /// matte's device pixels outside the shapes' boxes, times the shapes.
+  /// Each such pixel tests every shape's box before it finds itself empty,
+  /// so a sparse layer (a page of buttons in one layer) costs the GPU more
+  /// than encoding its low-res matte, a quarter or a sixteenth of the pixels.
+  /// Glass that fills its rect, however large, stays analytic, and so do
+  /// rows that fill most of theirs. The bound sits between the two on a
+  /// Mali-G78 phone: a column of eight round buttons over a page is sparse,
+  /// eight full-width rows and a sheet are not.
+  @visibleForTesting
+  static int analyticMaxEmptyTests = 6000000;
+
+  bool _analytic = false;
+
+  /// Whether the latest geometry frame is shaded analytically.
+  @visibleForTesting
+  bool get debugAnalytic => _analytic;
+
+  /// Why the latest geometry frame encoded a matte, or null when it was
+  /// analytic.
+  @visibleForTesting
+  String? get debugAnalyticIneligibility => _analyticIneligibility;
+  String? _analyticIneligibility;
+
+  // Whether the layer asked for a matte frame to rest on, and which analytic
+  // frame's quiet frames are being counted.
+  bool _restRequested = false;
+  int _analyticGeneration = 0;
+
+  // Sampler 0 takes its filtering from the image bound to it; an analytic
+  // frame has no matte to bind, so it binds this.
+  static final ui.Image _placeholder = () {
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder);
+    return recorder.endRecording().toImageSync(1, 1);
+  }();
+
+  List<FragmentShader> get _finalShaders => [
+    defaultRenderShader,
+    materialRenderShader,
+    tintRenderShader,
+    analyticRenderShader,
+  ];
 
   /// How many matte pixels one low-res matte texel covers in each direction:
   /// 2 or 4 (see `liquidGlassMatteScale`). The final shaders work for both,
@@ -629,12 +723,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   FragmentShader get renderShader => switch ((
+    _analytic,
     _usesShapeAppearances,
     _usesTintOnlyAppearance,
   )) {
-    (false, _) => defaultRenderShader,
-    (true, true) => tintRenderShader,
-    (true, false) => materialRenderShader,
+    (true, _, _) => analyticRenderShader,
+    (false, false, _) => defaultRenderShader,
+    (false, true, true) => tintRenderShader,
+    (false, true, false) => materialRenderShader,
   };
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
@@ -685,24 +781,14 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _shaderInputsChanged = true;
     final appearance = _uniformAppearance ?? defaultAppearance;
     final colorModels = _colorModelSlots(_shapeAppearances);
-    _writeCommonShaderUniforms(
-      defaultRenderShader,
-      appearance,
-      _materialCenterInMatte,
-      colorModels,
-    );
-    _writeCommonShaderUniforms(
-      materialRenderShader,
-      appearance,
-      _materialCenterInMatte,
-      colorModels,
-    );
-    _writeCommonShaderUniforms(
-      tintRenderShader,
-      appearance,
-      _materialCenterInMatte,
-      colorModels,
-    );
+    for (final shader in _finalShaders) {
+      _writeCommonShaderUniforms(
+        shader,
+        appearance,
+        _materialCenterInMatte,
+        colorModels,
+      );
+    }
   }
 
   /// The layer's adaptive color models in shader slot order.
@@ -926,8 +1012,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (_glow == value) return;
     _glow = value;
     // Only the glow's uniforms change. A retained pass takes them in a new
-    // filter, without painting the layer and its shapes.
-    _writeGlow(renderShader);
+    // filter, without painting the layer and its shapes. Every final shader
+    // takes them: the layer switches between them without rewriting them.
+    _finalShaders.forEach(_writeGlow);
     _shaderInputsChanged = true;
     if (!_refreshRetainedFilter()) markNeedsPaint();
   }
@@ -1121,6 +1208,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (hasDrawableGlass(shapesWithGeometry)) {
       final reuseMatte =
           !needsGeometryUpdate &&
+          !_analytic &&
           _geometryImage != null &&
           _reuseUniformlyTranslatedGeometry(bounds);
       if (!reuseMatte || _needsMaterialUpdate) {
@@ -1254,6 +1342,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
           final canReuseTranslatedGeometry =
               !needsGeometryUpdate &&
+              !_analytic &&
               _geometryImage != null &&
               _reuseUniformlyTranslatedGeometry(geometryBounds);
           needsGeometryUpdate = false;
@@ -1382,10 +1471,16 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         0,
         geometryImage,
         filterQuality: FilterQuality.low,
-      )
+      );
+    if (!_analytic) {
       // Linear filtering: the shader relies on each read blending the four
       // nearest texels of the low-res matte.
-      ..setImageSampler(1, geometryImage, filterQuality: FilterQuality.low);
+      activeRenderShader.setImageSampler(
+        1,
+        geometryImage,
+        filterQuality: FilterQuality.low,
+      );
+    }
     if (_materialImage case final materialImage? when _usesShapeAppearances) {
       if (_usesTintOnlyAppearance) {
         activeRenderShader.setImageSampler(
@@ -2065,6 +2160,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   // A pair's bottom half, 12 floats per shape, zeros for every other shape.
   final List<double> _rseLowerData = [];
   final List<double> _boundsData = [];
+  // Each shape's smallest stretch over its largest, for analytic frames.
+  final List<double> _cullData = [];
   static final Matrix4 _identity = Matrix4.identity();
 
   @override
@@ -2148,6 +2245,76 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     return (axisX: axisX, axisY: axisY, determinant: determinant);
   }
 
+  /// Writes an analytic frame's shapes into the analytic final shader, in
+  /// the layout of analytic_geometry.glsl from uAnalyticHeader.
+  void _writeAnalyticUniforms({
+    required int numShapes,
+    required double contourExtent,
+    required bool blended,
+  }) {
+    const header = _FinalUniforms.analytic;
+    const shapeData = header + 4;
+    const rseData = shapeData + analyticMaxShapes * 12;
+    const rseLower = rseData + analyticMaxShapes * 12;
+    const bounds = rseLower + analyticMaxShapes * 12;
+    const cull = bounds + analyticMaxShapes * 4;
+    // One setFloatUniforms call for all of them: each array is padded with
+    // zeros to its declared length, so the next starts where the shader
+    // declares it.
+    analyticRenderShader.setFloatUniforms(initialIndex: header, (value) {
+      void fill(List<double> values, int length) {
+        value
+          ..setFloats(values)
+          ..setFloats(List<double>.filled(length - values.length, 0));
+      }
+
+      fill([
+        numShapes.toDouble(),
+        max(0.5, contourExtent),
+        if (blended) 1 else 0,
+      ], shapeData - header);
+      fill(_shapeData, rseData - shapeData);
+      fill(_rseData, rseLower - rseData);
+      fill(_rseLowerData, bounds - rseLower);
+      fill(_boundsData, cull - bounds);
+      fill(_cullData, analyticMaxShapes);
+    });
+    _shaderInputsChanged = true;
+  }
+
+  /// [area] less the shapes' box areas, times [numShapes]; overlapping boxes
+  /// count twice, which errs toward analytic.
+  int _emptyTests(int area, int numShapes) {
+    var covered = 0.0;
+    for (var i = 0; i + 3 < _boundsData.length; i += 4) {
+      covered +=
+          (_boundsData[i + 2] - _boundsData[i]) *
+          (_boundsData[i + 3] - _boundsData[i + 1]);
+    }
+    return max(0, area - covered.round()) * numShapes;
+  }
+
+  /// Asks for one matte frame [analyticRestFrames] frames after the latest
+  /// analytic frame, unless another one comes first.
+  void _scheduleAnalyticRest() {
+    final generation = ++_analyticGeneration;
+    var frames = 0;
+    void check(Duration _) {
+      if (!attached || !_analytic || generation != _analyticGeneration) return;
+      if (++frames < analyticRestFrames) {
+        SchedulerBinding.instance
+          ..addPostFrameCallback(check)
+          ..scheduleFrame();
+        return;
+      }
+      _restRequested = true;
+      needsGeometryUpdate = true;
+      markNeedsPaint();
+    }
+
+    SchedulerBinding.instance.addPostFrameCallback(check);
+  }
+
   _GpuGeometryFrame _buildGpuGeometryImage(
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
     Rect bounds, {
@@ -2199,6 +2366,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _rseData.clear();
       _rseLowerData.clear();
       _boundsData.clear();
+      _cullData.clear();
+      var blended = false;
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
 
@@ -2236,6 +2405,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           final distanceScale = sqrt(
             max(0.0, (trace - sqrt(discriminant)) * 0.5),
           );
+          // trace + sqrt(discriminant) > 0: the basis is invertible.
+          _cullData.add(
+            distanceScale / sqrt((trace + sqrt(discriminant)) * 0.5),
+          );
+          if (!firstInGroup) blended = true;
 
           final centerInGeometry = MatrixUtils.transformPoint(
             shapeToGeometry,
@@ -2327,6 +2501,46 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       }
       final (usesShapeAppearances, usesTintOnlyAppearance, _) =
           _classifyShapeAppearances(appearances, defaultAppearance);
+
+      final rest = _restRequested;
+      _restRequested = false;
+      _analyticIneligibility = switch (()) {
+        _ when !analyticGeometry => 'off',
+        _ when !writeMatte => 'material update',
+        _ when rest => 'rest',
+        _ when _field != null => 'field',
+        _ when usesShapeAppearances => 'shape appearances',
+        _ when numShapes > analyticMaxShapes => 'more than $analyticMaxShapes',
+        _
+            when _emptyTests(textureWidth * textureHeight, numShapes) >
+                analyticMaxEmptyTests =>
+          'sparse',
+        _ => null,
+      };
+      _analytic = _analyticIneligibility == null;
+      if (_analytic) {
+        _writeAnalyticUniforms(
+          numShapes: numShapes,
+          contourExtent: aaPadding * devicePixelRatio,
+          blended: blended,
+        );
+        _scheduleAnalyticRest();
+        _needsMaterialUpdate = false;
+        return (
+          image: _placeholder,
+          materialImage: null,
+          materialCenter: materialCenter,
+          textureSize: const Size(1, 1),
+          materialTextureSize: const Size(1, 1),
+          appearances: appearances,
+          matteBounds: Rect.fromLTWH(
+            boundsInMatteSpace.left,
+            boundsInMatteSpace.top,
+            textureWidth / devicePixelRatio,
+            textureHeight / devicePixelRatio,
+          ),
+        );
+      }
 
       final result = renderer.render(
         writeMatte: writeMatte,
@@ -2425,4 +2639,7 @@ abstract final class _FinalUniforms {
 
   /// uBackdropOverlay, four floats.
   static const int overlay = 159;
+
+  /// The analytic variant's first uniform, uAnalyticHeader, after uEffects.
+  static const int analytic = 163;
 }

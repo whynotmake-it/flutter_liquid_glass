@@ -95,6 +95,13 @@ uniform vec4 uEffects[6];
 #define uBackdropShrinkAxis uEffects[4].xy
 #define uBackdropOverlay uEffects[5]
 
+#ifndef ANALYTIC_GEOMETRY
+#define ANALYTIC_GEOMETRY 0
+#endif
+#if ANALYTIC_GEOMETRY
+#include "analytic_geometry.glsl"
+#endif
+
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
 }
@@ -157,7 +164,9 @@ float gGlintVibrancy = kGlintVibrancy;
 const float kContourCoverageFeather = 1.0;
 
 uniform sampler2D uBackgroundTexture;
+#if !ANALYTIC_GEOMETRY
 uniform sampler2D uGeometryTexture;
+#endif
 #if SHAPE_APPEARANCE || SHAPE_TINT
 uniform sampler2D uMaterialTexture;
 #endif
@@ -553,12 +562,15 @@ const float kMinBlendedNormalLength = 0.5;
 vec3 lowResNormalFiltered(vec4 lowResTexel, vec2 texelCoord) {
     vec2 sum = lowResTexel.yz;
     float sumLength = length(sum);
+    // An analytic texel is the fragment's own, never a blend.
+    #if !ANALYTIC_GEOMETRY
     if (sumLength < kMinBlendedNormalLength) {
         vec2 nearestUV =
             (floor(texelCoord + 0.5) + 0.5) / uLowResMatte.yz;
         sum = texture(uGeometryTexture, nearestUV).yz;
         sumLength = length(sum);
     }
+    #endif
     return vec3(
         sumLength > 0.0001 ? sum / sumLength : vec2(0.0),
         sumLength
@@ -625,6 +637,13 @@ void main() {
     // (kPixelCenter in geometry_fragment.glsl).
     vec2 lowResTexelCoord =
         (matteCoord - uGeometryOffset - 0.5) / uLowResMatte.x;
+    #if ANALYTIC_GEOMETRY
+    // Deeper than the bevel and the rim, only coverage reads the distance.
+    vec4 lowResTexel = analyticTexel(
+        matteCoord,
+        max(uLowResOptics.x, rimReach()) + 1.0
+    );
+    #else
     // One read, which blends the four nearest texels. Reads past the edge of
     // the texture repeat its last texel, and the texture has one extra texel
     // past the last matte pixel.
@@ -632,6 +651,7 @@ void main() {
         uGeometryTexture,
         (lowResTexelCoord + 0.5) / uLowResMatte.yz
     );
+    #endif
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
     // Weight of the material over the refracted backdrop. Frosted glass

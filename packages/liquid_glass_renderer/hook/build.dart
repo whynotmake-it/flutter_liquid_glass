@@ -17,6 +17,7 @@ const _runtimeEffectShaders = [
   'liquid_glass_final_render',
   'liquid_glass_final_render_material',
   'liquid_glass_final_render_tint',
+  'liquid_glass_final_render_analytic',
 ];
 
 void main(List<String> args) async {
