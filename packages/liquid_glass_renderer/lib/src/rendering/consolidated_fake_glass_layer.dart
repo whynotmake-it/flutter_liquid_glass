@@ -182,18 +182,20 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     if (!_hasBlur) return 0;
     final sigma = settings.frostSigmaAt(
       devicePixelRatio,
-      shapeShortSide: _sharedShapeShortSide,
+      shapeShortSide: _layerShapeShortSide,
     );
     return sigma * 3 + 1;
   }
 
-  /// Short side of the smallest shape the shared filter covers. The blur is
-  /// layer-wide, like RealGlass's.
-  double get _sharedShapeShortSide {
+  /// Short side of the smallest visible shape, fading ones included. The
+  /// blur is layer-wide, like RealGlass's: the shared filter and every
+  /// separate one use it, so a shape that starts to fade (and leaves the
+  /// shared filter for one of its own) keeps the blur it had.
+  double get _layerShapeShortSide {
     double? shortest;
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
       for (final shape in geometry.shapes) {
-        if (_backdropClass(shape.appearance) != 2) continue;
+        if (_backdropClass(shape.appearance) == 0) continue;
         // shapeBounds is already in the geometry's local space.
         final side = MatrixUtils.transformRect(
           geometryToLayer,
@@ -207,7 +209,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   }
 
   ImageFilter _sharedBackdropFilter() {
-    final shortSide = _sharedShapeShortSide;
+    final shortSide = _layerShapeShortSide;
     final cached = _cachedFilter;
     if (cached != null && _cachedFilterShortSide == shortSide) return cached;
     final filter = _buildBackdropFilter();
@@ -435,6 +437,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
   ) {
     final active = <LiquidGlassShapeRenderObject>{};
+    final shortSide = _layerShapeShortSide;
     for (final (_, geometry, geometryToLayer) in geometries) {
       for (final shape in geometry.shapes) {
         if (_backdropClass(shape.appearance) != 1) continue;
@@ -445,10 +448,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           settings,
           shape.appearance,
           deviceScale: devicePixelRatio,
-          shapeShortSide: MatrixUtils.transformRect(
-            geometryToLayer,
-            shape.shapeBounds,
-          ).shortestSide,
+          shapeShortSide: shortSide,
         );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
@@ -527,7 +527,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
       settings,
       defaultAppearance.copyWith(visibility: 1),
       deviceScale: devicePixelRatio,
-      shapeShortSide: _sharedShapeShortSide,
+      shapeShortSide: _layerShapeShortSide,
     )!;
   }
 

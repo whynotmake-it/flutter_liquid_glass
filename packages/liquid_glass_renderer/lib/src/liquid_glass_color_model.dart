@@ -104,9 +104,6 @@ class GlassColorParameters with Equatable {
     required this.transmittance,
     required this.luminanceLift,
     required this.chromaGain,
-    this.transmittanceAtSmallSize,
-    this.luminanceLiftAtSmallSize,
-    this.chromaGainAtSmallSize,
     this.toneLow = const GlassToneRamp.constant(0),
     this.toneHigh = const GlassToneRamp.constant(1),
     this.toneGammaLuminance = 0,
@@ -121,9 +118,10 @@ class GlassColorParameters with Equatable {
   /// `preset` base (`'ios27Light'`, `'ios27Dark'` or `'ios27Clear'`) so a
   /// fit candidate only has to carry the keys it changes.
   ///
-  /// The pre-1.0 size-dependent transmittance keys (`transmittanceSmall`,
-  /// `transmittanceLarge` and `transmittanceSize`) are silently ignored;
-  /// `transmittanceSmall` still seeds `transmittance` so old fit files load.
+  /// The former size-dependent keys (`transmittanceSmall`,
+  /// `transmittanceLarge`, `transmittanceSize` and the `*AtSmallSize` curves)
+  /// are silently ignored; `transmittanceSmall` still seeds `transmittance` so
+  /// old fit files load.
   factory GlassColorParameters.fromJson(Map<String, Object?> json) {
     final initial = switch (json['preset']) {
       'ios27Dark' => ios27Dark,
@@ -168,11 +166,8 @@ class GlassColorParameters with Equatable {
     return base.copyWith(
       emissionAlpha: curve('emissionAlpha'),
       transmittance: curve('transmittance') ?? curve('transmittanceSmall'),
-      transmittanceAtSmallSize: curve('transmittanceAtSmallSize'),
       luminanceLift: curve('luminanceLift'),
-      luminanceLiftAtSmallSize: curve('luminanceLiftAtSmallSize'),
       chromaGain: curve('chromaGain'),
-      chromaGainAtSmallSize: curve('chromaGainAtSmallSize'),
       toneLow: ramp('toneLow'),
       toneHigh: ramp('toneHigh'),
       toneGammaLuminance: number('toneGammaLuminance'),
@@ -193,24 +188,11 @@ class GlassColorParameters with Equatable {
   /// Transmittance of transmitted content over the slider.
   final GlassColorCurve transmittance;
 
-  /// Transmittance on small glass, where Apple's dark material is more
-  /// transmissive. Blended with [transmittance] by the layer's short side:
-  /// fully small below ~63 pt, fully [transmittance] above ~118 pt.
-  ///
-  /// `null` keeps [transmittance] at every size.
-  final GlassColorCurve? transmittanceAtSmallSize;
-
   /// S-curve lift applied to transmitted luminance.
   final GlassColorCurve luminanceLift;
 
-  /// [luminanceLift] on small glass. `null` keeps [luminanceLift].
-  final GlassColorCurve? luminanceLiftAtSmallSize;
-
   /// Gain applied to the transmitted chroma.
   final GlassColorCurve chromaGain;
-
-  /// [chromaGain] on small glass. `null` keeps [chromaGain].
-  final GlassColorCurve? chromaGainAtSmallSize;
 
   /// Luminance ramp of the tint tone's lower bound.
   final GlassToneRamp toneLow;
@@ -263,19 +245,22 @@ class GlassColorParameters with Equatable {
   /// `32/255` emission, a density that rises with the slider, and a border
   /// that strengthens with the opacity the slider adds.
   ///
-  /// Apple's dark material is more transmissive on small controls: 0.600 at
-  /// 63 pt and 0.4525 on large shapes at slider 0, tracked by
-  /// [transmittanceAtSmallSize]. The shader blends the two by the layer's
-  /// short side.
+  /// Apple's dark material changes with the control's size: on small controls
+  /// it is more transmissive and lifts less. These curves are the mean of the
+  /// fits at 63 pt (transmittance 0.600/0.298, no lift, chroma 1) and on large
+  /// shapes (0.4525/0.2086, lift 1.166/1.294, chroma 1.01/0.571), the same for
+  /// every size. This is deliberate; keep it when refitting. A layer has one
+  /// color per model for all its shapes (and FakeGlass one color matrix), so a
+  /// size response made a shape's look depend on the other shapes in its layer
+  /// and jump when a FakeGlass shape faded. Only reintroduce one if each shape
+  /// can resolve its own look in real glass and FakeGlass
+  /// (`appearance_size_independence_test.dart` guards this).
   static const ios27Dark = GlassColorParameters(
     emissionColor: Color.fromRGBO(32, 32, 32, 1),
     emissionAlpha: GlassColorCurve.constant(1),
-    transmittance: GlassColorCurve(0.4525, 0.2086),
-    transmittanceAtSmallSize: GlassColorCurve(0.600, 0.298),
-    luminanceLift: GlassColorCurve(1.166, 1.294),
-    luminanceLiftAtSmallSize: GlassColorCurve.constant(0),
-    chromaGain: GlassColorCurve(1.01, 0.571),
-    chromaGainAtSmallSize: GlassColorCurve.constant(1),
+    transmittance: GlassColorCurve(0.52625, 0.2533),
+    luminanceLift: GlassColorCurve(0.583, 0.647),
+    chromaGain: GlassColorCurve(1.005, 0.7855),
     toneLow: GlassToneRamp(
       base: 0,
       amplitude: .08611765,
@@ -316,14 +301,8 @@ class GlassColorParameters with Equatable {
     'emissionColor': [emissionColor.r, emissionColor.g, emissionColor.b],
     'emissionAlpha': _curveToJson(emissionAlpha),
     'transmittance': _curveToJson(transmittance),
-    if (transmittanceAtSmallSize case final curve?)
-      'transmittanceAtSmallSize': _curveToJson(curve),
     'luminanceLift': _curveToJson(luminanceLift),
-    if (luminanceLiftAtSmallSize case final curve?)
-      'luminanceLiftAtSmallSize': _curveToJson(curve),
     'chromaGain': _curveToJson(chromaGain),
-    if (chromaGainAtSmallSize case final curve?)
-      'chromaGainAtSmallSize': _curveToJson(curve),
     'toneLow': _rampToJson(toneLow),
     'toneHigh': _rampToJson(toneHigh),
     'toneGammaLuminance': toneGammaLuminance,
@@ -349,11 +328,8 @@ class GlassColorParameters with Equatable {
     Color? emissionColor,
     GlassColorCurve? emissionAlpha,
     GlassColorCurve? transmittance,
-    GlassColorCurve? transmittanceAtSmallSize,
     GlassColorCurve? luminanceLift,
-    GlassColorCurve? luminanceLiftAtSmallSize,
     GlassColorCurve? chromaGain,
-    GlassColorCurve? chromaGainAtSmallSize,
     GlassToneRamp? toneLow,
     GlassToneRamp? toneHigh,
     double? toneGammaLuminance,
@@ -366,13 +342,8 @@ class GlassColorParameters with Equatable {
     emissionColor: emissionColor ?? this.emissionColor,
     emissionAlpha: emissionAlpha ?? this.emissionAlpha,
     transmittance: transmittance ?? this.transmittance,
-    transmittanceAtSmallSize:
-        transmittanceAtSmallSize ?? this.transmittanceAtSmallSize,
     luminanceLift: luminanceLift ?? this.luminanceLift,
-    luminanceLiftAtSmallSize:
-        luminanceLiftAtSmallSize ?? this.luminanceLiftAtSmallSize,
     chromaGain: chromaGain ?? this.chromaGain,
-    chromaGainAtSmallSize: chromaGainAtSmallSize ?? this.chromaGainAtSmallSize,
     toneLow: toneLow ?? this.toneLow,
     toneHigh: toneHigh ?? this.toneHigh,
     toneGammaLuminance: toneGammaLuminance ?? this.toneGammaLuminance,
@@ -394,7 +365,7 @@ class GlassColorParameters with Equatable {
   /// premultiplied. Mirrors `parametricNeutralTint` and
   /// `parametricFaceTransfer` in the final render shader.
   ({Color emission, double transmittance, double lift, double chromaGain})
-  faceTransfer({double tintAmount = 0, double sizeProgress = 0}) {
+  faceTransfer({double tintAmount = 0}) {
     final alpha = emissionAlpha.evaluate(tintAmount);
     return (
       emission: Color.from(
@@ -403,36 +374,10 @@ class GlassColorParameters with Equatable {
         green: emissionColor.g * alpha,
         blue: emissionColor.b * alpha,
       ),
-      transmittance: _blend(
-        transmittance,
-        transmittanceAtSmallSize,
-        tintAmount,
-        sizeProgress,
-      ),
-      lift: _blend(
-        luminanceLift,
-        luminanceLiftAtSmallSize,
-        tintAmount,
-        sizeProgress,
-      ),
-      chromaGain: _blend(
-        chromaGain,
-        chromaGainAtSmallSize,
-        tintAmount,
-        sizeProgress,
-      ),
+      transmittance: transmittance.evaluate(tintAmount),
+      lift: luminanceLift.evaluate(tintAmount),
+      chromaGain: chromaGain.evaluate(tintAmount),
     );
-  }
-
-  static double _blend(
-    GlassColorCurve regular,
-    GlassColorCurve? small,
-    double tintAmount,
-    double sizeProgress,
-  ) {
-    final base = regular.evaluate(tintAmount);
-    if (small == null || sizeProgress <= 0) return base;
-    return base + (small.evaluate(tintAmount) - base) * sizeProgress;
   }
 
   /// Factor applied to the border strength at slider [tintAmount].
@@ -458,40 +403,21 @@ class GlassColorParameters with Equatable {
   /// Floats of one slot of `uColorModelParams` in the final render shader.
   /// Six vec4 slots per model; keep the packing mirrored with
   /// liquid_glass_final_render_core.glsl.
-  ///
-  /// [sizeProgress] (0 regular, 1 small) pre-blends the size-dependent
-  /// curves. The shader sees only the layer's final curve, so no size uniform
-  /// or extra slot is needed.
   @internal
-  List<double> toShaderParameters({double sizeProgress = 0}) {
-    final transmittanceCurve = _blendedCurve(
-      transmittance,
-      transmittanceAtSmallSize,
-      sizeProgress,
-    );
-    final liftCurve = _blendedCurve(
-      luminanceLift,
-      luminanceLiftAtSmallSize,
-      sizeProgress,
-    );
-    final chromaCurve = _blendedCurve(
-      chromaGain,
-      chromaGainAtSmallSize,
-      sizeProgress,
-    );
+  List<double> toShaderParameters() {
     return [
       emissionColor.r,
       emissionColor.g,
       emissionColor.b,
       emissionAlpha.clear,
       emissionAlpha.tinted,
-      transmittanceCurve.clear,
-      transmittanceCurve.tinted,
+      transmittance.clear,
+      transmittance.tinted,
       contourResponse,
-      liftCurve.clear,
-      liftCurve.tinted,
-      chromaCurve.clear,
-      chromaCurve.tinted,
+      luminanceLift.clear,
+      luminanceLift.tinted,
+      chromaGain.clear,
+      chromaGain.tinted,
       toneLow.base,
       toneLow.amplitude,
       toneLow.pivot,
@@ -507,19 +433,6 @@ class GlassColorParameters with Equatable {
     ];
   }
 
-  static GlassColorCurve _blendedCurve(
-    GlassColorCurve regular,
-    GlassColorCurve? small,
-    double sizeProgress,
-  ) {
-    if (small == null || sizeProgress <= 0) return regular;
-    if (sizeProgress >= 1) return small;
-    return GlassColorCurve(
-      regular.clear + (small.clear - regular.clear) * sizeProgress,
-      regular.tinted + (small.tinted - regular.tinted) * sizeProgress,
-    );
-  }
-
   /// Floats per model slot in `uColorModelParams` (six vec4).
   static const int shaderParameterFloatCount = 24;
 
@@ -528,11 +441,8 @@ class GlassColorParameters with Equatable {
     emissionColor,
     emissionAlpha,
     transmittance,
-    transmittanceAtSmallSize,
     luminanceLift,
-    luminanceLiftAtSmallSize,
     chromaGain,
-    chromaGainAtSmallSize,
     toneLow,
     toneHigh,
     toneGammaLuminance,
@@ -661,11 +571,8 @@ final class LiquidGlassColorModel with Equatable {
   /// See [GlassColorParameters.faceTransfer].
   @internal
   ({Color emission, double transmittance, double lift, double chromaGain})?
-  faceTransfer({double tintAmount = 0, double sizeProgress = 0}) =>
-      parameters?.faceTransfer(
-        tintAmount: tintAmount,
-        sizeProgress: sizeProgress,
-      );
+  faceTransfer({double tintAmount = 0}) =>
+      parameters?.faceTransfer(tintAmount: tintAmount);
 
   /// Factor applied to the border strength at the Liquid Glass slider
   /// position [tintAmount]. Mirrors the shader's contour response.

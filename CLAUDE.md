@@ -99,6 +99,7 @@ The liquid glass effect works by capturing and distorting background pixels thro
 - **FakeGlass** (`lib/src/fake_glass.dart`): Lightweight alternative using backdrop filters instead of shaders
 - **GlassGlow** (`lib/src/glass_glow.dart`): Touch-responsive glow effects
 - **LiquidStretch** (`lib/src/stretch.dart`): Squash and stretch animations
+- **Color models** (`lib/src/liquid_glass_color_model.dart`): Color models have no size response. iOS 27's dark material changes with control size (small controls are more transmissive and lift less), but a layer can only pick one value for all its shapes, and FakeGlass applies the color in one shared backdrop filter, so a size response made a shape's look depend on its neighbours and jump when a FakeGlass shape fades (it moves to a filter of its own). `ios27Dark` therefore uses the mean of the small (63 pt) and large fits for every size. Do not reintroduce size-dependent color curves, or fit the dark model per control size, unless each shape can resolve its own look in both real glass and FakeGlass (see `appearance_size_independence_test.dart`).
 
 ### Performance Considerations
 
