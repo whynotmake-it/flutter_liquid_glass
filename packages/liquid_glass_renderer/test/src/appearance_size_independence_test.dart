@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 
@@ -154,20 +155,31 @@ void main() {
           find.byType(ConsolidatedFakeGlassLayer),
         )
         .toList();
-    double sigmaOf(BackdropFilterLayer layer) => double.parse(
-      RegExp(r'blur\(([\d.]+),').firstMatch(layer.filter.toString())!.group(1)!,
-    );
+    // In a seeded pass the blur is the seed's, not the filter's.
+    double sigmaOf(BackdropFilterLayer layer) {
+      var filter = layer.filter;
+      for (Layer? l = layer.parent; l != null; l = l.parent) {
+        if (l is SeededBackdropPassLayer) {
+          if (l.nativeSeed == BackdropSeed.blur) filter = l.debugSeedFilter!;
+          break;
+        }
+      }
+      final match = RegExp(r'blur\(([\d.]+),').firstMatch(filter.toString());
+      return double.parse(match!.group(1)!);
+    }
+
     // The middle layer: the 140 pt pill fading next to a 40 pt pill.
     final fading = layers[1];
     expect(fading.debugSeparateBackdropLayers, hasLength(1));
+    // Seeds that share a key differ by SeededBackdropPassLayer.seedSigmaStep.
     expect(
       sigmaOf(fading.debugSeparateBackdropLayers.single),
-      sigmaOf(fading.debugBackdropFilterLayer!),
+      closeTo(sigmaOf(fading.debugBackdropFilterLayer!), 0.01),
     );
     // And the same blur as the first layer's fully visible pills.
     expect(
       sigmaOf(fading.debugSeparateBackdropLayers.single),
-      sigmaOf(layers[0].debugBackdropFilterLayer!),
+      closeTo(sigmaOf(layers[0].debugBackdropFilterLayer!), 0.01),
     );
   });
 }

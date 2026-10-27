@@ -21,6 +21,10 @@ void runAppearanceOutputSplitTests(TestWidgetsFlutterBinding binding) {
   final sceneCapture = (binding as SubmittedSceneCapture)
     ..captureWidth = 240
     ..captureHeight = 180;
+  // flutter_tester renders a native seed's pass wrong and differently from
+  // run to run (see `pinPlainBackdropPath`); a device runs the production
+  // defaults.
+  if (sceneCapture.isFlutterTester) setUp(pinPlainBackdropPath);
 
   for (final retained in [false, true]) {
     testWidgets('appearance outputs split (retained=$retained)', (

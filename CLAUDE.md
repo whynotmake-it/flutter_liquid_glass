@@ -101,6 +101,7 @@ The liquid glass effect works by capturing and distorting background pixels thro
 - **GlassGlow** (`lib/src/glass_glow.dart`): Touch-responsive glow effects
 - **LiquidStretch** (`lib/src/stretch.dart`): Squash and stretch animations
 - **Color models** (`lib/src/liquid_glass_color_model.dart`): Color models have no size response. iOS 27's dark material changes with control size (small controls are more transmissive and lift less), but a layer can only pick one value for all its shapes, and FakeGlass applies the color in one shared backdrop filter, so a size response made a shape's look depend on its neighbours and jump when a FakeGlass shape fades (it moves to a filter of its own). `ios27Dark` therefore uses the mean of the small (63 pt) and large fits for every size. Do not reintroduce size-dependent color curves, or fit the dark model per control size, unless each shape can resolve its own look in both real glass and FakeGlass (see `appearance_size_independence_test.dart`).
+- **Seeded backdrop passes** (`SeededBackdropPassLayer`, `lib/src/internal/backdrop_seed.dart`; on wherever Impeller renders, off under `flutter test` unless `--dart-define=LIQUID_GLASS_SEED_PASSES=true`, and inside a `LiquidGlassCapture`): Impeller crops a backdrop blur only when it is the outermost filter, so each glass with a blur paints its filter inside a small pass seeded by a plain blur (or an identity at a screen edge) that Impeller crops to the pass rect, and the glass shader runs over that pass. Every seed reads the backdrop itself; seeds share one read only through a declared key (`BackdropGroup` + `useBackdropGroup`, or `backdropKey`). Pass sizes are bucketed (`BackdropPassSizing`, `PixelBuckets`) so render targets are reused
 
 ### Performance Considerations
 
@@ -135,6 +136,26 @@ melos run update-goldens
 Do not regenerate on a different macOS version — the references then fail on the `xcode-27` golden job.
 
 All tests must use the `--enable-impeller` flag since Skia is not supported.
+
+### Device Tests (seeded passes)
+
+flutter_tester renders a natively seeded pass of real glass wrongly (wrong and
+different from run to run, see `pinPlainBackdropPath` in `test/src/shared.dart`),
+so the host runs of the tests that compare captured pixels pin the plain path.
+Macs render the same scenes exactly like the plain path (Metal), and
+`example/integration_test/*_device_test.dart` runs them there with the
+production defaults (the seeds are on whenever it is not flutter_tester):
+
+```bash
+cd packages/liquid_glass_renderer/example
+flutter drive --driver=test_driver/backdrop_seed_driver.dart \
+  --target=integration_test/native_seed_parity_device_test.dart -d macos \
+  --enable-impeller --enable-flutter-gpu
+```
+
+Run the `native_seed_parity`, `visibility_frame`, `visibility_fade`,
+`opacity_composition_bounds` and `appearance_output_split` device tests after
+changing `backdrop_seed.dart`.
 
 ### Test Structure
 - Tests are in `packages/*/test/` directories

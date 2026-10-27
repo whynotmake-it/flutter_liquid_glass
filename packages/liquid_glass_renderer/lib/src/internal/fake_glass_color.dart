@@ -140,6 +140,31 @@ ImageFilter? fakeGlassBackdropFilter(
   LiquidGlassAppearance appearance, {
   double deviceScale = 1,
   double? shapeShortSide,
+}) => fakeGlassBackdropFilterParts(
+  settings,
+  appearance,
+  deviceScale: deviceScale,
+  shapeShortSide: shapeShortSide,
+)?.full;
+
+/// A fake glass backdrop filter and its blur-free variant, for a pass that
+/// has already blurred its backdrop.
+@internal
+typedef FakeGlassFilterParts = ({
+  ImageFilter full,
+  ImageFilter withoutBlur,
+  double sigma,
+  TileMode tileMode,
+});
+
+/// Like [fakeGlassBackdropFilter], also returning the filter without its blur
+/// (just the color transfer), the blur's logical sigma and its tile mode.
+@internal
+FakeGlassFilterParts? fakeGlassBackdropFilterParts(
+  LiquidGlassSettings settings,
+  LiquidGlassAppearance appearance, {
+  double deviceScale = 1,
+  double? shapeShortSide,
 }) {
   final visibility = appearance.visibility.clamp(0.0, 1.0);
   if (visibility <= 0) return null;
@@ -148,11 +173,12 @@ ImageFilter? fakeGlassBackdropFilter(
     deviceScale,
     shapeShortSide: shapeShortSide,
   );
+  const tileMode = TileMode.mirror;
   final blur = frost != 0
       ? ImageFilter.blur(
           sigmaX: frost,
           sigmaY: frost,
-          tileMode: TileMode.mirror,
+          tileMode: tileMode,
         )
       : null;
   final faceTransfer = colorModel.faceTransfer(
@@ -190,7 +216,7 @@ ImageFilter? fakeGlassBackdropFilter(
           )
         : null;
   }
-  return switch ((blur, colorTransfer)) {
+  final full = switch ((blur, colorTransfer)) {
     (final blur?, final colorTransfer?) => ImageFilter.compose(
       inner: blur,
       outer: colorTransfer,
@@ -199,4 +225,21 @@ ImageFilter? fakeGlassBackdropFilter(
     (null, final colorTransfer?) => colorTransfer,
     (null, null) => null,
   };
+  if (full == null) return null;
+  return (
+    full: full,
+    withoutBlur: colorTransfer ?? fakeGlassIdentityFilter,
+    sigma: frost,
+    tileMode: tileMode,
+  );
 }
+
+/// The filter [FakeGlassFilterParts.withoutBlur] is for a glass that is only a
+/// blur: nothing is left to do once the pass has blurred its backdrop.
+@internal
+const ImageFilter fakeGlassIdentityFilter = ColorFilter.matrix(<double>[
+  1, 0, 0, 0, 0, //
+  0, 1, 0, 0, 0, //
+  0, 0, 1, 0, 0, //
+  0, 0, 0, 1, 0, //
+]);
