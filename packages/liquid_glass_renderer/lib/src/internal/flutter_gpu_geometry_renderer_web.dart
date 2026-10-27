@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:liquid_glass_renderer/src/liquid_glass_field.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_support.dart';
 import 'package:meta/meta.dart';
 
 /// Web stand-in for the Flutter GPU geometry renderer.
@@ -21,6 +22,10 @@ class FlutterGpuGeometryRenderer {
 
   /// Nothing is ever cached on the web.
   static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey) => null;
+
+  /// The web has no shader filters.
+  LiquidGlassDeviceClass get deviceClass =>
+      LiquidGlassDeviceClass.noShaderFilters;
 
   static int get debugTotalRenderCount => 0;
   static int get debugActiveRendererCount => 0;
