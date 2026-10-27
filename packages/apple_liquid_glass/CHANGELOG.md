@@ -1,3 +1,7 @@
+## 1.0.0-dev.2
+
+ - Update a dependency to the latest release.
+
 ## 1.0.0-dev.1
 
 - Require `liquid_glass_renderer` 1.0.0-dev.1 for the refined iOS 27 color
