@@ -23,6 +23,9 @@ abstract class ShaderKeys {
   static final liquidGlassTintRender =
       '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_tint.iplr';
 
+  static final liquidGlassAnalyticRender =
+      '${_shadersRoot}build/shaderbundles/liquid_glass_final_render_analytic.iplr';
+
   static final fakeGlassSurface =
       '${_shadersRoot}lib/assets/shaders/fake_glass_surface.frag';
 

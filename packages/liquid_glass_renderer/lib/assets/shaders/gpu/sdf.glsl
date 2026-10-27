@@ -26,7 +26,8 @@
 // IMPORTANT: Every shader that includes this file must declare a
 // `uniform vec4 uShapeData[MAX_SHAPES * 3];`,
 // `uniform vec4 uRseData[MAX_SHAPES * 6];` and
-// `uniform vec4 uShapeBounds[MAX_SHAPES];` *before* the include. The SDF
+// `uniform vec4 uShapeBounds[N];`, N at least MAX_SHAPES, *before* the
+// include. The SDF
 // helpers below read these uniforms directly rather than taking them as
 // parameters, so no shape array is ever passed, and copied, by value.
 #ifndef MAX_SHAPES

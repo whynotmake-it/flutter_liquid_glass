@@ -29,6 +29,7 @@ Future<void> precacheLiquidGlass() {
         ShaderKeys.liquidGlassRender,
         ShaderKeys.liquidGlassMaterialRender,
         ShaderKeys.liquidGlassTintRender,
+        ShaderKeys.liquidGlassAnalyticRender,
       ]),
   ]);
   return Future.wait<void>([
