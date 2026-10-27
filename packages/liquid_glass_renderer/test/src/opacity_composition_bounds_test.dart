@@ -37,9 +37,6 @@ void runOpacityCompositionBoundsTests(TestWidgetsFlutterBinding testBinding) {
         await tester.runAsync(
           () => MultiShaderBuilder.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
         final movement = ValueNotifier(Offset.zero);

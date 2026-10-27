@@ -14,6 +14,7 @@ import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/filter_pass_transform.dart';
+import 'package:liquid_glass_renderer/src/internal/final_shader_variant.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
@@ -427,19 +428,11 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
         child: InheritedGeometryRenderLink(
           link: _link,
           child: MultiShaderBuilder(
-            assetKeys: [
-              ShaderKeys.liquidGlassRender,
-              ShaderKeys.liquidGlassMaterialRender,
-              ShaderKeys.liquidGlassTintRender,
-              ShaderKeys.liquidGlassAnalyticRender,
-            ],
+            assetKeys: FinalShaderVariant.assetKeys,
             (context, shaders, child) {
               return _RawShapes(
                 key: _shapesKey,
-                defaultRenderShader: shaders[0],
-                materialRenderShader: shaders[1],
-                tintRenderShader: shaders[2],
-                analyticRenderShader: shaders[3],
+                finalShaders: shaders,
                 backdropKey: backdropKey,
                 backdropCache: backdropCacheOf(widget.backdrop),
                 field: _field,
@@ -506,10 +499,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
 
 class _RawShapes extends SingleChildRenderObjectWidget {
   const _RawShapes({
-    required this.defaultRenderShader,
-    required this.materialRenderShader,
-    required this.tintRenderShader,
-    required this.analyticRenderShader,
+    required this.finalShaders,
     required this.backdropKey,
     required this.backdropCache,
     required this.field,
@@ -525,10 +515,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     super.key,
   });
 
-  final FragmentShader defaultRenderShader;
-  final FragmentShader materialRenderShader;
-  final FragmentShader tintRenderShader;
-  final FragmentShader analyticRenderShader;
+  final List<FragmentShader> finalShaders;
   final BackdropKey? backdropKey;
   final LiquidGlassBackdropCache? backdropCache;
   final LiquidGlassField? field;
@@ -549,10 +536,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   RenderObject createRenderObject(BuildContext context) {
     return RenderLiquidGlassLayer(
         devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-        defaultRenderShader: defaultRenderShader,
-        materialRenderShader: materialRenderShader,
-        tintRenderShader: tintRenderShader,
-        analyticRenderShader: analyticRenderShader,
+        finalShaders: finalShaders,
         backdropKey: backdropKey,
         settings: settings,
         defaultAppearance: defaultAppearance,
@@ -617,10 +601,7 @@ class LiquidGlassLayerFrame {
 class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     with TransformTrackingRenderObjectMixin {
   RenderLiquidGlassLayer({
-    required this.defaultRenderShader,
-    required this.materialRenderShader,
-    required this.tintRenderShader,
-    required this.analyticRenderShader,
+    required this.finalShaders,
     required super.backdropKey,
     required super.devicePixelRatio,
     required super.settings,
@@ -632,10 +613,19 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _updateShaderSettings();
   }
 
-  final FragmentShader defaultRenderShader;
-  final FragmentShader materialRenderShader;
-  final FragmentShader tintRenderShader;
-  final FragmentShader analyticRenderShader;
+  /// The final shaders, one per [FinalShaderVariant.all]; the layer draws
+  /// with the cheapest that shades its frame ([renderShader]).
+  final List<FragmentShader> finalShaders;
+
+  /// Whether a layer draws with the variant of its color model family;
+  /// false always draws with the general one.
+  @visibleForTesting
+  static bool debugShaderVariants = true;
+
+  // Shaders whose common uniforms predate the layer's latest settings, and
+  // the last shader picked: a different pick changes the shader inputs.
+  final Set<FragmentShader> _staleShaders = Set.identity();
+  FragmentShader? _lastShader;
 
   /// Whether a frame whose geometry changes may shade the shapes
   /// analytically (see [LiquidGlassLayer.analyticGeometry]): the final
@@ -690,13 +680,6 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     return recorder.endRecording().toImageSync(1, 1);
   }();
 
-  List<FragmentShader> get _finalShaders => [
-    defaultRenderShader,
-    materialRenderShader,
-    tintRenderShader,
-    analyticRenderShader,
-  ];
-
   /// How many matte pixels one low-res matte texel covers in each direction:
   /// 2 or 4 (see `liquidGlassMatteScale`). The final shaders work for both,
   /// because the scale is passed in as a uniform.
@@ -722,16 +705,62 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     debugPrint('liquid_glass_renderer: $message');
   }
 
-  FragmentShader get renderShader => switch ((
-    _analytic,
-    _usesShapeAppearances,
-    _usesTintOnlyAppearance,
-  )) {
-    (true, _, _) => analyticRenderShader,
-    (false, false, _) => defaultRenderShader,
-    (false, true, true) => tintRenderShader,
-    (false, true, false) => materialRenderShader,
-  };
+  /// The cheapest final shader that shades the layer's frame: by where it
+  /// reads its geometry and appearance, and the color model family of its
+  /// appearances. Its common uniforms are brought up to date when it is
+  /// picked.
+  FragmentShader get renderShader {
+    final kind = switch ((
+      _analytic,
+      _usesShapeAppearances,
+      _usesTintOnlyAppearance,
+    )) {
+      (true, _, _) => FinalShaderKind.analytic,
+      (false, false, _) => FinalShaderKind.single,
+      (false, true, true) => FinalShaderKind.tint,
+      (false, true, false) => FinalShaderKind.material,
+    };
+    final shader =
+        finalShaders[FinalShaderVariant.indexOf(kind, _colorModelFamily)];
+    if (_staleShaders.remove(shader)) {
+      _writeCommonShaderUniforms(
+        shader,
+        _uniformAppearance ?? defaultAppearance,
+        _materialCenterInMatte,
+        _colorModelSlots(_shapeAppearances),
+      );
+    }
+    if (!identical(shader, _lastShader)) {
+      _lastShader = shader;
+      _shaderInputsChanged = true;
+    }
+    return shader;
+  }
+
+  /// The color models the layer shades: the direct model alone, one iOS
+  /// 27 model in the first slot, or any.
+  FinalShaderModels get _colorModelFamily {
+    if (!debugShaderVariants) return FinalShaderModels.all;
+    final shaded = _usesShapeAppearances
+        ? _shapeAppearances
+        : [_uniformAppearance ?? defaultAppearance];
+    final first = shaded.first.colorModel.parameters;
+    for (final appearance in shaded) {
+      if (appearance.colorModel.parameters != first) {
+        return FinalShaderModels.all;
+      }
+    }
+    return first == null ? FinalShaderModels.direct : FinalShaderModels.ios27;
+  }
+
+  /// The analytic variants, which an analytic frame writes its shapes into.
+  Iterable<FragmentShader> get _analyticShaders => [
+    for (final models in FinalShaderModels.values)
+      finalShaders[FinalShaderVariant.indexOf(
+        FinalShaderKind.analytic,
+        models,
+      )],
+  ];
 
   FlutterGpuGeometryRenderer? _gpuGeometryRenderer;
   FlutterGpuGeometryRenderer? get gpuGeometryRenderer => _gpuGeometryRenderer;
@@ -779,22 +808,16 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   void _updateShaderSettings() {
     _shaderInputsChanged = true;
-    final appearance = _uniformAppearance ?? defaultAppearance;
-    final colorModels = _colorModelSlots(_shapeAppearances);
-    for (final shader in _finalShaders) {
-      _writeCommonShaderUniforms(
-        shader,
-        appearance,
-        _materialCenterInMatte,
-        colorModels,
-      );
-    }
+    _staleShaders.addAll(finalShaders);
+    // Reading renderShader writes the picked shader's uniforms; the others
+    // are written when a frame picks them.
+    renderShader;
   }
 
   /// The layer's adaptive color models in shader slot order.
   ///
   /// `uColorModelParams` holds at most three distinct models; extra models
-  /// fold onto the first slot. The direct model needs no slot — it always
+  /// fold onto the first slot. The direct model needs no slot: it always
   /// takes code 0.
   List<GlassColorParameters> _colorModelSlots(
     List<LiquidGlassAppearance> appearances,
@@ -809,8 +832,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       }
     }
 
-    add(defaultAppearance);
+    // The shaded models first, so a layer of one iOS 27 model has it in the
+    // first slot, which its one-model variant reads.
     appearances.forEach(add);
+    add(defaultAppearance);
     return List.unmodifiable(slots);
   }
 
@@ -1014,7 +1039,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // Only the glow's uniforms change. A retained pass takes them in a new
     // filter, without painting the layer and its shapes. Every final shader
     // takes them: the layer switches between them without rewriting them.
-    _finalShaders.forEach(_writeGlow);
+    finalShaders.forEach(_writeGlow);
     _shaderInputsChanged = true;
     if (!_refreshRetainedFilter()) markNeedsPaint();
   }
@@ -2245,7 +2270,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     return (axisX: axisX, axisY: axisY, determinant: determinant);
   }
 
-  /// Writes an analytic frame's shapes into the analytic final shader, in
+  /// Writes an analytic frame's shapes into the analytic final shaders, in
   /// the layout of analytic_geometry.glsl from uAnalyticHeader.
   void _writeAnalyticUniforms({
     required int numShapes,
@@ -2261,24 +2286,29 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // One setFloatUniforms call for all of them: each array is padded with
     // zeros to its declared length, so the next starts where the shader
     // declares it.
-    analyticRenderShader.setFloatUniforms(initialIndex: header, (value) {
-      void fill(List<double> values, int length) {
-        value
-          ..setFloats(values)
-          ..setFloats(List<double>.filled(length - values.length, 0));
-      }
+    void write(FragmentShader shader) =>
+        shader.setFloatUniforms(initialIndex: header, (value) {
+          void fill(List<double> values, int length) {
+            value
+              ..setFloats(values)
+              ..setFloats(List<double>.filled(length - values.length, 0));
+          }
 
-      fill([
-        numShapes.toDouble(),
-        max(0.5, contourExtent),
-        if (blended) 1 else 0,
-      ], shapeData - header);
-      fill(_shapeData, rseData - shapeData);
-      fill(_rseData, rseLower - rseData);
-      fill(_rseLowerData, bounds - rseLower);
-      fill(_boundsData, cull - bounds);
-      fill(_cullData, analyticMaxShapes);
-    });
+          fill([
+            numShapes.toDouble(),
+            max(0.5, contourExtent),
+            if (blended) 1 else 0,
+          ], shapeData - header);
+          fill(_shapeData, rseData - shapeData);
+          fill(_rseData, rseLower - rseData);
+          fill(_rseLowerData, bounds - rseLower);
+          fill(_boundsData, cull - bounds);
+          fill(_cullData, analyticMaxShapes);
+        });
+
+    // Every analytic variant, so the one a frame picks by its color models
+    // has them.
+    _analyticShaders.forEach(write);
     _shaderInputsChanged = true;
   }
 
