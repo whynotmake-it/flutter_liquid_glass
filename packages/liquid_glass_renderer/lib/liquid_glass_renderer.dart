@@ -16,6 +16,8 @@ export 'src/liquid_glass_color_model.dart' show LiquidGlassColorModel;
 export 'src/liquid_glass_field.dart' show LiquidGlassField;
 export 'src/liquid_glass_glow.dart' show LiquidGlassGlow;
 export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
+export 'src/liquid_glass_support.dart'
+    show LiquidGlassDeviceClass, LiquidGlassSupport;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
 export 'src/liquid_shape.dart'
     show

@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_gpu/gpu.dart' as gpu;
 import 'package:liquid_glass_renderer/src/liquid_glass_field.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_support.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 /// The edge distance stored in low-res matte texels that are far away from
@@ -66,6 +67,29 @@ class FlutterGpuGeometryRenderer {
 
   // Flutter's centered half-pixel coverage transition.
   static const double _geometryAaHalfWidth = 0.5;
+
+  /// The class of the GPU the Flutter GPU context runs on. Flutter GPU
+  /// names no backend, so it is read from capabilities: rendering into a
+  /// mip level is not implemented on GLES yet, and ASTC HDR starts at the
+  /// A13 (Apple6). A renderer exists only once the engine has created the
+  /// context; reading it earlier blocks the UI thread on Android.
+  LiquidGlassDeviceClass get deviceClass {
+    final context = gpu.gpuContext;
+    if (!context.doesSupportFramebufferRenderMipmap) {
+      // Only an Android device without a usable Vulkan driver is short of
+      // GPU on OpenGL ES; a desktop has plenty.
+      return Platform.isAndroid
+          ? LiquidGlassDeviceClass.gles
+          : LiquidGlassDeviceClass.capable;
+    }
+    if (Platform.isIOS &&
+        !context.supportsTextureCompression(
+          gpu.TextureCompressionFamily.astcHdr,
+        )) {
+      return LiquidGlassDeviceClass.appleBeforeA13;
+    }
+    return LiquidGlassDeviceClass.capable;
+  }
 
   static Future<FlutterGpuGeometryRenderer> fromAsset(String assetKey) async {
     final cachedResources = _resolvedAssetResources[assetKey];

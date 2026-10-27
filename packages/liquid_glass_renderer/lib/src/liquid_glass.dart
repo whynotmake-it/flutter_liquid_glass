@@ -244,7 +244,11 @@ class LiquidGlass extends StatefulWidget {
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.
-  static Future<void> precache() => precacheLiquidGlass();
+  ///
+  /// The returned [LiquidGlassSupport] says whether full glass draws on this
+  /// device and on what GPU, for code that chooses a cheaper look itself.
+  /// Calling it again only reads what the first call loaded.
+  static Future<LiquidGlassSupport> precache() => precacheLiquidGlass();
 
   @override
   State<LiquidGlass> createState() => _LiquidGlassState();
