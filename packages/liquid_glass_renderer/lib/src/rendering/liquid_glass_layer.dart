@@ -846,6 +846,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// shader
   Rect _geometryMatteBounds = Rect.zero;
   Offset _materialCenterInMatte = Offset.zero;
+  Size _materialSize = Size.zero;
   // The matte and material map fill the top-left of textures that only grow.
   Size _geometryTextureSize = Size.zero;
   Size _materialTextureSize = const Size(1, 1);
@@ -926,6 +927,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         _geometryTextureSize = result.textureSize;
         _materialTextureSize = result.materialTextureSize;
         _materialCenterInMatte = result.materialCenter;
+        _materialSize = bounds.size;
         _setShapeAppearances(result.appearances);
         _rememberEncodedGeometry(bounds);
       }
@@ -1043,6 +1045,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
             _geometryTextureSize = gpuResult.textureSize;
             _materialTextureSize = gpuResult.materialTextureSize;
             _materialCenterInMatte = gpuResult.materialCenter;
+            _materialSize = geometryBounds.size;
             _setShapeAppearances(gpuResult.appearances);
             _rememberEncodedGeometry(geometryBounds);
           }
@@ -1116,6 +1119,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       })
       ..setFloatUniforms(initialIndex: 34, (value) {
         value.setOffset(_materialCenterInMatte * devicePixelRatio);
+      })
+      // Float index 139, after the low-res matte: uBackdropShrinkAxis, along
+      // the glass's long side.
+      ..setFloatUniforms(initialIndex: 139, (value) {
+        final half =
+            settings.effectiveBackdropShrinkRim *
+            (_materialSize.longestSide - _materialSize.shortestSide) /
+            2 *
+            devicePixelRatio;
+        final alongX = _materialSize.width >= _materialSize.height;
+        value.setOffset(alongX ? Offset(half, 0) : Offset(0, half));
       })
       // Float index 57, after uBackdropBounds.
       ..setFloatUniforms(initialIndex: 57, (value) {
@@ -1650,6 +1664,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   final List<double> _shapeData = [];
   final List<double> _rseData = [];
+  // A pair's bottom half, 12 floats per shape, zeros for every other shape.
+  final List<double> _rseLowerData = [];
   final List<double> _boundsData = [];
   static final Matrix4 _identity = Matrix4.identity();
 
@@ -1708,6 +1724,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
               y.abs() * (halfSize.height - radius) +
               radius * sqrt(x * x + y * y);
         case RawShapeType.squircle:
+        case RawShapeType.squirclePair:
           return x.abs() * halfSize.width + y.abs() * halfSize.height;
       }
     }
@@ -1782,6 +1799,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       // unrelated standalone glass widgets together.
       _shapeData.clear();
       _rseData.clear();
+      _rseLowerData.clear();
       _boundsData.clear();
       final appearances = <LiquidGlassAppearance>[];
       var numShapes = 0;
@@ -1840,16 +1858,29 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           // oversized primitives), which is especially visible for stretched
           // shapes in a blend group.
           final size = shape.renderObject.size;
-          final rseParameters = roundedSuperellipseParameters(
-            size,
-            shape.rawCornerRadius,
-            scale: devicePixelRatio,
-          );
+          final pair = shape.rawShapeType == RawShapeType.squirclePair;
+          final rseParameters = pair
+              ? roundedSuperellipsePairParameters(
+                  size,
+                  shape.rawCornerRadius,
+                  shape.rawBottomRadius,
+                  scale: devicePixelRatio,
+                )
+              : roundedSuperellipseParameters(
+                  size,
+                  shape.rawCornerRadius,
+                  scale: devicePixelRatio,
+                );
           // The geometry shader tests each cap's angular span as
           // 1 - cos(span); FakeGlass reads the spans themselves.
-          rseParameters[2] = 1.0 - cos(rseParameters[2]);
-          rseParameters[3] = 1.0 - cos(rseParameters[3]);
-          _rseData.addAll(rseParameters);
+          for (var half = 0; half < rseParameters.length; half += 12) {
+            rseParameters[half + 2] = 1.0 - cos(rseParameters[half + 2]);
+            rseParameters[half + 3] = 1.0 - cos(rseParameters[half + 3]);
+          }
+          _rseData.addAll(rseParameters.take(12));
+          _rseLowerData.addAll(
+            pair ? rseParameters.skip(12) : List<double>.filled(12, 0),
+          );
           final center = centerInMatte * devicePixelRatio;
           final halfExtents = _matteHalfExtents(
             shape.rawShapeType,
@@ -1905,6 +1936,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
         height: textureHeight,
         shapeData: _shapeData,
         rseData: _rseData,
+        rseLowerData: _rseLowerData,
         boundsData: _boundsData,
         numShapes: numShapes,
         refractionHeight: settings.effectiveRefractionHeight * devicePixelRatio,

@@ -29,6 +29,7 @@ final class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
+    this.backdropShrinkRim = 0.0,
     double? frost,
     this.dispersion = 0.0,
     this.highlight = 0.6,
@@ -50,6 +51,7 @@ final class LiquidGlassSettings with Equatable {
     this.refractionAmount = 60.0,
     this.refractionFitsShape = true,
     this.backdropShrink = 0.0,
+    this.backdropShrinkRim = 0.0,
     this.frost = _minBlurPassSigma,
     this.dispersion = 0.0,
     this.highlight = 0.6,
@@ -77,6 +79,10 @@ final class LiquidGlassSettings with Equatable {
       refractionFitsShape:
           json['refractionFitsShape'] as bool? ?? defaults.refractionFitsShape,
       backdropShrink: number('backdropShrink', defaults.backdropShrink),
+      backdropShrinkRim: number(
+        'backdropShrinkRim',
+        defaults.backdropShrinkRim,
+      ),
       // Omitted frost keeps the default regular frost, including its device
       // and size response. An explicit value is the caller's and is used
       // verbatim.
@@ -305,7 +311,8 @@ final class LiquidGlassSettings with Equatable {
   final bool refractionFitsShape;
 
   /// How much the backdrop seen through the face is shrunk, about the center
-  /// of the layer's glass: `0` keeps its size, `0.08` shows it at 92%.
+  /// of the layer's glass or the line through it that [backdropShrinkRim]
+  /// sets: `0` keeps its size, `0.08` shows it at 92%.
   ///
   /// Clamped to `0` to `0.75`, so the glass can reveal more of its
   /// surroundings but never enlarges (and pixelates) the captured backdrop.
@@ -313,9 +320,26 @@ final class LiquidGlassSettings with Equatable {
   /// (the example app's loupe does). The bevel's [refractionAmount] is applied
   /// on top.
   ///
-  /// All glass in one layer shares the center, so give a shrinking shape its
-  /// own layer when it should shrink about itself.
+  /// All glass in one layer shares that center and line, so give a shrinking
+  /// shape its own layer when it should shrink about itself.
   final double backdropShrink;
+
+  /// Where [backdropShrink] shrinks about, from `0` to `1`.
+  ///
+  /// At `0`, the center of the layer's glass: a point moves in proportion to
+  /// its distance from that center. At `1`, the nearest point of the long
+  /// center line of the layer's glass bounds, which spans the long side less
+  /// the short side: a point moves in proportion to its distance from that
+  /// line. A capsule then minifies across its straight part and radially about
+  /// the centers of its round ends, and the middle of a long lens shows the
+  /// backdrop in place along its length, as a lifted iOS lens does. In between,
+  /// the line is that fraction of its full length. A circle or square has no
+  /// line. Clamped to `0` to `1`.
+  final double backdropShrinkRim;
+
+  /// [backdropShrinkRim] clamped to `0` to `1`.
+  @internal
+  double get effectiveBackdropShrinkRim => backdropShrinkRim.clamp(0.0, 1.0);
 
   /// Backdrop blur, as an approximate Gaussian-equivalent sigma in logical
   /// pixels.
@@ -467,6 +491,7 @@ final class LiquidGlassSettings with Equatable {
     double? refractionAmount,
     bool? refractionFitsShape,
     double? backdropShrink,
+    double? backdropShrinkRim,
     double? frost,
     double? dispersion,
     double? highlight,
@@ -479,6 +504,7 @@ final class LiquidGlassSettings with Equatable {
     refractionAmount: refractionAmount ?? this.refractionAmount,
     refractionFitsShape: refractionFitsShape ?? this.refractionFitsShape,
     backdropShrink: backdropShrink ?? this.backdropShrink,
+    backdropShrinkRim: backdropShrinkRim ?? this.backdropShrinkRim,
     frost: frost ?? this.frost,
     // Passing an explicit frost makes it the caller's, not the preset's.
     floorEligible: frost == null && _frostIsFloorEligible,
@@ -502,6 +528,7 @@ final class LiquidGlassSettings with Equatable {
     'refractionAmount': refractionAmount,
     'refractionFitsShape': refractionFitsShape,
     'backdropShrink': backdropShrink,
+    'backdropShrinkRim': backdropShrinkRim,
     'frost': frost,
     'dispersion': dispersion,
     'highlight': highlight,
@@ -517,6 +544,7 @@ final class LiquidGlassSettings with Equatable {
     refractionAmount,
     refractionFitsShape,
     backdropShrink,
+    backdropShrinkRim,
     frost,
     dispersion,
     highlight,

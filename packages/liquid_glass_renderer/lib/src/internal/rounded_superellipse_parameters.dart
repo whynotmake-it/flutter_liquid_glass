@@ -121,3 +121,51 @@ List<double> roundedSuperellipseParameters(
     rightRadius,
   ];
 }
+
+/// The factor every radius of a pair of [size] with top radius [top] and
+/// bottom radius [bottom] is scaled by: below 1 when two corners overflow a
+/// side, as Impeller's `RoundingRadii::Scaled` scales them.
+@internal
+double roundedSuperellipsePairFit(Size size, double top, double bottom) => [
+  1.0,
+  if (top > 0) size.width / (2 * top),
+  if (bottom > 0) size.width / (2 * bottom),
+  if (top + bottom > 0) size.height / (top + bottom),
+].reduce(min);
+
+/// [roundedSuperellipseParameters] of the top and bottom halves of Flutter
+/// 3.47's rounded superellipse of [size] whose two top corners have radius
+/// [top] and two bottom corners [bottom], 24 floats: the top half's 12, then
+/// the bottom half's 12. Impeller's `MakeBoundsRadii` splits the sides where
+/// the radii divide them in their own ratio; each half is a symmetric
+/// rounded superellipse centered on that split line, and the shape is the
+/// top one above the line and the bottom one below it, as Impeller's
+/// quadrants are. Radii that do not fit are scaled down together, as
+/// Impeller does. The bottom half's half-width slot, which repeats the
+/// top's, carries its corner radius instead. Lengths are [size] units times
+/// [scale].
+@internal
+List<double> roundedSuperellipsePairParameters(
+  Size size,
+  double top,
+  double bottom, {
+  double scale = 1,
+}) {
+  final fit = roundedSuperellipsePairFit(size, top, bottom);
+  final upper = top + bottom <= 0
+      ? size.height / 2
+      : size.height * top / (top + bottom);
+  final lower = size.height - upper;
+  final topHalf = roundedSuperellipseParameters(
+    Size(size.width, 2 * upper),
+    top * fit,
+    scale: scale,
+  );
+  final bottomHalf = roundedSuperellipseParameters(
+    Size(size.width, 2 * lower),
+    bottom * fit,
+    scale: scale,
+  );
+  bottomHalf[8] = bottom * fit * scale;
+  return <double>[...topHalf, ...bottomHalf];
+}

@@ -171,7 +171,9 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
     required this._link,
     required this._blend,
   }) {
-    link.addListener(_onLinkUpdate);
+    link
+      ..addListener(_onLinkUpdate)
+      ..onMembershipChanged = _onMembershipChanged;
   }
 
   GlassGroupLink _link;
@@ -181,9 +183,13 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
 
   set link(GlassGroupLink value) {
     if (_link == value) return;
-    _link.removeListener(_onLinkUpdate);
+    _link
+      ..removeListener(_onLinkUpdate)
+      ..onMembershipChanged = null;
     _link = value;
-    value.addListener(_onLinkUpdate);
+    value
+      ..addListener(_onLinkUpdate)
+      ..onMembershipChanged = _onMembershipChanged;
     markNeedsPaint();
   }
 
@@ -211,6 +217,11 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
     markGeometryNeedsUpdate();
     markNeedsPaint();
   }
+
+  // A shape joining or leaving under a repaint boundary of its own repaints
+  // only that boundary, and this group may sit under one too: the layer has to
+  // paint this frame as it does for a glass that joins it directly.
+  void _onMembershipChanged() => renderLink?.onMembershipChanged?.call();
 
   List<Matrix4?> _lastShapeTransforms = const [];
 
@@ -346,6 +357,9 @@ class GlassGroupLink with ChangeNotifier {
   /// Creates a new [GlassGroupLink].
   GlassGroupLink();
 
+  /// Called when a shape registers with or leaves the group.
+  VoidCallback? onMembershipChanged;
+
   /// Information about a shape registered with this link.
   final Map<LiquidGlassShapeRenderObject, LiquidShape> _shapes = {};
 
@@ -365,6 +379,7 @@ class GlassGroupLink with ChangeNotifier {
     _shapes[renderObject] = shape;
     _shapeEntriesCache = null;
     notifyListeners();
+    onMembershipChanged?.call();
   }
 
   /// Unregister a shape from this link.
@@ -372,6 +387,7 @@ class GlassGroupLink with ChangeNotifier {
     _shapes.remove(renderObject);
     _shapeEntriesCache = null;
     notifyListeners();
+    onMembershipChanged?.call();
   }
 
   /// Update the shape properties for a registered render object.
