@@ -233,18 +233,20 @@ vec4 getShapeGradients(
     return vec4(toScene * exact, toScene * optical);
 }
 
-// Smooth-union radius for two surfaces with normals na and nb. It scales with
-// the chord between the normals: zero where the surfaces are aligned, such as
-// the collinear sides of shapes in a row, and the full blend where they face
-// each other across a gap. A plain smooth minimum lifts aligned edges near a
-// join by up to k/4; this keeps them straight while concave joins and
-// bridges still round. The iOS 27 GlassEffectContainer captures in
-// example/tool/apple_match follow this within half a point, including the
-// sub-point rise it leaves where two rounded corners meet.
+// Smooth-union radius for two surfaces with normals na and nb:
+// k sin^2(theta / 2) = k (1 - cos theta) / 2, theta the angle between them.
+// Zero where the surfaces are aligned, such as the collinear sides of shapes
+// in a row, and the full blend where they face each other across a gap. A
+// plain smooth minimum lifts aligned edges near a join by up to k/4; this
+// keeps them straight while concave joins and bridges still round. On an
+// iOS 27 device, the necks of UIGlassContainerEffect and SwiftUI's
+// GlassEffectContainer give this radius within one percent.
 float angularBlendRadius(float k, vec2 na, vec2 nb) {
-    // Clamped because stretched shapes have gradients longer than 1; the
-    // empty-pixel budget in sceneBoundsOutsideSquared assumes k at most.
-    return k * min(0.5 * length(na - nb), 1.0);
+    // Divided by the lengths so only the angle counts: gradients of stretched
+    // shapes and of blended groups can be shorter than 1. The empty-pixel
+    // budget in sceneBoundsOutsideSquared assumes a radius of k at most.
+    float cosine = dot(na, nb) / max(length(na) * length(nb), 1e-8);
+    return k * clamp(0.5 * (1.0 - cosine), 0.0, 1.0);
 }
 
 // Weight of the first operand in a polynomial smooth minimum of radius k. It
