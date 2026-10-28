@@ -378,7 +378,12 @@ enum RawShapeType {
   // none(0), unused in CPU code
   squircle(1),
   ellipse(2),
-  roundedRectangle(3);
+  roundedRectangle(3),
+
+  /// A squircle whose two bottom corners have a different radius from its two
+  /// top ones, drawn as two halves that meet on the split line (sdf.glsl's
+  /// resolvePairHalf).
+  squirclePair(4);
 
   const RawShapeType(this.shaderIndex);
 
@@ -386,7 +391,8 @@ enum RawShapeType {
 
   static RawShapeType fromLiquidGlassShape(LiquidShape shape) =>
       switch (shape) {
-        LiquidRoundedSuperellipse() => RawShapeType.squircle,
+        LiquidRoundedSuperellipse(:final isUniform) =>
+          isUniform ? RawShapeType.squircle : RawShapeType.squirclePair,
         LiquidOval() => RawShapeType.ellipse,
         LiquidRoundedRectangle() => RawShapeType.roundedRectangle,
       };
@@ -406,6 +412,11 @@ class ShapeGeometry extends Equatable {
     this.shadows = const [],
     this.shapeToGeometry,
   }) : rawCornerRadius = shape.cornerRadius,
+       rawBottomRadius = switch (shape) {
+         LiquidRoundedSuperellipse(:final effectiveBottomRadius) =>
+           effectiveBottomRadius,
+         _ => shape.cornerRadius,
+       },
        rawShapeType = RawShapeType.fromLiquidGlassShape(shape);
 
   final LiquidGlassShapeRenderObject renderObject;
@@ -415,6 +426,10 @@ class ShapeGeometry extends Equatable {
   final RawShapeType rawShapeType;
 
   final double rawCornerRadius;
+
+  /// The radius of the two bottom corners: [rawCornerRadius] except for a
+  /// [RawShapeType.squirclePair].
+  final double rawBottomRadius;
 
   final LiquidGlassAppearance appearance;
 

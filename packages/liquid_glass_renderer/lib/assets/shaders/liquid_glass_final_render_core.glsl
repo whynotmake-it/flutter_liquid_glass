@@ -11,6 +11,7 @@ precision highp float;
 
 #include <flutter/runtime_effect.glsl>
 #include "render.glsl"
+#include "glass_glow.glsl"
 
 // The geometry texture is the low-res matte: one RGBA16F texel for every
 // uLowResMatte.x x uLowResMatte.x block of matte pixels (see
@@ -71,6 +72,22 @@ uniform vec4 uColorModelParams[18];
 //                  shape. These two set the bevel.
 uniform vec4 uLowResMatte;
 uniform vec2 uLowResOptics;
+// Half of the segment backdropShrink shrinks about, in matte device px from
+// the material center; zero shrinks about the center itself. Float index 139.
+uniform vec2 uBackdropShrinkAxis;
+// The opaque color the glass is shaded over when it is drawn as a paint
+// instead of a backdrop filter: every backdrop read returns it. Alpha 0 reads
+// the backdrop. Float index 141.
+uniform vec4 uSolidBackdrop;
+// The touch glow of one lit shape (glass_glow.glsl), float index 145: the
+// spot, the lit shape's box and its corner radius and wash. All zero draws
+// no glow.
+uniform vec4 uGlowSpot;
+uniform vec4 uGlowBox;
+uniform vec4 uGlowShape;
+// A color laid over the read backdrop at its alpha: the dimming between a
+// cached copy of the page and the glass. Float index 157.
+uniform vec4 uBackdropOverlay;
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -777,28 +794,43 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // backdropShrink is one lens over the whole face, about the material
-        // center of the layer, uniform up to the silhouette. The bevel
+        // backdropShrink is one lens over the whole face, uniform up to the
+        // silhouette, about the nearest point of the segment
+        // +-uBackdropShrinkAxis through the material center. The bevel
         // displacement adds on top of it. It never enlarges: magnifiers
         // re-render their content instead (see the example's loupe).
-        vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
-            matteCoord - uMaterialCenter,
+        vec2 shrinkAnchor = uMaterialCenter;
+        float axisLengthSquared = dot(uBackdropShrinkAxis, uBackdropShrinkAxis);
+        if (axisLengthSquared > 0.0) {
+            shrinkAnchor += uBackdropShrinkAxis * clamp(
+                dot(matteCoord - uMaterialCenter, uBackdropShrinkAxis) /
+                    axisLengthSquared,
+                -1.0,
+                1.0
+            );
+        }
+        vec2 filterDeltaFromAnchor = filterDeltaFromMatteDelta(
+            matteCoord - shrinkAnchor,
             uFilterToMatteBasis
         );
         float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
-            filterDeltaFromCenter *
+            filterDeltaFromAnchor *
             (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
     vec4 refractColor;
-    // Skip two texture reads only when the maximum channel separation is
-    // subpixel. The uniform predicate stays coherent across the layer and the
-    // displacement bound keeps this optimization valid for either CA sign.
-    if (
+    if (uSolidBackdrop.a > 0.5) {
+        // Refracting, frosting or splitting a uniform color returns it.
+        refractColor = vec4(uSolidBackdrop.rgb, 1.0);
+    } else if (
         abs(uDispersion) * maxDisplacement <=
         kDispersionSubpixelThreshold
     ) {
+        // Skip two texture reads only when the maximum channel separation is
+        // subpixel. The uniform predicate stays coherent across the layer and
+        // the displacement bound keeps this optimization valid for either CA
+        // sign.
         vec2 sourceOffset = backdropScaleOffset + displacement;
         vec2 refractedUV;
         if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
@@ -859,6 +891,13 @@ void main() {
         float blue = texture(uBackgroundTexture, blueUV).b;
         
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
+    }
+    if (uBackdropOverlay.a > 0.0) {
+        refractColor.rgb = mix(
+            refractColor.rgb,
+            uBackdropOverlay.rgb,
+            uBackdropOverlay.a
+        );
     }
     
     vec3 transmittedColor = vec3(0.0);
@@ -1021,6 +1060,25 @@ void main() {
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
+#if !SHAPE_APPEARANCE
+    // Over everything the glass shows, under the content. Skipped in the
+    // per-shape appearance variant, whose registers it would spill on
+    // Mali GPUs. The matte coordinate is derived again, so no register
+    // holds it across the shading.
+    if (uGlowSpot.w > 0.0 || uGlowShape.y > 0.0) {
+        vec2 glowCoord = FlutterFragCoord().xy;
+        finalColor = applyGlassGlow(
+            finalColor,
+            vec2(
+                dot(uFilterToMatteBasis.xy, glowCoord),
+                dot(uFilterToMatteBasis.zw, glowCoord)
+            ) + uFilterToMatteOffset,
+            uGlowSpot,
+            uGlowBox,
+            uGlowShape
+        );
+    }
+#endif
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
         uContourColor.rgb * externalContourAlpha;
 

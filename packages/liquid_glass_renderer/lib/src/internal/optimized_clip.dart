@@ -15,6 +15,7 @@ class OptimizedClip extends StatelessWidget {
     required this.child,
     this.clipBehavior = Clip.antiAlias,
     this.outset = 0,
+    this.clipKey,
     super.key,
   });
 
@@ -24,6 +25,10 @@ class OptimizedClip extends StatelessWidget {
 
   /// Extra room outside the widget bounds retained by the clip.
   final double outset;
+
+  /// The key of the clip widget this builds, whose render object a live
+  /// shape writes a new corner radius into.
+  final Key? clipKey;
 
   final Widget child;
 
@@ -42,17 +47,20 @@ class OptimizedClip extends StatelessWidget {
     }
     return switch (shape) {
       null => child,
-      LiquidRoundedSuperellipse(:final borderRadius) => ClipRSuperellipse(
+      LiquidRoundedSuperellipse(:final radii) => ClipRSuperellipse(
+        key: clipKey,
         clipBehavior: clipBehavior,
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius: radii,
         child: child,
       ),
       LiquidRoundedRectangle(:final borderRadius) => ClipRRect(
+        key: clipKey,
         clipBehavior: clipBehavior,
         borderRadius: BorderRadius.circular(borderRadius),
         child: child,
       ),
       LiquidOval() => ClipOval(
+        key: clipKey,
         clipBehavior: clipBehavior,
         child: child,
       ),
