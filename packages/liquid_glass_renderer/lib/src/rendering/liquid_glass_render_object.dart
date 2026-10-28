@@ -86,6 +86,23 @@ Rect expandForGlassShadows(
   return result;
 }
 
+/// Whether every render object between [shape] and [layer] paints its child
+/// on the way down, so [shape] shows up on screen when [layer] paints.
+///
+/// A shape stays registered with its layer while attached, including inside
+/// an [Offstage], an [IndexedStack] child that is not shown, or an opacity of
+/// zero, where Flutter does not paint it ([RenderObject.paintsChild]).
+@internal
+bool isGlassShapePainted(RenderObject shape, RenderObject layer) {
+  var child = shape;
+  while (child != layer) {
+    final parent = child.parent;
+    if (parent == null || !parent.paintsChild(child)) return false;
+    child = parent;
+  }
+  return true;
+}
+
 /// Union of the geometry bounds registered with [link], in layer space, with
 /// the shapes and transforms needed to grow it. Pure: no polling, no rebuild.
 @internal
@@ -96,7 +113,11 @@ Rect expandForGlassShadows(
   Rect? bounds;
   final shapes = <(List<ShapeGeometry>, Matrix4)>[];
   for (final geometryRo in link.shapes) {
-    if (!geometryRo.attached || !geometryRo.hasSize) continue;
+    if (!geometryRo.attached ||
+        !geometryRo.hasSize ||
+        !isGlassShapePainted(geometryRo, layer)) {
+      continue;
+    }
     final (geometryBounds, geometryShapes, _) = geometryRo.gatherShapeData();
     if (geometryShapes.isEmpty) continue;
     final toLayer = geometryRo.getTransformTo(layer);
@@ -183,6 +204,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     _link = value;
     markNeedsPaint();
   }
+
+  /// The registered shapes that are painted when this layer paints (see
+  /// [isGlassShapePainted]), in paint order.
+  @protected
+  List<RenderLiquidGlassGeometry> get paintedShapes => [
+    for (final shape in link.shapes)
+      if (isGlassShapePainted(shape, this)) shape,
+  ];
+
+  List<RenderLiquidGlassGeometry> _lastPaintedShapes = const [];
 
   LiquidGlassSettings _settings;
   LiquidGlassSettings get settings => _settings;
@@ -425,7 +456,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     Rect? boundingBox;
     link.updatePaintOrder(this);
     _framePoll.markPolled();
-    for (final geometryRo in link.shapes) {
+    final painted = paintedShapes;
+    // A shape coming back onstage keeps its registration and geometry, so the
+    // link would not tell the matte it changed.
+    if (!listEquals(painted, _lastPaintedShapes)) link.markDirty();
+    _lastPaintedShapes = painted;
+    for (final geometryRo in painted) {
       final transformPoll = geometryRo.pollRelativeTransforms(this);
       final geometry = geometryRo.maybeRebuildGeometry();
       final transform = transformPoll.transform;
@@ -600,7 +636,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// instead of repainting every frame.
   @protected
   ({bool needsRepaint, Offset? translation}) pollCompositorTranslation() {
-    final current = link.shapes;
+    // A shape going offstage or onstage changes this list, which repaints.
+    final current = paintedShapes;
     final committed = shapesWithGeometry;
     if (_framePoll.polledThisFrame && committed.length == current.length) {
       return (needsRepaint: false, translation: Offset.zero);
