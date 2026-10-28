@@ -85,6 +85,9 @@ uniform vec4 uSolidBackdrop;
 uniform vec4 uGlowSpot;
 uniform vec4 uGlowBox;
 uniform vec4 uGlowShape;
+// A color laid over the read backdrop at its alpha: the dimming between a
+// cached copy of the page and the glass. Float index 157.
+uniform vec4 uBackdropOverlay;
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -888,6 +891,13 @@ void main() {
         float blue = texture(uBackgroundTexture, blueUV).b;
         
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
+    }
+    if (uBackdropOverlay.a > 0.0) {
+        refractColor.rgb = mix(
+            refractColor.rgb,
+            uBackdropOverlay.rgb,
+            uBackdropOverlay.a
+        );
     }
     
     vec3 transmittedColor = vec3(0.0);

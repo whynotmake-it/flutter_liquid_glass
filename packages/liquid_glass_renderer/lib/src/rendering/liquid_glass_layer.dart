@@ -417,6 +417,7 @@ class _LiquidGlassLayerState extends State<LiquidGlassLayer>
                 materialRenderShader: shaders[1],
                 tintRenderShader: shaders[2],
                 backdropKey: backdropKey,
+                backdropCache: backdropCacheOf(widget.backdrop),
                 field: _field,
                 solidBackdrop: solidColorOf(widget.backdrop),
                 glow: _glow,
@@ -484,6 +485,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
     required this.materialRenderShader,
     required this.tintRenderShader,
     required this.backdropKey,
+    required this.backdropCache,
     required this.field,
     required this.solidBackdrop,
     required this.glow,
@@ -500,6 +502,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
   final FragmentShader materialRenderShader;
   final FragmentShader tintRenderShader;
   final BackdropKey? backdropKey;
+  final LiquidGlassBackdropCache? backdropCache;
   final LiquidGlassField? field;
 
   final Color? solidBackdrop;
@@ -527,6 +530,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
         gpuGeometryRenderer: gpuGeometryRenderer,
         matteScale: matteScale,
       )
+      ..backdropCache = backdropCache
       ..field = field
       ..solidBackdrop = solidBackdrop
       ..glow = glow;
@@ -545,6 +549,7 @@ class _RawShapes extends SingleChildRenderObjectWidget {
       ..backdropKey = backdropKey
       ..gpuGeometryRenderer = gpuGeometryRenderer
       ..matteScale = matteScale
+      ..backdropCache = backdropCache
       ..field = field
       ..solidBackdrop = solidBackdrop
       ..glow = glow;
@@ -812,6 +817,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     // paint over a solid sets it only while it records.
     shader.setFloat(144, 0);
     _writeGlow(shader);
+    // Float index 160: uBackdropOverlay's alpha; 0 lays no color over the
+    // backdrop. A paint over a cached copy sets it only while it records.
+    shader.setFloat(160, 0);
     // Float index 61, after the geometry/material texture sizes: the three
     // adaptive color-model slots (six vec4 each), zero-filled when fewer
     // than three distinct models are in use.
@@ -874,6 +882,42 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   }
 
   bool get _drawsOverSolid => (_solidBackdrop?.a ?? 0) == 1;
+
+  /// The cache of a [LiquidGlassBackdrop.cached], or null.
+  LiquidGlassBackdropCache? get backdropCache => _backdropCache;
+  LiquidGlassBackdropCache? _backdropCache;
+  set backdropCache(LiquidGlassBackdropCache? value) {
+    if (identical(_backdropCache, value)) return;
+    _backdropCache = value;
+    markNeedsPaint();
+  }
+
+  // Whether the last paint chose the cached backdrop. Compositing then fills
+  // the slot with the glass painted over the copy, or with the filter when
+  // the copy is not exact this frame.
+  bool _cachesBackdrop = false;
+  final _cacheSlotHandle = LayerHandle<ContainerLayer>();
+
+  /// Whether the layer's last paint chose its [backdropCache].
+  @visibleForTesting
+  bool get debugCachesBackdrop => _cachesBackdrop;
+
+  /// Whether the last composited frame drew the glass over the copy of its
+  /// [backdropCache] rather than reading the backdrop.
+  @visibleForTesting
+  bool debugDrewOverCopy = false;
+
+  // A copy holds the screen's pixels, so it stands in only for a filter that
+  // reads the screen itself: not a shared backdrop capture (backdropKey), an
+  // opacity seed's pass or a LiquidGlassCapture's pass.
+  bool get _wantsCachedBackdrop {
+    final cache = _backdropCache;
+    return cache != null &&
+        backdropKey == null &&
+        !compositionProbeSeeding &&
+        RenderLiquidGlassCapture.enclosing(this) == null &&
+        cache.ready;
+  }
 
   /// See [LiquidGlassLayer.glow].
   LiquidGlassGlow? get glow => _glow;
@@ -1161,6 +1205,10 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     Offset offset,
     Rect? geometryBounds,
   ) {
+    // Set again where the frame paints its material.
+    _cachesBackdrop = false;
+    debugDrewOverCopy = false;
+    _cacheSlotHandle.layer = null;
     if (geometryBounds == null) {
       _clearGeometryImage();
       _releaseCompositorFilter();
@@ -1705,6 +1753,16 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
       _paintOverSolid(context, offset, materialBounds);
       return;
     }
+    _cachesBackdrop = _wantsCachedBackdrop;
+    if (_cachesBackdrop) {
+      // The filter stays ready: a frame whose copy is not exact reads the
+      // backdrop through it, without a seeded pass. Compositing picks the
+      // path.
+      _passHandle.layer = null;
+      _syncMaterialFilter(materialBounds, offset);
+      context.addLayer(_cacheSlotHandle.layer = ContainerLayer());
+      return;
+    }
     // The engine snapshots this shader's uniforms into the native image
     // filter at creation, so the composed filter can only be reused while
     // every snapshotted input is unchanged. Repaints with identical shader
@@ -1823,6 +1881,115 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   void onCompositing() {
     if (!attached) return;
     runCompositorPoll();
+    // A frame that painted no material has no path to pick.
+    final painted =
+        _cacheSlotHandle.layer != null || _shaderHandle.layer != null;
+    if (painted && _cachesBackdrop != _wantsCachedBackdrop) {
+      // Whether the cache can serve changed since paint (its source came,
+      // went or moved off the screen's origin, or an opacity started
+      // seeding): this frame reads the backdrop, and the next paint picks the
+      // path again.
+      if (_cachesBackdrop) _composeCached(overCopy: false);
+      markNeedsPaint();
+    } else if (_cachesBackdrop) {
+      _composeCached();
+    }
+  }
+
+  // Chosen at compositing, not paint: the source can change in a frame in
+  // which this layer does not repaint. Without an exact copy the slot holds
+  // the backdrop filter, its mapping synced to this frame's transform.
+  void _composeCached({bool overCopy = true}) {
+    final slot = _cacheSlotHandle.layer;
+    if (slot == null) return;
+    final bounds = _filterMaterialBounds!;
+    slot.removeAllChildren();
+    debugDrewOverCopy = false;
+    if (drawableEmpty) return;
+    if (overCopy && _recordCached(slot, bounds)) {
+      debugDrewOverCopy = true;
+      return;
+    }
+    // Before the sync, which sizes this clip and moves the filter into it.
+    final clip = _clipRectLayerHandle.layer ??= ClipRectLayer();
+    _syncMaterialFilter(bounds, _filterPaintOffset);
+    slot.append(clip);
+  }
+
+  // Records the glass as one rect painted with the final shader over the
+  // copy. The rect is drawn in screen device pixels (the canvas undoes the
+  // layer's transform), so the shader's fragment coordinates are the screen
+  // coordinates its filter mapping expects, and it samples the copy where
+  // the filter would have read the backdrop.
+  bool _recordCached(ContainerLayer slot, Rect bounds) {
+    final cache = _backdropCache!;
+    final dpr = devicePixelRatio;
+    final screen = shaderCoordinateTransform;
+    final logical = MatrixUtils.transformRect(
+      screen,
+      bounds.expandToPixelBuckets(dpr),
+    );
+    final frost = _frostSigmaForCurrentShapes();
+    final image = cache.imageFor(
+      // The copy holds what the filter reads: blurred by the frost's blur
+      // pass.
+      sigma: frost,
+      devicePixelRatio: dpr,
+      // All the glass may sample, and a pixel more.
+      region: logical.inflate(backdropSamplingReach(bounds) + 1),
+    );
+    if (image == null) return false;
+    final canvasToScreen = screen.clone()
+      ..multiply(
+        Matrix4.translationValues(
+          -_filterPaintOffset.dx,
+          -_filterPaintOffset.dy,
+          0,
+        ),
+      );
+    final screenToCanvas = Matrix4.zero();
+    if (screenToCanvas.copyInverse(canvasToScreen) == 0) return false;
+    screenToCanvas.multiply(Matrix4.diagonal3Values(1 / dpr, 1 / dpr, 1));
+    syncCoordinateMapping();
+    final overlay = cache.overlay.withValues(
+      colorSpace: ColorSpace.extendedSRGB,
+    );
+    final shader = renderShader
+      ..setFloat(0, image.width.toDouble())
+      ..setFloat(1, image.height.toDouble())
+      // Float index 157: uBackdropOverlay.
+      ..setFloat(157, overlay.r)
+      ..setFloat(158, overlay.g)
+      ..setFloat(159, overlay.b)
+      ..setFloat(160, overlay.a)
+      ..setImageSampler(0, image, filterQuality: FilterQuality.low);
+    final device = Rect.fromLTRB(
+      logical.left * dpr,
+      logical.top * dpr,
+      logical.right * dpr,
+      logical.bottom * dpr,
+    );
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder)
+      ..transform(screenToCanvas.storage)
+      ..drawRect(
+        device,
+        Paint()
+          ..shader = shader
+          ..isAntiAlias = false,
+      );
+    slot.append(
+      PictureLayer(MatrixUtils.transformRect(screenToCanvas, device))
+        ..picture = recorder.endRecording(),
+    );
+    // The shader snapshotted its uniforms and samplers with the rect. It
+    // lets go of the copy, which the cache replaces or disposes, by binding
+    // the matte again.
+    shader.setFloat(160, 0);
+    if (_geometryImage case final matte?) {
+      shader.setImageSampler(0, matte, filterQuality: FilterQuality.low);
+    }
+    return true;
   }
 
   @override
@@ -1883,6 +2050,7 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     _shaderHandle.layer = null;
     _clipRectLayerHandle.layer = null;
     _passHandle.layer = null;
+    _cacheSlotHandle.layer = null;
     _cachedFilter = null;
     _cachedShaderFilter = null;
     _clearGeometryImage();
