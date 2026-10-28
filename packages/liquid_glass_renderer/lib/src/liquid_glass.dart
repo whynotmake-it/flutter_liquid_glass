@@ -240,15 +240,24 @@ class LiquidGlass extends StatefulWidget {
   ///
   /// This can be awaited before `runApp`, including on Android: loading GPU
   /// resources does not depend on rendering a frame. Acquiring the engine's
-  /// GPU context may add startup time; drawing can still incur first-use work.
+  /// GPU context may add startup time.
+  ///
+  /// The first glass frame still creates its GPU pipelines, which stalls it
+  /// on a mid-range Android phone when none are cached. With [warmUp] the
+  /// precache draws the shaders, backdrop filters, seeded passes and
+  /// shadows of glass layers and fake glass once, offscreen, so that frame
+  /// finds their pipelines created. Pipelines are cached on disk, so this
+  /// spares only the first launch after an install or a cleared cache, while
+  /// the offscreen draws cost every launch: it is off by default.
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.
   ///
   /// The returned [LiquidGlassSupport] says whether full glass draws on this
   /// device and on what GPU, for code that chooses a cheaper look itself.
-  /// Calling it again only reads what the first call loaded.
-  static Future<LiquidGlassSupport> precache() => precacheLiquidGlass();
+  /// Calling it again loads and draws nothing new.
+  static Future<LiquidGlassSupport> precache({bool warmUp = false}) =>
+      precacheLiquidGlass(warmUp: warmUp);
 
   @override
   State<LiquidGlass> createState() => _LiquidGlassState();

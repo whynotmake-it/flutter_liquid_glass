@@ -4,14 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/src/internal/final_shader_variant.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
+import 'package:liquid_glass_renderer/src/internal/warm_up.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_support.dart';
 import 'package:liquid_glass_renderer/src/shaders.dart';
 
-/// Implementation of [LiquidGlass.precache]: the fake-glass surface program
-/// everywhere, and the real-glass programs plus the Flutter GPU geometry
-/// bundle where shader filters are supported.
-Future<LiquidGlassSupport> precacheLiquidGlass() async {
+/// Implementation of [LiquidGlass.precache]. The warm-up runs only when
+/// every full-glass program and the geometry bundle loaded.
+Future<LiquidGlassSupport> precacheLiquidGlass({bool warmUp = false}) async {
   final fullGlass = !kIsWeb && ui.ImageFilter.isShaderFilterSupported;
   final finalShaders = FinalShaderVariant.assetKeys;
   FlutterGpuGeometryRenderer? renderer;
@@ -45,11 +45,18 @@ Future<LiquidGlassSupport> precacheLiquidGlass() async {
             'load; the error was reported through FlutterError.',
       );
     }
-    return LiquidGlassSupport(deviceClass: renderer!.deviceClass);
+    final loaded = renderer!;
+    if (warmUp) {
+      await (_warmUp ??= _guard(() => warmLiquidGlassPipelines(loaded)));
+    }
+    return LiquidGlassSupport(deviceClass: loaded.deviceClass);
   } finally {
     renderer?.dispose();
   }
 }
+
+// The pipelines a warm-up creates last as long as the process.
+Future<bool>? _warmUp;
 
 Future<bool> _guard(Future<void> Function() load) async {
   try {

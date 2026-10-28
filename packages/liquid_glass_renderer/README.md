@@ -109,6 +109,12 @@ the UI mounts.
 It does not eliminate all first-use GPU work; omit it if showing an initial
 fallback is preferable to delaying startup.
 
+The first glass frame also creates the GPU pipelines glass draws with, which
+stalls it on a mid-range Android phone the first time an installed app shows
+glass; they are cached on disk for later launches.
+`LiquidGlass.precache(warmUp: true)` creates them offscreen during the
+precache instead, at the cost of an offscreen frame on every launch.
+
 ## The widgets
 
 | Widget | What it does |
