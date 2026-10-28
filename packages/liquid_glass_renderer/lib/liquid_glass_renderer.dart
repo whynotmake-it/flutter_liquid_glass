@@ -6,12 +6,18 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 export 'src/fake_glass.dart' show FakeGlass;
 export 'src/glass_glow.dart' show GlassGlow, GlassGlowLayer;
 export 'src/internal/glass_drag_builder.dart' show GestureMode;
-export 'src/liquid_glass.dart' show LiquidGlass;
+export 'src/liquid_glass.dart' show LiquidGlass, LiquidGlassShapeFrame;
 export 'src/liquid_glass_appearance.dart' show LiquidGlassAppearance;
+export 'src/liquid_glass_backdrop.dart' show LiquidGlassBackdrop;
+export 'src/liquid_glass_backdrop_cache.dart' show LiquidGlassBackdropCache;
 export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
 export 'src/liquid_glass_capture.dart' show LiquidGlassCapture;
 export 'src/liquid_glass_color_model.dart' show LiquidGlassColorModel;
+export 'src/liquid_glass_field.dart' show LiquidGlassField;
+export 'src/liquid_glass_glow.dart' show LiquidGlassGlow;
 export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
+export 'src/liquid_glass_support.dart'
+    show LiquidGlassDeviceClass, LiquidGlassSupport;
 export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
 export 'src/liquid_shape.dart'
     show
@@ -20,7 +26,8 @@ export 'src/liquid_shape.dart'
         LiquidRoundedSuperellipse,
         LiquidShape;
 export 'src/logging.dart' show LgrLogs;
-export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
+export 'src/rendering/liquid_glass_layer.dart'
+    show LiquidGlassLayer, LiquidGlassLayerFrame;
 export 'src/stretch.dart'
     show LiquidStretch, OffsetResistanceExtension, RawLiquidStretch;
 

@@ -2,6 +2,7 @@
 
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -11,7 +12,26 @@ import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/precache.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
-import 'package:meta/meta.dart';
+
+/// One frame of a live [LiquidGlass]: its geometry, material and shadows.
+@immutable
+class LiquidGlassShapeFrame {
+  /// Describes one frame of a shape.
+  const LiquidGlassShapeFrame({
+    required this.shape,
+    this.appearance,
+    this.shadows = const [],
+  });
+
+  /// See [LiquidGlass.shape].
+  final LiquidShape shape;
+
+  /// See [LiquidGlass.appearance].
+  final LiquidGlassAppearance? appearance;
+
+  /// See [LiquidGlass.shadows].
+  final List<BoxShadow> shadows;
+}
 
 /// A liquid glass shape.
 ///
@@ -53,14 +73,15 @@ class LiquidGlass extends StatefulWidget {
   /// tree, where the liquid glass effect will be rendered.
   const LiquidGlass({
     required this.child,
-    required this.shape,
+    required LiquidShape this._shape,
     this.clipBehavior = Clip.hardEdge,
-    this.shadows = const [],
-    this.appearance,
+    this._shadows = const [],
+    this._appearance,
     super.key,
   }) : _grouped = false,
        _ownLayerConfig = null,
-       _auto = false;
+       _auto = false,
+       frame = null;
 
   /// Creates a new [LiquidGlass] that automatically renders on a parent
   /// [LiquidGlassLayer] if one exists, or creates its own layer if not.
@@ -78,15 +99,15 @@ class LiquidGlass extends StatefulWidget {
   /// layer instead so nested glass never renders into the same sample.
   const LiquidGlass.auto({
     required this.child,
-    required this.shape,
+    required LiquidShape this._shape,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
     bool fake = false,
     bool useBackdropGroup = false,
     BackdropKey? backdropKey,
     super.key,
     this.clipBehavior = Clip.hardEdge,
-    this.shadows = const [],
-    this.appearance,
+    this._shadows = const [],
+    this._appearance,
   }) : _grouped = true,
        _ownLayerConfig = (
          settings: settings,
@@ -94,7 +115,8 @@ class LiquidGlass extends StatefulWidget {
          useBackdropGroup: useBackdropGroup,
          backdropKey: backdropKey,
        ),
-       _auto = true;
+       _auto = true,
+       frame = null;
 
   /// Creates a new [LiquidGlass] that is part of a [LiquidGlassBlendGroup].
   ///
@@ -103,14 +125,15 @@ class LiquidGlass extends StatefulWidget {
   /// result will be rendered.
   const LiquidGlass.grouped({
     required this.child,
-    required this.shape,
+    required LiquidShape this._shape,
     super.key,
     this.clipBehavior = Clip.hardEdge,
-    this.shadows = const [],
-    this.appearance,
+    this._shadows = const [],
+    this._appearance,
   }) : _ownLayerConfig = null,
        _grouped = true,
-       _auto = false;
+       _auto = false,
+       frame = null;
 
   /// Creates a new [LiquidGlass] that creates its own [LiquidGlassLayer].
   ///
@@ -123,15 +146,15 @@ class LiquidGlass extends StatefulWidget {
   /// or needs its own [LiquidGlassSettings].
   const LiquidGlass.withOwnLayer({
     required this.child,
-    required this.shape,
+    required LiquidShape this._shape,
     LiquidGlassSettings settings = const LiquidGlassSettings(),
     bool fake = false,
     bool useBackdropGroup = false,
     BackdropKey? backdropKey,
     super.key,
     this.clipBehavior = Clip.hardEdge,
-    this.shadows = const [],
-    this.appearance,
+    this._shadows = const [],
+    this._appearance,
   }) : _ownLayerConfig = (
          settings: settings,
          fake: fake,
@@ -139,6 +162,26 @@ class LiquidGlass extends StatefulWidget {
          backdropKey: backdropKey,
        ),
        _grouped = false,
+       _auto = false,
+       frame = null;
+
+  /// Creates a shape whose geometry, material and shadows follow [frame].
+  ///
+  /// Every notification of [frame] writes the new frame straight into the
+  /// shape's render objects; the widget rebuilds only when the kind of shape
+  /// changes, its shadows appear or vanish, or the layer draws fake glass.
+  /// With `grouped` true, the shape joins the nearest
+  /// [LiquidGlassBlendGroup].
+  const LiquidGlass.live({
+    required ValueListenable<LiquidGlassShapeFrame> this.frame,
+    required this.child,
+    this.clipBehavior = Clip.hardEdge,
+    this._grouped = false,
+    super.key,
+  }) : _shape = null,
+       _shadows = const [],
+       _appearance = null,
+       _ownLayerConfig = null,
        _auto = false;
 
   /// The child of this widget.
@@ -151,7 +194,11 @@ class LiquidGlass extends StatefulWidget {
   ///
   /// This is the shape of the glass that will be rendered.
   /// {@endtemplate}
-  final LiquidShape shape;
+  LiquidShape get shape => frame?.value.shape ?? _shape!;
+  final LiquidShape? _shape;
+
+  /// The source of a live shape's frames, or null for a fixed shape.
+  final ValueListenable<LiquidGlassShapeFrame>? frame;
 
   /// The clip behavior of this glass.
   ///
@@ -171,12 +218,15 @@ class LiquidGlass extends StatefulWidget {
   /// [BoxShadow.blurStyle] is ignored. A singleton standalone shape with only
   /// zero-offset, nonnegative-spread shadows keeps the native outer-blur
   /// behavior.
-  final List<BoxShadow> shadows;
+  List<BoxShadow> get shadows => frame?.value.shadows ?? _shadows;
+  final List<BoxShadow> _shadows;
 
   /// Color and materialization override for this shape.
   ///
   /// Omit this to inherit the containing layer's default appearance.
-  final LiquidGlassAppearance? appearance;
+  LiquidGlassAppearance? get appearance =>
+      frame?.value.appearance ?? _appearance;
+  final LiquidGlassAppearance? _appearance;
 
   /// Whether this glass should automatically detect a parent layer.
   final bool _auto;
@@ -190,11 +240,24 @@ class LiquidGlass extends StatefulWidget {
   ///
   /// This can be awaited before `runApp`, including on Android: loading GPU
   /// resources does not depend on rendering a frame. Acquiring the engine's
-  /// GPU context may add startup time; drawing can still incur first-use work.
+  /// GPU context may add startup time.
+  ///
+  /// The first glass frame still creates its GPU pipelines, which stalls it
+  /// on a mid-range Android phone when none are cached. With [warmUp] the
+  /// precache draws the shaders, backdrop filters, seeded passes and
+  /// shadows of glass layers and fake glass once, offscreen, so that frame
+  /// finds their pipelines created. Pipelines are cached on disk, so this
+  /// spares only the first launch after an install or a cleared cache, while
+  /// the offscreen draws cost every launch: it is off by default.
   ///
   /// Failures are reported through [FlutterError] and never thrown; glass
   /// layers fall back the same way they would without precaching.
-  static Future<void> precache() => precacheLiquidGlass();
+  ///
+  /// The returned [LiquidGlassSupport] says whether full glass draws on this
+  /// device and on what GPU, for code that chooses a cheaper look itself.
+  /// Calling it again loads and draws nothing new.
+  static Future<LiquidGlassSupport> precache({bool warmUp = false}) =>
+      precacheLiquidGlass(warmUp: warmUp);
 
   @override
   State<LiquidGlass> createState() => _LiquidGlassState();
@@ -205,10 +268,92 @@ class _LiquidGlassState extends State<LiquidGlass> {
   /// between its fake and real subtrees.
   final _childKey = GlobalKey(debugLabel: 'LiquidGlass.child');
 
+  // The render objects a live frame is written into, and what the tree was
+  // built with: a frame that keeps the structure goes straight to them.
+  final _rawKey = GlobalKey(debugLabel: 'LiquidGlass.raw');
+  final _fadeKey = GlobalKey(debugLabel: 'LiquidGlass.fade');
+  final _clipKey = GlobalKey(debugLabel: 'LiquidGlass.clip');
+  LiquidGlassShapeFrame? _built;
+  bool _writable = false;
+  late LiquidGlassAppearance _defaultAppearance;
+  double _visibility = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.frame?.addListener(_onFrame);
+  }
+
+  @override
+  void didUpdateWidget(covariant LiquidGlass oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.frame, widget.frame)) {
+      oldWidget.frame?.removeListener(_onFrame);
+      widget.frame?.addListener(_onFrame);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.frame?.removeListener(_onFrame);
+    super.dispose();
+  }
+
+  /// Writes [shape]'s corners into the child's clip, or returns false when
+  /// the clip cannot follow it without a rebuild.
+  bool _clipFollows(LiquidShape shape) {
+    if (widget.clipBehavior == Clip.none) return true;
+    final clip = _clipKey.currentContext?.findRenderObject();
+    switch ((shape, clip)) {
+      case (
+        LiquidRoundedSuperellipse(:final radii),
+        final RenderClipRSuperellipse clip,
+      ):
+        clip.borderRadius = radii;
+        return true;
+      case (
+        LiquidRoundedRectangle(:final borderRadius),
+        final RenderClipRRect clip,
+      ):
+        clip.borderRadius = BorderRadius.circular(borderRadius);
+        return true;
+      case (LiquidOval(), RenderClipOval()):
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  void _onFrame() {
+    final frame = widget.frame!.value;
+    final built = _built;
+    final raw = _rawKey.currentContext?.findRenderObject();
+    if (!_writable ||
+        built == null ||
+        raw is! RenderLiquidGlass ||
+        frame.shape.runtimeType != built.shape.runtimeType ||
+        frame.shadows.isEmpty != built.shadows.isEmpty ||
+        !_clipFollows(frame.shape)) {
+      setState(() {});
+      return;
+    }
+    final appearance = _visibleAppearance(frame.appearance);
+    raw
+      ..shape = frame.shape
+      ..layerShadows = frame.shadows
+      ..appearance = appearance;
+    final fade = _fadeKey.currentContext?.findRenderObject();
+    if (fade is RenderOpacity) {
+      fade.opacity = appearance.visibility.clamp(0.0, 1.0);
+    }
+  }
+
   Widget get _keyedChild => KeyedSubtree(key: _childKey, child: widget.child);
 
   @override
   Widget build(BuildContext context) {
+    _built = widget.frame?.value;
+    _writable = false;
     // Join an existing sample whenever one is already in the tree. Creating a
     // layer is the fallback, not the default for a row of siblings. A glass
     // ancestor blocks reuse of the layer above it because nested shapes cannot
@@ -265,6 +410,13 @@ class _LiquidGlassState extends State<LiquidGlass> {
     return result;
   }
 
+  /// [own] or the layer's default appearance, faded by the visibility
+  /// around the shape.
+  LiquidGlassAppearance _visibleAppearance(LiquidGlassAppearance? own) {
+    final base = own ?? _defaultAppearance;
+    return base.copyWith(visibility: base.visibility * _visibility);
+  }
+
   /// Renders this shape on the nearest [LiquidGlassLayer].
   ///
   /// Grouped constructors join a [LiquidGlassBlendGroup] when one exists.
@@ -272,10 +424,9 @@ class _LiquidGlassState extends State<LiquidGlass> {
   /// one backdrop sample without a dummy blend group.
   Widget _buildGlass(BuildContext context) {
     final scopeSettings = LiquidGlassRenderScope.of(context);
-    final baseAppearance = widget.appearance ?? scopeSettings.defaultAppearance;
-    final appearance = baseAppearance.copyWith(
-      visibility: baseAppearance.visibility * LiquidGlassVisibility.of(context),
-    );
+    _defaultAppearance = scopeSettings.defaultAppearance;
+    _visibility = LiquidGlassVisibility.of(context);
+    final appearance = _visibleAppearance(widget.appearance);
     if (scopeSettings.useFake) {
       return FakeGlass.inLayerResolved(
         shape: widget.shape,
@@ -314,6 +465,7 @@ class _LiquidGlassState extends State<LiquidGlass> {
         ? InheritedGeometryRenderLink.of(context)
         : null;
 
+    _writable = !scope.consolidatesFakeBackdrop;
     final registeredChild = scope.consolidatesFakeBackdrop
         ? FakeGlass.inLayerResolved(
             shape: widget.shape,
@@ -324,14 +476,17 @@ class _LiquidGlassState extends State<LiquidGlass> {
         : OptimizedClip(
             shape: widget.shape,
             clipBehavior: widget.clipBehavior,
+            clipKey: _clipKey,
             child: _fadeChildren(
               appearance.visibility,
               GlassGlowLayer(
                 child: _keyedChild,
               ),
+              key: _fadeKey,
             ),
           );
     return _RawLiquidGlass(
+      key: _rawKey,
       blendGroupLink: blendGroupLink,
       renderLink: renderLink,
       settings: settings,
@@ -343,8 +498,12 @@ class _LiquidGlassState extends State<LiquidGlass> {
     );
   }
 
-  static Widget _fadeChildren(double visibility, Widget child) {
-    return Opacity(opacity: visibility.clamp(0.0, 1.0), child: child);
+  static Widget _fadeChildren(double visibility, Widget child, {Key? key}) {
+    return Opacity(
+      key: key,
+      opacity: visibility.clamp(0.0, 1.0),
+      child: child,
+    );
   }
 }
 
@@ -367,6 +526,7 @@ class _RawLiquidGlass extends SingleChildRenderObjectWidget {
     required this.settings,
     required this.appearance,
     required this.devicePixelRatio,
+    super.key,
   });
 
   final LiquidShape shape;

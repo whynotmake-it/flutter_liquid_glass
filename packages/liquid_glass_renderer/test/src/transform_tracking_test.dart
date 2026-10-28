@@ -15,11 +15,10 @@ import 'shared.dart';
 /// so these tests must fail if the sentinel in
 /// updateSubtreeNeedsAddToScene stops polling.
 void main() {
-  RenderLiquidGlassLayer layerOf(WidgetTester tester) =>
-      tester.allRenderObjects
-          .whereType<RenderLiquidGlassLayer>()
-          .where((renderObject) => renderObject.gpuGeometryRenderer != null)
-          .last;
+  RenderLiquidGlassLayer layerOf(WidgetTester tester) => tester.allRenderObjects
+      .whereType<RenderLiquidGlassLayer>()
+      .where((renderObject) => renderObject.gpuGeometryRenderer != null)
+      .last;
 
   testWidgets(
     'updates the matte when a repaint boundary retransforms a shape',
@@ -290,8 +289,7 @@ class _PaintTimeTransform extends SingleChildRenderObjectWidget {
   void updateRenderObject(
     BuildContext context,
     _RenderPaintTimeTransform renderObject,
-  ) =>
-      renderObject.angle = angle;
+  ) => renderObject.angle = angle;
 }
 
 class _RenderPaintTimeTransform extends RenderProxyBox {

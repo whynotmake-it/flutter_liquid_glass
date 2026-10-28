@@ -49,9 +49,6 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
         await tester.runAsync(
           () => MultiShaderBuilder.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
 

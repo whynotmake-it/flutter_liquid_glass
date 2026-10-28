@@ -1060,27 +1060,40 @@ class SeededBackdropPassLayer extends ContainerLayer {
     builder.pop();
   }
 
+  /// The pass [addToScene] adds around the children, in this layer's
+  /// parent's coordinates, or null when they paint without one: the rect
+  /// it clips them to, the filter that seeds it, the backdrop that filter
+  /// reads (a blur reads three sigmas past the pass), and the clip it cuts
+  /// the effect to.
+  ({Rect rect, ui.ImageFilter seed, Rect reads, PassFilterClip clip})?
+  get scenePass {
+    final rect = passRect;
+    if (hidden || rect == null || _seed == BackdropSeed.none) return null;
+    final clip = _readFilterClip(rect);
+    if (clip == null) return null;
+    final blur = _seed == BackdropSeed.blur ? _blur : null;
+    return (
+      rect: rect,
+      seed: _seedFilterFor(),
+      reads: blur == null ? rect : rect.inflate(3 * blur.sigma),
+      clip: clip,
+    );
+  }
+
   @override
   void addToScene(ui.SceneBuilder builder) {
-    if (hidden) {
-      _forgetEngineLayers();
+    if (scenePass case final pass?) {
+      _addSeededPass(
+        builder,
+        pass.rect,
+        seed: pass.seed,
+        clip: pass.clip,
+        key: _seedKey,
+      );
       return;
     }
-    final rect = passRect;
-    if (rect != null && _seed != BackdropSeed.none) {
-      if (_readFilterClip(rect) case final clip?) {
-        _addSeededPass(
-          builder,
-          rect,
-          seed: _seedFilterFor(),
-          clip: clip,
-          key: _seedKey,
-        );
-        return;
-      }
-    }
     _forgetEngineLayers();
-    addChildrenToScene(builder);
+    if (!hidden) addChildrenToScene(builder);
   }
 
   /// Forgets the retained engine layers of a pass that is not being added.

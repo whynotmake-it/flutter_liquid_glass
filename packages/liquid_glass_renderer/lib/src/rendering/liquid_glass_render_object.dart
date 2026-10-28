@@ -180,8 +180,27 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   GeometryRenderLink get link => _link;
   set link(GeometryRenderLink value) {
     if (_link == value) return;
+    if (attached) {
+      _link.onMembershipChanged = null;
+      value.onMembershipChanged = markNeedsPaint;
+    }
     _link = value;
     markNeedsPaint();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    // A glass or blend group that joins or leaves under a repaint boundary of
+    // its own repaints only that boundary. Real glass would otherwise learn of
+    // it in its compositing poll and draw it a frame late.
+    _link.onMembershipChanged = markNeedsPaint;
+  }
+
+  @override
+  void detach() {
+    _link.onMembershipChanged = null;
+    super.detach();
   }
 
   LiquidGlassSettings _settings;
@@ -850,12 +869,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   }
 
   /// Draws every committed shape's exterior shadows into [canvas] at
-  /// [offset], then cuts the shape silhouettes back out so interior fills
-  /// do not darken the glass. Both passes scale with shape visibility.
+  /// [offset], kept outside the silhouette of every shape above zero
+  /// visibility so they do not darken the glass. Shadow color, blur and the
+  /// cut-out silhouette scale with shape visibility.
   @protected
   void drawGlassShadows(Canvas canvas, Offset offset) {
-    // The silhouette cutout needs a saveLayer, so skip the pass entirely
-    // when no committed shape casts a shadow.
     final hasShadows = shapesWithGeometry.any(
       (entry) => entry.$2.shapes.any((shape) => shape.shadows.isNotEmpty),
     );
@@ -870,21 +888,36 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         );
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
-    if (!useNativeOuterBlur) {
-      // The layer only bounds what it holds, and the shadows are painted inside
-      // effectPaintBounds, so growing it to pixel buckets changes no pixel;
-      // an animated shape would otherwise give every frame a render target of
-      // a new size, which Impeller cannot reuse.
-      canvas.saveLayer(
-        effectPaintBounds.expandToPixelBuckets(devicePixelRatio),
-        Paint(),
-      );
+    if (useNativeOuterBlur) {
+      _paintShadows(canvas, (_) => true, outer: true);
+    } else if (_anyShapeFading) {
+      _paintShadowsCutOffscreen(canvas);
+    } else {
+      // A clip, not an offscreen layer. Shadows whose bounds meet are
+      // grouped, and each group is clipped to its own bounds less the
+      // silhouettes, so glass scattered over a large layer clips only around
+      // each group, not the whole layer.
+      final silhouettes = _currentSilhouettes();
+      for (final (:bounds, shapes: group) in _shadowGroups()) {
+        canvas.save();
+        _clipOutsideSilhouettes(canvas, bounds, silhouettes);
+        _paintShadows(canvas, group.contains, outer: false);
+        canvas.restore();
+      }
     }
+    canvas.restore();
+  }
 
+  void _paintShadows(
+    Canvas canvas,
+    bool Function(ShapeGeometry shape) include, {
+    required bool outer,
+  }) {
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
       for (final shape in geometry.shapes) {
         final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
         if (shape.shadows.isEmpty || shapeVisibility <= 0) continue;
+        if (!include(shape)) continue;
         _ancestorClips.paintWithIndividualClips(
           canvas,
           shape.renderObject,
@@ -903,9 +936,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
                       alpha: shadow.color.a * shapeVisibility,
                     ),
                     blurRadius: shadow.blurRadius * shapeVisibility,
-                    blurStyle: useNativeOuterBlur
-                        ? BlurStyle.outer
-                        : BlurStyle.normal,
+                    blurStyle: outer ? BlurStyle.outer : BlurStyle.normal,
                   )
                   .toPaint();
               drawGlassShape(
@@ -920,31 +951,165 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
         );
       }
     }
+  }
 
-    if (!useNativeOuterBlur) {
-      for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
-        for (final shape in geometry.shapes) {
-          final shapeVisibility = shape.appearance.visibility.clamp(0.0, 1.0);
-          if (shapeVisibility <= 0) continue;
-          canvas.save();
-          canvas.transform(geometryToLayer.storage);
-          if (shape.shapeToGeometry case final transform?) {
-            canvas.transform(transform.storage);
-          }
-          drawGlassShape(
-            canvas,
-            shape.shape,
-            (Offset.zero & shape.renderObject.size).deflate(.5),
-            Paint()
-              ..color = Color.fromRGBO(0, 0, 0, shapeVisibility)
-              ..blendMode = BlendMode.dstOut,
-          );
-          canvas.restore();
-        }
+  bool get _anyShapeFading => shapesWithGeometry.any(
+    (entry) => entry.$2.shapes.any(
+      (shape) =>
+          shape.appearance.visibility > 0 && shape.appearance.visibility < 1,
+    ),
+  );
+
+  // A clip cuts a silhouette whole, but a fading glass lets as much of the
+  // shadow under it show as it has yet to fade in. Only an offscreen layer
+  // cuts by a fraction; fades are brief, so only they pay for one.
+  void _paintShadowsCutOffscreen(Canvas canvas) {
+    // Bounds only: growing them to pixel buckets changes no pixel, and an
+    // animated shape does not get a render target of a new size each frame.
+    canvas.saveLayer(
+      effectPaintBounds.expandToPixelBuckets(devicePixelRatio),
+      Paint(),
+    );
+    _paintShadows(canvas, (_) => true, outer: false);
+    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        final visibility = shape.appearance.visibility.clamp(0.0, 1.0);
+        if (visibility <= 0) continue;
+        canvas
+          ..save()
+          ..transform(_shapeToLayer(shape, geometryToLayer).storage);
+        drawGlassShape(
+          canvas,
+          shape.shape,
+          (Offset.zero & shape.renderObject.size).deflate(.5),
+          Paint()
+            ..color = Color.fromRGBO(0, 0, 0, visibility)
+            ..blendMode = BlendMode.dstOut,
+        );
+        canvas.restore();
       }
-      canvas.restore();
     }
     canvas.restore();
+  }
+
+  static Matrix4 _shapeToLayer(ShapeGeometry shape, Matrix4 geometryToLayer) =>
+      shape.shapeToGeometry == null
+      ? geometryToLayer
+      : geometryToLayer.multiplied(shape.shapeToGeometry!);
+
+  List<({Rect bounds, Set<ShapeGeometry> shapes})> _shadowGroups() {
+    final groups = <({Rect bounds, Set<ShapeGeometry> shapes})>[];
+    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        if (shape.shadows.isEmpty || shape.appearance.visibility <= 0) continue;
+        var bounds = expandForGlassShadows(
+          MatrixUtils.transformRect(
+            _shapeToLayer(shape, geometryToLayer),
+            Offset.zero & shape.renderObject.size,
+          ),
+          [
+            (<ShapeGeometry>[shape], geometryToLayer),
+          ],
+        );
+        // By identity: ShapeGeometry is Equatable, so its hash would walk its
+        // appearance, shadows and transform on every lookup.
+        final members = Set<ShapeGeometry>.identity()..add(shape);
+        // Joining a group can make it meet another: merge until none meets.
+        for (var i = groups.length - 1; i >= 0; i--) {
+          final (bounds: other, shapes: otherMembers) = groups[i];
+          if (!other.overlaps(bounds)) continue;
+          bounds = bounds.expandToInclude(other);
+          members.addAll(otherMembers);
+          groups.removeAt(i);
+          i = groups.length;
+        }
+        groups.add((bounds: bounds, shapes: members));
+      }
+    }
+    return groups;
+  }
+
+  // The last draw's silhouettes, matched to shapes by position: an entry is
+  // reused while its shape, size and transform stay the same, and only
+  // re-mapped when just the transform changed.
+  List<_Silhouette> _silhouettes = const [];
+
+  List<_Silhouette> _currentSilhouettes() {
+    final previous = _silhouettes;
+    final next = <_Silhouette>[];
+    for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
+      for (final shape in geometry.shapes) {
+        if (shape.appearance.visibility <= 0) continue;
+        // A copy: the silhouette keeps it to compare with the next frame's.
+        final transform = Matrix4.copy(_shapeToLayer(shape, geometryToLayer));
+        final size = shape.renderObject.size;
+        final old = next.length < previous.length
+            ? previous[next.length]
+            : null;
+        final sameOutline =
+            old != null && old.shape == shape.shape && old.size == size;
+        if (sameOutline && MatrixUtils.matrixEquals(old.transform, transform)) {
+          next.add(old);
+          continue;
+        }
+        // Half a pixel inside the outline, so the shadow reaches into the
+        // glass's antialiased edge and no seam shows between them.
+        final local = sameOutline
+            ? old.local
+            : shape.shape.getOuterPath((Offset.zero & size).deflate(.5));
+        final path = local.transform(transform.storage);
+        next.add(
+          _Silhouette(
+            shape.shape,
+            size,
+            local,
+            transform,
+            path,
+            path.getBounds(),
+          ),
+        );
+      }
+    }
+    return _silhouettes = next;
+  }
+
+  /// Clips [canvas] to [bounds] less each of [all] whose bounds meet it,
+  /// without a path operation. While no two of those silhouettes' bounds
+  /// meet, one even-odd path cuts them all as holes; otherwise even-odd would
+  /// add back where two overlap, so each clips the bounds less itself and the
+  /// clips intersect to the bounds less their union.
+  void _clipOutsideSilhouettes(
+    Canvas canvas,
+    Rect bounds,
+    List<_Silhouette> all,
+  ) {
+    final silhouettes = [
+      for (final silhouette in all)
+        if (silhouette.bounds.overlaps(bounds)) silhouette,
+    ];
+    var apart = true;
+    for (var i = 0; i < silhouettes.length && apart; i++) {
+      for (var j = i + 1; j < silhouettes.length; j++) {
+        if (silhouettes[i].bounds.overlaps(silhouettes[j].bounds)) {
+          apart = false;
+          break;
+        }
+      }
+    }
+    Path outside() => Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(bounds);
+    if (apart) {
+      final path = outside();
+      for (final silhouette in silhouettes) {
+        path.addPath(silhouette.path, Offset.zero);
+      }
+      canvas.clipPath(path);
+      return;
+    }
+    for (final silhouette in silhouettes) {
+      canvas.clipPath(outside()..addPath(silhouette.path, Offset.zero));
+    }
   }
 
   @protected
@@ -973,6 +1138,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   @override
   @mustCallSuper
   void dispose() {
+    _silhouettes = const [];
     _compositionProbe.dispose();
     _ancestorClips.dispose();
     _idleAncestorClips.dispose();
@@ -1035,12 +1201,16 @@ class GeometryRenderLink {
     }
   }
 
+  /// Called when a glass or a blend group registers with or leaves the layer.
+  VoidCallback? onMembershipChanged;
+
   void registerGeometry(
     RenderLiquidGlassGeometry renderObject,
   ) {
     if (_shapeGeometries.contains(renderObject)) return;
     _dirty = true;
     _shapeGeometries.add(renderObject);
+    onMembershipChanged?.call();
   }
 
   void markDirty() {
@@ -1050,6 +1220,7 @@ class GeometryRenderLink {
   void unregisterGeometry(RenderLiquidGlassGeometry renderObject) {
     if (_shapeGeometries.remove(renderObject)) {
       _dirty = true;
+      onMembershipChanged?.call();
     }
   }
 
@@ -1078,4 +1249,24 @@ class InheritedGeometryRenderLink extends InheritedWidget {
   bool updateShouldNotify(covariant InheritedGeometryRenderLink oldWidget) {
     return oldWidget.link != link;
   }
+}
+
+/// A shape's outline at its size ([local]) and under its [transform] into
+/// the layer ([path], with its [bounds]).
+class _Silhouette {
+  _Silhouette(
+    this.shape,
+    this.size,
+    this.local,
+    this.transform,
+    this.path,
+    this.bounds,
+  );
+
+  final LiquidShape shape;
+  final Size size;
+  final Path local;
+  final Matrix4 transform;
+  final Path path;
+  final Rect bounds;
 }

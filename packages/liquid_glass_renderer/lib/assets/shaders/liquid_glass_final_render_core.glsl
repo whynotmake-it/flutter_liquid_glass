@@ -9,8 +9,19 @@
 // the coordinate subtraction into visible shimmer on large layers.
 precision highp float;
 
+// The color models a variant shades: every model, the direct model alone,
+// or one iOS 27 model in slot 0 alone. A variant that shades one family fits
+// in fewer registers (FinalShaderVariant).
+#define COLOR_MODELS_ALL 0
+#define COLOR_MODELS_DIRECT 1
+#define COLOR_MODELS_IOS27 2
+#ifndef COLOR_MODELS
+#define COLOR_MODELS COLOR_MODELS_ALL
+#endif
+
 #include <flutter/runtime_effect.glsl>
 #include "render.glsl"
+#include "glass_glow.glsl"
 
 // The geometry texture is the low-res matte: one RGBA16F texel for every
 // uLowResMatte.x x uLowResMatte.x block of matte pixels (see
@@ -64,13 +75,42 @@ uniform vec2 uMaterialTextureSize;
 //   +5: toneGammaLuminance, glintLuminance, glintFaceGain, glintVibrancy
 uniform vec4 uColorModelParams[18];
 
-// Declared last (float index 133).
+// Float index 133.
 //   uLowResMatte:  how many matte pixels one low-res matte texel covers in
 //                  each direction, then the texture's size in texels.
 //   uLowResOptics: refraction height in px, and whether refraction fits the
 //                  shape. These two set the bevel.
 uniform vec4 uLowResMatte;
 uniform vec2 uLowResOptics;
+// The inputs of the optional effects, in one declaration: impellerc gives
+// every uniform declaration its own Metal buffer slot, Metal has 31, and a
+// shader past them fails to compile on Metal alone (Vulkan and GLES accept
+// it). The analytic variant declares its shapes after these. From float
+// index 139:
+// [0] uSolidBackdrop: the opaque color the glass is shaded over when it is
+//     drawn as a paint instead of a backdrop filter; every backdrop read
+//     returns it. Alpha 0 reads the backdrop.
+// [1..3] the touch glow of one lit shape (glass_glow.glsl): the spot, the
+//     lit shape's box, its corner radius and wash. All zero draws no glow.
+// [4] xy uBackdropShrinkAxis: half of the segment backdropShrink shrinks
+//     about, in matte device px from the material center; zero shrinks
+//     about the center itself. zw unused.
+// [5] uBackdropOverlay: a color laid over the read backdrop at its alpha,
+//     the dimming between a cached copy of the page and the glass.
+uniform vec4 uEffects[6];
+#define uSolidBackdrop uEffects[0]
+#define uGlowSpot uEffects[1]
+#define uGlowBox uEffects[2]
+#define uGlowShape uEffects[3]
+#define uBackdropShrinkAxis uEffects[4].xy
+#define uBackdropOverlay uEffects[5]
+
+#ifndef ANALYTIC_GEOMETRY
+#define ANALYTIC_GEOMETRY 0
+#endif
+#if ANALYTIC_GEOMETRY
+#include "analytic_geometry.glsl"
+#endif
 
 vec4 colorModelSlot(int slot, int field) {
     return uColorModelParams[slot * 6 + field];
@@ -134,7 +174,9 @@ float gGlintVibrancy = kGlintVibrancy;
 const float kContourCoverageFeather = 1.0;
 
 uniform sampler2D uBackgroundTexture;
+#if !ANALYTIC_GEOMETRY
 uniform sampler2D uGeometryTexture;
+#endif
 #if SHAPE_APPEARANCE || SHAPE_TINT
 uniform sampler2D uMaterialTexture;
 #endif
@@ -530,12 +572,15 @@ const float kMinBlendedNormalLength = 0.5;
 vec3 lowResNormalFiltered(vec4 lowResTexel, vec2 texelCoord) {
     vec2 sum = lowResTexel.yz;
     float sumLength = length(sum);
+    // An analytic texel is the fragment's own, never a blend.
+    #if !ANALYTIC_GEOMETRY
     if (sumLength < kMinBlendedNormalLength) {
         vec2 nearestUV =
             (floor(texelCoord + 0.5) + 0.5) / uLowResMatte.yz;
         sum = texture(uGeometryTexture, nearestUV).yz;
         sumLength = length(sum);
     }
+    #endif
     return vec3(
         sumLength > 0.0001 ? sum / sumLength : vec2(0.0),
         sumLength
@@ -602,6 +647,13 @@ void main() {
     // (kPixelCenter in geometry_fragment.glsl).
     vec2 lowResTexelCoord =
         (matteCoord - uGeometryOffset - 0.5) / uLowResMatte.x;
+    #if ANALYTIC_GEOMETRY
+    // Deeper than the bevel and the rim, only coverage reads the distance.
+    vec4 lowResTexel = analyticTexel(
+        matteCoord,
+        max(uLowResOptics.x, rimReach()) + 1.0
+    );
+    #else
     // One read, which blends the four nearest texels. Reads past the edge of
     // the texture repeat its last texel, and the texture has one extra texel
     // past the last matte pixel.
@@ -609,6 +661,7 @@ void main() {
         uGeometryTexture,
         (lowResTexelCoord + 0.5) / uLowResMatte.yz
     );
+    #endif
     vec4 materialTint = uTint;
     float appearanceVisibility = clamp(uAppearanceConfig.y, 0.0, 1.0);
     // Weight of the material over the refracted backdrop. Frosted glass
@@ -777,28 +830,43 @@ void main() {
     vec2 invUSize = 1.0 / uSize;
     vec2 backdropScaleOffset = vec2(0.0);
     if (abs(uBackdropScale - 1.0) > 0.0001) {
-        // backdropShrink is one lens over the whole face, about the material
-        // center of the layer, uniform up to the silhouette. The bevel
+        // backdropShrink is one lens over the whole face, uniform up to the
+        // silhouette, about the nearest point of the segment
+        // +-uBackdropShrinkAxis through the material center. The bevel
         // displacement adds on top of it. It never enlarges: magnifiers
         // re-render their content instead (see the example's loupe).
-        vec2 filterDeltaFromCenter = filterDeltaFromMatteDelta(
-            matteCoord - uMaterialCenter,
+        vec2 shrinkAnchor = uMaterialCenter;
+        float axisLengthSquared = dot(uBackdropShrinkAxis, uBackdropShrinkAxis);
+        if (axisLengthSquared > 0.0) {
+            shrinkAnchor += uBackdropShrinkAxis * clamp(
+                dot(matteCoord - uMaterialCenter, uBackdropShrinkAxis) /
+                    axisLengthSquared,
+                -1.0,
+                1.0
+            );
+        }
+        vec2 filterDeltaFromAnchor = filterDeltaFromMatteDelta(
+            matteCoord - shrinkAnchor,
             uFilterToMatteBasis
         );
         float magnification = clamp(uBackdropScale, 0.25, 1.0);
         backdropScaleOffset =
-            filterDeltaFromCenter *
+            filterDeltaFromAnchor *
             (1.0 / magnification - 1.0) *
             appearanceVisibility;
     }
     vec4 refractColor;
-    // Skip two texture reads only when the maximum channel separation is
-    // subpixel. The uniform predicate stays coherent across the layer and the
-    // displacement bound keeps this optimization valid for either CA sign.
-    if (
+    if (uSolidBackdrop.a > 0.5) {
+        // Refracting, frosting or splitting a uniform color returns it.
+        refractColor = vec4(uSolidBackdrop.rgb, 1.0);
+    } else if (
         abs(uDispersion) * maxDisplacement <=
         kDispersionSubpixelThreshold
     ) {
+        // Skip two texture reads only when the maximum channel separation is
+        // subpixel. The uniform predicate stays coherent across the layer and
+        // the displacement bound keeps this optimization valid for either CA
+        // sign.
         vec2 sourceOffset = backdropScaleOffset + displacement;
         vec2 refractedUV;
         if (sourceOffset.x == 0.0 && sourceOffset.y == 0.0) {
@@ -860,10 +928,24 @@ void main() {
         
         refractColor = vec4(red, greenSample.g, blue, greenSample.a);
     }
+    if (uBackdropOverlay.a > 0.0) {
+        refractColor.rgb = mix(
+            refractColor.rgb,
+            uBackdropOverlay.rgb,
+            uBackdropOverlay.a
+        );
+    }
     
     vec3 transmittedColor = vec3(0.0);
     vec3 baseColor = vec3(0.0);
+    #if COLOR_MODELS == COLOR_MODELS_IOS27
+    float directShare = 0.0;
+    #elif COLOR_MODELS == COLOR_MODELS_DIRECT
+    float directShare = 1.0;
+    #else
     float directShare = colorModelShares.x;
+    #endif
+    #if COLOR_MODELS != COLOR_MODELS_IOS27
     if (directShare > 0.0) {
         transmittedColor = pow(
             max(refractColor.rgb, vec3(0.0)),
@@ -883,6 +965,8 @@ void main() {
             );
         }
     }
+    #endif
+    #if COLOR_MODELS != COLOR_MODELS_DIRECT
     if (directShare < 1.0) {
         // Apple's public tint is not a flat source-over wash. Its documented
         // "range of tones" is selected from backdrop brightness, while tint
@@ -906,8 +990,13 @@ void main() {
             0.0,
             directShare * kGlintVibrancy
         );
+        #if COLOR_MODELS == COLOR_MODELS_IOS27
+        for (int slot = 0; slot < 1; slot++) {
+            float share = 1.0;
+        #else
         for (int slot = 0; slot < 3; slot++) {
             float share = colorModelShares[slot + 1];
+        #endif
             if (share <= 0.0) {
                 continue;
             }
@@ -981,6 +1070,7 @@ void main() {
             directShare
         );
     }
+    #endif
 
     // Reconstruct the original material silhouette from the signed SDF. The
     // geometry alpha is only an expanded support mask, allowing the attached
@@ -1021,6 +1111,25 @@ void main() {
     float fadeAlpha = mix(1.0, appearanceVisibility, uBlurFade);
     float visibleMaterialAlpha = materialAlpha * fadeAlpha;
     float alpha = visibleMaterialAlpha + externalContourAlpha;
+#if !SHAPE_APPEARANCE
+    // Over everything the glass shows, under the content. Skipped in the
+    // per-shape appearance variant, whose registers it would spill on
+    // Mali GPUs. The matte coordinate is derived again, so no register
+    // holds it across the shading.
+    if (uGlowSpot.w > 0.0 || uGlowShape.y > 0.0) {
+        vec2 glowCoord = FlutterFragCoord().xy;
+        finalColor = applyGlassGlow(
+            finalColor,
+            vec2(
+                dot(uFilterToMatteBasis.xy, glowCoord),
+                dot(uFilterToMatteBasis.zw, glowCoord)
+            ) + uFilterToMatteOffset,
+            uGlowSpot,
+            uGlowBox,
+            uGlowShape
+        );
+    }
+#endif
     vec3 premultipliedColor = finalColor * visibleMaterialAlpha +
         uContourColor.rgb * externalContourAlpha;
 

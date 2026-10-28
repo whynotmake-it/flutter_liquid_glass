@@ -1,5 +1,7 @@
 import 'dart:ui' as ui;
 
+import 'package:liquid_glass_renderer/src/liquid_glass_field.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_support.dart';
 import 'package:meta/meta.dart';
 
 /// Web stand-in for the Flutter GPU geometry renderer.
@@ -20,6 +22,10 @@ class FlutterGpuGeometryRenderer {
 
   /// Nothing is ever cached on the web.
   static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey) => null;
+
+  /// The web has no shader filters.
+  LiquidGlassDeviceClass get deviceClass =>
+      LiquidGlassDeviceClass.noShaderFilters;
 
   static int get debugTotalRenderCount => 0;
   static int get debugActiveRendererCount => 0;
@@ -80,8 +86,11 @@ class FlutterGpuGeometryRenderer {
     bool writeTintOnly = false,
     List<double> appearanceData = const <double>[],
     List<double> rseData = const <double>[],
+    List<double> rseLowerData = const <double>[],
     List<double> boundsData = const <double>[],
     required int matteScale,
+    LiquidGlassField? field,
+    double fieldScale = 1,
   }) => throw UnsupportedError('Flutter GPU is not available on the web.');
 
   void releaseOutput() {}
