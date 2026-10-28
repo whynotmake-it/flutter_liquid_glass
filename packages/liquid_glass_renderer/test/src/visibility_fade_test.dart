@@ -139,7 +139,8 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
             expect(
               await deviationAt(0.02) / full,
               lessThan(0.05),
-              reason: 'Nearly hidden glass must already be nearly the '
+              reason:
+                  'Nearly hidden glass must already be nearly the '
                   'backdrop, or it pops when it reaches zero.',
             );
             visibility.value = 0;

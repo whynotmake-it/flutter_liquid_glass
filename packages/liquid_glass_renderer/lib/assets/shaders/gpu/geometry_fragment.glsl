@@ -30,7 +30,9 @@ layout(std140) uniform GeometryUniforms {
     vec4 uOpticalProps;
     vec4 uContourProps;
     vec4 uShapeData[MAX_SHAPES * 3];
-    vec4 uRseData[MAX_SHAPES * 3];
+    // Each shape's three rows, then from MAX_SHAPES * 3 each pair's
+    // bottom-half rows (sdf.glsl).
+    vec4 uRseData[MAX_SHAPES * 6];
     vec4 uShapeTints[MAX_SHAPES];
     vec4 uShapeResponses[MAX_SHAPES];
     vec4 uShapeBounds[MAX_SHAPES];
@@ -49,6 +51,7 @@ layout(std140) uniform GeometryUniforms {
 #define uShapeBounds geometryUniforms.uShapeBounds
 
 #include "sdf.glsl"
+#include "matte_encoding.glsl"
 
 out vec4 fragColor;
 
@@ -57,12 +60,6 @@ out vec4 fragColor;
 // same value, so the pass only has to draw the part near the shapes. Keep in
 // sync with kLowResFarInward in the renderer.
 const float kFarInward = -4096.0;
-// Distances are capped here, well within 16-bit float range. A hidden shape
-// reports a distance of 1e9, which would otherwise become infinity and break
-// the blending between texels.
-const float kInwardLimit = 16000.0;
-// The distance from a pixel's corner to its center, in matte pixels.
-const float kPixelCenter = 0.5;
 
 void main() {
     float scale = geometryUniforms.uLowRes.x;
@@ -86,14 +83,9 @@ void main() {
     }
 
     SceneSample scene = sceneSample(position, int(uNumShapes));
-    float gradientLength = length(scene.opticalNormal);
-    vec2 normal = gradientLength > 0.0001
-        ? scene.opticalNormal / gradientLength
-        : vec2(0.0);
-    float refractionScale = sqrt(clamp(gradientLength, 0.0, 1.0));
-    fragColor = vec4(
-        clamp(-scene.distance, -kInwardLimit, kInwardLimit),
-        normal * refractionScale,
+    fragColor = encodeMatte(
+        scene.distance,
+        scene.opticalNormal,
         scene.halfMinor
     );
 }
