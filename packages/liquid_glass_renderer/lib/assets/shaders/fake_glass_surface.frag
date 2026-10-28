@@ -36,10 +36,18 @@ uniform float uGlintLuminance;
 // Premultiplied emission of the face the backdrop filter produced, so the
 // inner shadow can shade only the transmitted part of that face.
 uniform vec3 uFaceEmission;
-// Rounded superellipse parameters (see roundedSuperellipseParameters).
-uniform vec4 uRseDegreeAndSpans;
-uniform vec4 uRseCircleCenters;
-uniform vec4 uRseSemiAxisAndRadii;
+// Rounded superellipse parameters (see roundedSuperellipseParameters): the
+// degree and spans, the circle centers, the semi-axis and radii, and a
+// pair's bottom half after them (see roundedSuperellipsePairParameters). One
+// array: Metal gives every uniform declaration a buffer of its own, and a
+// stage has 31.
+uniform vec4 uRse[6];
+#define uRseDegreeAndSpans uRse[0]
+#define uRseCircleCenters uRse[1]
+#define uRseSemiAxisAndRadii uRse[2]
+#define uRseLowerDegreeAndSpans uRse[3]
+#define uRseLowerCircleCenters uRse[4]
+#define uRseLowerSemiAxisAndRadii uRse[5]
 // Face contribution to the glint target (see the color model's
 // glintFaceGain and glintVibrancy). FakeGlass approximates the face with
 // the surface tint plus emission; clear glass brightens that proxy
@@ -51,6 +59,10 @@ uniform float uGlintVibrancy;
 // exceed the surface's premultiplied alpha (and SDR white) without clamping
 // the translucent face.
 uniform float uHighlightsOnly;
+// A pair's bottom corner radius (LiquidRoundedSuperellipse.bottomRadius), or
+// -1 for one radius. Below the split line the shape is then its bottom half,
+// a squircle centered on the line.
+uniform float uBottomRadius;
 
 const vec3 LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
 // The reference rim's peak is lower than a source-over mix of the same glint
@@ -63,15 +75,44 @@ layout(location = 0) out vec4 fragColor;
 #include "fake_glass_shape.glsl"
 
 float shapeDistance(vec2 p) {
-  return sdFakeGlassShape(
-    uShapeType,
-    p,
-    uSize * 0.5,
+  if (uBottomRadius < 0.0) {
+    return sdFakeGlassShape(
+      uShapeType,
+      p,
+      uSize * 0.5,
+      uCornerRadius,
+      uRseDegreeAndSpans,
+      uRseCircleCenters,
+      uRseSemiAxisAndRadii
+    );
+  }
+  // The pair's halves, as real glass resolves them (gpu/sdf.glsl's
+  // resolvePairHalf and pairOtherEdge).
+  float upper = uRseSemiAxisAndRadii.y;
+  float lower = uRseLowerSemiAxisAndRadii.y;
+  vec2 q = vec2(p.x, p.y - 0.5 * (upper - lower));
+  if (q.y > 0.0) {
+    float d = sdFakeGlassShape(
+      2.0,
+      q,
+      vec2(uSize.x * 0.5, lower),
+      uBottomRadius,
+      uRseLowerDegreeAndSpans,
+      uRseLowerCircleCenters,
+      uRseLowerSemiAxisAndRadii
+    );
+    return max(d, -(upper + q.y));
+  }
+  float d = sdFakeGlassShape(
+    2.0,
+    q,
+    vec2(uSize.x * 0.5, upper),
     uCornerRadius,
     uRseDegreeAndSpans,
     uRseCircleCenters,
     uRseSemiAxisAndRadii
   );
+  return max(d, q.y - lower);
 }
 
 vec2 shapeNormal(vec2 p) {
@@ -80,7 +121,15 @@ vec2 shapeNormal(vec2 p) {
     vec2 radius = max(halfSize, vec2(0.001));
     return normalize(p / (radius * radius) + vec2(0.00001));
   }
-  float radius = clamp(uCornerRadius, 0.0, min(halfSize.x, halfSize.y));
+  float cornerRadius = uCornerRadius;
+  if (uBottomRadius >= 0.0) {
+    float upper = uRseSemiAxisAndRadii.y;
+    float lower = uRseLowerSemiAxisAndRadii.y;
+    p.y -= 0.5 * (upper - lower);
+    halfSize.y = p.y > 0.0 ? lower : upper;
+    cornerRadius = p.y > 0.0 ? uBottomRadius : uCornerRadius;
+  }
+  float radius = clamp(cornerRadius, 0.0, min(halfSize.x, halfSize.y));
   vec2 q = abs(p) - halfSize + vec2(radius);
   vec2 corner = max(q, 0.0);
   if (dot(corner, corner) > 0.0001) {
