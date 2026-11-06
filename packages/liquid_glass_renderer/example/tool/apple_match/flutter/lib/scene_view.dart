@@ -21,6 +21,7 @@ const matchSettingsKeys = {
   'refractionHeight', 'refractionAmount', 'refractionFitsShape',
   'backdropShrink', 'frost', 'dispersion', 'highlight', 'contourStrength',
   'contourDirectionality', 'bevelShadowStrength', 'tintAmount',
+  'lightDirectionX', 'lightDirectionY',
   // matchGlassAppearance
   'tint', 'tintRed', 'tintGreen', 'tintBlue', 'tintAlpha', 'saturation',
   'transmissionGamma', 'vibrancy', 'colorModel',

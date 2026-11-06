@@ -1,3 +1,11 @@
+## Unreleased
+
+### New features
+
+- `LiquidGlassSettings.lightDirection` sets the direction the light travels,
+  for the glint, the dark border and the inner bevel shadow, on both real
+  glass and `FakeGlass`. The default `Offset(0, 1)` keeps the top light.
+
 ## 1.0.0-dev.2
 
  - **PERF**(liquid_glass_renderer): keep the FakeGlass filter while its blur holds (#250).

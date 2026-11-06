@@ -165,6 +165,7 @@ void main() {
       throwsArgumentError,
     );
     checkMatchSettings({'frost': 1, 'blend': 30});
+    checkMatchSettings({'lightDirectionX': .6, 'lightDirectionY': .8});
   });
 
   testWidgets('merge scenes blend both shapes in one group', (tester) async {

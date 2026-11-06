@@ -348,10 +348,16 @@ String settingsSource(LiquidGlassSettings settings) {
           .replaceFirst(RegExp(r'\.$'), '.0'),
     _ => '$value',
   };
+  final direction = settings.lightDirection;
+  final offset = 'Offset(${literal(direction.dx)}, ${literal(direction.dy)})';
   final fields = [
     // ignore: experimental_member_use
     for (final MapEntry(:key, :value) in settings.toJson().entries)
-      if (value != defaults[key]) '  $key: ${literal(value)},',
+      // JSON splits the light direction into two keys; Dart takes an Offset.
+      if (!key.startsWith('lightDirection') && value != defaults[key])
+        '  $key: ${literal(value)},',
+    if (direction != const LiquidGlassSettings().lightDirection)
+      '  lightDirection: $offset,',
   ];
   if (fields.isEmpty) return 'const LiquidGlassSettings()';
   return 'const LiquidGlassSettings(\n${fields.join('\n')}\n)';
