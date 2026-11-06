@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
@@ -94,6 +95,9 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   final _backdropLayer = LayerHandle<BackdropFilterLayer>();
   final _clipLayer = LayerHandle<ClipPathLayer>();
 
+  /// The pass around the shared filter's clip.
+  final _sharedPass = _PassSlot();
+
   final _retainedFrameSlot = LayerHandle<ContainerLayer>();
 
   /// Capture shared by this layer's own backdrop filters when the user did
@@ -112,8 +116,8 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   /// its own clipped backdrop filter instead of swapping its widget subtree.
   final Map<LiquidGlassShapeRenderObject, _SeparateBackdropLayers>
   _separateBackdropLayers = {};
-  ImageFilter? _cachedFilter;
-  double? _cachedFilterShortSide;
+  FakeGlassFilterParts? _cachedFilter;
+  double? _cachedFilterSigma;
 
   Path? _cachedClipPath;
   Rect? _cachedClipBounds;
@@ -182,18 +186,20 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     if (!_hasBlur) return 0;
     final sigma = settings.frostSigmaAt(
       devicePixelRatio,
-      shapeShortSide: _sharedShapeShortSide,
+      shapeShortSide: _layerShapeShortSide,
     );
     return sigma * 3 + 1;
   }
 
-  /// Short side of the smallest shape the shared filter covers. The blur is
-  /// layer-wide, like RealGlass's.
-  double get _sharedShapeShortSide {
+  /// Short side of the smallest visible shape, fading ones included. The
+  /// blur is layer-wide, like RealGlass's: the shared filter and every
+  /// separate one use it, so a shape that starts to fade (and leaves the
+  /// shared filter for one of its own) keeps the blur it had.
+  double get _layerShapeShortSide {
     double? shortest;
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {
       for (final shape in geometry.shapes) {
-        if (_backdropClass(shape.appearance) != 2) continue;
+        if (_backdropClass(shape.appearance) == 0) continue;
         // shapeBounds is already in the geometry's local space.
         final side = MatrixUtils.transformRect(
           geometryToLayer,
@@ -206,34 +212,41 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     return shortest ?? 150;
   }
 
-  ImageFilter _sharedBackdropFilter() {
-    final shortSide = _sharedShapeShortSide;
+  FakeGlassFilterParts _sharedBackdropFilter() {
+    // Keyed on the blur sigma the short side turns into, not on the short
+    // side: an animated scale changes it every frame, but the filter only
+    // when the sigma does, and a new filter object is a new backdrop saveLayer
+    // paint.
+    final sigma = settings.frostSigmaAt(
+      devicePixelRatio,
+      shapeShortSide: _layerShapeShortSide,
+    );
     final cached = _cachedFilter;
-    if (cached != null && _cachedFilterShortSide == shortSide) return cached;
+    if (cached != null && _cachedFilterSigma == sigma) return cached;
     final filter = _buildBackdropFilter();
     _cachedFilter = filter;
-    _cachedFilterShortSide = shortSide;
+    _cachedFilterSigma = sigma;
     return filter;
   }
 
   @override
   void onDevicePixelRatioChanged() {
     _cachedFilter = null;
-    _cachedFilterShortSide = null;
+    _cachedFilterSigma = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onSettingsChanged(LiquidGlassSettings old) {
     _cachedFilter = null;
-    _cachedFilterShortSide = null;
+    _cachedFilterSigma = null;
     markNeedsCompositingBitsUpdate();
   }
 
   @override
   void onAppearanceChanged() {
     _cachedFilter = null;
-    _cachedFilterShortSide = null;
+    _cachedFilterSigma = null;
     markNeedsCompositingBitsUpdate();
   }
 
@@ -334,27 +347,36 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           _hasBackdropEffect && _cachedClipClasses.contains(2);
       var paintedBackdrop = sharedBackdropActive;
       if (sharedBackdropActive) {
+        final sharedFilter = _sharedBackdropFilter();
         final backdropLayer = (_backdropLayer.layer ??= BackdropFilterLayer())
-          ..filter = _sharedBackdropFilter()
-          ..blendMode = BlendMode.srcOver
-          ..backdropKey = _effectiveBackdropKey;
+          ..filter = sharedFilter.full
+          ..blendMode = BlendMode.srcOver;
         assert(() {
           debugRegisterBackdropCapture(this, _effectiveBackdropKey);
           return true;
         }(), 'Count independent backdrop captures in debug builds.');
-        _clipLayer.layer = effectContext.pushClipPath(
-          true,
+        _paintInPass(
+          effectContext,
           effectOffset,
-          bounds,
-          clipPath,
-          (clipContext, clipOffset) {
-            clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
-          },
-          oldLayer: _clipLayer.layer,
+          _sharedPass,
+          filter: backdropLayer,
+          parts: sharedFilter,
+          inner: bounds,
+          reach: effectSamplingReach(bounds),
+          (passContext, passOffset) => _paintPassClip(
+            passContext,
+            passOffset,
+            _sharedPass,
+            _clipLayer,
+            bounds,
+            clipPath,
+            backdropLayer,
+          ),
         );
       } else {
         _backdropLayer.layer = null;
         _clipLayer.layer = null;
+        _sharedPass.clear();
       }
       paintedBackdrop =
           _paintSeparateBackdrops(
@@ -435,20 +457,18 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     List<(RenderLiquidGlassGeometry, GeometryCache, Matrix4)> geometries,
   ) {
     final active = <LiquidGlassShapeRenderObject>{};
+    final shortSide = _layerShapeShortSide;
     for (final (_, geometry, geometryToLayer) in geometries) {
       for (final shape in geometry.shapes) {
         if (_backdropClass(shape.appearance) != 1) continue;
         // The shape's own appearance carries its visibility and any
         // backdrop-transfer override, so fading keeps the same transfer the
         // shared filter applied while it was fully visible.
-        final filter = fakeGlassBackdropFilter(
+        final filter = fakeGlassBackdropFilterParts(
           settings,
           shape.appearance,
           deviceScale: devicePixelRatio,
-          shapeShortSide: MatrixUtils.transformRect(
-            geometryToLayer,
-            shape.shapeBounds,
-          ).shortestSide,
+          shapeShortSide: shortSide,
         );
         if (filter == null) continue;
         final renderObject = shape.renderObject;
@@ -458,9 +478,8 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
           _SeparateBackdropLayers.new,
         );
         final backdropLayer = (layers.backdrop.layer ??= BackdropFilterLayer())
-          ..filter = filter
-          ..blendMode = BlendMode.srcOver
-          ..backdropKey = _effectiveBackdropKey;
+          ..filter = filter.full
+          ..blendMode = BlendMode.srcOver;
         assert(() {
           debugRegisterBackdropCapture(this, _effectiveBackdropKey);
           return true;
@@ -469,15 +488,30 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
             ? geometryToLayer
             : geometryToLayer.multiplied(shape.shapeToGeometry!);
         final shapeBounds = Offset.zero & renderObject.size;
-        layers.clip.layer = context.pushClipPath(
-          true,
+        final clipBounds = MatrixUtils.transformRect(shapeToLayer, shapeBounds);
+        final sigma = settings.frostSigmaAt(
+          devicePixelRatio,
+          shapeShortSide: shortSide,
+        );
+        _paintInPass(
+          context,
           offset,
-          MatrixUtils.transformRect(shapeToLayer, shapeBounds),
-          shape.shape.getOuterPath(shapeBounds).transform(shapeToLayer.storage),
-          (clipContext, clipOffset) {
-            clipContext.pushLayer(backdropLayer, (_, _) {}, clipOffset);
-          },
-          oldLayer: layers.clip.layer,
+          layers.pass,
+          filter: backdropLayer,
+          parts: filter,
+          inner: clipBounds,
+          reach: sigma != 0 ? sigma * 3 + 1 : 0,
+          (passContext, passOffset) => _paintPassClip(
+            passContext,
+            passOffset,
+            layers.pass,
+            layers.clip,
+            clipBounds,
+            shape.shape
+                .getOuterPath(shapeBounds)
+                .transform(shapeToLayer.storage),
+            backdropLayer,
+          ),
         );
       }
     }
@@ -520,14 +554,14 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
     _cachedClipClasses = const [];
   }
 
-  ImageFilter _buildBackdropFilter() {
+  FakeGlassFilterParts _buildBackdropFilter() {
     // Every shape the shared clip covers is fully visible, so the shared
     // transfer always applies at full strength.
-    return fakeGlassBackdropFilter(
+    return fakeGlassBackdropFilterParts(
       settings,
       defaultAppearance.copyWith(visibility: 1),
       deviceScale: devicePixelRatio,
-      shapeShortSide: _sharedShapeShortSide,
+      shapeShortSide: _layerShapeShortSide,
     )!;
   }
 
@@ -543,6 +577,125 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   void onCompositing() {
     if (!attached) return;
     runCompositorPoll();
+    // Where the glass is on screen decides how its passes are cut, and
+    // retained motion moves it without repainting.
+    _syncPassSlot(_sharedPass);
+    for (final layers in _separateBackdropLayers.values) {
+      _syncPassSlot(layers.pass);
+    }
+  }
+
+  /// Paints a clipped backdrop [filter] with [painter]. With seeds on (see
+  /// [seedsBackdrop]) and a blur to crop, that happens inside a
+  /// pass the layer holds in [slot], seeded by a small backdrop filter, and the
+  /// filter reads that pass instead of the backdrop its key names; otherwise
+  /// the filter keeps its key and nothing else is added to the layer tree.
+  void _paintInPass(
+    PaintingContext context,
+    Offset offset,
+    _PassSlot slot,
+    PaintingContextCallback painter, {
+    required BackdropFilterLayer filter,
+    required FakeGlassFilterParts parts,
+    required Rect inner,
+    required double reach,
+  }) {
+    final key = _effectiveBackdropKey;
+    // A glass without a blur, or that is nothing but a blur, needs no seed.
+    final seeds =
+        seedsBackdrop &&
+        parts.sigma > 0 &&
+        !identical(parts.withoutBlur, fakeGlassIdentityFilter);
+    if (!seeds) {
+      slot.clear();
+      filter.backdropKey = key;
+      painter(context, offset);
+      return;
+    }
+    final pass = slot.handle.layer ??= SeededBackdropPassLayer()
+      ..seedWhileResizing = true
+      ..onActiveChanged = () => _syncChildClip(slot);
+    slot
+      ..inner = inner.shift(offset)
+      ..offset = offset
+      ..reach = reach;
+    _syncPassSlot(slot);
+    pass.bindFilter(
+      filter,
+      key,
+      full: parts.full,
+      blur: PassBlur(
+        sigma: parts.sigma,
+        tileMode: parts.tileMode,
+        withoutBlur: parts.withoutBlur,
+        blurOnly: identical(parts.withoutBlur, fakeGlassIdentityFilter),
+      ),
+    );
+    context.pushLayer(pass, painter, offset);
+  }
+
+  void _syncPassSlot(_PassSlot slot) {
+    final layer = slot.handle.layer;
+    final inner = slot.inner;
+    if (layer == null || inner == null) return;
+    layer.apply(
+      planBackdropPass(inner, slot.offset, slot.reach, sizing: slot.sizing),
+      inner,
+    );
+    _syncChildClip(slot);
+  }
+
+  /// Paints the clip around [backdrop] in [slot]'s pass: the effect's
+  /// outline, [path], clipped natively like a filter without a pass.
+  ///
+  /// While the pass is in effect, [_syncChildClip] swaps the clip for a rect
+  /// the size of the pass, and the pass cuts [path] out with its own
+  /// outside-clear instead.
+  void _paintPassClip(
+    PaintingContext context,
+    Offset offset,
+    _PassSlot slot,
+    LayerHandle<ClipPathLayer> handle,
+    Rect bounds,
+    Path path,
+    BackdropFilterLayer backdrop,
+  ) {
+    final layer = context.pushClipPath(
+      true,
+      offset,
+      bounds,
+      path,
+      (clipContext, clipOffset) {
+        clipContext.pushLayer(backdrop, (_, _) {}, clipOffset);
+      },
+      oldLayer: handle.layer,
+    );
+    handle.layer = layer;
+    slot
+      ..clipLayer = layer
+      ..outline = layer?.clipPath;
+    _syncChildClip(slot);
+  }
+
+  /// Makes the pass's child clip a rect while the pass is in effect.
+  ///
+  /// The backdrop filter's saveLayer takes the size of its clip, and Impeller
+  /// reuses an offscreen target only at exactly the same size, so a clip that
+  /// is the exact outline of an animated shape allocates and frees a target
+  /// every frame. The pass rect is already on pixel buckets (see
+  /// [planSeededBackdropPass]) and contains the outline, so the filter paints
+  /// the whole of it and the pass clears everything outside the real outline
+  /// ([SeededBackdropPassLayer.silhouette]). Without a pass, the clip is the
+  /// outline itself, as before.
+  void _syncChildClip(_PassSlot slot) {
+    final clip = slot.clipLayer;
+    final outline = slot.outline;
+    if (clip == null || outline == null) return;
+    final pass = slot.handle.layer;
+    pass?.silhouette = outline;
+    final rect = pass?.passRect;
+    final wanted = rect == null ? outline : slot.rectPath(rect);
+    if (!identical(clip.clipPath, wanted)) clip.clipPath = wanted;
   }
 
   @override
@@ -571,6 +724,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   void _releaseGlassLayers() {
     _backdropLayer.layer = null;
     _clipLayer.layer = null;
+    _sharedPass.clear();
     for (final layers in _separateBackdropLayers.values) {
       layers.dispose();
     }
@@ -592,11 +746,55 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
 
 /// Retained layer handles for one shape's own clipped backdrop pass.
 class _SeparateBackdropLayers {
+  final pass = _PassSlot();
   final clip = LayerHandle<ClipPathLayer>();
   final backdrop = LayerHandle<BackdropFilterLayer>();
 
   void dispose() {
+    pass.clear();
     clip.layer = null;
     backdrop.layer = null;
+  }
+}
+
+/// A retained seeded pass layer and what it was last painted with, so its
+/// placement can be refreshed without repainting.
+class _PassSlot {
+  final handle = LayerHandle<SeededBackdropPassLayer>();
+
+  /// Keeps this slot's pass from resizing on every bucket step.
+  final sizing = BackdropPassSizing();
+
+  /// The clip around the backdrop filter, in the pass layer's parent's
+  /// coordinates.
+  Rect? inner;
+  Offset offset = Offset.zero;
+
+  /// How far the blur reads past [inner].
+  double reach = 0;
+
+  /// The clip layer around the backdrop filter, and the outline it has
+  /// without a pass.
+  ClipPathLayer? clipLayer;
+  Path? outline;
+
+  Rect? _rectPathRect;
+  Path? _rectPath;
+
+  /// A path of exactly [rect], the same object for the same rect.
+  Path rectPath(Rect rect) {
+    if (_rectPath == null || _rectPathRect != rect) {
+      _rectPath = Path()..addRect(rect);
+      _rectPathRect = rect;
+    }
+    return _rectPath!;
+  }
+
+  void clear() {
+    handle.layer?.onActiveChanged = null;
+    handle.layer = null;
+    inner = null;
+    clipLayer = null;
+    outline = null;
   }
 }

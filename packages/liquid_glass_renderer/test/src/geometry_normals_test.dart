@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
 
+import 'gpu_test_helpers.dart';
+
 const _expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
 
 void main() {
@@ -21,6 +23,7 @@ void main() {
       const radius = 12.0;
       const cx = 32.3;
       const cy = 31.7;
+      const scale = 2;
       final result = renderer.render(
         width: 64,
         height: 64,
@@ -34,28 +37,24 @@ void main() {
         refractionAmount: 60,
         offsetX: 0,
         offsetY: 0,
+        matteScale: scale,
       );
-      final bytes = (await result.image.toByteData())!;
+      final field = await readGeometryField(result.image);
 
+      // Texel (i, j) is computed at the center of matte pixel (i * scale,
+      // j * scale).
       var worst = 0.0;
       var checked = 0;
-      for (var y = 0; y < 64; y++) {
-        for (var x = 0; x < 64; x++) {
-          final i = (y * result.width + x) * 4;
-          final dx = x + 0.5 - cx;
-          final dy = y + 0.5 - cy;
+      for (var j = 0; j <= 64 ~/ scale; j++) {
+        for (var i = 0; i <= 64 ~/ scale; i++) {
+          final k = (j * result.textureWidth + i) * 4;
+          final dx = i * scale + 0.5 - cx;
+          final dy = j * scale + 0.5 - cy;
           final r = math.sqrt(dx * dx + dy * dy);
-          if (bytes.getUint8(i + 2) < 128 || r < 3 || r > radius - 0.5) {
-            continue;
-          }
-          // Diamond-angle normal code, as decodeSurfaceNormal in
-          // displacement_encoding.glsl.
-          final diamond =
-              (bytes.getUint8(i) * 16 + (bytes.getUint8(i + 1) >> 4)) / 1024;
-          final nx = diamond < 2 ? 1 - diamond : diamond - 3;
-          final ny = diamond < 1
-              ? diamond
-              : (diamond < 3 ? 2 - diamond : diamond - 4);
+          if (field[k] <= 0 || r < 3 || r > radius - 0.5) continue;
+          // The stored direction may be shortened; only its angle matters here.
+          final nx = field[k + 1];
+          final ny = field[k + 2];
           final cosine =
               (nx * dx + ny * dy) / (math.sqrt(nx * nx + ny * ny) * r);
           worst = math.max(worst, math.acos(cosine.clamp(-1.0, 1.0)));
@@ -63,7 +62,7 @@ void main() {
         }
       }
 
-      expect(checked, greaterThan(300));
+      expect(checked, greaterThan(80));
       expect(worst * 180 / math.pi, lessThan(1.5));
     },
     skip: _expectFallback,

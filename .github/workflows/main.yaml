@@ -21,7 +21,7 @@ jobs:
   flutter-check:
     name: Build Check
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       pull-requests: write
       contents: write
@@ -47,6 +47,9 @@ jobs:
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens
+
+      - name: 📝 Run Tests without goldens, with the production defaults
+        run: melos run test:defaults
 
 
   skia_build:

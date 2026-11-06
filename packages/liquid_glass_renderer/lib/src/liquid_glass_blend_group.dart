@@ -222,7 +222,7 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
       for (var i = 0; i < entries.length; i++) {
         final shape = entries[i].key;
         if (shape.attached && shape.parent != this) {
-          _lastShapeTransforms[i] = shape.getTransformTo(this);
+          _lastShapeTransforms[i] = _paintedTransform(shape);
         }
       }
       return false;
@@ -232,8 +232,12 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
     for (var i = 0; i < entries.length; i++) {
       final shape = entries[i].key;
       if (!shape.attached || shape.parent == this) continue;
-      final transform = shape.getTransformTo(this);
-      if (!MatrixUtils.matrixEquals(transform, _lastShapeTransforms[i])) {
+      final transform = _paintedTransform(shape);
+      final last = _lastShapeTransforms[i];
+      // `matrixEquals` reads null as the identity; a shape that stops or
+      // starts being painted is a change either way.
+      if ((transform == null) != (last == null) ||
+          !MatrixUtils.matrixEquals(transform, last)) {
         _lastShapeTransforms[i] = transform;
         changed = true;
       }
@@ -244,25 +248,27 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
     return changed;
   }
 
+  /// The shape's transform to this group, or null while the shape is not
+  /// painted (see [isGlassShapePainted]).
+  Matrix4? _paintedTransform(RenderObject shape) =>
+      isGlassShapePainted(shape, this) ? shape.getTransformTo(this) : null;
+
   @override
   (Rect, List<ShapeGeometry>, bool) gatherShapeData() {
     final shapes = <ShapeGeometry>[];
     final cachedShapes = geometry?.shapes ?? [];
 
-    var anyShapeChangedInLayer =
-        cachedShapes.length != link.shapeEntries.length;
+    var anyShapeChangedInLayer = false;
 
     Rect? layerBounds;
 
-    for (final (
-          index,
-          MapEntry(
-            key: renderObject,
-            value: shape,
-          ),
-        )
-        in link.shapeEntries.indexed) {
-      if (!renderObject.attached || !renderObject.hasSize) continue;
+    for (final MapEntry(key: renderObject, value: shape) in link.shapeEntries) {
+      if (!renderObject.attached ||
+          !renderObject.hasSize ||
+          !isGlassShapePainted(renderObject, this)) {
+        continue;
+      }
+      final index = shapes.length;
 
       try {
         final shapeData = _computeShapeInfo(
@@ -293,6 +299,8 @@ class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry {
         debugPrint('Failed to compute shape info: $e');
       }
     }
+
+    if (cachedShapes.length != shapes.length) anyShapeChangedInLayer = true;
 
     return (
       (layerBounds ?? Rect.zero).inflate(blend * .25),

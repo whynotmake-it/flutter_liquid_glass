@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
@@ -180,6 +181,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         final background = await capture(0);
         var visibleDifference = 0;
         var maxJump = 0;
+        var jumpsOverThree = 0;
         var halfError = 0;
         var zeroError = 0;
         for (var i = 0; i < full.length; i += 4) {
@@ -193,6 +195,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
             }
             final jump = (full[index] - almost[index]).abs();
             if (jump > maxJump) maxJump = jump;
+            if (jump > 3) jumpsOverThree++;
             final error =
                 (half[index] - (full[index] * 128 + zero[index] * 127) / 255)
                     .abs()
@@ -206,17 +209,31 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           reason:
               'Opacity must actually fade the material, not just its child.',
         );
+        // Glass under a fractional opacity paints without its native seed
+        // (a seed's pass is only planned in the root pass), so at 255/255 the
+        // seeded fake glass cuts its outline by clearing the pass outside it,
+        // which antialiases a few pixels of a rounded corner differently from
+        // the clip the plain path uses (9 levels on 4 pixels on Metal, see
+        // `native_seed_parity_test.dart`). Everything else is continuous.
+        final seededOutline =
+            kind == 'fake' && SeededBackdropPassLayer.mode != BackdropSeed.none;
         expect(
           maxJump,
-          lessThanOrEqualTo(3),
+          lessThanOrEqualTo(seededOutline ? 16 : 3),
           reason: 'Discontinuity at opaque; half-opacity error=$halfError',
+        );
+        expect(
+          jumpsOverThree,
+          lessThanOrEqualTo(seededOutline ? 16 : 0),
+          reason: 'Only a few outline pixels may jump at opaque',
         );
         expect(
           zeroError,
           0,
           reason: 'Zero opacity must leave only the backdrop.',
         );
-        expect(halfError, lessThanOrEqualTo(3));
+        // The same outline pixels, halved: `full` is one end of the blend.
+        expect(halfError, lessThanOrEqualTo(seededOutline ? 8 : 3));
       },
       skip:
           (kind == 'real' && skipProperGlassTests) ||

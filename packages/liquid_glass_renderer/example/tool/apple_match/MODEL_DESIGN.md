@@ -64,6 +64,15 @@ re-bound scalars) → zero performance delta. Geometry pass takes
    → tintColor(tint) → toneResponse → vibrancy → highlight → outline.
 3. Accept knob only if its stage improves ≥2 scenes beyond noise (3-frame
    median, repeated run identical → noise ≈ 0).
+4. Fit color models once for all control sizes. Apple's dark material is
+   more transmissive and lifts less on small controls, and a size-dependent
+   fit matches each scene better, but it was removed on purpose: a layer has
+   one color per model for all its shapes, and FakeGlass one color matrix, so
+   a shape's look then depended on the other shapes in its layer and jumped
+   when a FakeGlass shape faded. `ios27Dark` is the mean of the 63 pt and
+   large fits. Keep it size-independent unless every shape can resolve its
+   own look in real glass and FakeGlass; a better per-scene score is not a
+   reason to bring the size response back.
 
 ## Performance invariants
 

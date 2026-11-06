@@ -243,13 +243,13 @@ class _CanvasClipContext extends ClipContext {
 
 class _ClipEntry {
   _ClipEntry(this.source) {
-    handle.layer = _NativeClipLayer();
+    handle.layer = NativeClipLayer();
     forward.layer = TransformLayer(transform: Matrix4.identity());
     inverse.layer = TransformLayer(transform: Matrix4.identity());
   }
 
   final RenderBox source;
-  final handle = LayerHandle<_NativeClipLayer>();
+  final handle = LayerHandle<NativeClipLayer>();
   final forward = LayerHandle<TransformLayer>();
   final inverse = LayerHandle<TransformLayer>();
   Object? _geometry;
@@ -320,7 +320,8 @@ class _ClipEntry {
   }
 }
 
-class _NativeClipLayer extends ContainerLayer {
+@internal
+class NativeClipLayer extends ContainerLayer {
   Object? _geometry;
   Object? get geometry => _geometry;
   set geometry(Object value) {

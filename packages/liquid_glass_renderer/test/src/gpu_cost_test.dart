@@ -223,6 +223,7 @@ void _expectBudget(GpuReport report, Map<String, _Budget> budgets) {
 }
 
 void main() {
+  setUp(pinPlainBackdropPath);
   // This test file needs Impeeler's recording binding. It is installed here
   // rather than in flutter_test_config.dart because some test files install
   // their own specialized binding.

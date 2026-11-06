@@ -5,7 +5,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/fake_glass.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/liquid_glass.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 
@@ -63,11 +65,11 @@ void main() {
     int glassRenderObjectCount() =>
         tester.allRenderObjects.whereType<RenderLiquidGlass>().toSet().length;
 
-    // Excludes the composition-probe seed layer, whose filter is an identity
-    // ColorFilter; the shared and per-shape fading blurs carry ImageFilters.
+    // Excludes the composition-probe seed layer; inside a native seed's pass
+    // a filter keeps only what follows its blur, which can be a ColorFilter.
     int backdropFilterCount() => tester.layers
         .whereType<BackdropFilterLayer>()
-        .where((layer) => layer.filter is! ColorFilter)
+        .where((layer) => layer is! OpacitySeedLayer)
         .length;
 
     Widget build() => MaterialApp(
@@ -509,10 +511,19 @@ void main() {
         );
         // Both filters share one capture, whether the key came from the
         // group or from the layer itself.
-        final sharedKey = layer.debugBackdropFilterLayer!.backdropKey;
+        // With native seeds on, a filter inside its pass has no key and the
+        // pass remembers it instead.
+        BackdropKey? keyOf(BackdropFilterLayer filter) {
+          for (Layer? l = filter; l != null; l = l.parent) {
+            if (l is SeededBackdropPassLayer) return l.backdropGroupKey;
+          }
+          return filter.backdropKey;
+        }
+
+        final sharedKey = keyOf(layer.debugBackdropFilterLayer!);
         expect(sharedKey, isNotNull);
         expect(
-          layer.debugSeparateBackdropLayers.single.backdropKey,
+          keyOf(layer.debugSeparateBackdropLayers.single),
           same(sharedKey),
         );
 

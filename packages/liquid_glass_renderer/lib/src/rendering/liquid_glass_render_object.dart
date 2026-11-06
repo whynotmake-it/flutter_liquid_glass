@@ -11,10 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
+import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/retained_glass_clip.dart';
+import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
+import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
 import 'package:liquid_glass_renderer/src/logging.dart';
 
 @internal
@@ -83,6 +86,23 @@ Rect expandForGlassShadows(
   return result;
 }
 
+/// Whether every render object between [shape] and [layer] paints its child
+/// on the way down, so [shape] shows up on screen when [layer] paints.
+///
+/// A shape stays registered with its layer while attached, including inside
+/// an [Offstage], an [IndexedStack] child that is not shown, or an opacity of
+/// zero, where Flutter does not paint it ([RenderObject.paintsChild]).
+@internal
+bool isGlassShapePainted(RenderObject shape, RenderObject layer) {
+  var child = shape;
+  while (child != layer) {
+    final parent = child.parent;
+    if (parent == null || !parent.paintsChild(child)) return false;
+    child = parent;
+  }
+  return true;
+}
+
 /// Union of the geometry bounds registered with [link], in layer space, with
 /// the shapes and transforms needed to grow it. Pure: no polling, no rebuild.
 @internal
@@ -93,7 +113,11 @@ Rect expandForGlassShadows(
   Rect? bounds;
   final shapes = <(List<ShapeGeometry>, Matrix4)>[];
   for (final geometryRo in link.shapes) {
-    if (!geometryRo.attached || !geometryRo.hasSize) continue;
+    if (!geometryRo.attached ||
+        !geometryRo.hasSize ||
+        !isGlassShapePainted(geometryRo, layer)) {
+      continue;
+    }
     final (geometryBounds, geometryShapes, _) = geometryRo.gatherShapeData();
     if (geometryShapes.isEmpty) continue;
     final toLayer = geometryRo.getTransformTo(layer);
@@ -180,6 +204,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     _link = value;
     markNeedsPaint();
   }
+
+  /// The registered shapes that are painted when this layer paints (see
+  /// [isGlassShapePainted]), in paint order.
+  @protected
+  List<RenderLiquidGlassGeometry> get paintedShapes => [
+    for (final shape in link.shapes)
+      if (isGlassShapePainted(shape, this)) shape,
+  ];
+
+  List<RenderLiquidGlassGeometry> _lastPaintedShapes = const [];
 
   LiquidGlassSettings _settings;
   LiquidGlassSettings get settings => _settings;
@@ -306,6 +340,48 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   @visibleForTesting
   Offset get debugCompositorTranslation => _effectTranslation;
 
+  /// Places the seeded pass around a backdrop effect clipped to
+  /// [innerLayerRect] (in the layer coordinates it is painted in, [paintOffset]
+  /// from this object's), whose blur reads [reach] past that clip.
+  ///
+  /// Inside a seeded fractional-opacity pass the effect already renders in a
+  /// pass that starts at the enclosing clips, so no extra pass is placed.
+  /// Neither is one without a blur to crop or where seeds are off (see
+  /// [seedsBackdrop]).
+  ///
+  /// A large pass is sized by [sizing] (this object's own by default), which
+  /// keeps it from changing size on every bucket step; each effect painting
+  /// its own pass needs its own.
+  @protected
+  BackdropPassPlan planBackdropPass(
+    Rect innerLayerRect,
+    Offset paintOffset,
+    double reach, {
+    BackdropPassSizing? sizing,
+  }) => !seedsBackdrop || reach <= 0 || compositionProbeSeeding
+      ? BackdropPassPlan.unsupported
+      : planSeededBackdropPass(
+          owner: this,
+          innerLayerRect: innerLayerRect,
+          paintOffset: paintOffset,
+          translation: _effectTranslation,
+          reach: reach,
+          devicePixelRatio: devicePixelRatio,
+          ownerClip: retainedClipBounds,
+          sizing: sizing ?? _passSizing,
+        );
+
+  final _passSizing = BackdropPassSizing();
+
+  /// Whether this glass paints its backdrop effects in seeded passes (see
+  /// [SeededBackdropPassLayer.enabled]), which it does except inside a
+  /// [LiquidGlassCapture], whose own pass already holds the backdrop the glass
+  /// reads.
+  @protected
+  bool get seedsBackdrop =>
+      SeededBackdropPassLayer.enabled &&
+      RenderLiquidGlassCapture.enclosing(this) == null;
+
   /// Moves all layer-owned painting without recording it again.
   @protected
   bool setCompositorTranslation(Offset value) {
@@ -380,7 +456,12 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     Rect? boundingBox;
     link.updatePaintOrder(this);
     _framePoll.markPolled();
-    for (final geometryRo in link.shapes) {
+    final painted = paintedShapes;
+    // A shape coming back onstage keeps its registration and geometry, so the
+    // link would not tell the matte it changed.
+    if (!listEquals(painted, _lastPaintedShapes)) link.markDirty();
+    _lastPaintedShapes = painted;
+    for (final geometryRo in painted) {
       final transformPoll = geometryRo.pollRelativeTransforms(this);
       final geometry = geometryRo.maybeRebuildGeometry();
       final transform = transformPoll.transform;
@@ -555,7 +636,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
   /// instead of repainting every frame.
   @protected
   ({bool needsRepaint, Offset? translation}) pollCompositorTranslation() {
-    final current = link.shapes;
+    // A shape going offstage or onstage changes this list, which repaints.
+    final current = paintedShapes;
     final committed = shapesWithGeometry;
     if (_framePoll.polledThisFrame && committed.length == current.length) {
       return (needsRepaint: false, translation: Offset.zero);
@@ -826,7 +908,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     if (!useNativeOuterBlur) {
-      canvas.saveLayer(effectPaintBounds, Paint());
+      // The layer only bounds what it holds, and the shadows are painted inside
+      // effectPaintBounds, so growing it to pixel buckets changes no pixel;
+      // an animated shape would otherwise give every frame a render target of
+      // a new size, which Impeller cannot reuse.
+      canvas.saveLayer(
+        effectPaintBounds.expandToPixelBuckets(devicePixelRatio),
+        Paint(),
+      );
     }
 
     for (final (_, geometry, geometryToLayer) in shapesWithGeometry) {

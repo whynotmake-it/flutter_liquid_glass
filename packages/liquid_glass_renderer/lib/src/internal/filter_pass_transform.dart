@@ -10,7 +10,9 @@ import 'package:meta/meta.dart';
 /// root that is the screen; inside a [LiquidGlassCapture] it is the capture's
 /// pixel-snapped clip. Inside a seeded fractional-opacity pass ([seeding]) it
 /// is that pass, which the engine bounds by the enclosing clips (including
-/// any capture's). The innermost pass wins. [translation] is retained
+/// any capture's). A seeded pass around the effect itself (never inside a
+/// capture) is the innermost: pass [passOrigin], its screen-space top-left, to
+/// measure from it. The innermost pass wins. [translation] is retained
 /// compositor motion applied below [owner].
 @internal
 Matrix4 filterPassTransform(
@@ -18,10 +20,14 @@ Matrix4 filterPassTransform(
   required bool seeding,
   required double devicePixelRatio,
   Offset translation = Offset.zero,
+  Offset? passOrigin,
 }) {
   final Matrix4 transform;
   final capture = RenderLiquidGlassCapture.enclosing(owner);
-  if (seeding) {
+  if (passOrigin != null) {
+    transform = owner.getTransformTo(null)
+      ..leftTranslateByDouble(-passOrigin.dx, -passOrigin.dy, 0, 1);
+  } else if (seeding) {
     final origin = GlassCompositionProbe.seededPassOrigin(
       owner,
       devicePixelRatio,
