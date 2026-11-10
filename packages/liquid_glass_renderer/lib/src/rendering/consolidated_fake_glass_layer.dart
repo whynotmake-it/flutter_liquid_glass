@@ -8,6 +8,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/internal/fake_glass_shader_slots.dart';
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
 import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
 import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
@@ -411,6 +412,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   ) {
     final shader = surfaceShader;
     if (shader == null) return;
+    _shaderSlots.beginPaint();
     for (final (_, geometry, geometryToLayer) in geometries) {
       for (final shape in geometry.shapes) {
         canvas
@@ -422,7 +424,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         }
         paintFakeGlassSurface(
           canvas,
-          shader: shader,
+          shader: _shaderSlots.shaderFor((shape.renderObject, false), shader),
           size: shape.renderObject.size,
           shape: shape.shape,
           settings: settings,
@@ -432,7 +434,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         if (settings.highlight * shape.appearance.visibility > 0) {
           paintFakeGlassSurface(
             canvas,
-            shader: shader,
+            shader: _shaderSlots.shaderFor((shape.renderObject, true), shader),
             size: shape.renderObject.size,
             shape: shape.shape,
             settings: settings,
@@ -444,7 +446,15 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
         canvas.restore();
       }
     }
+    _shaderSlots.endPaint();
   }
+
+  /// A shader per shape and pass, keyed by (shape, glint); see
+  /// [FakeGlassShaderSlots].
+  final _shaderSlots = FakeGlassShaderSlots();
+
+  @visibleForTesting
+  FakeGlassShaderSlots get debugShaderSlots => _shaderSlots;
 
   /// Paints each separately served shape's own clipped backdrop filter so
   /// its transfer applies independently while the shape stays registered
@@ -740,6 +750,7 @@ class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject
   void dispose() {
     _retainedFrameSlot.layer = null;
     _releaseLayers();
+    _shaderSlots.dispose();
     super.dispose();
   }
 }
