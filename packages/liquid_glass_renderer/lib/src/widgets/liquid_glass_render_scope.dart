@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/painting.dart';
 import 'package:meta/meta.dart';
 
 @internal
@@ -9,10 +9,7 @@ class LiquidGlassRenderScope extends InheritedWidget {
     required this.settings,
     required this.defaultAppearance,
     required super.child,
-    this.useFake = false,
-    this.consolidatesFakeBackdrop = false,
-    this.consolidatesFakeSurface = false,
-    this.backdropKey,
+    this.fake = false,
     super.key,
   });
 
@@ -20,17 +17,9 @@ class LiquidGlassRenderScope extends InheritedWidget {
 
   final LiquidGlassAppearance defaultAppearance;
 
-  final bool useFake;
-
-  /// Whether fake shapes register with the parent layer while omitting their
-  /// individual backdrop filters.
-  final bool consolidatesFakeBackdrop;
-
-  /// Whether the parent layer paints each registered fake surface.
-  final bool consolidatesFakeSurface;
-
-  /// The backdrop capture shared by glass effects in this scope, if any.
-  final BackdropKey? backdropKey;
+  /// Whether the layer is consolidated fake glass: shapes register with it
+  /// without backdrop filters of their own, and it paints each fake surface.
+  final bool fake;
 
   static LiquidGlassRenderScope of(BuildContext context) {
     final scope = context
@@ -49,22 +38,14 @@ class LiquidGlassRenderScope extends InheritedWidget {
     BuildContext context, {
     bool watch = true,
   }) {
-    if (watch) {
-      return context
-          .dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
-    } else {
-      return context.getInheritedWidgetOfExactType<LiquidGlassRenderScope>();
-    }
+    return watch
+        ? context.dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>()
+        : context.getInheritedWidgetOfExactType<LiquidGlassRenderScope>();
   }
 
   @override
-  bool updateShouldNotify(covariant InheritedWidget oldWidget) {
-    return oldWidget is! LiquidGlassRenderScope ||
-        oldWidget.settings != settings ||
-        oldWidget.defaultAppearance != defaultAppearance ||
-        oldWidget.useFake != useFake ||
-        oldWidget.consolidatesFakeBackdrop != consolidatesFakeBackdrop ||
-        oldWidget.consolidatesFakeSurface != consolidatesFakeSurface ||
-        oldWidget.backdropKey != backdropKey;
-  }
+  bool updateShouldNotify(LiquidGlassRenderScope oldWidget) =>
+      oldWidget.settings != settings ||
+      oldWidget.defaultAppearance != defaultAppearance ||
+      oldWidget.fake != fake;
 }

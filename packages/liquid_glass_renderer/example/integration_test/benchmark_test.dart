@@ -4,10 +4,10 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, TileMode;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _defaultScenarioName = String.fromEnvironment(
   'LIQUID_GLASS_BENCHMARK_SCENARIO',
@@ -423,6 +423,7 @@ enum BenchmarkScenario {
   pxPillStretch,
   pxBlend5Motion,
   pxSheetResize,
+  pxSheetOverPage,
   pxMultiLayer,
   colorsBlendStatic,
   colorsBlendMotion,
@@ -466,7 +467,6 @@ enum BenchmarkScenario {
   independent8Motion,
   independent16Motion,
   litIndependent16Motion,
-  independent16SharedBackdrop,
   sparse16Motion,
   relativeBlendMotion,
   relativeBlend3Motion,
@@ -847,7 +847,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         count: 4,
         t: t,
         fake: true,
-        shareBackdrop: true,
       ),
       BenchmarkScenario.fakeUngrouped4Motion => _groupedGrid(
         settings: settings,
@@ -915,27 +914,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
         count: 16,
         t: t,
       ),
-      BenchmarkScenario.independent16SharedBackdrop => BackdropGroup(
-        child: Center(
-          child: Transform.translate(
-            offset: Offset(30 * math.sin(t * math.pi * 2), 0),
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              children: List.generate(
-                16,
-                (index) => LiquidGlass.withOwnLayer(
-                  settings: settings,
-                  useBackdropGroup: true,
-                  shape: LiquidRoundedSuperellipse(
-                    borderRadius: 8.0 + index,
-                  ),
-                  child: _tile(index, size: 72),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
       BenchmarkScenario.sparse16Motion => _sparseGroup(
         settings: settings,
         t: t,
@@ -989,6 +967,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
       BenchmarkScenario.pxPillStretch => _pxStretched(t, 96, 40, true),
       BenchmarkScenario.pxBlend5Motion => _pxBlend5(t),
       BenchmarkScenario.pxSheetResize => _pxSheet(t),
+      BenchmarkScenario.pxSheetOverPage => _pxSheetOverPage(t),
       BenchmarkScenario.pxMultiLayer => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1264,6 +1243,41 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     );
   }
 
+  // A sheet over a page that holds still, with a bar moving on the sheet.
+  Widget _pxSheetOverPage(double t) {
+    final size = MediaQuery.sizeOf(context);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const RepaintBoundary(child: _Background()),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: LiquidGlassLayer(
+              settings: _pxSettings,
+              child: LiquidGlass(
+                shape: const LiquidRoundedSuperellipse(borderRadius: 38),
+                child: SizedBox(
+                  width: size.width - 16,
+                  height: size.height * .6,
+                  child: Align(
+                    alignment: Alignment(-.8 + 1.6 * t, -.8),
+                    child: const SizedBox(
+                      width: 48,
+                      height: 4,
+                      child: ColoredBox(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _pxMultiLayer(double width, {bool tinted = false}) => LiquidGlassLayer(
     settings: _pxSettings,
     child: Row(
@@ -1332,7 +1346,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
     required double t,
     double blend = 24,
     bool fake = false,
-    bool shareBackdrop = false,
     bool variedAppearance = false,
     bool animateVisibility = false,
     LiquidGlassAppearance? defaultAppearance,
@@ -1343,7 +1356,6 @@ class _BenchmarkAppState extends State<_BenchmarkApp>
       settings: settings,
       defaultAppearance: defaultAppearance,
       fake: fake,
-      useBackdropGroup: shareBackdrop,
       child: Center(
         child: Transform.translate(
           offset: Offset(30 * math.sin(t * math.pi * 2), 0),

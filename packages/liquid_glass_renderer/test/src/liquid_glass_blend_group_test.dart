@@ -1,9 +1,10 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/composer.dart';
+import 'package:liquid_glass_renderer/effects.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:liquid_glass_renderer/rendering.dart';
+import 'package:liquid_glass_renderer/src/rendering/render_liquid_glass_geometry.dart';
 
 import 'shared.dart';
 
@@ -45,6 +46,55 @@ void main() {
         ),
       );
     }
+
+    testWidgets('a hidden shape leaves the group bounds to what shows', (
+      tester,
+    ) async {
+      Widget group({required double hidden}) => CupertinoApp(
+        home: Align(
+          alignment: Alignment.topLeft,
+          child: LiquidGlassLayer(
+            child: LiquidGlassBlendGroup(
+              blend: 8,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LiquidGlassVisibility(
+                    visibility: hidden,
+                    child: const LiquidGlass.grouped(
+                      shape: LiquidOval(),
+                      child: SizedBox.square(dimension: 100),
+                    ),
+                  ),
+                  const SizedBox(width: 200),
+                  const LiquidGlass.grouped(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 40),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      Rect bounds() => tester.allRenderObjects
+          .whereType<RenderLiquidGlassBlendGroup>()
+          .firstWhere((group) => group.geometryBlend == 8)
+          .maybeRebuildGeometry()!
+          .bounds;
+
+      await tester.pumpWidget(group(hidden: 0));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(44, epsilon: 2));
+
+      await tester.pumpWidget(group(hidden: 0.5));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(344, epsilon: 2));
+
+      await tester.pumpWidget(group(hidden: 0));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(44, epsilon: 2));
+    });
 
     testWidgets('generates reusable GPU geometry metadata', (tester) async {
       await tester.pumpWidget(
@@ -177,11 +227,7 @@ void main() {
                 child: LiquidGlassBlendGroup(
                   child: Wrap(
                     children: [
-                      for (
-                        var i = 0;
-                        i <= LiquidGlassBlendGroup.maxShapesPerLayer;
-                        i++
-                      )
+                      for (var i = 0; i <= geometryMaxShapesPerDraw; i++)
                         const LiquidGlass.grouped(
                           shape: LiquidOval(),
                           child: SizedBox.square(dimension: 20),

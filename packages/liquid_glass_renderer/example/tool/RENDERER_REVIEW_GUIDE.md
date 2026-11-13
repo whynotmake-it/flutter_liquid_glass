@@ -64,10 +64,7 @@ that real and fake glass track every submitted scroll frame.
 Metal and Vulkan render correctly:
 
 - It renders only the first subpass that contains a `BackdropFilter` per
-  process; later ones are black. The `LiquidGlassCapture` pixel tests
-  therefore live one scene per file and render the captured scene first, and
-  the host runs of the tests that compare pixels of seeded glass pin the plain
-  path (`pinPlainBackdropPath`); the seeded run is on a device.
+  process; later ones are black.
 - It rasterizes the first fractional frame after a fully transparent one
   wrong, including content outside the glass. The outer optical fade, seeded
   nested fade and real/fake opacity cases skip under `flutter_tester`
@@ -81,15 +78,7 @@ Metal and Vulkan render correctly:
 
 ### Device suites
 
-`integration_test/liquid_glass_capture_test.dart` runs every capture scene,
-the fake references under a fade, and dispose/recreate on a real GPU:
-
-```sh
-flutter test --enable-impeller -d macos \
-  integration_test/liquid_glass_capture_test.dart
-```
-
-The other device suites install a `SubmittedSceneCapture` binding, which
+The device suites install a `SubmittedSceneCapture` binding, which
 `flutter test -d macos` rejects because it initializes
 `IntegrationTestWidgetsFlutterBinding` before `main`. Run those through
 `flutter drive`, which leaves binding setup to the test:

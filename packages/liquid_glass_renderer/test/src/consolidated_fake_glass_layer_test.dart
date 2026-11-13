@@ -1,15 +1,14 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/fake_glass.dart';
-import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
-import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
-import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
+import 'package:liquid_glass_renderer/rendering.dart';
+import 'package:liquid_glass_renderer/src/rendering/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_composition_probe.dart';
+import 'package:liquid_glass_renderer/src/widgets/consolidated_fake_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/widgets/fake_glass.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'submitted_scene_binding.dart';
 
@@ -151,7 +150,7 @@ void main() {
       ],
     );
     final raw = tester.renderObject<RenderFakeGlass>(find.byType(RawFakeGlass));
-    expect(raw.paintSurface, isFalse);
+    expect(raw.role, FakeGlassRole.layerPaints);
   });
 
   testWidgets('fake content remains above the analytic surface', (
@@ -231,7 +230,7 @@ void main() {
     );
     final ownSurface = tester.allRenderObjects
         .whereType<RenderFakeGlass>()
-        .where((surface) => surface.paintSurface)
+        .where((surface) => surface.role != FakeGlassRole.layerPaints)
         .toSet();
     expect(ownSurface, isEmpty);
   });
@@ -440,129 +439,113 @@ void main() {
     expect(layer.debugSeparateBackdropLayers, hasLength(1));
   });
 
-  for (final grouped in [false, true]) {
-    testWidgets(
-      'an overlapping diverging shape applies its own transfer once '
-      '(useBackdropGroup: $grouped)',
-      (tester) async {
-        // Shared shapes desaturate the red background to gray; the
-        // diverging shape over-saturates it. If it sampled the shared
-        // filter's output, the overlap would stay gray instead of red.
-        final boundaryKey = GlobalKey();
-        Widget buildLayer() => LiquidGlassLayer(
-          fake: true,
-          settings: const LiquidGlassSettings(
-            frost: 0,
-            contourStrength: 0,
-          ),
-          defaultAppearance: const LiquidGlassAppearance(
-            colorModel: LiquidGlassColorModel.direct(saturation: 0),
-          ),
-          useBackdropGroup: grouped,
-          child: const Stack(
-            children: [
-              Align(
-                alignment: Alignment(-0.4, 0),
-                child: LiquidGlass(
-                  shape: LiquidOval(),
-                  child: SizedBox(width: 200, height: 200),
-                ),
-              ),
-              Align(
-                alignment: Alignment(0.4, 0),
-                child: LiquidGlass(
-                  appearance: LiquidGlassAppearance(
-                    colorModel: LiquidGlassColorModel.direct(saturation: 2),
-                  ),
-                  shape: LiquidOval(),
-                  child: SizedBox(width: 200, height: 200),
-                ),
-              ),
-            ],
-          ),
-        );
-        await tester.pumpWidget(
-          MaterialApp(
-            home: RepaintBoundary(
-              key: boundaryKey,
-              child: Stack(
-                children: [
-                  const Positioned.fill(
-                    child: ColoredBox(color: Colors.red),
-                  ),
-                  Center(
-                    child: SizedBox(
-                      width: 500,
-                      height: 400,
-                      child: grouped
-                          ? BackdropGroup(child: buildLayer())
-                          : buildLayer(),
-                    ),
-                  ),
-                ],
+  testWidgets(
+    'an overlapping diverging shape applies its own transfer once',
+    (tester) async {
+      // Shared shapes desaturate the red background to gray; the
+      // diverging shape over-saturates it. If it sampled the shared
+      // filter's output, the overlap would stay gray instead of red.
+      final boundaryKey = GlobalKey();
+      Widget buildLayer() => const LiquidGlassLayer(
+        fake: true,
+        settings: LiquidGlassSettings(
+          frost: 0,
+          contourStrength: 0,
+        ),
+        defaultAppearance: LiquidGlassAppearance(
+          colorModel: LiquidGlassColorModel.direct(saturation: 0),
+        ),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment(-0.4, 0),
+              child: LiquidGlass(
+                shape: LiquidOval(),
+                child: SizedBox(width: 200, height: 200),
               ),
             ),
+            Align(
+              alignment: Alignment(0.4, 0),
+              child: LiquidGlass(
+                appearance: LiquidGlassAppearance(
+                  colorModel: LiquidGlassColorModel.direct(saturation: 2),
+                ),
+                shape: LiquidOval(),
+                child: SizedBox(width: 200, height: 200),
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RepaintBoundary(
+            key: boundaryKey,
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: ColoredBox(color: Colors.red),
+                ),
+                Center(
+                  child: SizedBox(
+                    width: 500,
+                    height: 400,
+                    child: buildLayer(),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      );
+      await tester.pump();
+
+      final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
+        find.byType(ConsolidatedFakeGlassLayer).last,
+      );
+      // Both filters share the layer's capture.
+      final sharedKey = layer.debugBackdropFilterLayer!.backdropKey;
+      expect(sharedKey, isNotNull);
+      expect(
+        layer.debugSeparateBackdropLayers.single.backdropKey,
+        same(sharedKey),
+      );
+
+      final image =
+          await (boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary)
+              .toImage();
+      final data = await tester.runAsync(image.toByteData);
+      (int, int, int) pixel(double x, double y) {
+        final i = (y.round() * image.width + x.round()) * 4;
+        return (
+          data!.getUint8(i),
+          data.getUint8(i + 1),
+          data.getUint8(i + 2),
         );
-        await tester.pump();
+      }
 
-        final layer = tester.renderObject<RenderConsolidatedFakeGlassLayer>(
-          find.byType(ConsolidatedFakeGlassLayer).last,
-        );
-        // Both filters share one capture, whether the key came from the
-        // group or from the layer itself.
-        // With native seeds on, a filter inside its pass has no key and the
-        // pass remembers it instead.
-        BackdropKey? keyOf(BackdropFilterLayer filter) {
-          for (Layer? l = filter; l != null; l = l.parent) {
-            if (l is SeededBackdropPassLayer) return l.backdropGroupKey;
-          }
-          return filter.backdropKey;
-        }
+      final sharedOnly = pixel(290, 300);
+      final separateOnly = pixel(510, 300);
+      final overlap = pixel(400, 300);
+      image.dispose();
+      await tester.pumpWidget(const SizedBox.shrink());
 
-        final sharedKey = keyOf(layer.debugBackdropFilterLayer!);
-        expect(sharedKey, isNotNull);
-        expect(
-          keyOf(layer.debugSeparateBackdropLayers.single),
-          same(sharedKey),
-        );
-
-        final image =
-            await (boundaryKey.currentContext!.findRenderObject()!
-                    as RenderRepaintBoundary)
-                .toImage();
-        final data = await tester.runAsync(image.toByteData);
-        (int, int, int) pixel(double x, double y) {
-          final i = (y.round() * image.width + x.round()) * 4;
-          return (
-            data!.getUint8(i),
-            data.getUint8(i + 1),
-            data.getUint8(i + 2),
-          );
-        }
-
-        final sharedOnly = pixel(290, 300);
-        final separateOnly = pixel(510, 300);
-        final overlap = pixel(400, 300);
-        image.dispose();
-        await tester.pumpWidget(const SizedBox.shrink());
-
-        // The shared transfer desaturates the red background to gray.
-        expect((sharedOnly.$1 - sharedOnly.$2).abs(), lessThan(12));
-        // The diverging shape's own transfer keeps it red.
-        expect(separateOnly.$1, greaterThan(200));
-        // Overlapping pixels get the diverging shape's transfer applied to
-        // the unmodified backdrop — not the shared filter's gray output.
-        expect(
-          overlap.$1,
-          closeTo(separateOnly.$1, 12),
-          reason: 'Compounded transfers would show gray, not red.',
-        );
-        expect(overlap.$2, closeTo(separateOnly.$2, 12));
-        expect(overlap.$3, closeTo(separateOnly.$3, 12));
-      },
-    );
-  }
+      // The shared transfer desaturates the red background to gray.
+      expect((sharedOnly.$1 - sharedOnly.$2).abs(), lessThan(12));
+      // The diverging shape's own transfer keeps it red.
+      expect(separateOnly.$1, greaterThan(200));
+      // Overlapping pixels get the diverging shape's transfer applied to
+      // the unmodified backdrop — not the shared filter's gray output.
+      expect(
+        overlap.$1,
+        closeTo(separateOnly.$1, 12),
+        reason: 'Compounded transfers would show gray, not red.',
+      );
+      expect(overlap.$2, closeTo(separateOnly.$2, 12));
+      expect(overlap.$3, closeTo(separateOnly.$3, 12));
+    },
+  );
 
   testWidgets('fake parent updates and releases its backdrop filter', (
     tester,
@@ -660,13 +643,9 @@ void main() {
     expect(layer.debugBackdropFilterLayer!.filter, same(initialFilter));
   });
 
-  test('native color matrix matches Rec.709 tint-then-saturation algebra', () {
-    const tint = Color.fromARGB(104, 220, 240, 255);
+  test('native color matrix matches Rec.709 saturation algebra', () {
     const saturation = 0.8;
-    final matrix = fakeGlassColorMatrix(
-      saturation: saturation,
-      tint: tint,
-    );
+    final matrix = fakeGlassColorMatrix(saturation: saturation);
     const background = (0.17, 0.53, 0.91);
 
     double channel(int row) =>
@@ -675,11 +654,7 @@ void main() {
         matrix[row * 5 + 2] * background.$3 +
         matrix[row * 5 + 4] / 255;
 
-    final mixed = (
-      background.$1 * (1 - tint.a) + tint.r * tint.a,
-      background.$2 * (1 - tint.a) + tint.g * tint.a,
-      background.$3 * (1 - tint.a) + tint.b * tint.a,
-    );
+    const mixed = background;
     final luminance = mixed.$1 * 0.2126 + mixed.$2 * 0.7152 + mixed.$3 * 0.0722;
     final expected = (
       luminance + (mixed.$1 - luminance) * saturation,
@@ -694,7 +669,6 @@ void main() {
   test('native color matrix approximates transmission gamma at midtones', () {
     final matrix = fakeGlassColorMatrix(
       saturation: 1,
-      tint: const Color(0x00000000),
       transmissionGamma: 0.9,
     );
 
@@ -707,7 +681,7 @@ void main() {
 
   test('iOS 27 face matrix reproduces the native light solid palette', () {
     const model = LiquidGlassColorModel.ios27(brightness: Brightness.light);
-    final transfer = model.faceTransfer()!;
+    final transfer = model.parameters!.faceTransfer();
     final matrix = fakeGlassFaceMatrix(
       emission: transfer.emission,
       transmittance: transfer.transmittance,
@@ -753,11 +727,9 @@ void main() {
   test('native color matrix fades filtered backdrop premultiplied', () {
     final full = fakeGlassColorMatrix(
       saturation: 1,
-      tint: const Color(0x00000000),
     );
     final half = fakeGlassColorMatrix(
       saturation: 1,
-      tint: const Color(0x00000000),
       opacity: 0.5,
     );
 

@@ -1,11 +1,11 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/rendering/transform_tracking_render_object_mixin.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
@@ -15,11 +15,10 @@ import 'shared.dart';
 /// so these tests must fail if the sentinel in
 /// updateSubtreeNeedsAddToScene stops polling.
 void main() {
-  RenderLiquidGlassLayer layerOf(WidgetTester tester) =>
-      tester.allRenderObjects
-          .whereType<RenderLiquidGlassLayer>()
-          .where((renderObject) => renderObject.gpuGeometryRenderer != null)
-          .last;
+  RenderLiquidGlassLayer layerOf(WidgetTester tester) => tester.allRenderObjects
+      .whereType<RenderLiquidGlassLayer>()
+      .where((renderObject) => renderObject.gpuGeometryRenderer != null)
+      .last;
 
   testWidgets(
     'updates the matte when a repaint boundary retransforms a shape',
@@ -290,8 +289,7 @@ class _PaintTimeTransform extends SingleChildRenderObjectWidget {
   void updateRenderObject(
     BuildContext context,
     _RenderPaintTimeTransform renderObject,
-  ) =>
-      renderObject.angle = angle;
+  ) => renderObject.angle = angle;
 }
 
 class _RenderPaintTimeTransform extends RenderProxyBox {

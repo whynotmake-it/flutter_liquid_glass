@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
@@ -82,7 +82,7 @@ void main() {
                       .widgetList<LiquidGlassRenderScope>(
                         find.byType(LiquidGlassRenderScope),
                       )
-                      .every((scope) => !scope.consolidatesFakeBackdrop)) {
+                      .every((scope) => !scope.fake)) {
                 break;
               }
             }

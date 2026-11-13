@@ -1,10 +1,12 @@
 import 'dart:ui' as ui;
 
 import 'package:alchemist/alchemist.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/effects.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/fake_glass.dart';
+import 'package:liquid_glass_renderer/rendering.dart';
+import 'package:liquid_glass_renderer/src/widgets/fake_glass.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 

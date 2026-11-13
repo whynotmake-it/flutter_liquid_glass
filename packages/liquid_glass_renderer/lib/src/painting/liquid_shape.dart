@@ -1,9 +1,6 @@
-import 'package:equatable/equatable.dart';
-import 'package:flutter/material.dart';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:meta/meta.dart';
+import 'package:flutter/painting.dart';
 
-/// Represents a shape that can be used by a [LiquidGlass] widget.
+/// Represents a shape that can be used by a `LiquidGlass` widget.
 ///
 /// The set of shapes is closed and sealed: use [LiquidRoundedSuperellipse],
 /// [LiquidOval] or [LiquidRoundedRectangle]. `switch`es over a [LiquidShape]
@@ -14,12 +11,8 @@ import 'package:meta/meta.dart';
 /// accepts a [ShapeBorder]. The glass renderer ignores [side]; it is only
 /// painted when the shape is used as a regular border, for example in a
 /// [ShapeDecoration].
-sealed class LiquidShape extends OutlinedBorder with Equatable {
+sealed class LiquidShape extends OutlinedBorder {
   const LiquidShape({super.side = BorderSide.none});
-
-  /// Corner radius in logical pixels; `0` for shapes without corners.
-  @internal
-  double get cornerRadius;
 
   OutlinedBorder get _equivalentOutlinedBorder;
 
@@ -45,44 +38,62 @@ sealed class LiquidShape extends OutlinedBorder with Equatable {
   }
 
   @override
-  List<Object?> get props => [side];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other.runtimeType == runtimeType &&
+          other is LiquidShape &&
+          other.side == side;
+
+  @override
+  int get hashCode => side.hashCode;
 }
 
-/// Represents a squircle shape that can be used by a [LiquidGlass] widget.
+/// Represents a squircle shape that can be used by a `LiquidGlass` widget.
 ///
-/// Works like a [RoundedSuperellipseBorder].
+/// Works like a [RoundedSuperellipseBorder], with one radius for all four
+/// corners, or one for the two top corners and another for the two bottom
+/// ones, like a floating iOS sheet (38 pt on top, 54 pt below on an iPhone 16
+/// Pro).
 final class LiquidRoundedSuperellipse extends LiquidShape {
-  /// Creates a new [LiquidRoundedSuperellipse] with the given [borderRadius].
+  /// Creates a new [LiquidRoundedSuperellipse] with corners of
+  /// [borderRadius], or with the two bottom ones of [bottomRadius] when it is
+  /// given.
   ///
   /// The glass ignores [side]; see [LiquidShape].
   const LiquidRoundedSuperellipse({
     required this.borderRadius,
+    this.bottomRadius,
     super.side = BorderSide.none,
   });
 
-  /// The radius of the squircle.
-  ///
-  /// This is the radius of the corners of the squircle.
+  /// The radius of the squircle's corners, of its two top corners when
+  /// [bottomRadius] is given.
   final double borderRadius;
 
-  @internal
-  @override
-  double get cornerRadius => borderRadius;
+  /// The radius of the two bottom corners, or `null` for [borderRadius].
+  final double? bottomRadius;
+
+  /// The four corners as a [BorderRadius], for Flutter's clips and paths of
+  /// the same outline.
+  BorderRadius get radii => BorderRadius.vertical(
+    top: Radius.circular(borderRadius),
+    bottom: Radius.circular(bottomRadius ?? borderRadius),
+  );
 
   @override
-  OutlinedBorder get _equivalentOutlinedBorder => RoundedSuperellipseBorder(
-    borderRadius: BorderRadius.all(Radius.circular(borderRadius)),
-    side: side,
-  );
+  OutlinedBorder get _equivalentOutlinedBorder =>
+      RoundedSuperellipseBorder(borderRadius: radii, side: side);
 
   @override
   LiquidRoundedSuperellipse copyWith({
     BorderSide? side,
     double? borderRadius,
+    double? bottomRadius,
   }) {
     return LiquidRoundedSuperellipse(
       side: side ?? this.side,
       borderRadius: borderRadius ?? this.borderRadius,
+      bottomRadius: bottomRadius ?? this.bottomRadius,
     );
   }
 
@@ -90,15 +101,27 @@ final class LiquidRoundedSuperellipse extends LiquidShape {
   ShapeBorder scale(double t) {
     return LiquidRoundedSuperellipse(
       borderRadius: borderRadius * t,
+      bottomRadius: bottomRadius == null ? null : bottomRadius! * t,
       side: side.scale(t),
     );
   }
 
   @override
-  List<Object?> get props => [...super.props, borderRadius];
+  bool operator ==(Object other) =>
+      super == other &&
+      other is LiquidRoundedSuperellipse &&
+      other.borderRadius == borderRadius &&
+      other.bottomRadius == bottomRadius;
+
+  @override
+  int get hashCode => Object.hash(side, borderRadius, bottomRadius);
+
+  @override
+  String toString() =>
+      'LiquidRoundedSuperellipse($side, $borderRadius, $bottomRadius)';
 }
 
-/// Represents an ellipse shape that can be used by a [LiquidGlass] widget.
+/// Represents an ellipse shape that can be used by a `LiquidGlass` widget.
 ///
 /// Works like an [OvalBorder].
 final class LiquidOval extends LiquidShape {
@@ -106,10 +129,6 @@ final class LiquidOval extends LiquidShape {
   ///
   /// The glass ignores [side]; see [LiquidShape].
   const LiquidOval({super.side = BorderSide.none});
-
-  @internal
-  @override
-  double get cornerRadius => 0;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => OvalBorder(side: side);
@@ -127,9 +146,12 @@ final class LiquidOval extends LiquidShape {
       side: side.scale(t),
     );
   }
+
+  @override
+  String toString() => 'LiquidOval($side)';
 }
 
-/// Represents a rounded rectangle shape that can be used by a [LiquidGlass]
+/// Represents a rounded rectangle shape that can be used by a `LiquidGlass`
 /// widget.
 ///
 /// Works like a [RoundedRectangleBorder].
@@ -142,14 +164,8 @@ final class LiquidRoundedRectangle extends LiquidShape {
     super.side = BorderSide.none,
   });
 
-  /// The radius of the rounded rectangle.
-  ///
-  /// This is the radius of the corners of the rounded rectangle.
+  /// The radius of the corners.
   final double borderRadius;
-
-  @internal
-  @override
-  double get cornerRadius => borderRadius;
 
   @override
   OutlinedBorder get _equivalentOutlinedBorder => RoundedRectangleBorder(
@@ -177,5 +193,14 @@ final class LiquidRoundedRectangle extends LiquidShape {
   }
 
   @override
-  List<Object?> get props => [...super.props, borderRadius];
+  bool operator ==(Object other) =>
+      super == other &&
+      other is LiquidRoundedRectangle &&
+      other.borderRadius == borderRadius;
+
+  @override
+  int get hashCode => Object.hash(side, borderRadius);
+
+  @override
+  String toString() => 'LiquidRoundedRectangle($side, $borderRadius)';
 }

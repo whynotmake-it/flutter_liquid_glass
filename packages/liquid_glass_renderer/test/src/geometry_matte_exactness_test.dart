@@ -1,19 +1,20 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/rounded_superellipse_parameters.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_tiling.dart';
+import 'package:liquid_glass_renderer/src/rendering/rounded_superellipse_parameters.dart';
+import 'package:liquid_glass_renderer/src/rendering/shape_set.dart';
 
 import 'gpu_test_helpers.dart';
 
-// Exactness of the geometry pass, which draws only the part of the low-res
-// matte near the shapes and clears the rest.
+// Exactness of the geometry atlas, which evaluates only the tiles near an
+// edge and holds constants for the rest.
 //
-// Renders a spread of sheets, pills, ovals and blend groups at the matte scale
-// of a dpr 3 layer (4) and checks the low-res matte: rules any correct matte
-// follows, and a circle against its exact distance.
+// Renders a spread of sheets, pills, ovals and blend groups and checks the
+// atlas through its table: rules any correct geometry follows, and a circle
+// against its exact distance.
 const _expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
 
 class _Shape {
@@ -28,7 +29,12 @@ class _Shape {
     this.basis = const [1, 0, 0, 1],
   });
   final double type;
-  final double w, h, r, cx, cy, scale;
+  final double w;
+  final double h;
+  final double r;
+  final double cx;
+  final double cy;
+  final double scale;
   final List<double> basis;
 }
 
@@ -47,11 +53,16 @@ class _Scene {
     this.offsetY = 0,
   });
   final String name;
-  final int width, height;
+  final int width;
+  final int height;
   final List<_Shape> shapes;
-  final double blend, refractionHeight, refractionAmount, contourExtent;
+  final double blend;
+  final double refractionHeight;
+  final double refractionAmount;
+  final double contourExtent;
   final bool fits;
-  final double offsetX, offsetY;
+  final double offsetX;
+  final double offsetY;
 }
 
 final _scenes = <_Scene>[
@@ -141,14 +152,14 @@ final _scenes = <_Scene>[
     _Shape(1, 380, 300, 50, 230, 190),
     _Shape(1, 300, 260, 60, 950, 980),
   ], contourExtent: 6),
-  _Scene(
+  const _Scene(
     'blend_overlap_sheets',
     800,
     700,
     [
-      const _Shape(1, 600, 420, 80, 330, 250),
-      const _Shape(1, 360, 240, 60, 480, 470),
-      const _Shape(2, 200, 200, 0, 140, 540),
+      _Shape(1, 600, 420, 80, 330, 250),
+      _Shape(1, 360, 240, 60, 480, 470),
+      _Shape(2, 200, 200, 0, 140, 540),
     ],
     blend: 60,
     refractionHeight: 60,
@@ -157,7 +168,7 @@ final _scenes = <_Scene>[
   ),
 ];
 
-Future<(Float32List, int, int)> _renderMatte(
+Future<AtlasTexels> _renderAtlas(
   FlutterGpuGeometryRenderer renderer,
   _Scene scene,
 ) async {
@@ -166,54 +177,63 @@ Future<(Float32List, int, int)> _renderMatte(
   final bounds = <double>[];
   for (var i = 0; i < scene.shapes.length; i++) {
     final s = scene.shapes[i];
+    final cx = s.cx - scene.offsetX;
+    final cy = s.cy - scene.offsetY;
     shapeData.addAll([
       s.type, s.w, s.h, s.r, //
       ...s.basis,
-      s.cx, s.cy, s.scale, i == 0 ? -(scene.blend + 1) : scene.blend,
+      cx, cy, s.scale, if (i == 0) -(scene.blend + 1) else scene.blend,
     ]);
-    rseData.addAll(
-      s.type == 1
-          ? roundedSuperellipseParameters(ui.Size(s.w, s.h), s.r)
-          : List<double>.filled(12, 0),
-    );
-    final hw = s.w * s.scale, hh = s.h * s.scale;
-    bounds.addAll([s.cx - hw, s.cy - hh, s.cx + hw, s.cy + hh]);
+    final rse = s.type == 1
+        ? roundedSuperellipseParameters(ui.Size(s.w, s.h), s.r)
+        : List<double>.filled(12, 0);
+    for (var half = 0; half < rse.length; half += 12) {
+      rse[half + 2] = 1 - math.cos(rse[half + 2]);
+      rse[half + 3] = 1 - math.cos(rse[half + 3]);
+    }
+    rseData.addAll(rse.take(12));
+    final hw = s.w * s.scale;
+    final hh = s.h * s.scale;
+    bounds.addAll([cx - hw, cy - hh, cx + hw, cy + hh]);
   }
-  final result = renderer.render(
-    width: scene.width,
-    height: scene.height,
-    shapeData: shapeData,
-    rseData: rseData,
-    boundsData: bounds,
-    numShapes: scene.shapes.length,
-    refractionHeight: scene.refractionHeight,
-    refractionAmount: scene.refractionAmount,
-    refractionFitsShape: scene.fits,
-    contourExtent: scene.contourExtent,
-    offsetX: scene.offsetX,
-    offsetY: scene.offsetY,
-    matteScale: 4,
-  );
-  return (
-    await readGeometryField(result.image),
-    result.textureWidth,
-    result.textureHeight,
-  );
+  final image = renderer
+      .renderAtlas(
+        Tiling.shapes(
+          ShapeSet.rows(
+            shapes: shapeData,
+            boxes: bounds,
+            superellipses: rseData,
+          ),
+          width: scene.width,
+          height: scene.height,
+          reach: _reachOf(scene),
+        ),
+      )
+      .image;
+  return AtlasTexels.read(image);
 }
+
+GlassReach _reachOf(_Scene scene) => GlassReach(
+  inward: scene.refractionHeight + 1,
+  outward: scene.contourExtent + 1,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'the low-res matte is finite and positive inside every shape',
+    'the atlas is finite everywhere and positive inside every shape',
     () async {
       final renderer = await createGeometryRenderer();
       for (final scene in _scenes) {
-        final (field, _, _) = await _renderMatte(renderer, scene);
+        final atlas = await _renderAtlas(renderer, scene);
         var inside = 0;
-        for (var i = 0; i < field.length; i += 4) {
-          expect(field[i].isFinite, isTrue, reason: scene.name);
-          if (field[i] > 0) inside++;
+        for (var y = 0; y < scene.height; y++) {
+          for (var x = 0; x < scene.width; x++) {
+            final inward = atlas.inwardAt(x, y);
+            expect(inward.isFinite, isTrue, reason: '${scene.name} $x, $y');
+            if (inward > 0) inside++;
+          }
         }
         expect(inside, greaterThan(0), reason: scene.name);
       }
@@ -222,30 +242,26 @@ void main() {
     timeout: const Timeout(Duration(minutes: 5)),
   );
 
-  test('a circle\'s low-res matte holds its exact distance, whatever part the '
-      'pass draws', () async {
+  test("a circle's atlas holds its exact distance near the edge", () async {
     final renderer = await createGeometryRenderer();
     final scene = _scenes.firstWhere((scene) => scene.name == 'circle');
-    final (field, textureWidth, _) = await _renderMatte(renderer, scene);
+    final atlas = await _renderAtlas(renderer, scene);
+    final reach = _reachOf(scene);
     const radius = 130.0;
     const center = 150.0;
     var checked = 0;
     var worst = 0.0;
-    for (var j = 0; j <= scene.height ~/ 4; j++) {
-      for (var i = 0; i <= scene.width ~/ 4; i++) {
-        // Texel (i, j) is computed at the center of matte pixel
-        // (i * 4, j * 4).
-        final dx = i * 4 + 0.5 - center;
-        final dy = j * 4 + 0.5 - center;
+    for (var y = 0; y < scene.height; y++) {
+      for (var x = 0; x < scene.width; x++) {
+        final dx = x + 0.5 - center;
+        final dy = y + 0.5 - center;
         final inward = radius - math.sqrt(dx * dx + dy * dy);
-        // Far from the edge, the matte only holds "far outside".
-        if (inward.abs() > 12) continue;
-        final value = field[(j * textureWidth + i) * 4];
-        worst = math.max(worst, (value - inward).abs());
+        if (inward < -reach.outward || inward > 12) continue;
+        worst = math.max(worst, (atlas.inwardAt(x, y) - inward).abs());
         checked++;
       }
     }
-    expect(checked, greaterThan(100));
+    expect(checked, greaterThan(10000));
     expect(worst, lessThan(0.05));
   }, skip: _expectFallback);
 }

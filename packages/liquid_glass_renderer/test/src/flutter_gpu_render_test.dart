@@ -1,9 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_gpu/gpu.dart' as gpu;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_tiling.dart';
+import 'package:liquid_glass_renderer/src/rendering/shape_set.dart';
 
 import 'gpu_test_helpers.dart';
 
@@ -22,89 +23,68 @@ void main() {
         isTrue,
       );
 
-      const unusedShape = <double>[
-        1, 8, 8, 0, //
-        1, 0, 0, 1, //
-        8, 8, 1, -1, //
-      ];
-      first.render(
-        width: 16,
-        height: 16,
-        shapeData: unusedShape,
-        numShapes: 1,
-        refractionAmount: 24,
-        refractionHeight: 4,
-        offsetX: 0,
-        offsetY: 0,
-        matteScale: testMatteScale,
-      );
-
-      expect(
-        identical(
-          first.debugHostBufferIdentity,
-          second.debugHostBufferIdentity,
-        ),
-        isTrue,
-      );
-      expect(first.debugHostBufferBlockLength, greaterThan(0));
-      final library = (await gpu.ShaderLibrary.fromAsset(
-        ShaderKeys.gpuGeometryShaderBundle,
-      ))!;
-      final size = library['GeometryFragment']!
-          .getUniformSlot('GeometryUniforms')
-          .sizeInBytes!;
-      final alignment = gpu.gpuContext.minimumUniformByteAlignment;
-      expect(
-        first.debugHostBufferBlockLength,
-        ((size + alignment - 1) ~/ alignment) * alignment * 32,
-      );
+      renderTestRectangle(first);
+      renderTestRectangle(second);
+      expect(first.debugScratchBuffers, greaterThan(0));
+      expect(first.debugScratchBuffers, second.debugScratchBuffers);
     },
     skip: expectFallback,
   );
 
   test(
-    'geometry renderer buckets dimensions without overwriting older images',
+    'bytes a pass reads are written over only once the GPU has run the pass',
+    () async {
+      final renderer = await createGeometryRenderer();
+      // Passes the GPU has not run yet hold their bytes: the scratch grows
+      // instead of writing over them.
+      final before = renderer.debugScratchBuffers;
+      var renders = 0;
+      while (renderer.debugScratchBuffers < before + 2) {
+        renderTestRectangle(renderer, centerX: 16.0 + renders % 7);
+        renders++;
+        expect(renders, lessThan(4000));
+      }
+      // Once the GPU has run them, the same amount of drawing fits in the
+      // buffers there are. The first passes wait for their pipelines, so
+      // how long that takes is not known.
+      var reused = false;
+      for (var round = 0; round < 100 && !reused; round++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        final held = renderer.debugScratchBuffers;
+        for (var index = 0; index < renders; index++) {
+          renderTestRectangle(renderer, centerX: 16.0 + index % 7);
+        }
+        reused = renderer.debugScratchBuffers == held;
+      }
+      expect(reused, isTrue);
+    },
+    skip: expectFallback,
+  );
+
+  test(
+    'a new atlas releases the image of the last, which scenes hold',
     () async {
       final renderer = await createGeometryRenderer();
 
-      ({
-        ui.Image image,
-        int width,
-        int height,
-        int textureWidth,
-        int textureHeight,
-      })
-      render(int size) => renderer.render(
-        width: size,
-        height: size,
-        shapeData: const [
-          1, 40, 30, 8, // Rounded rectangle.
-          1, 0, 0, 1, // Identity inverse affine basis.
-          32, 32, 1, -1, // Center, distance scale, new group marker.
-        ],
-        numShapes: 1,
-        refractionAmount: 24,
-        refractionHeight: 10,
-        offsetX: 0,
-        offsetY: 0,
-        matteScale: testMatteScale,
-      );
+      ui.Image render(int size) => renderer
+          .renderAtlas(
+            Tiling.shapes(
+              testRectangle(),
+              width: size,
+              height: size,
+              reach: testReach,
+            ),
+          )
+          .image;
 
       final first = render(33);
-      final sameBucket = render(63);
-      final larger = render(65);
+      final larger = render(130);
       final smallerAgain = render(32);
 
-      expect((first.width, first.height), (64, 64));
-      expect(identical(first.image, sameBucket.image), isFalse);
-      expect(first.image.debugDisposed, isTrue);
-      expect(sameBucket.image.debugDisposed, isTrue);
-      expect((larger.width, larger.height), (128, 128));
-      expect(identical(first.image, larger.image), isFalse);
-      expect((smallerAgain.width, smallerAgain.height), (64, 64));
-      expect(identical(larger.image, smallerAgain.image), isFalse);
-      expect(larger.image.debugDisposed, isTrue);
-      expect(smallerAgain.image.debugDisposed, isFalse);
+      expect(identical(first, larger), isFalse);
+      expect(first.debugDisposed, isTrue);
+      expect(larger.debugDisposed, isTrue);
+      expect(smallerAgain.debugDisposed, isFalse);
     },
     skip: expectFallback,
   );
@@ -116,36 +96,35 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final renderer = await createGeometryRenderer();
 
-      final result = renderer.render(
-        width: 64,
-        height: 64,
-        shapeData: const [
-          1, 20, 20, 0, // Narrow rectangle on the top row.
-          1, 0, 0, 1,
-          32, 16, 1, -1,
-          1, 50, 20, 0, // Wide rectangle on the bottom row.
-          1, 0, 0, 1,
-          32, 48, 1, -1,
-        ],
-        numShapes: 2,
-        refractionAmount: 24,
-        refractionHeight: 10,
-        offsetX: 0,
-        offsetY: 0,
-        matteScale: testMatteScale,
-      );
-      final field = await readGeometryField(result.image);
-
-      double signedDistanceAt(int x, int y) =>
-          fieldInwardAt(field, result.textureWidth, x, y);
+      final image = renderer
+          .renderAtlas(
+            Tiling.shapes(
+              ShapeSet.rows(
+                shapes: const [
+                  1, 20, 20, 0, // Narrow rectangle on the top row.
+                  1, 0, 0, 1,
+                  32, 16, 1, -1,
+                  1, 50, 20, 0, // Wide rectangle on the bottom row.
+                  1, 0, 0, 1,
+                  32, 48, 1, -1,
+                ],
+                boxes: const [22, 6, 42, 26, 7, 38, 57, 58],
+              ),
+              width: 64,
+              height: 64,
+              reach: testReach,
+            ),
+          )
+          .image;
+      final atlas = await AtlasTexels.read(image);
 
       expect(
-        signedDistanceAt(10, 16),
+        atlas.inwardAt(10, 16),
         lessThan(0),
         reason: 'top row must stay narrow',
       );
       expect(
-        signedDistanceAt(10, 48),
+        atlas.inwardAt(10, 48),
         greaterThan(0),
         reason: 'bottom row must be wide',
       );
@@ -156,42 +135,20 @@ void main() {
   test(
     'shared host buffer handles more than 32 layer submissions per frame',
     () async {
-      const shape = <double>[
-        1,
-        12,
-        8,
-        0,
-        1,
-        0,
-        0,
-        1,
-        8,
-        8,
-        1,
-        -1,
-      ];
       final renderers = await Future.wait(
         List.generate(40, (_) => createGeometryRenderer()),
       );
 
       ui.Image? finalImage;
       for (var i = 0; i < renderers.length; i++) {
-        final result = renderers[i].render(
-          width: 16,
-          height: 16,
-          shapeData: shape,
-          numShapes: 1,
-          refractionAmount: 24,
-          refractionHeight: 4,
-          offsetX: i.isEven ? 0 : 1,
-          offsetY: 0,
-          matteScale: testMatteScale,
+        finalImage = renderTestRectangle(
+          renderers[i],
+          centerX: i.isEven ? 16 : 17,
         );
-        finalImage = result.image;
       }
 
-      final field = await readGeometryField(finalImage!);
-      expect(field.lengthInBytes, greaterThan(0));
+      final atlas = await AtlasTexels.read(finalImage!);
+      expect(atlas.inwardAt(17, 32), greaterThan(0));
     },
     skip: expectFallback,
   );

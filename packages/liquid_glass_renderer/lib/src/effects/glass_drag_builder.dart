@@ -2,29 +2,18 @@ import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 
 /// {@template gesture_mode}
-/// Controls which gesture handling mechanism is used to detect interactions.
-///
-/// [GestureMode.listener] (the default) uses a [Listener], which responds to
-/// raw pointer events before they are consumed by any gesture recognizer. This
-/// means the effect triggers regardless of what nested widgets do with the
-/// gesture.
-///
-/// [GestureMode.gestureDetector] uses a [GestureDetector] instead, which
-/// participates in the gesture arena. Nested widgets such as buttons can claim
-/// the gesture so the parent pan never wins. The drag state only begins in
-/// [GestureDetector.onPanStart] (after the pan wins the arena), not on the
-/// preliminary [GestureDetector.onPanDown], so the effect will **not** trigger
-/// when a descendant handles the interaction. [GestureDetector.onPanCancel]
-/// clears the drag when the pan loses the arena.
+/// Which gesture mechanism drives the effect. [GestureMode.listener] reacts
+/// to raw pointer events, even when a descendant handles the gesture.
+/// [GestureMode.gestureDetector] joins the gesture arena and starts the
+/// effect only once its pan wins, so a descendant that claims the gesture (a
+/// button) suppresses it.
 /// {@endtemplate}
 enum GestureMode {
-  /// Responds to all raw pointer events via a [Listener], including those
-  /// consumed by nested widgets.
+  /// Reacts to raw pointer events, including those a descendant handles.
   listener,
 
-  /// Participates in gesture disambiguation via a [GestureDetector], allowing
-  /// nested interactive widgets (e.g. buttons) to claim the gesture and
-  /// suppress the effect.
+  /// Joins the gesture arena; a descendant that claims the gesture
+  /// suppresses the effect.
   gestureDetector,
 }
 
@@ -50,67 +39,39 @@ class GlassDragBuilder extends StatefulWidget {
 }
 
 class _GlassDragBuilderState extends State<GlassDragBuilder> {
-  Offset? currentDragOffset;
+  Offset? _offset;
 
-  bool get isDragging => currentDragOffset != null;
+  void _set(Offset? offset) {
+    if (!mounted) return;
+    setState(() => _offset = offset);
+  }
+
+  void _begin() => _set(Offset.zero);
+
+  void _move(Offset delta) => _set((_offset ?? Offset.zero) + delta);
+
+  void _end() => _set(null);
 
   @override
   Widget build(BuildContext context) {
-    switch (widget.gestureMode) {
-      case GestureMode.listener:
-        return Listener(
-          behavior: widget.behavior,
-          onPointerDown: (event) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset = Offset.zero;
-            });
-          },
-          onPointerMove: (event) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset =
-                  (currentDragOffset ?? Offset.zero) + event.delta;
-            });
-          },
-          onPointerUp: (event) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset = null;
-            });
-          },
-          child: widget.builder(context, currentDragOffset, widget.child),
-        );
-      case GestureMode.gestureDetector:
-        return GestureDetector(
-          behavior: widget.behavior,
-          onPanStart: (details) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset = Offset.zero;
-            });
-          },
-          onPanUpdate: (details) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset =
-                  (currentDragOffset ?? Offset.zero) + details.delta;
-            });
-          },
-          onPanEnd: (details) {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset = null;
-            });
-          },
-          onPanCancel: () {
-            if (!mounted) return;
-            setState(() {
-              currentDragOffset = null;
-            });
-          },
-          child: widget.builder(context, currentDragOffset, widget.child),
-        );
-    }
+    final child = widget.builder(context, _offset, widget.child);
+    return switch (widget.gestureMode) {
+      GestureMode.listener => Listener(
+        behavior: widget.behavior,
+        onPointerDown: (_) => _begin(),
+        onPointerMove: (event) => _move(event.delta),
+        onPointerUp: (_) => _end(),
+        onPointerCancel: (_) => _end(),
+        child: child,
+      ),
+      GestureMode.gestureDetector => GestureDetector(
+        behavior: widget.behavior,
+        onPanStart: (_) => _begin(),
+        onPanUpdate: (details) => _move(details.delta),
+        onPanEnd: (_) => _end(),
+        onPanCancel: _end,
+        child: child,
+      ),
+    };
   }
 }

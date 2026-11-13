@@ -1,7 +1,9 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/internal/ancestor_clip.dart';
+import 'package:liquid_glass_renderer/src/rendering/ancestor_clip.dart';
+import 'package:liquid_glass_renderer/src/rendering/follower_transform.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_blur.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
 import 'package:meta/meta.dart';
 
@@ -15,57 +17,78 @@ import 'package:meta/meta.dart';
 class GlassCompositionProbe {
   final _layer = LayerHandle<OpacitySeedLayer>();
 
-  static const _identity = ColorFilter.matrix(<double>[
-    1, 0, 0, 0, 0, //
-    0, 1, 0, 0, 0, //
-    0, 0, 1, 0, 0, //
-    0, 0, 0, 1, 0, //
-  ]);
+  /// Whether the owner paints inside a fractional opacity pass that a live
+  /// backdrop read needs seeded, also while [suppressed].
+  bool get seeding => _wanted;
+  bool _wanted = false;
 
-  /// Whether the owner currently paints inside a seeded opacity pass.
-  bool get seeding => _layer.layer?.seeded ?? false;
+  /// Leaves the pass unseeded while the owner reads no backdrop.
+  bool get suppressed => _suppressed;
+  bool _suppressed = false;
+  set suppressed(bool value) {
+    if (value == _suppressed) return;
+    _suppressed = value;
+    _layer.layer?.seeded = _wanted && !value;
+  }
 
-  /// Paints the original sequence, seeding only fractional-opacity surfaces.
+  /// Paints [painter] inside the seed layer, which seeds only while
+  /// [syncOpacity] finds a fractional opacity above.
   void paint(
     PaintingContext context,
     Offset offset,
     PaintingContextCallback painter, {
     required RenderObject owner,
   }) {
-    final layer = _layer.layer ??= OpacitySeedLayer()..filter = _identity;
+    final layer = _layer.layer ??= OpacitySeedLayer()
+      ..filter = identityColorFilter;
     syncOpacity(owner);
     context.pushLayer(layer, painter, offset);
   }
 
-  /// Updates before retained-layer dirtiness is propagated for this frame.
+  /// Runs from paint and from the composer's pass, before the update pass.
   ///
   /// Seeds iff an ancestor between [owner] and the nearest enclosing
-  /// [LiquidGlassLayerRenderObject] has fractional native opacity and none is
+  /// [LiquidGlassRenderObject] has fractional native opacity and none is
   /// fully transparent.
   void syncOpacity(RenderObject owner) {
     final layer = _layer.layer;
     if (layer == null) return;
     var fractional = false;
     var blocked = false;
+    // Glass nearby shares its path up, and a scroll polls all of it.
+    final memo = FrameAncestors.current;
+    List<RenderObject>? opaque;
     for (
       var ancestor = owner.parent;
-      ancestor != null && ancestor is! LiquidGlassLayerRenderObject;
+      ancestor != null && ancestor is! LiquidGlassRenderObject;
       ancestor = ancestor.parent
     ) {
-      final alpha = ui.Color.getAlphaFromOpacity(
-        switch (ancestor) {
-          RenderOpacity() => ancestor.opacity,
-          RenderAnimatedOpacity() => ancestor.opacity.value,
-          _ => 1.0,
-        },
-      );
-      if (alpha == 0) {
-        blocked = true;
-        break;
+      final opacity = switch (ancestor) {
+        RenderOpacity() => ancestor.opacity,
+        RenderAnimatedOpacity() => ancestor.opacity.value,
+        _ => null,
+      };
+      if (opacity != null) {
+        final alpha = ui.Color.getAlphaFromOpacity(opacity);
+        if (alpha == 0) {
+          blocked = true;
+          break;
+        }
+        if (alpha < 255) {
+          fractional = true;
+          opaque?.clear();
+        }
       }
-      if (alpha < 255) fractional = true;
+      if (memo != null && ancestor.isRepaintBoundary) {
+        if (memo.opaqueAbove(ancestor)) break;
+        (opaque ??= []).add(ancestor);
+      }
     }
-    layer.seeded = fractional && !blocked;
+    if (memo != null && opaque != null && !blocked) {
+      opaque.forEach(memo.noteOpaqueAbove);
+    }
+    _wanted = fractional && !blocked;
+    layer.seeded = _wanted && !_suppressed;
   }
 
   /// Screen-space origin of the opacity pass [owner] paints into while

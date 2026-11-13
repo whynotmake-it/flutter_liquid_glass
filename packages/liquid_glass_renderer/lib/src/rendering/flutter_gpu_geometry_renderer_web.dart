@@ -1,15 +1,14 @@
 import 'dart:ui' as ui;
 
-import 'package:meta/meta.dart';
+import 'package:flutter/foundation.dart';
 
-/// Web stand-in for the Flutter GPU geometry renderer.
-///
-/// Every entry point that would submit GPU work throws: the web has no
-/// `flutter_gpu`, and real glass is not selected there because
-/// `ImageFilter.isShaderFilterSupported` is false. Keeping the class shape
-/// identical lets the render objects compile unchanged.
-@internal
-class FlutterGpuGeometryRenderer {
+import 'package:liquid_glass_renderer/painting.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer_members.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_tiling.dart';
+
+/// Web stand-in for the Flutter GPU geometry renderer: the web has no
+/// `flutter_gpu`, and every entry point that would submit GPU work throws.
+class FlutterGpuGeometryRenderer implements GeometryRendererMembers {
   FlutterGpuGeometryRenderer._();
 
   /// Always fails on the web; callers fall back to fake glass.
@@ -21,70 +20,108 @@ class FlutterGpuGeometryRenderer {
   /// Nothing is ever cached on the web.
   static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey) => null;
 
+  /// The web has no shader filters.
+  @override
+  LiquidGlassDeviceClass get deviceClass =>
+      LiquidGlassDeviceClass.noShaderFilters;
+
+  /// Always 0: nothing is drawn on the web.
   static int get debugTotalRenderCount => 0;
+
+  /// Always 0: no renderer exists on the web.
   static int get debugActiveRendererCount => 0;
+
+  /// Always 0: no atlas exists on the web.
   static int get debugActiveGeometryTextureCount => 0;
-  static int get debugActiveMaterialTextureCount => 0;
 
   /// Matches the native renderer's reuse horizon; nothing is reused here.
   static const int reuseAfterFrames = 1;
+
+  /// Never counts on the web.
   static int debugReusedTextureCount = 0;
+
+  /// Never counts on the web.
   static int debugAllocatedTextureCount = 0;
+
+  /// Never counts on the web.
   static int debugDroppedTextureCount = 0;
 
-  /// Nothing is ever deferred on the web.
-  static void flushPendingSubmissions() {}
+  /// Nothing is ever drawn on the web.
+  static void flush() {}
+
+  /// Does nothing on the web.
+  static void debugResetPages() {}
+
+  /// Never counts on the web.
   static int debugBatchedSubmitCount = 0;
+
+  /// Never counts on the web.
   static int debugDeferredPassCount = 0;
+
+  /// Never counts on the web.
   static int debugPostFrameFlushCount = 0;
-  int get debugRetiredTextureCount => 0;
-  int get debugMatteTextureCount => 0;
+
+  /// Always null on the web.
+  @override
   Object? get debugMatteTexture => null;
+
+  /// Always null on the web.
+  @override
   (int, int)? get debugMatteTextureSize => null;
 
-  /// Material map texels per matte pixel; shared constant with the native
-  /// renderer so uniform math stays identical.
-  static const int materialRasterScale = 8;
+  /// Nothing is drawn on the web, so nothing is left out.
+  @override
+  int get droppedShapes => 0;
 
+  /// Never counts on the web.
+  @override
   int debugRenderCount = 0;
-  int debugMatteDrawCount = 0;
-  int debugMaterialDrawCount = 0;
+
+  /// The renderer itself: there is no pipeline on the web.
+  @override
   Object get debugPipelineIdentity => this;
-  int get debugHostBufferBlockLength => 0;
-  Object? get debugHostBufferIdentity => null;
+
+  /// Always 0 on the web.
+  @override
+  int get debugScratchBuffers => 0;
+
+  /// Always true: a web renderer holds nothing.
+  @override
   bool get debugDisposed => true;
-  ui.Image? get materialImage => null;
 
-  // ignore: avoid_unused_constructor_parameters
-  ({
-    ui.Image image,
-    int width,
-    int height,
-    int textureWidth,
-    int textureHeight,
-  })
-  render({
-    required int width,
-    required int height,
-    required List<double> shapeData,
-    required int numShapes,
-    required double refractionHeight,
-    required double refractionAmount,
-    required double offsetX,
-    required double offsetY,
-    double? edgeDistanceRange,
-    bool refractionFitsShape = true,
-    double contourExtent = 0.5,
-    bool writeMatte = true,
-    bool writeMaterials = false,
-    bool writeTintOnly = false,
-    List<double> appearanceData = const <double>[],
-    List<double> rseData = const <double>[],
-    List<double> boundsData = const <double>[],
-    required int matteScale,
-  }) => throw UnsupportedError('Flutter GPU is not available on the web.');
+  /// Always null on the web.
+  @override
+  ui.Image? get atlasImage => null;
 
+  /// Always empty on the web.
+  @override
+  List<ui.Image> get lookImages => const [];
+
+  /// Does nothing on the web.
+  @override
+  void releaseAtlas() {}
+
+  /// Does nothing on the web.
+  @override
   void releaseOutput() {}
 
+  /// Does nothing on the web.
+  @override
   void dispose() {}
+}
+
+/// A web renderer for a host test: the web build itself never makes one.
+@visibleForTesting
+FlutterGpuGeometryRenderer debugWebGeometryRenderer() =>
+    FlutterGpuGeometryRenderer._();
+
+/// The renderer's atlas, which only the rendering library draws and reads.
+extension FlutterGpuGeometryRendererAtlas on FlutterGpuGeometryRenderer {
+  /// Always null on the web.
+  AtlasPlace? get atlasPlace => null;
+
+  /// Throws: the web has no Flutter GPU.
+  ({ui.Image image, List<ui.Image> looks, AtlasPlace place}) renderAtlas(
+    Tiling tiling,
+  ) => throw UnsupportedError('Flutter GPU is not available on the web.');
 }

@@ -1,6 +1,5 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_color_model.dart';
+import 'package:liquid_glass_renderer/src/painting/liquid_glass_color_model.dart';
 import 'package:meta/meta.dart';
 
 /// Lightweight color and materialization controls for one glass shape.
@@ -12,7 +11,8 @@ import 'package:meta/meta.dart';
 /// Colors and color transfers are display-referred. The defaults of the
 /// unnamed constructor may be retuned before 1.0; the version-named presets
 /// (`ios27*`) track Apple's appearance on that OS version.
-final class LiquidGlassAppearance with Equatable {
+@immutable
+final class LiquidGlassAppearance {
   /// Creates a per-shape glass appearance.
   ///
   /// The defaults may be retuned before 1.0.
@@ -30,16 +30,16 @@ final class LiquidGlassAppearance with Equatable {
     double number(String key, double fallback) =>
         (json[key] as num?)?.toDouble() ?? fallback;
     final tint = json['tint'];
-    final colorModel = LiquidGlassColorModel.fromJson(json['colorModel']);
     return LiquidGlassAppearance(
       tint: tint is num ? Color(tint.toInt()) : const Color(0x00FFFFFF),
       visibility: number('visibility', 1),
-      colorModel: colorModel,
+      colorModel: LiquidGlassColorModel.fromJson(json['colorModel']),
     );
   }
 
-  /// The fitted light iOS 27 regular-material appearance (`Glass.regular`,
-  /// which Apple also uses for toolbars and `.glass` buttons).
+  /// The light iOS 27 regular material (`Glass.regular`, which Apple also
+  /// uses for toolbars and `.glass` buttons). Its face follows the size of
+  /// the shape that wears it ([at]).
   const LiquidGlassAppearance.ios27RegularLight({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
@@ -47,7 +47,8 @@ final class LiquidGlassAppearance with Equatable {
          brightness: Brightness.light,
        );
 
-  /// The fitted dark iOS 27 regular-material appearance.
+  /// The dark iOS 27 regular material. Its face follows the size of the
+  /// shape that wears it ([at]).
   const LiquidGlassAppearance.ios27RegularDark({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
@@ -55,7 +56,7 @@ final class LiquidGlassAppearance with Equatable {
          brightness: Brightness.dark,
        );
 
-  /// Creates the fitted iOS 27 regular material for [brightness].
+  /// Creates the iOS 27 regular material for [brightness].
   factory LiquidGlassAppearance.ios27Regular({
     required Brightness brightness,
     Color tint = const Color(0x00007AFF),
@@ -70,7 +71,8 @@ final class LiquidGlassAppearance with Equatable {
           visibility: visibility,
         );
 
-  /// The fitted iOS 27 `Glass.clear` appearance, identical in light and dark.
+  /// The iOS 27 `Glass.clear` appearance, identical in light and dark and
+  /// at every size.
   const LiquidGlassAppearance.ios27Clear({
     this.tint = const Color(0x00007AFF),
     this.visibility = 1,
@@ -88,6 +90,16 @@ final class LiquidGlassAppearance with Equatable {
   /// vibrancy; the iOS 27 models derive the accompanying tonal response
   /// automatically from their fitted parameters.
   final LiquidGlassColorModel colorModel;
+
+  /// The appearance as a shape of [size] wears it: its [colorModel] at the
+  /// shape's shorter side and under its [tint] (see
+  /// [LiquidGlassColorModel.at]).
+  ///
+  /// Returns this appearance itself where neither changes anything.
+  LiquidGlassAppearance at(Size size) {
+    final worn = colorModel.at(size.shortestSide, tint: tint);
+    return identical(worn, colorModel) ? this : copyWith(colorModel: worn);
+  }
 
   /// Returns a copy with the supplied appearance controls replaced.
   LiquidGlassAppearance copyWith({
@@ -111,5 +123,17 @@ final class LiquidGlassAppearance with Equatable {
   };
 
   @override
-  List<Object?> get props => [tint, visibility, colorModel];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other.runtimeType == runtimeType &&
+          other is LiquidGlassAppearance &&
+          other.tint == tint &&
+          other.visibility == visibility &&
+          other.colorModel == colorModel;
+
+  @override
+  int get hashCode => Object.hash(tint, visibility, colorModel);
+
+  @override
+  String toString() => 'LiquidGlassAppearance($tint, $visibility, $colorModel)';
 }

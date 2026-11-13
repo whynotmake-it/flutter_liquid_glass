@@ -4,8 +4,11 @@ import 'package:flutter_gpu_shaders/build.dart';
 import 'package:flutter_gpu_shaders/environment.dart';
 import 'package:hooks/hooks.dart';
 
-/// Runtime-effect shaders compiled to `.iplr` by this hook instead of being
-/// listed under `flutter.shaders` in the pubspec.
+/// The prefixes of the runtime-effect shaders compiled to `.iplr` by this
+/// hook instead of being listed under `flutter.shaders` in the pubspec: every
+/// `liquid_glass_final_render*.frag`, one per final shader variant
+/// (`FinalShaderVariant`), the `backdrop_frost*.frag` and the
+/// `backdrop_haze*.frag`.
 ///
 /// `flutter.shaders` are compiled for every backend a target platform
 /// supports, including SkSL. These shaders use sampling that SkSL cannot
@@ -13,10 +16,10 @@ import 'package:hooks/hooks.dart';
 /// builds (such as `flutter build web`) fail outright. Compiling here bundles
 /// the same `.iplr` output that `FragmentProgram.fromAsset` decodes on
 /// Impeller, while Skia builds never attempt a SkSL compile.
-const _runtimeEffectShaders = [
+const _runtimeEffectPrefixes = [
   'liquid_glass_final_render',
-  'liquid_glass_final_render_material',
-  'liquid_glass_final_render_tint',
+  'backdrop_frost',
+  'backdrop_haze',
 ];
 
 void main(List<String> args) async {
@@ -35,7 +38,7 @@ void main(List<String> args) async {
   });
 }
 
-/// Compiles each shader in [_runtimeEffectShaders] to
+/// Compiles each shader named after one of [_runtimeEffectPrefixes] to
 /// `build/shaderbundles/<name>.iplr`, an Impeller runtime-effect library
 /// covering every backend except SkSL.
 Future<void> _buildRuntimeEffects(
@@ -55,7 +58,26 @@ Future<void> _buildRuntimeEffects(
       help.exitCode == 0 && impellerCHelpSupportsDepfile(help.stdout as String);
   final shaderLibDirectory = impellercExec.resolve('./shader_lib');
 
-  for (final name in _runtimeEffectShaders) {
+  final names = [
+    for (final file in Directory.fromUri(shadersDirectory).listSync())
+      if (file.uri.pathSegments.last case final name
+          when _runtimeEffectPrefixes.any(name.startsWith) &&
+              name.endsWith('.frag'))
+        name.substring(0, name.length - '.frag'.length),
+  ]..sort();
+  // A shader added or removed changes the listing.
+  output.dependencies.add(shadersDirectory);
+  // A file the shaders include: impellerc names the ones a shader read only
+  // where it writes a depfile, and the bundle's shaders name none. An edit
+  // to one compiles everything again.
+  for (final file in Directory.fromUri(
+    shadersDirectory,
+  ).listSync(recursive: true)) {
+    if (file is File && file.path.endsWith('.glsl')) {
+      output.dependencies.add(file.uri);
+    }
+  }
+  for (final name in names) {
     final source = shadersDirectory.resolve('$name.frag');
     final outFile = outputDirectory.uri.resolve('$name.iplr');
     final spirv = File('${outFile.toFilePath()}.spirv');

@@ -1,12 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/glass_shadow.dart';
-import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:liquid_glass_renderer/rendering.dart';
+import 'package:liquid_glass_renderer/src/widgets/glass_shadow.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -26,7 +23,6 @@ const _sideShadow = BoxShadow(
 );
 
 const _negativeSpreadShadow = BoxShadow(
-  color: Color(0xFF000000),
   blurRadius: 16,
   spreadRadius: -8,
 );

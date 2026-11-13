@@ -354,7 +354,6 @@ class _LiquidGlassAdaptiveBrightnessState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _published ??= _brightnessFilter.value;
     _armFrameHook();
   }
 

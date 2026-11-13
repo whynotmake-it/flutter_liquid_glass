@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/internal/glass_drag_builder.dart';
+import 'package:flutter/widgets.dart';
+import 'package:liquid_glass_renderer/src/effects/effect_springs.dart';
+import 'package:liquid_glass_renderer/src/effects/glass_drag_builder.dart';
 import 'package:meta/meta.dart';
-import 'package:motor/motor.dart';
 
 /// A widget that provides a squash and stretch effect to its child based on
 /// user interaction.
@@ -46,9 +46,9 @@ class LiquidStretch extends StatelessWidget {
 
   /// The resistance factor to apply to the drag offset.
   ///
-  /// The higher the resistance, the more sticky the drag will feel.
-  /// See [OffsetResistanceExtension.withResistance] for details on how this
-  /// works.
+  /// The higher the resistance, the more sticky the drag will feel: a drag
+  /// of `d` pixels stretches as `d / (1 + |d| * resistance)` would, keeping
+  /// its direction, so larger drags are held back more.
   ///
   /// Defaults to 0.08.
   final double resistance;
@@ -75,33 +75,100 @@ class LiquidStretch extends StatelessWidget {
     return GlassDragBuilder(
       behavior: hitTestBehavior,
       gestureMode: gestureMode,
-      builder: (context, value, child) {
-        final scale = value == null ? 1.0 : interactionScale;
-        return SingleMotionBuilder(
-          value: scale,
-          motion: const Motion.smoothSpring(
-            duration: Duration(milliseconds: 300),
-            snapToEnd: true,
-          ),
-          builder: (context, value, child) => Transform.scale(
-            scale: value,
-            child: child,
-          ),
-          child: MotionBuilder(
-            value: value?.withResistance(resistance) ?? Offset.zero,
-            motion: value == null
-                ? const Motion.bouncySpring(snapToEnd: true)
-                : const Motion.interactiveSpring(snapToEnd: true),
-            converter: const OffsetMotionConverter(),
-            builder: (context, value, child) => RawLiquidStretch(
-              stretchPixels: value * stretch,
-              child: child,
-            ),
-            child: child,
-          ),
-        );
-      },
+      builder: (context, drag, child) => _StretchMotion(
+        scale: drag == null ? 1.0 : interactionScale,
+        offset: drag == null
+            ? Offset.zero
+            : drag / (1 + drag.distance * resistance),
+        dragging: drag != null,
+        stretch: stretch,
+        child: child,
+      ),
       child: child,
+    );
+  }
+}
+
+/// Springs the scale and the stretch of a [LiquidStretch] toward the drag's
+/// targets: the stretch follows a finger on the interactive spring and
+/// springs back on the bouncy one, the scale settles on a smooth one.
+class _StretchMotion extends StatefulWidget {
+  const _StretchMotion({
+    required this.scale,
+    required this.offset,
+    required this.dragging,
+    required this.stretch,
+    required this.child,
+  });
+
+  final double scale;
+  final Offset offset;
+  final bool dragging;
+  final double stretch;
+  final Widget? child;
+
+  @override
+  State<_StretchMotion> createState() => _StretchMotionState();
+}
+
+class _StretchMotionState extends State<_StretchMotion>
+    with TickerProviderStateMixin {
+  static final _scaleSpring = smoothSpring(const Duration(milliseconds: 300));
+
+  late final _scale = AnimationController.unbounded(
+    value: widget.scale,
+    vsync: this,
+  );
+  late final _x = AnimationController.unbounded(
+    value: widget.offset.dx,
+    vsync: this,
+  );
+  late final _y = AnimationController.unbounded(
+    value: widget.offset.dy,
+    vsync: this,
+  );
+  late final _motion = Listenable.merge([_scale, _x, _y]);
+
+  SpringDescription get _offsetSpring =>
+      widget.dragging ? interactiveSpring : bouncySpring;
+
+  @override
+  void didUpdateWidget(_StretchMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.scale != oldWidget.scale) {
+      springTo(_scale, _scaleSpring, widget.scale);
+    }
+    if (widget.dragging != oldWidget.dragging) {
+      // A stretch in flight keeps going to the same place on the new spring.
+      if (_x.isAnimating) springTo(_x, _offsetSpring, oldWidget.offset.dx);
+      if (_y.isAnimating) springTo(_y, _offsetSpring, oldWidget.offset.dy);
+    }
+    if (widget.offset != oldWidget.offset) {
+      springTo(_x, _offsetSpring, widget.offset.dx);
+      springTo(_y, _offsetSpring, widget.offset.dy);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scale.dispose();
+    _x.dispose();
+    _y.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _motion,
+      builder: (context, child) => Transform.scale(
+        scale: _scale.value,
+        child: RawLiquidStretch(
+          stretchPixels: Offset(_x.value, _y.value) * widget.stretch,
+          child: child,
+        ),
+      ),
+      child: widget.child,
     );
   }
 }
@@ -192,9 +259,7 @@ class RenderRawLiquidStretch extends RenderProxyBox {
       return;
     }
 
-    // Check if the matrix is singular
-    final det = transform.determinant();
-    if (det == 0 || !det.isFinite) {
+    if (!transform.determinant().isFinite) {
       layer = null;
       return;
     }
@@ -204,7 +269,10 @@ class RenderRawLiquidStretch extends RenderProxyBox {
       offset,
       transform,
       super.paint,
-      oldLayer: layer is TransformLayer ? layer as TransformLayer? : null,
+      oldLayer: switch (layer) {
+        final TransformLayer old => old,
+        _ => null,
+      },
     );
   }
 
@@ -221,25 +289,17 @@ class RenderRawLiquidStretch extends RenderProxyBox {
       return null;
     }
 
-    final scale = getScale(
-      stretchPixels: _stretchPixels,
-      size: size,
-    );
+    final scale = _scale();
 
-    // Scale about the center so opposite drag directions produce mirrored
-    // results. Scaling about the local origin makes right/down stretches
-    // travel further than left/up ones, and anchoring the edge opposite the
-    // drag pins that edge in place and jumps whenever a stretch component
-    // crosses zero while the other axis is still scaled.
-    //
-    // The centered scale moves each edge by about half the stretch, so
-    // translating by 1.5x the stretch makes the leading edge travel roughly
-    // twice the stretch and the trailing edge roughly once, in every
-    // direction.
+    // About the center, so opposite drags mirror each other: about the origin
+    // right and down stretches travel further, and about the edge opposite
+    // the drag that edge jumps when one axis crosses zero. The centered scale
+    // moves each edge by about half the stretch, so a translation of 1.5
+    // stretches moves the leading edge about twice the stretch and the
+    // trailing one about once.
     final center = size.center(Offset.zero);
     final translation = _stretchPixels * 1.5;
-
-    final matrix = Matrix4.identity()
+    return Matrix4.identity()
       ..translateByDouble(
         center.dx + translation.dx,
         center.dy + translation.dy,
@@ -248,67 +308,19 @@ class RenderRawLiquidStretch extends RenderProxyBox {
       )
       ..scaleByDouble(scale.dx, scale.dy, 1, 1)
       ..translateByDouble(-center.dx, -center.dy, 0, 1);
-
-    return matrix;
   }
 
-  @internal
-  Offset getScale({
-    required Offset stretchPixels,
-    required Size size,
-  }) {
-    if (size.isEmpty) {
-      return const Offset(1, 1);
-    }
-
-    final stretchX = stretchPixels.dx.abs();
-    final stretchY = stretchPixels.dy.abs();
-
-    // Convert pixel stretch to relative stretch based on size
-    final relativeStretchX = size.width > 0 ? stretchX / size.width : 0.0;
-    final relativeStretchY = size.height > 0 ? stretchY / size.height : 0.0;
-
-    // Use a consistent stretch factor for both dimensions
-    const stretchFactor = 1.0;
-    const volumeFactor = 0.5;
-
-    final baseScaleX = 1 + relativeStretchX * stretchFactor;
-    final baseScaleY = 1 + relativeStretchY * stretchFactor;
-
-    // Calculate magnitude in relative space for volume preservation
+  Offset _scale() {
+    if (size.isEmpty) return const Offset(1, 1);
+    final relativeStretchX = _stretchPixels.dx.abs() / size.width;
+    final relativeStretchY = _stretchPixels.dy.abs() / size.height;
+    final baseScaleX = 1 + relativeStretchX;
+    final baseScaleY = 1 + relativeStretchY;
     final magnitude = math.sqrt(
       relativeStretchX * relativeStretchX + relativeStretchY * relativeStretchY,
     );
-    final targetVolume = 1 + magnitude * volumeFactor;
-    final currentVolume = baseScaleX * baseScaleY;
-    final volumeCorrection = math.sqrt(targetVolume / currentVolume);
-
-    final finalScaleX = baseScaleX * volumeCorrection;
-    final finalScaleY = baseScaleY * volumeCorrection;
-
-    return Offset(finalScaleX, finalScaleY);
-  }
-}
-
-/// Provides [withResistance] method to apply drag resistance to an [Offset].
-extension OffsetResistanceExtension on Offset {
-  /// Returns a new [Offset] with a given [resistance] applied, which will
-  /// hold it back the further it deviates from [Offset.zero].
-  ///
-  /// Applies a non-linear damping effect that reduces the offset's magnitude
-  /// while preserving its direction. Higher resistance values create stronger
-  /// damping.
-  /// Larger offsets are reduced more aggressively than smaller ones,
-  /// creating a natural "stretch resistance" effect commonly used in scrolling.
-  Offset withResistance(double resistance) {
-    if (resistance == 0) return this;
-
-    final magnitude = math.sqrt(dx * dx + dy * dy);
-    if (magnitude == 0) return Offset.zero;
-
-    final resistedMagnitude = magnitude / (1 + magnitude * resistance);
-    final scale = resistedMagnitude / magnitude;
-
-    return Offset(dx * scale, dy * scale);
+    final areaGrowth = 1 + magnitude * 0.5;
+    final correction = math.sqrt(areaGrowth / (baseScaleX * baseScaleY));
+    return Offset(baseScaleX * correction, baseScaleY * correction);
   }
 }

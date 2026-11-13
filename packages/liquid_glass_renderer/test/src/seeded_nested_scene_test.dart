@@ -2,13 +2,13 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/shader_programs.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -47,11 +47,8 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
         addTearDown(opacity.dispose);
 
         await tester.runAsync(
-          () => MultiShaderBuilder.precacheShaders([
+          () => GlassShaderPrograms.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
 
@@ -116,7 +113,7 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
             );
             expect(scopes.length, greaterThanOrEqualTo(2));
             expect(
-              scopes.every((scope) => !scope.consolidatesFakeBackdrop),
+              scopes.every((scope) => !scope.fake),
               isTrue,
               reason: 'Both nested material passes must actually be real.',
             );

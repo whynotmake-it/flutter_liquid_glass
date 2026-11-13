@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
@@ -340,19 +340,29 @@ class _ActionsState extends State<_Actions> {
 String settingsSource(LiquidGlassSettings settings) {
   // ignore: experimental_member_use
   final defaults = const LiquidGlassSettings().toJson();
-  String literal(Object value) => switch (value) {
-    final double v =>
-      v
-          .toStringAsFixed(3)
-          .replaceFirst(RegExp(r'0+$'), '')
-          .replaceFirst(RegExp(r'\.$'), '.0'),
-    _ => '$value',
-  };
+  // A nested value is a map, new each time it is asked for.
+  bool differs(Object value, Object? from) =>
+      value is Map ? '$value' != '$from' : value != from;
   final fields = [
     // ignore: experimental_member_use
     for (final MapEntry(:key, :value) in settings.toJson().entries)
-      if (value != defaults[key]) '  $key: ${literal(value)},',
+      if (differs(value, defaults[key])) '  $key: ${_literal(value)},',
   ];
   if (fields.isEmpty) return 'const LiquidGlassSettings()';
   return 'const LiquidGlassSettings(\n${fields.join('\n')}\n)';
 }
+
+String _literal(Object value) => switch (value) {
+  final double v =>
+    v
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '.0'),
+  final Map<String, Object> haze => 'LiquidGlassHaze(${_arguments(haze)})',
+  _ => '$value',
+};
+
+String _arguments(Map<String, Object> fields) => [
+  for (final MapEntry(:key, :value) in fields.entries)
+    '$key: ${_literal(value)}',
+].join(', ');
