@@ -42,6 +42,7 @@ private material APIs.
 - [Glass on glass](#glass-on-glass)
 - [Performance](#performance)
 - [Example playground](#example-playground)
+- [Upgrading from 1.0.0-dev.2](#upgrading-from-100-dev2)
 
 ## Requirements
 
@@ -565,6 +566,37 @@ The playground has an iOS-style tab bar and toolbar, blending and color
 scenes, the text loupe, every preset in light and dark, the Liquid Glass
 slider, full/fake switching and several backdrops. Settings you tune can be
 saved as custom presets.
+
+## Upgrading from 1.0.0-dev.2
+
+Run `dart fix --apply` after the upgrade. It handles most of the breaking
+changes:
+
+- `GlassGlow`, `GestureMode`, `LiquidStretch` and `RawLiquidStretch` now
+  come from `package:liquid_glass_renderer/effects.dart`, and
+  `debugPaintLiquidGlassGeometry` from `rendering.dart`. The fix adds the
+  imports.
+- `LiquidGlassSettings.of(context)` becomes
+  `LiquidGlassLayer.settingsOf(context)`.
+- `useBackdropGroup` and `backdropKey` are dropped from `LiquidGlassLayer`,
+  `LiquidGlass.auto`, `LiquidGlass.withOwnLayer` and `FakeGlass`. The
+  renderer now decides which glass shares a backdrop read. A `BackdropKey`
+  you made only for the glass is left unused, delete it.
+
+A few changes need a hand:
+
+- Remove `GlassGlowLayer` and keep its child. `GlassGlow` lights the nearest
+  `LiquidGlass` or `FakeGlass` above it without one.
+- Remove `LiquidGlassCapture` and keep its child. Glass over glass refracts
+  the glass below without it, see [Glass on glass](#glass-on-glass).
+- `LgrLogs` is gone, along with the dependency on `logging`.
+- `LiquidGlassBlendGroup.maxShapesPerLayer` is gone. The limit is still 16,
+  see [Limitations](#limitations).
+- `Offset.withResistance` is gone. It computed
+  `offset * (1 / (1 + offset.distance * resistance))`.
+- `LiquidGlassSettings`, `LiquidGlassAppearance`, `LiquidGlassColorModel` and
+  the shapes no longer mix in `Equatable`, so `props` is gone. `==` and
+  `hashCode` still compare values.
 
 ## Limitations
 

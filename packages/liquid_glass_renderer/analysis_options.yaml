@@ -6,6 +6,8 @@ analyzer:
     asset_directory_does_not_exist: ignore
   exclude:
     - build/**
+    # Old API on purpose: dart fix rewrites it, see lib/fix_data.yaml.
+    - test_fixes/**
     - android/**
     - ios/**
     - web/**

@@ -44,6 +44,9 @@ jobs:
       - name: 🧪 Run Analyze
         run: melos run analyze
 
+      - name: 🔧 Check dart fix data
+        run: melos run fix-data
+
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens

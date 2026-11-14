@@ -1,0 +1,123 @@
+# Format: https://github.com/flutter/flutter/blob/master/docs/contributing/Data-driven-Fixes.md
+# Checked against test_fixes/: run `melos run fix-data` after changing it.
+#
+# What dart fix cannot express is listed under "Upgrading from 1.0.0-dev.2"
+# in README.md.
+version: 1
+transforms:
+  - title: 'Import GlassGlow from effects.dart'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      class: 'GlassGlow'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['effects.dart']
+          class: 'GlassGlow'
+
+  - title: 'Import GestureMode from effects.dart'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      enum: 'GestureMode'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['effects.dart']
+          enum: 'GestureMode'
+
+  - title: 'Import LiquidStretch from effects.dart'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      class: 'LiquidStretch'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['effects.dart']
+          class: 'LiquidStretch'
+
+  - title: 'Import RawLiquidStretch from effects.dart'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      class: 'RawLiquidStretch'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['effects.dart']
+          class: 'RawLiquidStretch'
+
+  - title: 'Import debugPaintLiquidGlassGeometry from rendering.dart'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      variable: 'debugPaintLiquidGlassGeometry'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['rendering.dart']
+          variable: 'debugPaintLiquidGlassGeometry'
+
+  - title: 'Use LiquidGlassLayer.settingsOf'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      method: 'of'
+      inClass: 'LiquidGlassSettings'
+    changes:
+      - kind: 'replacedBy'
+        newElement:
+          uris: ['liquid_glass_renderer.dart']
+          method: 'settingsOf'
+          inClass: 'LiquidGlassLayer'
+          static: true
+
+  - title: 'Remove useBackdropGroup and backdropKey'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      constructor: ''
+      inClass: 'LiquidGlassLayer'
+    changes:
+      - kind: 'removeParameter'
+        name: 'useBackdropGroup'
+      - kind: 'removeParameter'
+        name: 'backdropKey'
+
+  - title: 'Remove useBackdropGroup and backdropKey'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      constructor: 'auto'
+      inClass: 'LiquidGlass'
+    changes:
+      - kind: 'removeParameter'
+        name: 'useBackdropGroup'
+      - kind: 'removeParameter'
+        name: 'backdropKey'
+
+  - title: 'Remove useBackdropGroup and backdropKey'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      constructor: 'withOwnLayer'
+      inClass: 'LiquidGlass'
+    changes:
+      - kind: 'removeParameter'
+        name: 'useBackdropGroup'
+      - kind: 'removeParameter'
+        name: 'backdropKey'
+
+  - title: 'Remove useBackdropGroup and backdropKey'
+    date: 2026-11-13
+    element:
+      uris: ['liquid_glass_renderer.dart']
+      constructor: ''
+      inClass: 'FakeGlass'
+    changes:
+      - kind: 'removeParameter'
+        name: 'useBackdropGroup'
+      - kind: 'removeParameter'
+        name: 'backdropKey'
