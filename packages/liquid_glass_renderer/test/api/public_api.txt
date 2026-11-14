@@ -1,0 +1,1491 @@
+# package:liquid_glass_renderer/composer.dart
+final class BandLook
+  const BandLook({
+    required double sigma,
+    required FrostBandPaint paint,
+    required Offset origin,
+    required Rect shown,
+    required double devicePixelRatio,
+  })
+  final double devicePixelRatio
+  final Offset origin
+  final FrostBandPaint paint
+  final Rect shown
+  final double sigma
+  overrides: ==, hashCode
+final class BandSiteRole extends SiteRole
+  const BandSiteRole(BandLook look)
+  final BandLook look
+  overrides: ==, hashCode
+final class ComputedShape extends GeometryKind
+  const ComputedShape()
+final class CopyNeed
+  factory CopyNeed.blurred(
+    double sigma, {
+    required double devicePixelRatio,
+    required int maxShare,
+  })
+  const CopyNeed(
+    double devicePixelRatio, {
+    int share = ...,
+    double shaderFrost = ...,
+    LiquidGlassHaze? haze,
+  })
+  bool bandFits(CopyNeed glass)
+  final double devicePixelRatio
+  static CopyNeed? edgeFrost(double sigma, {required double devicePixelRatio})
+  static CopyNeed? glassFrost(
+    double sigma, {
+    required double devicePixelRatio,
+    LiquidGlassHaze? haze,
+  })
+  final LiquidGlassHaze? haze
+  double get reach
+  final double shaderFrost
+  final int share
+  overrides: ==, hashCode
+final class DirtyLog
+  DirtyLog()
+  void add(int order, Rect rect)
+  static const int capacity
+  void clear()
+  bool get isEmpty
+  int get length
+  bool meets(int before, Rect band)
+final class FilterLook
+  const FilterLook({
+    required Object? key,
+    required CopyNeed need,
+    bool drawsBand = ...,
+    Object? tint,
+    GlassBody body = ...,
+    PageFilter? page,
+    bool anyGrid = ...,
+  })
+  final bool anyGrid
+  final GlassBody body
+  final bool drawsBand
+  double get frostSigma
+  final Object? key
+  final CopyNeed need
+  static const FilterLook none
+  final PageFilter? page
+  int get shapes
+  final Object? tint
+  overrides: ==, hashCode
+final class FollowFate extends SiteFate
+  const FollowFate(GlassRead read)
+  final GlassRead read
+final class FrostBandPaint
+  const FrostBandPaint({
+    required Color fade,
+    required double whole,
+    required double gone,
+    required double lineStart,
+    required double lineEnd,
+    required double lineGray,
+    required double presence,
+    required double saturation,
+    required double brightness,
+  })
+  final double brightness
+  final Color fade
+  final double gone
+  final double lineEnd
+  final double lineGray
+  final double lineStart
+  final double presence
+  final double saturation
+  final double whole
+  overrides: ==, hashCode
+enum FrostLattice
+  square,
+  axes,
+sealed class GeometryKind
+  const GeometryKind()
+final class GlassBody
+  const GlassBody({
+    required int shapes,
+    bool field = ...,
+    bool looks = ...,
+    bool leans = ...,
+  })
+  final bool field
+  final bool leans
+  final bool looks
+  static const GlassBody none
+  static const GlassBody one
+  final int shapes
+  overrides: ==, hashCode
+abstract final class GlassCopyTuning
+  GlassCopyTuning()
+  @visibleForTesting static void debugOverride({
+    bool shaderFrost = ...,
+    int maxCopyShare = ...,
+  })
+  static int get maxCopyShare
+  static bool get shaderFrost
+final class GlassFrameReport
+  const GlassFrameReport({
+    required int frame,
+    required bool planned,
+    required List<GlassReadReport> reads,
+    required int targetBudget,
+    required int issuedTargets,
+    required Duration walk,
+    required Duration compile,
+    required Duration emit,
+    required int filtersBuilt,
+    required int picturesRecorded,
+    required int imagesDrawn,
+    required int layersReplayed,
+    required int repaintsAsked,
+    required int lateRepaints,
+    required List<String> notes,
+  })
+  static void addListener(void Function(GlassFrameReport) listener)
+  final Duration compile
+  static void deliver(GlassFrameReport Function() report)
+  final Duration emit
+  final int filtersBuilt
+  final int frame
+  int get imageReads
+  final int imagesDrawn
+  final int issuedTargets
+  final int lateRepaints
+  final int layersReplayed
+  static bool get listening
+  int get liveReads
+  final List<String> notes
+  final int picturesRecorded
+  final bool planned
+  static GlassReadReport readOf(GlassRead read, {required bool stands})
+  final List<GlassReadReport> reads
+  static void removeListener(void Function(GlassFrameReport) listener)
+  final int repaintsAsked
+  final int targetBudget
+  final Duration walk
+  overrides: toString
+final class GlassPlan
+  GlassPlan(
+    List<GlassRead> reads,
+    List<SiteFate> fates, {
+    required int issuedTargets,
+    required int dueAt,
+    required List<String> notes,
+  })
+  final int dueAt
+  final List<SiteFate> fates
+  final int issuedTargets
+  final List<String> notes
+  final List<GlassRead> reads
+final class GlassRead
+  GlassRead(SiteFacts lead)
+  Rect band
+  bool changed
+  bool get flat
+  static const double flatFrost
+  late ReadGeometry geometry
+  GeometryKind geometryKind
+  List<GlassBody> get glass
+  final List<GlassRead> holds
+  int inside
+  final SiteFacts lead
+  double get leadShaderFrost
+  int level
+  ReadLimit limit
+  int? liveGroup
+  final List<SiteFacts> members
+  Rect quad
+  int get sceneTargets
+  int shapes
+  int share
+  ReadSource source
+  int get targets
+final class GlassReadReport
+  const GlassReadReport({
+    required GlassReadSource source,
+    required int level,
+    required int glass,
+    required bool hasBand,
+    required Rect band,
+    required int targets,
+    required bool changed,
+  })
+  final Rect band
+  final bool changed
+  final int glass
+  final bool hasBand
+  final int level
+  final GlassReadSource source
+  final int targets
+  overrides: toString
+enum GlassReadSource
+  scene,
+  image,
+  heldImage,
+  live,
+abstract base class GlassSiteRole extends SiteRole
+  const GlassSiteRole()
+abstract final class GlassWork
+  GlassWork()
+  static int filters
+  static int images
+  static int lateMarks
+  static int marks
+  static int pictures
+  static int replayed
+final class HazeStrip
+  factory HazeStrip(double sigma, Size copy)
+  final int across
+  final int cell
+  final int down
+  final double reach
+  int get rows
+final class HiddenFate extends SiteFate
+  const HiddenFate()
+final class ImageRead extends ReadSource
+  const ImageRead({required bool held})
+  final bool held
+abstract final class ImpellerLayers
+  ImpellerLayers()
+  static bool keepsWhole(Rect layer, Rect clip)
+  static (Rect, Rect) pinsOf(Rect layer, double devicePixelRatio)
+final class Lattice
+  const Lattice(double devicePixelRatio, int share)
+  Lattice get atScreen
+  final double devicePixelRatio
+  Matrix4 deviceToCopy(Rect rect, Offset origin)
+  Lattice inside(int target)
+  Lattice over(int target)
+  double get pixels
+  (int, int) pixelsOf(Rect rect)
+  double residual(double sigma)
+  final int share
+  Rect snapOut(Rect rect)
+  Rect toDevice(Rect rect)
+  overrides: ==, hashCode
+final class LeadFate extends SiteFate
+  const LeadFate(GlassRead read)
+  final GlassRead read
+final class LiquidGlassBackdropFrost
+  LiquidGlassBackdropFrost({
+    required double sigma,
+    List<double>? colorMatrix,
+    TileMode? tileMode,
+  })
+  final List<double>? colorMatrix
+  late final ImageFilter filter
+  final double sigma
+  final TileMode? tileMode
+  overrides: ==, hashCode
+final class LiveRead extends ReadSource
+  const LiveRead()
+enum NoJoin
+  field,
+  glow,
+  shrink,
+  fadingShadows,
+  noMatte,
+  scaled,
+final class OwnAtlas extends GeometryKind
+  const OwnAtlas()
+final class PageFilter
+  const PageFilter({
+    ImageFilter? filter,
+    (double, double)? blur,
+    Rect? clip,
+    BlendMode blendMode = ...,
+  })
+  final BlendMode blendMode
+  final (double, double)? blur
+  final Rect? clip
+  final ImageFilter? filter
+  Object? get key
+  static const PageFilter none
+  overrides: ==, hashCode
+final class PlanLedger
+  PlanLedger()
+  final Map<Object, ReadMemo> reads
+final class PlanLedgerEdits
+  PlanLedgerEdits()
+  void applyTo(PlanLedger ledger, int frame)
+  final Map<Object, ReadMemo> writes
+final class PlanPolicy
+  const PlanPolicy({
+    int maxTargets = ...,
+    int maxShapes = ...,
+    bool bands = ...,
+    bool copies = ...,
+    bool dropsFrost = ...,
+  })
+  final bool bands
+  final bool copies
+  final bool dropsFrost
+  final int maxShapes
+  final int maxTargets
+final class PlanPrices
+  const PlanPrices({
+    double rasterWeight = ...,
+    double passGpu = ...,
+    double passRaster = ...,
+    double copyGpuPerMpx = ...,
+    double deadGpuPerMpx = ...,
+    double imageGpu = ...,
+    double imageRaster = ...,
+    double pixelsPerLogical = ...,
+  })
+  final double copyGpuPerMpx
+  final double deadGpuPerMpx
+  double get imageCost
+  final double imageGpu
+  final double imageRaster
+  double passCost(Rect band, int share)
+  final double passGpu
+  final double passRaster
+  final double pixelsPerLogical
+  final double rasterWeight
+  int rent(Rect band, int share, {int targets = ...})
+abstract interface class PlanScenery
+  PlanScenery()
+  double get devicePixelRatio
+  DirtyLog get dirty
+  abstract int lastChangedUnder(int order, Rect band)
+  abstract ReadLimit limitUnder(SiteFacts site)
+  abstract int savedUnder(int order, Rect band, {required bool flat})
+  Rect get screen
+  List<SiteFacts> get sites
+  abstract String? whyLimited(SiteFacts site)
+final class ReadGeometry
+  factory ReadGeometry.resolve({
+    required double devicePixelRatio,
+    required int share,
+    required bool atScreen,
+    required Rect reads,
+    required Rect screen,
+    required Rect? clip,
+    required bool holdsGlass,
+    required double glassFrost,
+    required double? bandFrost,
+    required double frostLeftOut,
+    required Object? filter,
+    LiquidGlassHaze? haze,
+  })
+  final double bakedFrost
+  double bakedIn(int scale)
+  final Rect band
+  final Rect? clip
+  Lattice copyIn(int scale)
+  bool drawsLike(ReadGeometry other)
+  final Object? filter
+  double frostFor(double sigma)
+  int frostLayersIn(int scale)
+  final double frostLeftOut
+  Lattice gridIn(int scale)
+  final LiquidGlassHaze? haze
+  int get hazeLayers
+  Rect heldIn(ReadGeometry outer)
+  final Rect? imageRect
+  final Lattice lattice
+  final Rect layer
+  final Rect reads
+  final Rect? room
+  bool servesAsImage(ReadGeometry next)
+  ReadGeometry withRoom(Rect room, Rect screen)
+enum ReadLimit
+  none,
+  sceneOnly,
+  liveOnly,
+final class ReadMemo
+  ReadMemo()
+  int? boughtAt
+  int changedAt
+  bool forBudget
+  ReadGeometry? geometry
+  List<Object> holds
+  Rect? lastBand
+  int misses
+  int seenAt
+sealed class ReadSource
+  const ReadSource()
+final class SceneRead extends ReadSource
+  const SceneRead()
+final class SharedAtlas extends GeometryKind
+  const SharedAtlas()
+final class SiteAsk
+  const SiteAsk({
+    required Rect drawn,
+    required Rect reads,
+    FilterLook look = ...,
+    SiteRole? role,
+    NoJoin? noJoin,
+    bool turned = ...,
+    Object? paints,
+  })
+  final Rect drawn
+  final bool hidden
+  final FilterLook look
+  final NoJoin? noJoin
+  static const SiteAsk none
+  final Object? paints
+  final Rect reads
+  final SiteRole? role
+  final bool turned
+  overrides: ==, hashCode
+final class SiteFacts
+  SiteFacts(Object id)
+  SiteAsk get ask
+  Rect? get clip
+  int get floor
+  final Object id
+  int get index
+  bool get isBand
+  @internal bool noteForLog()
+  int get order
+  @internal void placeInWalk({
+    required int order,
+    required int index,
+    required StateChain state,
+    required Rect? clip,
+  })
+  @internal void settleFloor(int floor)
+  StateChain get state
+  @internal bool takeAsk(SiteAsk ask)
+sealed class SiteFate
+  const SiteFate()
+sealed class SiteRole
+  const SiteRole()
+final class StateChain
+  const StateChain(StateChain? parent, Object? token)
+  final StateChain? parent
+  static const StateChain root
+  bool same(StateChain other)
+  final Object? token
+double ceilPixels(double pixels)
+(GlassPlan, PlanLedgerEdits) compilePlan(
+  PlanScenery scene,
+  PlanLedger ledger,
+  PlanPrices prices,
+  PlanPolicy policy,
+  int frame, {
+  bool explain = ...,
+})
+void debugDumpGlassPlan()
+FrostLattice? frostLatticeOf(double inCopyPixels)
+GeometryKind geometryKindOf(List<GlassBody> glass)
+const int geometryMaxShapesPerDraw
+
+# package:liquid_glass_renderer/effects.dart
+enum GestureMode
+  listener,
+  gestureDetector,
+class GlassGlow extends StatefulWidget
+  const GlassGlow({
+    required Widget child,
+    Color glowColor = ...,
+    double glowRadius = ...,
+    HitTestBehavior hitTestBehavior = ...,
+    GestureMode gestureMode = ...,
+    Key? key,
+  })
+  final Widget child
+  final GestureMode gestureMode
+  final Color glowColor
+  final double glowRadius
+  final HitTestBehavior hitTestBehavior
+  overrides: createState
+class LiquidStretch extends StatelessWidget
+  const LiquidStretch({
+    required Widget child,
+    double interactionScale = ...,
+    double stretch = ...,
+    double resistance = ...,
+    HitTestBehavior hitTestBehavior = ...,
+    GestureMode gestureMode = ...,
+    Key? key,
+  })
+  final Widget child
+  final GestureMode gestureMode
+  final HitTestBehavior hitTestBehavior
+  final double interactionScale
+  final double resistance
+  final double stretch
+  overrides: build
+class RawLiquidStretch extends SingleChildRenderObjectWidget
+  const RawLiquidStretch({
+    required Offset stretchPixels,
+    required Widget? child,
+    Key? key,
+  })
+  final Offset stretchPixels
+  overrides: createRenderObject, updateRenderObject
+
+# package:liquid_glass_renderer/liquid_glass_renderer.dart
+class FakeGlass extends StatelessWidget
+  const FakeGlass.inLayer({
+    required LiquidShape shape,
+    required Widget child,
+    LiquidGlassAppearance? appearance,
+    List<BoxShadow> shadows = ...,
+    Key? key,
+  })
+  @internal const FakeGlass.inLayerResolved({
+    required LiquidShape shape,
+    required Widget child,
+    required LiquidGlassAppearance? appearance,
+    ValueListenable<LiquidGlassShapeFrame>? live,
+    Key? fakeKey,
+    Key? fadeKey,
+    Key? key,
+  })
+  const FakeGlass({
+    required LiquidShape shape,
+    required Widget child,
+    LiquidGlassSettings settings = ...,
+    LiquidGlassAppearance? appearance,
+    List<BoxShadow> shadows = ...,
+    Key? key,
+  })
+  final LiquidGlassAppearance? appearance
+  final Widget child
+  @internal final Key? fadeKey
+  @internal final Key? fakeKey
+  @internal final bool inheritVisibility
+  @internal final ValueListenable<LiquidGlassShapeFrame>? live
+  final LiquidGlassSettings? settings
+  final List<BoxShadow> shadows
+  final LiquidShape shape
+  overrides: build
+class GlassColorBleed
+  const GlassColorBleed({
+    required double opacity,
+    required double black,
+    required double white,
+    double saturation = ...,
+    bool onBright = ...,
+  })
+  const GlassColorBleed.none()
+  double apply(double face, double backdrop)
+  final double black
+  final bool onBright
+  final double opacity
+  final double saturation
+  double share(double face)
+  final double white
+  overrides: ==, hashCode, toString
+class GlassColorCurve
+  const GlassColorCurve.constant(double value)
+  const GlassColorCurve(double clear, double tinted)
+  factory GlassColorCurve.sampled(double Function(double) value)
+  GlassColorCurve.through(List<double> values)
+  final double clear
+  double evaluate(double tintAmount)
+  final double tinted
+  overrides: ==, hashCode, toString
+class GlassColorParameters
+  factory GlassColorParameters.fromJson(Map<String, Object?> json)
+  factory GlassColorParameters.ios27Regular({
+    required Brightness brightness,
+    double shortSide = ...,
+    bool greyTint = ...,
+  })
+  const GlassColorParameters({
+    required Color emissionColor,
+    required GlassColorCurve emissionAlpha,
+    required GlassColorCurve transmittance,
+    required GlassColorCurve luminanceLift,
+    required GlassColorCurve chromaGain,
+    GlassColorBleed bleed = ...,
+    GlassToneRamp toneLow = ...,
+    GlassToneRamp toneHigh = ...,
+    double toneGammaLuminance = ...,
+    double glintLuminance = ...,
+    double glintFaceGain = ...,
+    double glintVibrancy = ...,
+    double contourResponse = ...,
+    double fakeGlintLuminance = ...,
+  })
+  final GlassColorBleed bleed
+  final GlassColorCurve chromaGain
+  final double contourResponse
+  double contourScale(double tintAmount)
+  GlassColorParameters copyWith({
+    Color? emissionColor,
+    GlassColorCurve? emissionAlpha,
+    GlassColorCurve? transmittance,
+    GlassColorCurve? luminanceLift,
+    GlassColorCurve? chromaGain,
+    GlassColorBleed? bleed,
+    GlassToneRamp? toneLow,
+    GlassToneRamp? toneHigh,
+    double? toneGammaLuminance,
+    double? glintLuminance,
+    double? glintFaceGain,
+    double? glintVibrancy,
+    double? contourResponse,
+    double? fakeGlintLuminance,
+  })
+  final GlassColorCurve emissionAlpha
+  final Color emissionColor
+  ({double chromaGain, Color emission, double lift, double transmittance}) faceTransfer({
+    double tintAmount = ...,
+  })
+  final double fakeGlintLuminance
+  final double glintFaceGain
+  final double glintLuminance
+  final double glintVibrancy
+  static const GlassColorParameters ios27Clear
+  static final GlassColorParameters ios27Dark
+  static final GlassColorParameters ios27Light
+  static const double ios27LightLuminanceCap
+  final GlassColorCurve luminanceLift
+  Color tintTone(Color tint, double luminance)
+  Map<String, Object?> toJson()
+  final double toneGammaLuminance
+  final GlassToneRamp toneHigh
+  final GlassToneRamp toneLow
+  final GlassColorCurve transmittance
+  overrides: ==, hashCode, toString
+class GlassPlanOverlay extends StatefulWidget
+  const GlassPlanOverlay({required Widget child, Key? key})
+  final Widget child
+  overrides: createState
+abstract final class GlassRim
+  GlassRim()
+  static const double bevelShadowDepth
+  static const double bevelShadowDirectionality
+  static const double bevelShadowOffset
+  static const double contourWidth
+  static const double highlightOppositeStrength
+  static const double highlightWidth
+  static const double highlightWrap
+class GlassToneRamp
+  const GlassToneRamp.constant(double base)
+  const GlassToneRamp({
+    required double base,
+    required double amplitude,
+    required double pivot,
+    required double exponent,
+  })
+  final double amplitude
+  final double base
+  double evaluate(double luminance)
+  final double exponent
+  final double pivot
+  overrides: ==, hashCode, toString
+class LiquidGlass extends StatefulWidget
+  const LiquidGlass.auto({
+    required Widget child,
+    required LiquidShape shape,
+    LiquidGlassSettings settings = ...,
+    bool fake = ...,
+    Key? key,
+    Clip clipBehavior = ...,
+    List<BoxShadow> shadows = ...,
+    LiquidGlassAppearance? appearance,
+  })
+  const LiquidGlass.grouped({
+    required Widget child,
+    required LiquidShape shape,
+    Key? key,
+    Clip clipBehavior = ...,
+    List<BoxShadow> shadows = ...,
+    LiquidGlassAppearance? appearance,
+  })
+  const LiquidGlass.live({
+    required ValueListenable<LiquidGlassShapeFrame> frame,
+    required Widget child,
+    Clip clipBehavior = ...,
+    bool grouped = ...,
+    Key? key,
+  })
+  const LiquidGlass({
+    required Widget child,
+    required LiquidShape shape,
+    Clip clipBehavior = ...,
+    List<BoxShadow> shadows = ...,
+    LiquidGlassAppearance? appearance,
+    Key? key,
+  })
+  const LiquidGlass.withOwnLayer({
+    required Widget child,
+    required LiquidShape shape,
+    LiquidGlassSettings settings = ...,
+    bool fake = ...,
+    Key? key,
+    Clip clipBehavior = ...,
+    List<BoxShadow> shadows = ...,
+    LiquidGlassAppearance? appearance,
+  })
+  LiquidGlassAppearance? get appearance
+  final Widget child
+  final Clip clipBehavior
+  final ValueListenable<LiquidGlassShapeFrame>? frame
+  static Future<LiquidGlassSupport> precache({bool warmUp = ...})
+  List<BoxShadow> get shadows
+  LiquidShape get shape
+  overrides: createState
+final class LiquidGlassAppearance
+  factory LiquidGlassAppearance.fromJson(Map<String, Object?> json)
+  const LiquidGlassAppearance.ios27Clear({
+    Color tint = ...,
+    double visibility = ...,
+  })
+  factory LiquidGlassAppearance.ios27Regular({
+    required Brightness brightness,
+    Color tint = ...,
+    double visibility = ...,
+  })
+  const LiquidGlassAppearance.ios27RegularDark({
+    Color tint = ...,
+    double visibility = ...,
+  })
+  const LiquidGlassAppearance.ios27RegularLight({
+    Color tint = ...,
+    double visibility = ...,
+  })
+  const LiquidGlassAppearance({
+    Color tint = ...,
+    double visibility = ...,
+    LiquidGlassColorModel colorModel = ...,
+  })
+  LiquidGlassAppearance at(Size size)
+  final LiquidGlassColorModel colorModel
+  LiquidGlassAppearance copyWith({
+    Color? tint,
+    double? visibility,
+    LiquidGlassColorModel? colorModel,
+  })
+  final Color tint
+  Map<String, Object> toJson()
+  final double visibility
+  overrides: ==, hashCode, toString
+sealed class LiquidGlassBackdrop
+  const factory LiquidGlassBackdrop.read()
+  const factory LiquidGlassBackdrop.solid(Color color)
+  Color? get solidColor
+class LiquidGlassBlendGroup extends StatefulWidget
+  const LiquidGlassBlendGroup({
+    required Widget child,
+    double blend = ...,
+    Key? key,
+  })
+  final double blend
+  final Widget child
+  @internal static GlassGroupLink? maybeOf(BuildContext context)
+  overrides: createState
+final class LiquidGlassColorModel
+  const LiquidGlassColorModel.direct({
+    double saturation = ...,
+    double transmissionGamma = ...,
+    double vibrancy = ...,
+  })
+  factory LiquidGlassColorModel.fromJson(Object? value)
+  const LiquidGlassColorModel.ios27({
+    required Brightness brightness,
+    double transmissionGamma = ...,
+  })
+  const LiquidGlassColorModel.ios27Clear()
+  const LiquidGlassColorModel(GlassColorParameters parameters)
+  LiquidGlassColorModel at(double shortSide, {Color? tint})
+  GlassColorParameters? get parameters
+  final double saturation
+  Object toJson()
+  final double transmissionGamma
+  final double vibrancy
+  overrides: ==, hashCode, toString
+enum LiquidGlassDeviceClass
+  unknown,
+  capable,
+  gles,
+  appleBeforeA13,
+  noShaderFilters,
+class LiquidGlassField
+  factory LiquidGlassField.fromPath(
+    Path path, {
+    double step = ...,
+    double? thickness,
+  })
+  const LiquidGlassField({
+    required Float32List samples,
+    required int cols,
+    required int rows,
+    required Offset origin,
+    required double step,
+  })
+  final int cols
+  final Offset origin
+  final int rows
+  final Float32List samples
+  LiquidGlassField shift(Offset offset)
+  final double step
+  overrides: ==, hashCode
+class LiquidGlassGlow
+  const LiquidGlassGlow({
+    required Rect bounds,
+    required double cornerRadius,
+    required Offset center,
+    required double radius,
+    required double gain,
+    required double wash,
+  })
+  final Rect bounds
+  final Offset center
+  final double cornerRadius
+  final double gain
+  final double radius
+  @visibleForTesting static (double, double, double) shade(
+    List<double> uniforms,
+    Offset point,
+    (double, double, double) rgb,
+  )
+  final double wash
+  overrides: ==, hashCode
+final class LiquidGlassHaze
+  factory LiquidGlassHaze.fromJson(Map<String, Object?> json)
+  factory LiquidGlassHaze.ios27Clear({double tintAmount = ...})
+  factory LiquidGlassHaze.ios27Regular({
+    required Brightness brightness,
+    double tintAmount = ...,
+  })
+  const LiquidGlassHaze({
+    double sigma = ...,
+    double lighten = ...,
+    double darken = ...,
+    double cover = ...,
+  })
+  const LiquidGlassHaze.none()
+  final double cover
+  final double darken
+  static const double ios27Sigma
+  bool get isNone
+  final double lighten
+  final double sigma
+  Map<String, Object> toJson()
+  overrides: ==, hashCode, toString
+class LiquidGlassLayer extends StatefulWidget
+  const LiquidGlassLayer.live({
+    required ValueListenable<LiquidGlassLayerFrame> frame,
+    required Widget child,
+    LiquidGlassAppearance? defaultAppearance,
+    bool fake = ...,
+    LiquidGlassBackdrop backdrop = ...,
+    Key? key,
+  })
+  const LiquidGlassLayer({
+    required Widget child,
+    LiquidGlassSettings settings = ...,
+    LiquidGlassAppearance? defaultAppearance,
+    bool fake = ...,
+    LiquidGlassField? field,
+    LiquidGlassBackdrop backdrop = ...,
+    LiquidGlassGlow? glow,
+    Key? key,
+  })
+  final LiquidGlassBackdrop backdrop
+  final Widget child
+  final LiquidGlassAppearance? defaultAppearance
+  static bool existsIn(BuildContext context, {bool watch = ...})
+  final bool fake
+  final LiquidGlassField? field
+  final LiquidGlassGlow? glow
+  final ValueListenable<LiquidGlassLayerFrame>? live
+  final LiquidGlassSettings settings
+  static LiquidGlassSettings settingsOf(BuildContext context)
+  overrides: createState
+class LiquidGlassLayerFrame
+  const LiquidGlassLayerFrame({
+    LiquidGlassSettings settings = ...,
+    LiquidGlassField? field,
+    LiquidGlassGlow? glow,
+  })
+  final LiquidGlassField? field
+  final LiquidGlassGlow? glow
+  final LiquidGlassSettings settings
+final class LiquidGlassSettings
+  factory LiquidGlassSettings.fromJson(Map<String, Object?> json)
+  factory LiquidGlassSettings.ios27Clear({
+    double tintAmount = ...,
+    double? frost,
+  })
+  factory LiquidGlassSettings.ios27Regular({
+    required Brightness brightness,
+    double? frost,
+    double tintAmount = ...,
+  })
+  factory LiquidGlassSettings.ios27RegularDark({
+    double tintAmount = ...,
+    double? frost,
+  })
+  factory LiquidGlassSettings.ios27RegularLight({
+    double tintAmount = ...,
+    double? frost,
+  })
+  const LiquidGlassSettings({
+    double refractionHeight = ...,
+    double refractionAmount = ...,
+    bool refractionFitsShape = ...,
+    double backdropShrink = ...,
+    double backdropShrinkRim = ...,
+    double backdropPull = ...,
+    double backdropPullHeight = ...,
+    double aberration = ...,
+    double aberrationDepth = ...,
+    double? frost,
+    double dispersion = ...,
+    double highlight = ...,
+    double contourStrength = ...,
+    double contourDirectionality = ...,
+    double bevelShadowStrength = ...,
+    double tintAmount = ...,
+    LiquidGlassHaze haze = ...,
+  })
+  final double aberration
+  final double aberrationDepth
+  final double backdropPull
+  final double backdropPullHeight
+  final double backdropShrink
+  final double backdropShrinkRim
+  final double bevelShadowStrength
+  final double contourDirectionality
+  final double contourStrength
+  LiquidGlassSettings copyWith({
+    double? refractionHeight,
+    double? refractionAmount,
+    bool? refractionFitsShape,
+    double? backdropShrink,
+    double? backdropShrinkRim,
+    double? backdropPull,
+    double? backdropPullHeight,
+    double? aberration,
+    double? aberrationDepth,
+    double? frost,
+    double? dispersion,
+    double? highlight,
+    double? contourStrength,
+    double? contourDirectionality,
+    double? bevelShadowStrength,
+    double? tintAmount,
+    LiquidGlassHaze? haze,
+  })
+  final double dispersion
+  final double frost
+  @internal bool get frostIsPreset
+  double frostSigmaAt(double deviceScale, {double? shapeShortSide})
+  final LiquidGlassHaze haze
+  double hazedFrostSigmaAt(double deviceScale, {double? shapeShortSide})
+  final double highlight
+  static double ios27ClearFrost(double tintAmount)
+  static double ios27RegularFrost(double tintAmount)
+  final double refractionAmount
+  final bool refractionFitsShape
+  final double refractionHeight
+  final double tintAmount
+  Map<String, Object> toJson()
+  overrides: ==, hashCode, toString
+final class LiquidGlassShadow extends BoxShadow
+  const LiquidGlassShadow.ios27({Brightness brightness = ...})
+  BoxShadow at(Size size)
+  final Brightness brightness
+  static List<BoxShadow> resolve(List<BoxShadow> shadows, Size size)
+class LiquidGlassShapeFrame
+  const LiquidGlassShapeFrame({
+    required LiquidShape shape,
+    LiquidGlassAppearance? appearance,
+    List<BoxShadow> shadows = ...,
+    Rect? rect,
+    double scaleX = ...,
+    double scaleY = ...,
+  })
+  final LiquidGlassAppearance? appearance
+  final Rect? rect
+  final double scaleX
+  final double scaleY
+  final List<BoxShadow> shadows
+  final LiquidShape shape
+final class LiquidGlassSupport
+  const LiquidGlassSupport({
+    required LiquidGlassDeviceClass deviceClass,
+    String? unavailableReason,
+  })
+  bool get available
+  final LiquidGlassDeviceClass deviceClass
+  final String? unavailableReason
+  overrides: ==, hashCode, toString
+class LiquidGlassVisibility extends StatelessWidget
+  const LiquidGlassVisibility({
+    required double visibility,
+    required Widget child,
+    Key? key,
+  })
+  final Widget child
+  static double of(BuildContext context)
+  final double visibility
+  overrides: build
+final class LiquidOval extends LiquidShape
+  const LiquidOval({BorderSide side = ...})
+  overrides: copyWith, scale, toString
+final class LiquidRoundedRectangle extends LiquidShape
+  const LiquidRoundedRectangle({
+    required double borderRadius,
+    BorderSide side = ...,
+  })
+  final double borderRadius
+  overrides: ==, copyWith, hashCode, scale, toString
+final class LiquidRoundedSuperellipse extends LiquidShape
+  const LiquidRoundedSuperellipse({
+    required double borderRadius,
+    double? bottomRadius,
+    BorderSide side = ...,
+  })
+  final double borderRadius
+  final double? bottomRadius
+  BorderRadius get radii
+  overrides: ==, copyWith, hashCode, scale, toString
+sealed class LiquidShape extends OutlinedBorder
+  const LiquidShape({BorderSide side = ...})
+  overrides: ==, getInnerPath, getOuterPath, hashCode, paint
+
+# package:liquid_glass_renderer/painting.dart
+class GlassColorBleed (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class GlassColorCurve (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class GlassColorParameters (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class GlassRim (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class GlassToneRamp (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassAppearance (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassBackdrop (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassColorModel (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+enum LiquidGlassDeviceClass (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassField (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassGlow (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassHaze (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassLayerFrame (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassSettings (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassShadow (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassShapeFrame (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassSupport (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidOval (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidRoundedRectangle (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidRoundedSuperellipse (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidShape (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+extension RectScaling on Rect
+  Rect scaled(double factor)
+
+# package:liquid_glass_renderer/rendering.dart
+enum FakeGlassRole
+  layerPaints,
+  inFakeLayer,
+  standalone,
+class FlutterGpuGeometryRenderer implements GeometryRendererMembers
+  @visibleForTesting static int get debugActiveGeometryTextureCount
+  @visibleForTesting static int get debugActiveRendererCount
+  @visibleForTesting static int debugAllocatedTextureCount
+  @visibleForTesting static int debugBatchedSubmitCount
+  @visibleForTesting static int debugDeferredPassCount
+  @visibleForTesting static int debugDroppedTextureCount
+  @visibleForTesting static int debugPostFrameFlushCount
+  @visibleForTesting static void debugResetPages()
+  @visibleForTesting static int debugReusedTextureCount
+  @visibleForTesting static int get debugTotalRenderCount
+  static void flush()
+  static Future<FlutterGpuGeometryRenderer> fromAsset(String assetKey)
+  static const int reuseAfterFrames
+  static FlutterGpuGeometryRenderer? tryCreateCached(String assetKey)
+  overrides: atlasImage, debugDisposed, debugMatteTexture, debugMatteTextureSize, debugPipelineIdentity, debugRenderCount, debugScratchBuffers, deviceClass, dispose, droppedShapes, lookImages, releaseAtlas, releaseOutput
+class GeometryRenderLink
+  GeometryRenderLink()
+  void dispose()
+  bool get isDirty
+  void markClean()
+  void markDirty()
+  void Function()? onMembershipChanged
+  void registerGeometry(RenderLiquidGlassGeometry renderObject)
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+  late final UnmodifiableListView<RenderLiquidGlassGeometry> shapes
+  void unregisterGeometry(RenderLiquidGlassGeometry renderObject)
+  void updateAllGeometries()
+  void updatePaintOrder(RenderObject owner)
+class GlassGroupLink with ChangeNotifier
+  GlassGroupLink()
+  void notifyShapeLayoutChanged(RenderObject renderObject)
+  void Function()? onMembershipChanged
+  void registerShape(
+    LiquidGlassShapeRenderObject renderObject,
+    LiquidShape shape,
+  )
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+  List<MapEntry<LiquidGlassShapeRenderObject, LiquidShape>> get shapeEntries
+  void unregisterShape(LiquidGlassShapeRenderObject renderObject)
+  void updateShape(LiquidGlassShapeRenderObject renderObject, LiquidShape shape)
+  overrides: dispose
+abstract final class GlassShaderPrograms
+  GlassShaderPrograms()
+  static FragmentProgram? cached(String assetKey)
+  static bool isCached(String assetKey)
+  static Future<void> precacheShader(String assetKey)
+  static Future<void> precacheShaders(List<String> assetKeys)
+mixin LiquidGlassBackdropFilterHost on RenderObject
+  Layer? get composedLayer
+  overrides: attach, detach
+class LiquidGlassBackdropFilterLayer extends ContainerLayer with ComposedLayer implements PlanSite
+  LiquidGlassBackdropFilterLayer.frosted({
+    required LiquidGlassBackdropFrost frost,
+    required Rect clip,
+    required double reach,
+    required double devicePixelRatio,
+    BlendMode blendMode = ...,
+  })
+  LiquidGlassBackdropFilterLayer({
+    required ImageFilter filter,
+    required Rect clip,
+    required double reach,
+    required double devicePixelRatio,
+    BlendMode blendMode = ...,
+  })
+  FrostBandPaint? get bandPaint
+  set bandPaint(FrostBandPaint? value)
+  BlendMode get blendMode
+  Rect get clip
+  set clip(Rect value)
+  double get devicePixelRatio
+  set devicePixelRatio(double value)
+  @visibleForTesting bool get drawsGroup
+  ImageFilter get filter
+  set filter(ImageFilter value)
+  LiquidGlassBackdropFrost? get frost
+  set frost(LiquidGlassBackdropFrost value)
+  double get reach
+  set reach(double value)
+  @internal Offset get screenOrigin
+  @visibleForTesting bool get serves
+  @internal Rect get shown
+  overrides: addOutput, addToScene, ask, beginFate, dispose, drawsOwnChildren, endFrame, formNode, outputsInPlace, show
+final class LiquidGlassBentContent
+  LiquidGlassBentContent()
+  void dispose()
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required Rect rect,
+    required double radius,
+    required Path clip,
+    required List<LiquidGlassContentBend> bends,
+    required double devicePixelRatio,
+    required void Function(PaintingContext, Offset) content,
+    double aberration = ...,
+    double aberrationDepth = ...,
+  })
+final class LiquidGlassContentBend
+  const LiquidGlassContentBend({required double amount, required double height})
+  final double amount
+  final double height
+  double shownDepth(double depth)
+  overrides: ==, hashCode
+typedef LiquidGlassLayerEffects = ({int? alpha, double blur, RRect? clip, Matrix4 transform})
+abstract class LiquidGlassRenderObject extends RenderProxyBox
+  LiquidGlassRenderObject({
+    required GeometryRenderLink link,
+    required LiquidGlassSettings settings,
+    required LiquidGlassAppearance defaultAppearance,
+    required double devicePixelRatio,
+  })
+  @protected void clearFrameInputs()
+  @protected void clearGlassShadows()
+  @protected bool get compositionProbeSeeding
+  @protected bool get compositionSeedSuppressed
+  @protected set compositionSeedSuppressed(bool value)
+  @protected bool get compositorPollMisses
+  @protected Offset get compositorTranslation
+  @visibleForTesting Offset get debugCompositorTranslation
+  @visibleForTesting int debugPaintCount
+  @visibleForTesting bool get debugShadowsUnderGlass
+  LiquidGlassAppearance get defaultAppearance
+  set defaultAppearance(LiquidGlassAppearance value)
+  double get devicePixelRatio
+  set devicePixelRatio(double value)
+  @protected void drawGlassShadows(Canvas canvas, Offset offset)
+  @protected Rect effectPaintBounds
+  @protected Rect? encodedGeometryBounds
+  @protected Offset? encodedMatteDelta(Rect bounds)
+  @protected bool get encodesMatte
+  @protected Rect expandEffectBounds(Rect bounds)
+  @protected PictureLayer? get glassShadowPicture
+  @protected bool get glassShadowsFade
+  @protected bool get hasReusableIdleContents
+  static const double largestFittedShortSide
+  GeometryRenderLink get link
+  set link(GeometryRenderLink value)
+  @protected double get materialOutset
+  @protected void onAppearanceChanged()
+  @protected void onCompositorTranslated(Offset translation)
+  @protected abstract void onCompositorTranslationMissed()
+  @protected void onDevicePixelRatioChanged()
+  @protected void onFrameGeometryCommitted()
+  @protected void onSettingsChanged(LiquidGlassSettings old)
+  @protected abstract void paintFrame(
+    PaintingContext context,
+    Offset offset,
+    Rect? geometryBounds,
+  )
+  @protected void paintRetainedEffect(
+    PaintingContext context,
+    Offset offset,
+    void Function(PaintingContext, Offset) painter,
+  )
+  @protected List<RenderLiquidGlassGeometry> get paintedShapes
+  @protected Offset? pollCompositorTranslation()
+  @protected Rect? prepareFrameGeometry()
+  @protected ContainerLayer? recordGlassShadows(Offset offset)
+  @protected void releaseRetainedEffectLayer()
+  @protected void rememberFrameInputs()
+  @protected Rect? get retainedClipBounds
+  @protected Offset retainedPaintOffset
+  @protected void runCompositorPoll()
+  @protected bool setCompositorTranslation(Offset value)
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+  @protected bool shadowsUnderGlass
+  @protected Iterable<RenderBox> get shapeRenderObjects
+  @protected double? smallestVisibleShortSide()
+  @protected void syncAncestorClips()
+  @protected void syncCompositionOpacity()
+  @protected void updateIdleAncestorClips()
+  overrides: attach, detach, dispose, paint, paintBounds
+mixin LiquidGlassShapeRenderObject on RenderBox
+  LiquidGlassAppearance get appearance
+  List<BoxShadow> get castShadows
+  List<BoxShadow> get layerShadows
+  Size get paintSize
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+abstract final class LiquidGlassUnderlay
+  LiquidGlassUnderlay()
+  static void registerLayer<T extends ContainerLayer>(
+    ({int? alpha, double blur, RRect? clip, Matrix4 transform}) Function(T) effects,
+  )
+mixin LivePaintSize on RenderBox
+  ValueListenable<LiquidGlassShapeFrame>? get live
+  set live(ValueListenable<LiquidGlassShapeFrame>? value)
+  @protected void livePaintSizeChanged()
+  Size get paintSize
+  overrides: attach, detach
+class RenderConsolidatedFakeGlassLayer extends LiquidGlassRenderObject with TransformTrackingRenderObjectMixin
+  RenderConsolidatedFakeGlassLayer({
+    required double devicePixelRatio,
+    required GeometryRenderLink link,
+    required LiquidGlassSettings settings,
+    required LiquidGlassAppearance defaultAppearance,
+    required FragmentShader? surfaceShader,
+  })
+  @visibleForTesting BackdropFilterLayer? get debugBackdropFilterLayer
+  @visibleForTesting Rect? debugClipBounds
+  @visibleForTesting Path? get debugClipPath
+  @visibleForTesting bool debugDrewOverCopy
+  @visibleForTesting List<String> get debugLastPaintStages
+  @visibleForTesting Iterable<BackdropFilterLayer> get debugSeparateBackdropLayers
+  @visibleForTesting FragmentShader? get debugSurfaceShader
+  FragmentShader? get surfaceShader
+  set surfaceShader(FragmentShader? value)
+  overrides: addOutput, ask, beginFate, dispose, encodesMatte, materialOutset, onAppearanceChanged, onCompositorTranslationMissed, onDevicePixelRatioChanged, onPreparing, onSettingsChanged, onTransformChanged, paintFrame, show
+class RenderFakeGlass extends RenderProxyBox with LivePaintSize, LiquidGlassBackdropFilterHost
+  RenderFakeGlass({
+    required double devicePixelRatio,
+    required LiquidShape shape,
+    required LiquidGlassSettings settings,
+    required LiquidGlassAppearance appearance,
+    required FakeGlassRole role,
+    required FragmentShader? surfaceShader,
+  })
+  LiquidGlassAppearance get appearance
+  set appearance(LiquidGlassAppearance value)
+  @visibleForTesting LiquidGlassBackdropFilterLayer? get debugBackdropFilterLayer
+  @visibleForTesting int debugPaintCount
+  double get devicePixelRatio
+  set devicePixelRatio(double value)
+  FakeGlassRole get role
+  set role(FakeGlassRole value)
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+  LiquidShape get shape
+  set shape(LiquidShape value)
+  FragmentShader? get surfaceShader
+  set surfaceShader(FragmentShader? value)
+  overrides: alwaysNeedsCompositing, composedLayer, dispose, layer, paint
+class RenderGlassShadow extends RenderProxyBox with LivePaintSize
+  RenderGlassShadow({
+    required LiquidShape shape,
+    required List<BoxShadow> shadows,
+    required double visibility,
+    required double devicePixelRatio,
+  })
+  double get devicePixelRatio
+  set devicePixelRatio(double value)
+  List<BoxShadow> get shadows
+  set shadows(List<BoxShadow> value)
+  LiquidShape get shape
+  set shape(LiquidShape value)
+  double get visibility
+  set visibility(double value)
+  overrides: paint, paintBounds
+class RenderLiquidGlass extends RenderLiquidGlassGeometry with LiquidGlassShapeRenderObject, LivePaintSize
+  RenderLiquidGlass({
+    required LiquidShape shape,
+    required List<BoxShadow> layerShadows,
+    required LiquidGlassAppearance appearance,
+    required double devicePixelRatio,
+    GlassGroupLink? blendGroupLink,
+    GeometryRenderLink? renderLink,
+  })
+  set appearance(LiquidGlassAppearance value)
+  void bindLinks({
+    GlassGroupLink? blendGroupLink,
+    GeometryRenderLink? renderLink,
+  })
+  set layerShadows(List<BoxShadow> value)
+  LiquidShape get shape
+  set shape(LiquidShape value)
+  overrides: appearance, attach, detach, gatherShapeData, gatheredShapes, layerShadows, livePaintSizeChanged, performLayout
+class RenderLiquidGlassBlendGroup extends RenderLiquidGlassGeometry
+  RenderLiquidGlassBlendGroup({
+    required GeometryRenderLink? renderLink,
+    required double devicePixelRatio,
+    required GlassGroupLink link,
+    required double blend,
+  })
+  double get blend
+  set blend(double value)
+  GlassGroupLink get link
+  set link(GlassGroupLink value)
+  overrides: gatherShapeData, gatheredShapes, geometryBlend, pollChildShapeTransforms, settings, updatePaintOrder
+class RenderLiquidGlassContent extends RenderOpacity
+  RenderLiquidGlassContent({double opacity = ..., RenderBox? child})
+  Color get glowColor
+  set glowColor(Color value)
+  Offset get glowOffset
+  set glowOffset(Offset value)
+  double get glowRadius
+  set glowRadius(double value)
+  overrides: debugFillProperties, paint
+abstract class RenderLiquidGlassGeometry extends RenderProxyBox
+  RenderLiquidGlassGeometry({
+    required double devicePixelRatio,
+    LiquidGlassSettings settings = ...,
+    GeometryRenderLink? renderLink,
+  })
+  void acceptCompositorTranslation()
+  double get devicePixelRatio
+  set devicePixelRatio(double value)
+  abstract (Rect, List<ShapeGeometry>, bool) gatherShapeData()
+  Iterable<LiquidGlassShapeRenderObject> get gatheredShapes
+  @internal GeometryCache? get geometry
+  double get geometryBlend
+  @internal LiquidGlassGeometryState get geometryState
+  @internal bool hasCurrentGeometryCache(GeometryCache candidate)
+  bool hasCurrentMatteRevision(int revision)
+  @protected void markGeometryNeedsUpdate({bool force = ...})
+  @internal GeometryCache? maybeRebuildGeometry()
+  @protected bool pollChildShapeTransforms({required bool record})
+  @internal ({bool childChanged, Matrix4? transform}) pollRelativeTransforms(
+    RenderObject layer, {
+    bool record = ...,
+  })
+  GeometryRenderLink? get renderLink
+  set renderLink(GeometryRenderLink? value)
+  LiquidGlassSettings get settings
+  set settings(LiquidGlassSettings value)
+  bool get transformMayLag
+  void updatePaintOrder()
+  overrides: attach, detach, dispose
+class RenderLiquidGlassLayer extends LiquidGlassRenderObject with TransformTrackingRenderObjectMixin
+  RenderLiquidGlassLayer({
+    required List<FragmentShader> finalShaders,
+    required double devicePixelRatio,
+    required LiquidGlassSettings settings,
+    required LiquidGlassAppearance defaultAppearance,
+    required GeometryRenderLink link,
+    FlutterGpuGeometryRenderer? gpuGeometryRenderer,
+  })
+  @protected Rect? get backdropSampleBounds
+  double backdropSamplingReach(Rect material)
+  double get blurPassSigma
+  @visibleForTesting BackdropFilterLayer? get debugBackdropFilterLayer
+  @visibleForTesting Rect? get debugBackdropSampleBounds
+  @visibleForTesting bool debugDrewOverCopy
+  @visibleForTesting int debugEncodeCount
+  @visibleForTesting SiteFate? get debugFate
+  @visibleForTesting Rect? debugFilterBounds
+  @visibleForTesting Image? get debugGeometryImage
+  @visibleForTesting Rect get debugGeometryMatteBounds
+  @visibleForTesting FragmentShader get debugLiveShader
+  @visibleForTesting List<Image> get debugLookImages
+  @visibleForTesting static bool debugShaderVariants
+  @visibleForTesting bool get debugUsesShapeAppearances
+  @visibleForTesting bool get debugUsesTintOnlyAppearance
+  bool get drawableEmpty
+  LiquidGlassField? get field
+  set field(LiquidGlassField? value)
+  final List<FragmentShader> finalShaders
+  LiquidGlassGlow? get glow
+  set glow(LiquidGlassGlow? value)
+  FlutterGpuGeometryRenderer? get gpuGeometryRenderer
+  set gpuGeometryRenderer(FlutterGpuGeometryRenderer? value)
+  @protected bool get hasReusableGeometry
+  @protected bool needsGeometryUpdate
+  Matrix4 get shaderCoordinateTransform
+  Color? get solidBackdrop
+  set solidBackdrop(Color? value)
+  overrides: addOutput, ask, beginFate, dispose, encodesMatte, materialOutset, mayRest, onAppearanceChanged, onCompositorTranslated, onCompositorTranslationMissed, onDevicePixelRatioChanged, onFrameGeometryCommitted, onPreparing, onResting, onSettingsChanged, onTransformChanged, paintFrame, paintsLate, repaintsOnMove, show
+class RenderLiveGlassFrame extends RenderProxyBox
+  RenderLiveGlassFrame({required ValueListenable<LiquidGlassShapeFrame> frame})
+  ValueListenable<LiquidGlassShapeFrame> get frame
+  set frame(ValueListenable<LiquidGlassShapeFrame> value)
+  overrides: applyPaintTransform, attach, detach, paint
+abstract class ShaderKeys
+  static final String backdropFrost
+  static final String backdropFrostAxis
+  static final String backdropFrostSquare
+  static final String backdropHazeMix
+  static final String backdropHazeStrip
+  static final String bentContent
+  static final String fakeGlassSurface
+  static final List<String> fakeSurfaceAssets
+  static String finalRender(String name)
+  static List<String> get finalRenders
+  static final String gpuGeometryShaderBundle
+class ShapeGeometry
+  ShapeGeometry({
+    required LiquidGlassShapeRenderObject renderObject,
+    required LiquidShape shape,
+    required Rect shapeBounds,
+    required LiquidGlassAppearance appearance,
+    List<BoxShadow> shadows = ...,
+    Matrix4? shapeToGeometry,
+  })
+  final LiquidGlassAppearance appearance
+  @internal double get encodedBottomRadius
+  @internal double get encodedCornerRadius
+  @internal RawShapeType get encodedShapeType
+  final LiquidGlassShapeRenderObject renderObject
+  final List<BoxShadow> shadows
+  final LiquidShape shape
+  final Rect shapeBounds
+  final Matrix4? shapeToGeometry
+  overrides: ==, hashCode, toString
+bool? debugGlassCopies
+bool? debugGlassHaze
+bool? debugGlassLean
+PlanPolicy debugGlassPolicy
+PlanPrices debugGlassPrices
+bool debugPaintLiquidGlassGeometry
+double fakeGlassSurfaceOutset(LiquidGlassSettings settings)
+Future<LiquidGlassSupport> precacheLiquidGlass({bool warmUp = ...})
+
+# package:liquid_glass_renderer/widgets.dart
+class FakeGlass (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class GlassPlanOverlay (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlass (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassBlendGroup (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassLayer (see package:liquid_glass_renderer/liquid_glass_renderer.dart)
+class LiquidGlassVisibility (see package:liquid_glass_renderer/liquid_glass_renderer.dart)

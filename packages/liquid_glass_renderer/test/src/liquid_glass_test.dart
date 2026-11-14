@@ -1,16 +1,37 @@
 import 'package:alchemist/alchemist.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/effects.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/rendering/render_liquid_glass_geometry.dart';
+import 'package:liquid_glass_renderer/src/rendering/shading.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
 void main() {
   group('LiquidGlass', () {
+    testWidgets('settingsOf reads the settings of the nearest layer', (
+      tester,
+    ) async {
+      const settings = LiquidGlassSettings(refractionHeight: 12);
+      late LiquidGlassSettings seen;
+      await tester.pumpWidget(
+        LiquidGlassLayer(
+          settings: settings,
+          child: Builder(
+            builder: (context) {
+              seen = LiquidGlassLayer.settingsOf(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(seen, settings);
+    });
+
     testWidgets('fake layer retains its painted subtree', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -170,7 +191,7 @@ void main() {
         final initialScope = tester.widget<LiquidGlassRenderScope>(
           find.byType(LiquidGlassRenderScope),
         );
-        if (initialScope.useFake) {
+        if (initialScope.fake) {
           // Shader-bundle I/O completes on the host event loop rather than the
           // fake clock advanced by pump durations. A warm cache may already
           // have selected the real renderer during pumpWidget.
@@ -185,7 +206,7 @@ void main() {
               .widget<LiquidGlassRenderScope>(
                 find.byType(LiquidGlassRenderScope),
               )
-              .useFake,
+              .fake,
           isFalse,
         );
       },
@@ -207,11 +228,23 @@ void main() {
         Widget app() => MaterialApp(
           home: AnimatedBuilder(
             animation: Listenable.merge([fake, revision]),
+            // Two shapes, so the layer's geometry is an atlas: one shape
+            // holds no texture.
             builder: (_, __) => LiquidGlassLayer(
               fake: fake.value,
-              child: const LiquidGlass(
-                shape: LiquidOval(),
-                child: SizedBox.square(dimension: 100),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LiquidGlass(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 100),
+                  ),
+                  SizedBox(width: 16),
+                  LiquidGlass(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 100),
+                  ),
+                ],
               ),
             ),
           ),
@@ -228,7 +261,7 @@ void main() {
             .whereType<RenderLiquidGlassLayer>()
             .last;
         final renderer = renderObject.gpuGeometryRenderer!;
-        final renderShader = renderObject.renderShader;
+        final renderShader = renderObject.debugLiveShader;
         final renderCount = renderer.debugRenderCount;
         expect(
           FlutterGpuGeometryRenderer.debugActiveRendererCount,
@@ -245,7 +278,7 @@ void main() {
         revision.value++;
         await tester.pump();
         expect(renderer.debugRenderCount, renderCount);
-        expect(renderObject.renderShader, same(renderShader));
+        expect(renderObject.debugLiveShader, same(renderShader));
         expect(renderShader.debugDisposed, isFalse);
         expect(
           FlutterGpuGeometryRenderer.debugActiveGeometryTextureCount,
@@ -279,7 +312,7 @@ void main() {
             .whereType<RenderLiquidGlassLayer>()
             .last;
         final replacement = replacementRenderObject.gpuGeometryRenderer!;
-        final replacementShader = replacementRenderObject.renderShader;
+        final replacementShader = replacementRenderObject.debugLiveShader;
         expect(replacement, isNot(same(renderer)));
 
         await tester.pumpWidget(const SizedBox());
@@ -298,12 +331,10 @@ void main() {
     );
 
     testWidgets(
-      'uses a low-resolution contributor map only for differing appearances',
+      'writes looks beside the atlas only for differing appearances',
       (tester) async {
         final appearanceMode = ValueNotifier(0);
         addTearDown(appearanceMode.dispose);
-        final initialMaterialTextures =
-            FlutterGpuGeometryRenderer.debugActiveMaterialTextureCount;
 
         Widget app() => MaterialApp(
           home: AnimatedBuilder(
@@ -351,14 +382,15 @@ void main() {
 
         RenderLiquidGlassLayer renderObject() =>
             tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
+        // The looks the live draw reads.
+        Object read() => switch (renderObject().debugLiveDraw.matte.geometry) {
+          AtlasGeometry(:final looks) => looks,
+          ComputedGeometry() => const <Object>[],
+        };
 
         expect(renderObject().debugUsesShapeAppearances, isFalse);
         expect(renderObject().debugUsesTintOnlyAppearance, isFalse);
-        expect(renderObject().debugMaterialImage, isNull);
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveMaterialTextureCount,
-          initialMaterialTextures,
-        );
+        expect(renderObject().debugLookImages, isEmpty);
 
         appearanceMode.value = 1;
         await tester.pump();
@@ -366,21 +398,10 @@ void main() {
 
         expect(renderObject().debugUsesShapeAppearances, isTrue);
         expect(renderObject().debugUsesTintOnlyAppearance, isTrue);
-        final materialImage = renderObject().debugMaterialImage;
-        expect(materialImage, isNotNull);
-        expect(
-          materialImage!.width,
-          lessThanOrEqualTo(
-            (renderObject().debugGeometryMatteBounds.width *
-                    tester.view.devicePixelRatio /
-                    FlutterGpuGeometryRenderer.materialRasterScale)
-                .ceil(),
-          ),
-        );
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveMaterialTextureCount,
-          initialMaterialTextures + 1,
-        );
+        final tint = renderObject().debugLookImages.single;
+        final atlas = renderObject().debugGeometryImage!;
+        expect((tint.width, tint.height), (atlas.width, atlas.height));
+        expect(read(), [same(tint)]);
 
         appearanceMode.value = 2;
         await tester.pump();
@@ -388,24 +409,16 @@ void main() {
 
         expect(renderObject().debugUsesShapeAppearances, isTrue);
         expect(renderObject().debugUsesTintOnlyAppearance, isFalse);
+        expect(renderObject().debugLookImages, hasLength(3));
+        expect(read(), hasLength(3));
 
         appearanceMode.value = 0;
         await tester.pump();
         await tester.pump();
 
+        // The atlas stays; glass that looks alike reads none of its looks.
         expect(renderObject().debugUsesShapeAppearances, isFalse);
-        expect(renderObject().debugMaterialImage, isNull);
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveMaterialTextureCount,
-          initialMaterialTextures,
-        );
-
-        await tester.pumpWidget(const SizedBox());
-        await tester.pump();
-        expect(
-          FlutterGpuGeometryRenderer.debugActiveMaterialTextureCount,
-          initialMaterialTextures,
-        );
+        expect(read(), isEmpty);
       },
       skip: skipProperGlassTests,
     );
@@ -1238,24 +1251,27 @@ void main() {
               .whereType<RenderLiquidGlassLayer>()
               .where((renderObject) => renderObject.gpuGeometryRenderer != null)
               .last;
-          final renderer = renderObject.gpuGeometryRenderer!;
-          final initialRenderCount = renderer.debugRenderCount;
+          final initialRenderCount = renderObject.debugEncodeCount;
 
           appearance.value = appearance.value.copyWith(tint: Colors.cyan);
           await tester.pump();
-          expect(renderer.debugRenderCount, initialRenderCount);
+          expect(renderObject.debugEncodeCount, initialRenderCount);
 
           settings.value = settings.value.copyWith(backdropShrink: .2);
           await tester.pump();
           expect(
-            renderer.debugRenderCount,
+            renderObject.debugEncodeCount,
             initialRenderCount,
             reason: 'backdrop scaling belongs to the final material pass',
           );
 
           settings.value = settings.value.copyWith(refractionHeight: 24);
           await tester.pump();
-          expect(renderer.debugRenderCount, initialRenderCount + 1);
+          expect(
+            renderObject.debugEncodeCount,
+            greaterThan(initialRenderCount),
+            reason: 'a deeper refraction asks for geometry farther in',
+          );
         },
         skip: skipProperGlassTests,
       );
@@ -1303,20 +1319,23 @@ void main() {
               .whereType<RenderLiquidGlassLayer>()
               .where((renderObject) => renderObject.gpuGeometryRenderer != null)
               .last;
-          final renderer = renderObject.gpuGeometryRenderer!;
-          final initialRenderCount = renderer.debugRenderCount;
+          final initialRenderCount = renderObject.debugEncodeCount;
 
           visibility.value = .5;
           await tester.pump();
           expect(
-            renderer.debugRenderCount,
+            renderObject.debugEncodeCount,
             initialRenderCount + 1,
             reason: 'the first response difference selects the full map',
           );
 
           visibility.value = 0;
           await tester.pump();
-          expect(renderer.debugRenderCount, initialRenderCount + 2);
+          expect(
+            renderObject.debugEncodeCount,
+            initialRenderCount + 2,
+            reason: 'the hidden shape leaves; one shape needs no map',
+          );
         },
         skip: skipProperGlassTests,
       );
@@ -1327,7 +1346,7 @@ void main() {
 Future<void> _pumpAtDpr2(WidgetTester tester) async {
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.resetDevicePixelRatio);
-  await pumpOnce(tester);
+  await pumpNTimes(2)(tester);
 }
 
 /// A 120x80 continuous-corner rect blended with [second], [gap] logical

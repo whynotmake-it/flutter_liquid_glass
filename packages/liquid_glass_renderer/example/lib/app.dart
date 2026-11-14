@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
 import 'package:liquid_glass_renderer_example/performance_probe.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';

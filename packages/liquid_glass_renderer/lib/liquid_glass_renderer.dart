@@ -1,34 +1,15 @@
-/// Liquid Glass Effect for Flutter
-library liquid_glass_renderer;
-
-import 'package:flutter/foundation.dart' show kDebugMode;
-
-export 'src/fake_glass.dart' show FakeGlass;
-export 'src/glass_glow.dart' show GlassGlow, GlassGlowLayer;
-export 'src/internal/glass_drag_builder.dart' show GestureMode;
-export 'src/liquid_glass.dart' show LiquidGlass;
-export 'src/liquid_glass_appearance.dart' show LiquidGlassAppearance;
-export 'src/liquid_glass_blend_group.dart' show LiquidGlassBlendGroup;
-export 'src/liquid_glass_capture.dart' show LiquidGlassCapture;
-export 'src/liquid_glass_color_model.dart' show LiquidGlassColorModel;
-export 'src/liquid_glass_settings.dart' show LiquidGlassSettings;
-export 'src/liquid_glass_visibility.dart' show LiquidGlassVisibility;
-export 'src/liquid_shape.dart'
-    show
-        LiquidOval,
-        LiquidRoundedRectangle,
-        LiquidRoundedSuperellipse,
-        LiquidShape;
-export 'src/logging.dart' show LgrLogs;
-export 'src/rendering/liquid_glass_layer.dart' show LiquidGlassLayer;
-export 'src/stretch.dart'
-    show LiquidStretch, OffsetResistanceExtension, RawLiquidStretch;
-
-/// Whether to paint the liquid glass geometry texture for debugging purposes.
+/// Liquid glass for Flutter: what an app needs to put glass on screen, in
+/// one import.
 ///
-/// When enabled, geometry textures will be drawn directly instead of the
-/// liquid glass effect.
+/// `painting` describes glass as values (shapes, settings, appearance) and
+/// `widgets` puts it in the tree (`LiquidGlass`, `LiquidGlassLayer`,
+/// `LiquidGlassBlendGroup`, `FakeGlass`).
 ///
-/// Will be set to `false` in release builds.
-@pragma('vm:platform-const-if', !kDebugMode)
-bool debugPaintLiquidGlassGeometry = false;
+/// The other libraries are for those who build on the renderer and are
+/// imported by name: `composer` for the plan of a frame and its report,
+/// `rendering` for the render objects and layers that carry the plan out,
+/// `effects` for glass that reacts to touch (`GlassGlow`, `LiquidStretch`).
+library;
+
+export 'painting.dart' hide RectScaling;
+export 'widgets.dart';

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _expectFlutterGpuFallback = bool.fromEnvironment(
   'EXPECT_FLUTTER_GPU_FALLBACK',

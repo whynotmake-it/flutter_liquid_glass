@@ -1,0 +1,41 @@
+import 'package:flutter/widgets.dart';
+import 'package:liquid_glass_renderer/effects.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/rendering.dart';
+
+const shape = LiquidRoundedSuperellipse(borderRadius: 20);
+final key = BackdropKey();
+
+Widget effects() {
+  debugPaintLiquidGlassGeometry = true;
+  return const GlassGlow(
+    gestureMode: GestureMode.listener,
+    child: LiquidStretch(
+      child: RawLiquidStretch(stretchPixels: Offset.zero, child: null),
+    ),
+  );
+}
+
+LiquidGlassSettings settings(BuildContext context) =>
+    LiquidGlassLayer.settingsOf(context);
+
+Widget backdropGroups() {
+  return LiquidGlassLayer(
+    child: Column(
+      children: [
+        LiquidGlass.auto(
+          shape: shape,
+          child: const SizedBox(),
+        ),
+        LiquidGlass.withOwnLayer(
+          shape: shape,
+          child: const SizedBox(),
+        ),
+        FakeGlass(
+          shape: shape,
+          child: const SizedBox(),
+        ),
+      ],
+    ),
+  );
+}

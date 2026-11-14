@@ -2,6 +2,7 @@ name: liquid_glass_workspace_workspace
 
 packages:
   - packages/*
+  - tool/*
   - "packages/**/example/"
   - "packages/**/tool/apple_match/flutter/"
 
@@ -28,6 +29,12 @@ scripts:
     description: |
       Run `dart analyze` in all packages.
        - Note: you can also rely on your IDEs Dart Analysis / Issues window.
+  fix-data:
+    exec: dart fix test_fixes --compare-to-golden
+    packageFilters:
+      dirExists: test_fixes
+    description: Check that `dart fix` turns each test_fixes/*.dart into its .expect file.
+
   version-all:
     run: melos version --no-git-tag-version --yes
 
@@ -66,8 +73,10 @@ scripts:
     description: Generate coverage for all packages.
 
   test-without-goldens:select:
+    # `macos_pixels` holds only on macOS without seeded passes; the golden job
+    # runs those tests there.
     run: >-
-      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden,macos_pixels
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
     exec:
@@ -88,9 +97,10 @@ scripts:
     # with `pinPlainBackdropPath`. The geometry matte needs no define: the
     # low-res matte is the only matte, and `flutter test` uses it too, with the
     # scale picked per layer from its device pixel ratio (4 at 2 or more, else
-    # 2).
+    # 2). `macos_pixels` holds only on macOS without seeded passes; the golden
+    # job runs those tests there.
     run: >-
-      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden
+      flutter test --enable-impeller --enable-flutter-gpu --exclude-tags=golden,macos_pixels
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true
       --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=5
       --dart-define=LIQUID_GLASS_SEED_PASSES=true

@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_tiling.dart';
+import 'package:liquid_glass_renderer/src/rendering/shape_set.dart';
 
 import 'gpu_test_helpers.dart';
 
@@ -49,7 +51,7 @@ class _Shape {
   }
 }
 
-/// Coverage of one blend group, read back from the geometry matte: `true`
+/// Coverage of one blend group, read back from the geometry atlas: `true`
 /// where the pixel center lies inside the merged shape.
 typedef _Mask = List<List<bool>>;
 
@@ -80,30 +82,28 @@ void main() {
         if (index == 0) -(blend + 1) else blend,
       ],
     ];
-    final result = renderer.render(
-      width: _width,
-      height: _height,
-      shapeData: shapeData,
-      numShapes: shapes.length,
-      boundsData: [
-        for (final shape in shapes) ...[
-          shape.left, shape.top, shape.right, shape.bottom, //
-        ],
-      ],
-      refractionHeight: 10,
-      refractionAmount: 30,
-      offsetX: 0,
-      offsetY: 0,
-      matteScale: testMatteScale,
+    final atlas = await AtlasTexels.read(
+      renderer
+          .renderAtlas(
+            Tiling.shapes(
+              ShapeSet.rows(
+                shapes: shapeData,
+                boxes: [
+                  for (final shape in shapes) ...[
+                    shape.left, shape.top, shape.right, shape.bottom, //
+                  ],
+                ],
+              ),
+              width: _width,
+              height: _height,
+              reach: testReach,
+            ),
+          )
+          .image,
     );
-    final field = await readGeometryField(result.image);
-    // The first channel is the distance to the edge, positive inside.
     return [
       for (var y = 0; y < _height; y++)
-        [
-          for (var x = 0; x < _width; x++)
-            fieldInwardAt(field, result.textureWidth, x, y) >= 0,
-        ],
+        [for (var x = 0; x < _width; x++) atlas.inwardAt(x, y) >= 0],
     ];
   }
 

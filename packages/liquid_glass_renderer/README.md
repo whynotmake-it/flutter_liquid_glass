@@ -32,15 +32,17 @@ private material APIs.
 - [Quick start](#quick-start)
 - [The widgets](#the-widgets)
 - [Blending shapes](#blending-shapes)
+- [Custom outlines](#custom-outlines)
 - [iOS 27 presets and the Liquid Glass slider](#ios-27-presets-and-the-liquid-glass-slider)
 - [Tint and color](#tint-and-color)
 - [Refraction](#refraction)
 - [Glint](#glint)
 - [Visibility](#visibility)
 - [FakeGlass](#fakeglass)
-- [Glass on glass and `LiquidGlassCapture`](#glass-on-glass-and-liquidglasscapture)
+- [Glass on glass](#glass-on-glass)
 - [Performance](#performance)
 - [Example playground](#example-playground)
+- [Upgrading from 1.0.0-dev.2](#upgrading-from-100-dev2)
 
 ## Requirements
 
@@ -51,7 +53,8 @@ private material APIs.
   `io.flutter.embedding.android.EnableFlutterGPU` meta-data in
   `AndroidManifest.xml`. The example app shows both.
 - iOS, Android and macOS are the platforms the renderer is tested on. Web
-  builds compile and render [FakeGlass](#fakeglass).
+  builds compile and render [FakeGlass](#fakeglass). Windows and Linux are
+  untested.
 
 Wherever full glass is unavailable, layers switch to `FakeGlass`
 automatically.
@@ -109,20 +112,52 @@ the UI mounts.
 It does not eliminate all first-use GPU work; omit it if showing an initial
 fallback is preferable to delaying startup.
 
+The first glass frame also creates the GPU pipelines that glass draws with. On
+a mid-range Android phone, that stalls the frame the first time an installed
+app shows glass. Later launches load the pipelines from the disk cache.
+`LiquidGlass.precache(warmUp: true)` creates them offscreen during the
+precache instead, at the cost of one offscreen frame on every launch.
+
+### Is full glass available?
+
+Layers fall back to `FakeGlass` by themselves. To know before you build them,
+for example to pick an opaque look on a weak GPU, read the
+`LiquidGlassSupport` that `LiquidGlass.precache()` returns:
+
+```dart
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final support = await LiquidGlass.precache();
+  if (!support.available) {
+    debugPrint('Fake glass: ${support.unavailableReason}');
+  }
+  runApp(MyApp(fullGlass: support.available));
+}
+```
+
+- `available`: every full-glass program and the Flutter GPU geometry bundle
+  loaded, so layers can draw full glass.
+- `unavailableReason`: why full glass is unavailable, when it is.
+- `deviceClass`: the kind of GPU, a `LiquidGlassDeviceClass`: `capable`
+  (Vulkan, Metal on a Mac or an Apple GPU from the A13, or OpenGL ES on a
+  desktop), `gles` (Impeller's OpenGL ES fallback on an Android device
+  without a usable Vulkan driver, where full glass costs more frame time),
+  `appleBeforeA13`, `noShaderFilters` (Skia or the web) or `unknown` (full
+  glass did not load, for example because Flutter GPU is not enabled).
+
 ## The widgets
 
 | Widget | What it does |
 | --- | --- |
-| `LiquidGlassLayer` | Samples the backdrop once and renders every glass shape below it. Owns the shared `LiquidGlassSettings`. |
+| `LiquidGlassLayer` | Draws every glass shape below it together. Owns the shared `LiquidGlassSettings`. |
 | `LiquidGlass` | One glass shape. Its child paints on top of the glass, clipped to the shape. |
 | `LiquidGlassBlendGroup` | Melts the `LiquidGlass.grouped` shapes inside it into one surface. |
-| `LiquidGlassCapture` | Captures the backdrop once for glass that sits on other glass. |
 | `LiquidGlassVisibility` | Fades the glass in a subtree in and out. |
 | `FakeGlass` | The fallback without refraction, used automatically where full glass is unavailable. |
 | `LiquidGlassSettings` | Refraction, frost, glint, border and inner shadow, shared by a layer. |
 | `LiquidGlassAppearance` | Tint, color model and visibility, per shape or as a layer default. |
 
-`LiquidGlass` has four constructors:
+`LiquidGlass` has five constructors:
 
 | Constructor | Use it when |
 | --- | --- |
@@ -130,14 +165,17 @@ fallback is preferable to delaying startup.
 | `LiquidGlass.grouped(...)` | It sits in a `LiquidGlassBlendGroup` and should blend with its neighbors. |
 | `LiquidGlass.auto(...)` | Reusable code that may or may not have a layer above it. It uses a parent layer when there is one and creates its own otherwise. |
 | `LiquidGlass.withOwnLayer(...)` | It needs its own backdrop sample or its own settings, for example glass on glass. |
+| `LiquidGlass.live(frame: ...)` | Its geometry, appearance and shadows follow a `ValueListenable<LiquidGlassShapeFrame>`, for glass that moves every frame. Each new frame goes straight into the render objects without a rebuild. Hit testing follows the box the widget was laid out in. `grouped: true` joins the nearest `LiquidGlassBlendGroup`. |
 
-Put sibling shapes in one layer. Every independent layer samples the backdrop
-again, and that sample is the expensive part (see
-[Performance](#performance)).
+Put sibling shapes in one layer. A layer draws all its shapes together and
+pays its per-layer work once. [Performance](#performance) says what glass
+costs.
 
 Shapes are `LiquidRoundedSuperellipse` (squircles and capsules), `LiquidOval`
-and `LiquidRoundedRectangle`, each with one corner radius. Exterior shadows go
-on the shape, and the renderer cuts them out behind the translucent glass:
+and `LiquidRoundedRectangle`. A rounded rectangle has one corner radius. A
+superellipse has one radius, or a separate radius for its two bottom corners
+with `bottomRadius`. Exterior shadows go on the shape, and the renderer cuts
+them out behind the translucent glass:
 
 ```dart
 LiquidGlass(
@@ -150,7 +188,15 @@ LiquidGlass(
 ```
 
 `GlassGlow` adds a touch glow inside the glass, and `LiquidStretch` gives it
-the squash and stretch of iOS controls while it is dragged.
+the squash and stretch of iOS controls while it is dragged. Both come from
+`package:liquid_glass_renderer/effects.dart`.
+
+The main import holds what every app needs: the values in `painting.dart` and
+the widgets in `widgets.dart`. Import the other libraries by name:
+
+- `effects.dart` for `GlassGlow` and `LiquidStretch`
+- `rendering.dart` for the render objects and layers
+- `composer.dart` for the frame plan and its report
 
 ## Blending shapes
 
@@ -184,8 +230,43 @@ LiquidGlassLayer(
 )
 ```
 
-A layer renders at most 16 shapes. Plain `LiquidGlass` shapes in the same layer
-don't blend.
+A layer renders any number of shapes, as long as no more than 16 of them blend
+or sit within a few pixels of each other. A layer whose shapes have their own
+appearances, or a layer with a field, holds at most 16 shapes. Plain
+`LiquidGlass` shapes in the same layer don't blend.
+
+## Custom outlines
+
+A layer can shade a body of any outline in place of its shapes' own: give it
+the body's signed distance field. `LiquidGlassField.fromPath` computes one
+from any closed `Path`, in the layer's coordinates:
+
+```dart
+final star = Path()..addPolygon(points, true);
+
+LiquidGlassLayer(
+  field: LiquidGlassField.fromPath(star),
+  child: Stack(
+    children: [
+      Positioned.fromRect(
+        rect: star.getBounds(),
+        child: const LiquidGlass(
+          shape: LiquidRoundedRectangle(borderRadius: 0),
+          child: SizedBox.expand(),
+        ),
+      ),
+    ],
+  ),
+)
+```
+
+The shape under the field still supplies the appearance, the shadow, the
+content clip and the bounds of the glass, which must contain the body. A layer
+shades one field, so every custom body takes a layer of its own. Building a
+field measures every node against the whole edge (about 90 ms in a debug build
+for 300 x 200 at the default step of 2): compute it when the path changes and
+keep it, not once a frame. A widget that knows its outline analytically can
+fill a `LiquidGlassField` itself instead.
 
 ## iOS 27 presets and the Liquid Glass slider
 
@@ -299,11 +380,28 @@ bevel refracts; the face shows the backdrop undisplaced.
   keeps its size and `0.08` shows it at 92%. It never enlarges, so the glass
   never pixelates the backdrop. All glass in a layer shrinks about the center
   of the layer's glass; give a shape its own layer to shrink it about itself.
+- `backdropShrinkRim` (`0` to `1`): where `backdropShrink` shrinks about. At
+  `0`, that is the center of the layer's glass. At `1`, it is the long center
+  line of the glass's bounds, so a capsule shows the backdrop in place along
+  its length and shrinks it only across the capsule and around its ends.
+- `backdropPull` and `backdropPullHeight`: the edge reads the backdrop up to
+  `backdropPull` logical pixels outside the glass, falling to nothing
+  `backdropPullHeight` from the edge. Glass deeper than that shows its middle
+  in place and at its own size, where `backdropShrink` shows all of it smaller.
 - `dispersion`: splits the colors in the refracted edge. Red moves by
   `1 + dispersion / 2` and blue by `1 - dispersion / 2` times the edge
   displacement; negative values bend blue more, as real glass does. iOS 27
   regular and clear glass show none, so it defaults to `0`, which is also the
   cheapest setting to render.
+- `aberration` and `aberrationDepth`: parts the colors of everything the glass
+  shows, not only of the bevel: red shows what lies up to `aberration` logical
+  pixels toward the edge and blue what lies as far toward the middle, in full
+  at the edge and fading to nothing `aberrationDepth` from it. Glass that
+  parts colors draws with a larger shader variant, so leave it at `0` where it
+  is not wanted.
+
+`backdropPull` and `aberration` give a lifted iOS lens its look. Both default
+to `0`.
 
 The backdrop is always sampled bilinearly, so refracted lines move smoothly
 instead of snapping to whole pixels.
@@ -405,64 +503,37 @@ shadow, visibility and exterior shadows. It leaves out refraction,
 `FakeGlass` is not a cheaper mode: it pays for the same backdrop readback and
 blur as full glass (see below).
 
-## Glass on glass and `LiquidGlassCapture`
+## Glass on glass
 
 Apple's guidance is not to stack glass on glass. Sometimes you have to, for
 example with an indicator that slides over its tab bar and should refract it.
 
-Every `LiquidGlassLayer` is a `BackdropFilter`, and on Impeller each one copies
-the whole render pass behind it, usually the entire screen. Two independent
-layers pay that copy twice. You have four options:
+Where it can, glass doesn't read the screen live. Each layer paints over a
+copy of what lies under it, drawn from the layer tree while the frame
+composites and kept while that content stays the same. Glass that sits close
+together shares one copy. Glass on glass works the same way: the copy under
+the indicator holds the bar, so the indicator refracts it, and the frame draws
+that copy after the bar's.
 
-| | Backdrop copies | The top glass shows | Trade-off |
-| --- | --- | --- | --- |
-| Shapes in one `LiquidGlassLayer` | 1 | The content below | Shared settings; the shapes can't refract each other. |
-| Layers sharing a `BackdropGroup` (`useBackdropGroup: true`) | 1 | The content below, not the other glass | The indicator doesn't look like it sits on the bar. |
-| Independent layers (default) | 1 per layer | The glass below | Cost grows with every layer. |
-| Layers inside a `LiquidGlassCapture` | 1 small copy for the capture | The glass below | Content the glass refracts must paint outside the capture. |
-
-`LiquidGlassCapture` copies the backdrop once, only as large as the glass
-inside it, and the layers inside read from that small copy. The result looks
-the same as independent layers.
-
-```dart
-Stack(
-  children: [
-    content,
-    Align(
-      alignment: Alignment.bottomCenter,
-      child: LiquidGlassCapture(
-        child: LiquidGlassLayer(
-          // the bar
-          child: LiquidGlassLayer(
-            // the indicator, refracting the bar
-          ),
-        ),
-      ),
-    ),
-  ],
-)
-```
-
-The capture sizes itself to the glass inside plus its blur, refraction and
-shadows. Pass `bleed` to size it yourself. A capture the size of the screen
-saves nothing.
+| | The top glass shows | Trade-off |
+| --- | --- | --- |
+| Shapes in one `LiquidGlassLayer` | The content below | Shared settings. The shapes can't refract each other. |
+| Independent layers (default) | The glass below | One more copy for the glass on top. |
 
 ## Performance
 
-The unit of cost is the backdrop copy, not the glass widget. Every
-independent `BackdropFilter`, and so every independent layer, copies the
-backdrop before it can blur or refract it. On top of that copy, a plain blur,
-`FakeGlass` and full glass each cost progressively more, and every glass
-shadow adds its own cost.
+The unit of cost is the backdrop read, not the glass widget. Glass paints
+over a copy of what lies under it (see [Glass on glass](#glass-on-glass)), and
+a frame whose glass all paints over copies skips Impeller's offscreen pass and
+its screen readbacks. Glass reads the screen live only where no copy can be
+drawn: over a texture, a platform view, or glass that itself reads live. On
+top of that, a plain blur, `FakeGlass` and full glass each cost progressively
+more, and every glass shadow adds its own cost.
 
 Best practices:
 
-- **Count backdrop copies per frame.** Put siblings in one layer. Layers over
-  the same content can share one copy with `useBackdropGroup: true` or a
-  shared `backdropKey`; shared members don't see what paints between them. In
-  debug builds the package logs a warning when a frame makes more than one
-  independent copy.
+- **Put siblings in one layer.** A layer draws all its shapes together and
+  pays its own per-layer work once.
 - **Keep layers small.** A layer's cost grows with the area its glass covers.
 - **Don't animate blend-group geometry every frame.** Moving one shape in a
   group re-renders the whole group's geometry, which can drop frames. Static
@@ -496,12 +567,45 @@ scenes, the text loupe, every preset in light and dark, the Liquid Glass
 slider, full/fake switching and several backdrops. Settings you tune can be
 saved as custom presets.
 
+## Upgrading from 1.0.0-dev.2
+
+Run `dart fix --apply` after the upgrade. It handles most of the breaking
+changes:
+
+- `GlassGlow`, `GestureMode`, `LiquidStretch` and `RawLiquidStretch` now
+  come from `package:liquid_glass_renderer/effects.dart`, and
+  `debugPaintLiquidGlassGeometry` from `rendering.dart`. The fix adds the
+  imports.
+- `LiquidGlassSettings.of(context)` becomes
+  `LiquidGlassLayer.settingsOf(context)`.
+- `useBackdropGroup` and `backdropKey` are dropped from `LiquidGlassLayer`,
+  `LiquidGlass.auto`, `LiquidGlass.withOwnLayer` and `FakeGlass`. The
+  renderer now decides which glass shares a backdrop read. A `BackdropKey`
+  you made only for the glass is left unused, delete it.
+
+A few changes need a hand:
+
+- Remove `GlassGlowLayer` and keep its child. `GlassGlow` lights the nearest
+  `LiquidGlass` or `FakeGlass` above it without one.
+- Remove `LiquidGlassCapture` and keep its child. Glass over glass refracts
+  the glass below without it, see [Glass on glass](#glass-on-glass).
+- `LgrLogs` is gone, along with the dependency on `logging`.
+- `LiquidGlassBlendGroup.maxShapesPerLayer` is gone. The limit is still 16,
+  see [Limitations](#limitations).
+- `Offset.withResistance` is gone. It computed
+  `offset * (1 / (1 + offset.distance * resistance))`.
+- `LiquidGlassSettings`, `LiquidGlassAppearance`, `LiquidGlassColorModel` and
+  the shapes no longer mix in `Equatable`, so `props` is gone. `==` and
+  `hashCode` still compare values.
+
 ## Limitations
 
 - Experimental: not yet battle-tested in production apps.
 - Full glass needs Impeller and Flutter GPU; the web renders `FakeGlass`.
-- At most 16 shapes per layer.
-- One corner radius per shape.
+- At most 16 shapes that blend or touch, or 16 per layer with per-shape
+  appearances or a field.
+- One corner radius per shape, except a superellipse's optional
+  `bottomRadius` for its two bottom corners.
 - A glass widget's child is painted on top of the glass, never refracted by
   it.
 

@@ -1,5 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/gestures.dart';
+import 'package:liquid_glass_renderer/effects.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 /// The soft drop shadow iOS gives floating glass.
@@ -16,9 +17,7 @@ class GlowContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassGlowLayer(
-      child: GlassGlow(glowColor: const Color(0x29FFFFFF), child: child),
-    );
+    return GlassGlow(glowColor: const Color(0x29FFFFFF), child: child);
   }
 }
 

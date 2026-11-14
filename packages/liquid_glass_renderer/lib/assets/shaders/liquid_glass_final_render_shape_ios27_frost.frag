@@ -1,0 +1,14 @@
+// Copyright 2025, Tim Lehmann for whynotmake.it
+
+#version 460 core
+
+// One shape, worked out per fragment; one appearance, one iOS 27 color
+// model in slot 0 alone. Frosts an unblurred copy itself. See
+// FinalShaderVariant.
+
+#define SHAPE_APPEARANCE 0
+#define SHAPE_TINT 0
+#define SHAPE_GEOMETRY 1
+#define COLOR_MODELS COLOR_MODELS_IOS27
+#define FROST 1
+#include "liquid_glass_final_render_core.glsl"

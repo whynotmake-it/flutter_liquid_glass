@@ -1,10 +1,9 @@
 // The harness drives the experimental JSON and color-model API on purpose.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
-
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'scene.dart';
 

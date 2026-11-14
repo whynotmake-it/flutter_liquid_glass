@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -60,11 +60,6 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
               ..physicalSize = Size(_width.toDouble(), _height.toDouble())
               ..devicePixelRatio = 1;
             addTearDown(tester.view.reset);
-            // flutter_tester renders a seeded pass of real glass wrongly (see
-            // `pinPlainBackdropPath`); a device runs the production defaults.
-            if (binding.isFlutterTester && !fake && frost > 0) {
-              pinPlainBackdropPath();
-            }
             final visibility = ValueNotifier<double>(1);
             addTearDown(visibility.dispose);
 
@@ -128,9 +123,6 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
 
             final full = await deviationAt(1);
             expect(full, greaterThan(0));
-            if (!binding.isFlutterTester && frost > 0) {
-              expect(seededPasses(tester), isNotEmpty, reason: 'seeds are on');
-            }
             expect(
               await deviationAt(0.5) / full,
               inInclusiveRange(0.25, 0.75),
@@ -139,7 +131,8 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
             expect(
               await deviationAt(0.02) / full,
               lessThan(0.05),
-              reason: 'Nearly hidden glass must already be nearly the '
+              reason:
+                  'Nearly hidden glass must already be nearly the '
                   'backdrop, or it pops when it reaches zero.',
             );
             visibility.value = 0;

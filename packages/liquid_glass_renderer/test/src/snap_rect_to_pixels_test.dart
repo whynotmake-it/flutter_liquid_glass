@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/internal/snap_rect_to_pixels.dart';
+import 'package:liquid_glass_renderer/src/rendering/snap_rect_to_pixels.dart';
 
 void main() {
   test('matte snapping commutes with whole-pixel scroll across zero', () {

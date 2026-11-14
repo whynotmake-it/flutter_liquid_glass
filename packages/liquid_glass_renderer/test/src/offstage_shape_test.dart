@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_renderer/composer.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
-import 'shared.dart';
 import 'submitted_scene_binding.dart';
 
 const _width = 240;
@@ -17,8 +17,6 @@ void main() {
   final binding = SubmittedSceneBinding()
     ..captureWidth = _width
     ..captureHeight = _height;
-  setUp(pinPlainBackdropPath);
-
   Future<Uint8List> capture(WidgetTester tester) async {
     binding
       ..captureNextScene = true
@@ -59,7 +57,8 @@ void main() {
 
       /// A layer with one onstage shape and, unless [second] is null, a second
       /// shape whose [Offstage] follows [second], behind a [RepaintBoundary]
-      /// so toggling it does not repaint the layer.
+      /// of a fixed size so toggling it neither lays out nor repaints the
+      /// layer.
       Widget scene(ValueNotifier<bool>? second) {
         final children = Stack(
           children: [
@@ -68,12 +67,15 @@ void main() {
               Positioned(
                 left: 140,
                 top: 40,
-                child: RepaintBoundary(
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: second,
-                    builder: (_, offstage, child) =>
-                        Offstage(offstage: offstage, child: child),
-                    child: shape(),
+                child: SizedBox.square(
+                  dimension: 80,
+                  child: RepaintBoundary(
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: second,
+                      builder: (_, offstage, child) =>
+                          Offstage(offstage: offstage, child: child),
+                      child: shape(),
+                    ),
                   ),
                 ),
               ),
@@ -138,6 +140,39 @@ void main() {
           0,
           reason: 'the shape draws nothing once offstage again',
         );
+      });
+
+      testWidgets('a shape turning onstage and offstage under its own '
+          'boundary shows in that frame: $variant', (tester) async {
+        tester.view
+          ..physicalSize = Size(_width.toDouble(), _height.toDouble())
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final offstage = ValueNotifier(true);
+        addTearDown(offstage.dispose);
+
+        await tester.pumpWidget(scene(offstage));
+        await tester.pumpAndSettle();
+        final without = await capture(tester);
+
+        GlassWork.lateMarks = 0;
+        offstage.value = false;
+        // One frame: the capture's pump is the one the change lands in.
+        final onstage = await capture(tester);
+        expect(
+          pixel(onstage, _offstageSpot),
+          isNot(pixel(without, _offstageSpot)),
+          reason: 'the shape draws in the frame it comes onstage',
+        );
+        expect(GlassWork.lateMarks, 0, reason: 'nothing is drawn a frame late');
+
+        offstage.value = true;
+        expect(
+          differingBytes(without, await capture(tester)),
+          0,
+          reason: 'the shape draws nothing from the frame it goes offstage',
+        );
+        expect(GlassWork.lateMarks, 0, reason: 'nothing is drawn a frame late');
       });
     }
   }

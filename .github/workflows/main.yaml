@@ -44,6 +44,9 @@ jobs:
       - name: 🧪 Run Analyze
         run: melos run analyze
 
+      - name: 🔧 Check dart fix data
+        run: melos run fix-data
+
       - name: 📝 Run Tests without goldens
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens
@@ -51,6 +54,32 @@ jobs:
       - name: 📝 Run Tests without goldens, with the production defaults
         run: melos run test:defaults
 
+
+  latest_flutter:
+    name: Latest Flutter
+    # The packages take any Flutter from the one .fvmrc names, so the tests
+    # also run on the newest stable release: a release that breaks them shows
+    # here before a user of it meets it. Analysis stays on the pinned
+    # version, where a new release's deprecations are not yet reported.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+
+      - name: 📝 Run Tests without goldens, with the production defaults
+        run: melos run test:defaults
 
   skia_build:
     name: Skia Build Check
@@ -138,4 +167,5 @@ jobs:
         id: coverage-report
         uses: whynotmake-it/dart-coverage-assistant@v1.1
         with:
-          generate_badges: pr
+          # A fork's token cannot push the badge branch or open its pull request.
+          generate_badges: ${{ github.repository == 'whynotmake-it/flutter_liquid_glass' && 'pr' || 'false' }}

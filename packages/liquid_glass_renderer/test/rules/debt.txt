@@ -1,0 +1,4 @@
+# Breaks of the layer rules that the code has today, as rule, file, count.
+# The list only shrinks: a new break fails the test, and so does a line
+# that lists more than the code has. After fixing one, rewrite this file
+# with UPDATE_DEBT=1 (it never grows an entry).

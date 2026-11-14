@@ -16,12 +16,12 @@
 // Impeeler's model is pinned to Flutter 3.47.1. When the SDK moves, re-measure
 // these budgets instead of widening them blindly.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:impeeler/impeeler.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
@@ -32,7 +32,6 @@ const _settings = LiquidGlassSettings(
 );
 
 const _shape = LiquidRoundedSuperellipse(borderRadius: 28);
-const _backdropLayer = 'GeometryTransformTrackingLayer';
 
 typedef _Budget = ({int passes, double traffic});
 
@@ -167,7 +166,7 @@ Future<void> _pumpUntilGlassReady(WidgetTester tester) async {
         .whereType<RenderLiquidGlassLayer>()
         .where((layer) => layer.attached && layer.gpuGeometryRenderer != null);
     if (scopes.isNotEmpty &&
-        scopes.every((scope) => !scope.useFake) &&
+        scopes.every((scope) => !scope.fake) &&
         realLayers.isNotEmpty) {
       return;
     }
@@ -202,11 +201,6 @@ void _expectBudget(GpuReport report, Map<String, _Budget> budgets) {
         '${frame.traffic.relativeToPlainFrame.toStringAsFixed(2)}x traffic';
 
     // A silently unmodeled custom layer would make the estimate too low.
-    expect(
-      frame.sceneLayers,
-      contains(_backdropLayer),
-      reason: '$where; the glass backdrop layer was not read by Impeeler.',
-    );
     expect(frame.unmodeledLayers, isEmpty, reason: where);
     expect(frame.missingPictures, 0, reason: where);
     expect(
@@ -223,7 +217,6 @@ void _expectBudget(GpuReport report, Map<String, _Budget> budgets) {
 }
 
 void main() {
-  setUp(pinPlainBackdropPath);
   // This test file needs Impeeler's recording binding. It is installed here
   // rather than in flutter_test_config.dart because some test files install
   // their own specialized binding.

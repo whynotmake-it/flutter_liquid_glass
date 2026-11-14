@@ -1,0 +1,10 @@
+# package:liquid_glass_test/liquid_glass_test.dart
+Future<GlassFrameReport> expectGlassBudget(
+  WidgetTester tester, {
+  Object? reads,
+  Object? liveReads,
+  Object? issuedTargets,
+  Object? filtersBuilt,
+  Object? picturesRecorded,
+  Object? imagesDrawn,
+})

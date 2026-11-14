@@ -5,10 +5,10 @@ root with:
 
 ```sh
 cd packages/liquid_glass_renderer/example
-fvm flutter run -d macos
+flutter run --enable-impeller --enable-flutter-gpu -d macos
 ```
 
-Use `fvm flutter devices` to pick an iOS or Android Impeller device instead of
+Use `flutter devices` to pick an iOS or Android Impeller device instead of
 `macos`.
 
 The stage fills the window and shows glass over backdrops that page
@@ -39,7 +39,7 @@ exists while it is open.
 For a deterministic grid backdrop and a fixed blur (useful for screenshots):
 
 ```sh
-fvm flutter run -d macos \
+flutter run -d macos \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=0
 ```

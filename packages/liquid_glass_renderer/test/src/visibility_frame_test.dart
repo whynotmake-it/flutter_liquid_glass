@@ -1,9 +1,12 @@
+@Tags(['macos_pixels'])
+library;
+
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -18,11 +21,6 @@ void runVisibilityFrameTests(TestWidgetsFlutterBinding testBinding) {
   final binding = (testBinding as SubmittedSceneCapture)
     ..captureWidth = 240
     ..captureHeight = 160;
-  // flutter_tester renders a native seed's pass wrong and differently from
-  // run to run (see `pinPlainBackdropPath`); a device runs the production
-  // defaults.
-  if (binding.isFlutterTester) setUp(pinPlainBackdropPath);
-
   for (final grouped in [false, true]) {
     for (final mode in ['uniform', 'tint', 'response']) {
       testWidgets(
@@ -115,9 +113,6 @@ void runVisibilityFrameTests(TestWidgetsFlutterBinding testBinding) {
           await tester.pumpWidget(buildScene(fresh: false));
           await tester.pumpAndSettle();
           final before = await capture();
-          if (!binding.isFlutterTester) {
-            expect(seededPasses(tester), isNotEmpty, reason: 'seeds are on');
-          }
           final layer = tester.allRenderObjects
               .whereType<RenderLiquidGlassLayer>()
               .last;
@@ -125,7 +120,7 @@ void runVisibilityFrameTests(TestWidgetsFlutterBinding testBinding) {
           final renderCount = renderer.debugRenderCount;
           // Verify retained resource identity, not just submission counts.
           // ignore: invalid_use_of_protected_member
-          final matte = layer.geometryImage;
+          final matte = layer.debugGeometryImage;
           progress.value = 0.4;
           final animated = await capture();
           expect(animated, isNot(orderedEquals(before)));
@@ -135,7 +130,7 @@ void runVisibilityFrameTests(TestWidgetsFlutterBinding testBinding) {
           );
           if (mode == 'uniform') {
             // ignore: invalid_use_of_protected_member
-            expect(layer.geometryImage, same(matte));
+            expect(layer.debugGeometryImage, same(matte));
           }
 
           Uint8List? hidden;
@@ -146,7 +141,7 @@ void runVisibilityFrameTests(TestWidgetsFlutterBinding testBinding) {
             expect(renderer.debugRenderCount, renderCount);
             // Hidden material retains the last matte but does not sample it.
             // ignore: invalid_use_of_protected_member
-            expect(layer.geometryImage, same(matte));
+            expect(layer.debugGeometryImage, same(matte));
             progress.value = 1;
             final restored = await capture();
             expect(restored, orderedEquals(before));

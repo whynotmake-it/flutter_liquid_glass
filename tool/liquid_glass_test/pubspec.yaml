@@ -1,0 +1,25 @@
+name: liquid_glass_test
+description: >-
+  Widget-test helpers for liquid_glass_renderer: hold a screen to the glass
+  work it was reviewed at.
+version: 0.1.0-dev.1
+publish_to: none
+
+homepage: https://whynotmake.it
+repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/tool/liquid_glass_test
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  liquid_glass_renderer: ^1.0.0-dev.2
+
+dev_dependencies:
+  api_listing:
+    path: ../api_listing
+  lintervention: ^0.3.1

@@ -4,10 +4,10 @@ import 'dart:ui' as ui;
 
 import 'package:apple_match_flutter/scene.dart';
 import 'package:apple_match_flutter/scene_view.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 // Temporary fitting helper: renders many settings vectors against one scene in
 // a single `flutter test` process, so parameter scans do not pay the host

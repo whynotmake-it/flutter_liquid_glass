@@ -82,15 +82,13 @@ The liquid glass effect works by capturing and distorting background pixels thro
 
 2. **LiquidGlass** (`lib/src/liquid_glass.dart`): Individual glass shapes that must be inside a LiquidGlassLayer. Can be standalone or grouped for blending.
 
-3. **LiquidGlassBlendGroup** (`lib/src/liquid_glass_blend_group.dart`): Groups multiple `LiquidGlass.grouped()` shapes to blend them together seamlessly (max 16 shapes).
+3. **LiquidGlassBlendGroup** (`lib/src/liquid_glass_blend_group.dart`): Groups multiple `LiquidGlass.grouped()` shapes to blend them together seamlessly (max 16 shapes per group or cluster of touching shapes).
 
 4. **Geometry Rendering** (`lib/src/internal/render_liquid_glass_geometry.dart`): Renders glass shape geometry into textures for shader processing. Caches geometry to avoid re-rendering on every frame.
 
 5. **Shader Pipeline** (`lib/src/shaders.dart` and `lib/assets/shaders/`):
-   - `gpu/geometry_fragment.glsl` (Flutter GPU): renders every shape of a layer into the low-res matte: an RGBA16F texture with one texel per 2 x 2 or 4 x 4 matte pixels (R: distance to the edge, positive inside; GB: the direction the surface faces, shortened where refraction should be weaker; A: half the shape's shorter side). There is no full-resolution matte. The final shader reads it with linear filtering, which blends the four nearest texels (plus one more read on the center line of thin shapes), and works out the antialiased edge, the refraction and the rim lighting for each pixel
-   - `gpu/material_gradient_fragment.glsl` (Flutter GPU): low-resolution per-shape appearance map
+   - `gpu/tile_*_fragment.glsl` (Flutter GPU): the geometry atlas. `Tiling` (`lib/src/rendering/glass/geometry_tiling.dart`) cuts a layer's buffer into 16 x 16 tiles and draws only the ring tiles near an edge, one RGBA16F texel per buffer pixel (R: distance to the edge, positive inside; GB: the direction the surface faces, shortened where refraction should be weaker; A: half the shape's shorter side). Outside and deep tiles point at shared constant blocks through a table. Where shapes differ in look, the same pass writes their looks into textures beside the atlas (the tint, or the tint, response and color model shares), so fused glass blends its looks per pixel. The final shader reads one texel per pixel through the table and only shades
    - `liquid_glass_final_render{,_material,_tint}.frag`: the backdrop pass (refraction, frost, lighting, color). NOT listed in `pubspec.yaml`'s `flutter.shaders` (they can't compile to SkSL, which fails Skia/web builds) — `hook/build.dart` compiles them to `build/shaderbundles/*.iplr` via impellerc instead
-   - The matte scale (`lib/src/matte_scale_flag.dart`) is chosen per layer from its device pixel ratio: 4 at 2 or more, else 2 (also under `flutter test`); `LIQUID_GLASS_MATTE_SCALE=2|4` forces one. The scale is the `uLowResMatte` uniform, so the final shaders are the same for both. Pixel 10: 4x saves 41% GPU on moving blended shapes, 24% on a resizing sheet.
    - `fake_glass_surface.frag`, `fake_glass_backdrop_edge.frag`: FakeGlass
 
 ### Key Components

@@ -4,6 +4,7 @@ version: 1.0.0-dev.2
 
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_renderer
+issue_tracker: https://github.com/whynotmake-it/flutter_liquid_glass/issues
 screenshots:
   - description: "A liquid glass button and toolbar blending together"
     path: doc/readme/blend-light.jpg
@@ -16,7 +17,7 @@ topics:
   - effects
 
 environment:
-  sdk: ">=3.13.0 <3.14.0"
+  sdk: ">=3.13.0 <4.0.0"
   flutter: ">=3.47.0"
 
 # Real glass needs Impeller and Flutter GPU (macOS, iOS, Android). The web
@@ -28,35 +29,38 @@ platforms:
   web:
 
 dependencies:
-  equatable: ^2.1.0
   flutter:
     sdk: flutter
   flutter_gpu:
     sdk: flutter
   flutter_gpu_shaders: ^0.5.2
-  flutter_shaders: ^0.1.3
   hooks: ^2.0.2
-  logging: ^1.3.0
   meta: ^1.16.0
-  motor: ^1.0.1
   vector_math: ^2.1.4
 
 dev_dependencies:
   alchemist: ^0.12.1
+  api_listing:
+    path: ../../tool/api_listing
+  cupertino_ui: ^1.1.6
   flutter_test:
     sdk: flutter
   impeeler: 0.1.0-dev.2
+  layer_rules:
+    path: ../../tool/layer_rules
   lintervention: ^0.3.1
-  mocktail: ^1.0.3
+  liquid_glass_test:
+    path: ../../tool/liquid_glass_test
+  material_ui: ^1.11.0
   snaptest: 1.0.0-dev.5
 
 flutter:
-  uses-material-design: true
   # The liquid_glass_final_render* shaders are not listed here on purpose:
   # pubspec shaders are compiled to SkSL for Skia-capable targets, which they
   # cannot express (warning on desktop builds, hard failure on web). The build
   # hook compiles them to build/shaderbundles/*.iplr instead.
   shaders:
+    - lib/assets/shaders/bent_content.frag
     - lib/assets/shaders/fake_glass_surface.frag
   assets:
     - build/shaderbundles/

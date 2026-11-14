@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/shader_programs.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -19,11 +19,6 @@ void runOpacityCompositionBoundsTests(TestWidgetsFlutterBinding testBinding) {
   final binding = (testBinding as SubmittedSceneCapture)
     ..captureWidth = 240
     ..captureHeight = 160;
-  // flutter_tester renders a native seed's pass wrong and differently from
-  // run to run (see `pinPlainBackdropPath`); a device runs the production
-  // defaults.
-  if (binding.isFlutterTester) setUp(pinPlainBackdropPath);
-
   for (final fake in [true, false]) {
     testWidgets(
       'composition preserves foreground bounds and motion fake=$fake',
@@ -35,11 +30,8 @@ void runOpacityCompositionBoundsTests(TestWidgetsFlutterBinding testBinding) {
           ..devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         await tester.runAsync(
-          () => MultiShaderBuilder.precacheShaders([
+          () => GlassShaderPrograms.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
         final movement = ValueNotifier(Offset.zero);
@@ -107,9 +99,6 @@ void runOpacityCompositionBoundsTests(TestWidgetsFlutterBinding testBinding) {
         List<int> pixel(Uint8List frame, int x, int y) =>
             frame.sublist((y * 240 + x) * 4, (y * 240 + x) * 4 + 4);
         final before = await capture();
-        if (!binding.isFlutterTester && !fake) {
-          expect(seededPasses(tester), isNotEmpty, reason: 'seeds are on');
-        }
         movement.value = const Offset(20, 0);
         final moved = await capture();
         expect(
