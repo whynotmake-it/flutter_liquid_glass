@@ -121,6 +121,8 @@ final class _GlassPainter implements ReadPainter {
     Matrix4.identity().storage,
   );
 
+  static const Object _noImageKey = Object();
+
   @override
   ImageFilter readFilter(GlassRead read, CornerRead corner) {
     final frame = layer._drawingFrame;
@@ -138,6 +140,38 @@ final class _GlassPainter implements ReadPainter {
     }
     _inSceneFilters.add((draw, filter));
     return filter;
+  }
+
+  (GlassDraw, Rect) _imageDraw(GlassRead read, _Frame frame, ImageCopy copy) {
+    final draw = _readDraw(read, frame, copy);
+    final dpr = layer.devicePixelRatio;
+    final logical = _glassIn(read).length == 1 && _bandOf(read) == null
+        ? frame.logical
+        : ViewPixels(dpr).bucket(read.quad);
+    return (draw, logical.scaled(dpr));
+  }
+
+  @override
+  Object imageKey(GlassRead read, ImageCopy copy) {
+    final frame = layer._drawingFrame;
+    return frame == null ? _noImageKey : _imageDraw(read, frame, copy);
+  }
+
+  @override
+  ui.Picture recordImage(
+    GlassRead read,
+    ImageCopy copy,
+    Matrix4 screenToCanvas,
+  ) {
+    final frame = layer._drawingFrame;
+    if (!kReleaseMode) GlassWork.pictures++;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..transform(screenToCanvas.storage);
+    if (frame != null) {
+      final (draw, device) = _imageDraw(read, frame, copy);
+      layer._shading.paintRect(canvas, device, draw);
+    }
+    return recorder.endRecording();
   }
 
   Matrix4 _screenToCanvas(_Frame frame) {
@@ -240,6 +274,48 @@ final class _GlassPainter implements ReadPainter {
       _shownToCanvas,
       layer._rig.readLayer.held,
       clip: _shownClip,
+    );
+  }
+
+  void showImage(GlassRead read, _Frame frame, ImageCopy copy) {
+    layer._debugImageCopy = copy;
+    final toCanvas = _screenToCanvas(frame);
+    final under = _shadowsOfOthers(read, frame);
+    final dpr = layer.devicePixelRatio;
+    final quad = read.quad;
+    final bounds = MatrixUtils.transformRect(
+      toCanvas,
+      quad.scaled(dpr),
+    ).inflate(1);
+    final key = (
+      copy.image,
+      copy.placement,
+      copy.rect,
+      imageKey(read, copy),
+      toCanvas,
+      Object.hashAll([
+        for (final (picture, offset) in under) ...[picture, offset],
+      ]),
+    );
+    layer._rig.show(
+      layer._rig.imagePicture(key, bounds, () {
+        final body = recordImage(read, copy, toCanvas);
+        if (under.isEmpty) return body;
+        if (!kReleaseMode) GlassWork.pictures++;
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        for (final (shadow, offset) in under) {
+          canvas
+            ..save()
+            ..translate(offset.dx, offset.dy)
+            ..drawPicture(shadow)
+            ..restore();
+        }
+        canvas.drawPicture(body);
+        body.dispose();
+        return recorder.endRecording();
+      }),
+      under: layer._shadowsUnder,
     );
   }
 

@@ -134,6 +134,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   FragmentShader get debugBackdropShader =>
       finalShaders[debugBackdropDraw.variant];
 
+  // Whether the shader may frost the copy it draws over, which picks a
+  // variant that can. Settings pick it, as they pick the color models.
+  bool get _frostsCopies =>
+      glassPolicy.shaderFrost && _drawn.frosts && settings.dispersion == 0;
+
   // What the fitted frost and haze of the settings come to, worked out once
   // per settings.
   ({LiquidGlassSettings of, bool frosts, LiquidGlassFixedHaze? haze})
@@ -273,6 +278,33 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   static const int _coarseCopyShare = 2;
   static const double _coarseCopyMinRatio = 2.5;
 
+  CopyNeed? _hazedNeed(double stretch, double dpr) {
+    if (debugGlassHaze == false) return null;
+    final haze = _drawn.haze;
+    // Until the haze's programs load the one blur stands in for it.
+    if (haze != null && !CopyHaze.ready) return null;
+    final frost = _hazedFrostSigmaAt(dpr);
+    final coarse = settings.frostIsFitted && dpr >= _coarseCopyMinRatio;
+    if (frost <= 0) {
+      return haze == null && !coarse
+          ? null
+          : CopyNeed(share: coarse ? _coarseCopyShare : 1, haze: haze);
+    }
+    if (!_frostsCopies) return null;
+    final need = CopyNeed.glassFrost(
+      frost * stretch,
+      devicePixelRatio: dpr,
+      haze: haze,
+    );
+    return need != null && coarse && need.share < _coarseCopyShare
+        ? CopyNeed(
+            share: _coarseCopyShare,
+            shaderFrost: need.shaderFrost,
+            haze: haze,
+          )
+        : need;
+  }
+
   /// The color of a [LiquidGlassBackdrop.solid], or null to read the
   /// backdrop; only an opaque color is painted over.
   Color? get solidBackdrop => _solidBackdrop;
@@ -289,6 +321,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   /// copy rather than reading the backdrop.
   @visibleForTesting
   bool debugDrewOverCopy = false;
+
+  ImageCopy? _debugImageCopy;
 
   /// What the last plan has this glass do.
   @visibleForTesting
