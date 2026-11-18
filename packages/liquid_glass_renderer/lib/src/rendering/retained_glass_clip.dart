@@ -1,6 +1,9 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:liquid_glass_renderer/src/rendering/ancestor_clip.dart';
+import 'package:liquid_glass_renderer/src/rendering/clip_shape.dart';
+import 'package:liquid_glass_renderer/src/rendering/follower_transform.dart';
 import 'package:meta/meta.dart';
 
 /// Retains clip ancestry common to every contributor in one glass pass.
@@ -31,16 +34,11 @@ class RetainedGlassClip {
     }
     final nodes = common ?? const <RenderBox>[];
     _hasIndividualClips = all.length != nodes.length;
-    if (nodes.length == _entries.length) {
-      var sameNodes = true;
-      for (var i = 0; i < nodes.length; i++) {
-        if (!identical(nodes[i], _entries[i].source)) {
-          sameNodes = false;
-          break;
-        }
-      }
-      if (sameNodes) return;
+    var same = nodes.length == _entries.length;
+    for (var i = 0; same && i < nodes.length; i++) {
+      same = identical(nodes[i], _entries[i].source);
     }
+    if (same) return;
     _clearClips();
     _entries.addAll(nodes.map(_ClipEntry.new));
   }
@@ -112,15 +110,14 @@ class RetainedGlassClip {
         return;
       }
       final source = clips[index];
-      final (geometry, behavior) = _clipGeometry(source);
+      final (shape, behavior) = clipShapeOf(source)!;
       final transform = Matrix4.translationValues(
         -effectTranslation.dx,
         -effectTranslation.dy,
         0,
-      )..multiply(source.getTransformTo(owner));
+      )..multiply(transformToNow(source, owner));
       final inverse = Matrix4.tryInvert(transform);
       if (inverse == null) return;
-
       canvas
         ..save()
         ..transform(transform.storage);
@@ -129,48 +126,14 @@ class RetainedGlassClip {
         paint(index + 1);
       }
 
-      final paintGeometry = source is RenderClipOval
-          ? (Path()..addOval(geometry as Rect))
-          : geometry;
-      switch (paintGeometry) {
-        case Rect rect:
-          clipContext.clipRectAndPaint(
-            rect,
-            behavior,
-            rect,
-            descend,
-          );
-        case RRect rrect:
-          clipContext.clipRRectAndPaint(
-            rrect,
-            behavior,
-            rrect.outerRect,
-            descend,
-          );
-        case RSuperellipse rse:
-          clipContext.clipRSuperellipseAndPaint(
-            rse,
-            behavior,
-            rse.outerRect,
-            descend,
-          );
-        case Path path:
-          clipContext.clipPathAndPaint(
-            path,
-            behavior,
-            path.getBounds(),
-            descend,
-          );
-      }
+      shape.clipAndPaint(clipContext, behavior, descend);
       canvas.restore();
     }
 
     paint(0);
   }
 
-  void dispose() {
-    _clearClips();
-  }
+  void dispose() => _clearClips();
 
   void _clearClips() {
     for (final entry in _entries) {
@@ -197,43 +160,6 @@ Iterable<RenderBox> _clipAncestors(RenderBox shape, RenderBox owner) sync* {
   }
 }
 
-(Object, Clip) _clipGeometry(RenderBox source) => switch (source) {
-  final RenderClipRect clip => (
-    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-    clip.clipBehavior,
-  ),
-  final RenderClipRRect clip => (
-    clip.clipper?.getClip(clip.size) ??
-        clip.borderRadius
-            .resolve(clip.textDirection)
-            .toRRect(Offset.zero & clip.size),
-    clip.clipBehavior,
-  ),
-  final RenderClipRSuperellipse clip => (
-    clip.clipper?.getClip(clip.size) ??
-        clip.borderRadius
-            .resolve(clip.textDirection)
-            .toRSuperellipse(Offset.zero & clip.size),
-    clip.clipBehavior,
-  ),
-  final RenderClipOval clip => (
-    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-    clip.clipBehavior,
-  ),
-  final RenderClipPath clip => (
-    clip.clipper?.getClip(clip.size) ?? Offset.zero & clip.size,
-    clip.clipBehavior,
-  ),
-  final RenderViewportBase viewport => (
-    Offset.zero & viewport.size,
-    // Mirror RenderViewportBase.paint exactly. Its approximate clip API
-    // describes per-sliver semantics, not the actual paint clip.
-    // ignore: invalid_use_of_protected_member
-    viewport.hasVisualOverflow ? viewport.clipBehavior : Clip.none,
-  ),
-  _ => throw StateError('Unsupported retained clip'),
-};
-
 class _CanvasClipContext extends ClipContext {
   _CanvasClipContext(this.canvas);
 
@@ -252,9 +178,36 @@ class _ClipEntry {
   final handle = LayerHandle<NativeClipLayer>();
   final forward = LayerHandle<TransformLayer>();
   final inverse = LayerHandle<TransformLayer>();
-  Object? _geometry;
   Matrix4? _transform;
   Offset? _offset;
+
+  CustomClipper<Path>? _clipper;
+  Size? _clipperSize;
+  Path? _clipperPath;
+
+  void _reclip() => _clipperPath = null;
+
+  (ClipShape, Clip) _shapeOf(RenderBox source) {
+    if (source case RenderClipPath(:final clipper?, :final size)) {
+      if (!identical(clipper, _clipper)) {
+        final old = _clipper;
+        old?.removeListener(_reclip);
+        clipper.addListener(_reclip);
+        _clipper = clipper;
+        if (old == null ||
+            old.runtimeType != clipper.runtimeType ||
+            clipper.shouldReclip(old)) {
+          _clipperPath = null;
+        }
+      }
+      if (_clipperPath == null || _clipperSize != size) {
+        _clipperPath = clipper.getClip(size);
+        _clipperSize = size;
+      }
+      return (PathClip(_clipperPath!), source.clipBehavior);
+    }
+    return clipShapeOf(source)!;
+  }
 
   void sync(RenderBox owner, Offset offset) {
     final layer = handle.layer!;
@@ -262,43 +215,35 @@ class _ClipEntry {
       layer.enabled = false;
       return;
     }
-    final (geometry, behavior) = _clipGeometry(source);
+    final (shape, behavior) = _shapeOf(source);
     layer.enabled = behavior != Clip.none;
     if (!layer.enabled) return;
     layer.clipBehavior = behavior;
-    final transform = source.getTransformTo(owner);
-    if (geometry is! Path &&
-        _geometry == geometry &&
+    final transform = transformToNow(source, owner);
+    if (layer.shape == shape &&
         _offset == offset &&
         MatrixUtils.matrixEquals(_transform, transform)) {
       return;
     }
-    _geometry = geometry;
     _offset = offset;
     _transform = transform;
     final ownerTransform = Matrix4.translationValues(offset.dx, offset.dy, 0)
       ..multiply(transform);
     forward.layer!.transform = ownerTransform;
     inverse.layer!.transform = Matrix4.inverted(ownerTransform);
-    layer.geometry = source is RenderClipOval
-        ? (Path()..addOval(geometry as Rect))
-        : geometry;
+    layer.shape = shape;
   }
 
   Rect? get ownerBounds {
     final transform = _transform;
-    if (!handle.layer!.enabled || transform == null) return null;
-    final bounds = switch (_geometry) {
-      final Rect rect => rect,
-      final RRect rect => rect.outerRect,
-      final RSuperellipse rect => rect.outerRect,
-      final Path path => path.getBounds(),
-      _ => null,
-    };
-    if (bounds == null) return null;
-    final m = transform.storage;
-    if (m[1].abs() > 1e-9 || m[4].abs() > 1e-9) return null;
-    return MatrixUtils.transformRect(transform, bounds);
+    final shape = handle.layer!.shape;
+    if (!handle.layer!.enabled ||
+        transform == null ||
+        shape == null ||
+        !isRectilinearTransform(transform)) {
+      return null;
+    }
+    return MatrixUtils.transformRect(transform, shape.bounds);
   }
 
   void push(
@@ -314,6 +259,8 @@ class _ClipEntry {
   }
 
   void dispose() {
+    _clipper?.removeListener(_reclip);
+    _clipper = null;
     forward.layer = null;
     handle.layer = null;
     inverse.layer = null;
@@ -322,11 +269,11 @@ class _ClipEntry {
 
 @internal
 class NativeClipLayer extends ContainerLayer {
-  Object? _geometry;
-  Object? get geometry => _geometry;
-  set geometry(Object value) {
-    if (value is! Path && _geometry == value) return;
-    _geometry = value;
+  ClipShape? _shape;
+  ClipShape? get shape => _shape;
+  set shape(ClipShape value) {
+    if (_shape == value) return;
+    _shape = value;
     markNeedsAddToScene();
   }
 
@@ -348,38 +295,14 @@ class NativeClipLayer extends ContainerLayer {
 
   @override
   void addToScene(ui.SceneBuilder builder) {
-    if (_enabled) {
-      final oldLayer = engineLayer;
-      engineLayer = switch (_geometry) {
-        final Rect rect => builder.pushClipRect(
-          rect,
-          clipBehavior: _clipBehavior,
-          oldLayer: oldLayer is ui.ClipRectEngineLayer ? oldLayer : null,
-        ),
-        final RRect rect => builder.pushClipRRect(
-          rect,
-          clipBehavior: _clipBehavior,
-          oldLayer: oldLayer is ui.ClipRRectEngineLayer ? oldLayer : null,
-        ),
-        final RSuperellipse rect => builder.pushClipRSuperellipse(
-          rect,
-          clipBehavior: _clipBehavior,
-          oldLayer: oldLayer is ui.ClipRSuperellipseEngineLayer
-              ? oldLayer
-              : null,
-        ),
-        final Path path => builder.pushClipPath(
-          path,
-          clipBehavior: _clipBehavior,
-          oldLayer: oldLayer is ui.ClipPathEngineLayer ? oldLayer : null,
-        ),
-        _ => throw StateError('Missing native clip geometry'),
-      };
-      addChildrenToScene(builder);
-      builder.pop();
-    } else {
+    final shape = _enabled ? _shape : null;
+    if (shape == null) {
       engineLayer = null;
       addChildrenToScene(builder);
+      return;
     }
+    engineLayer = shape.push(builder, _clipBehavior, oldLayer: engineLayer);
+    addChildrenToScene(builder);
+    builder.pop();
   }
 }

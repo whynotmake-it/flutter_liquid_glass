@@ -44,6 +44,7 @@ import 'package:liquid_glass_renderer/src/rendering/shape_set.dart';
 import 'package:liquid_glass_renderer/src/rendering/tiling_drift.dart';
 import 'package:liquid_glass_renderer/src/rendering/transform_tracking_render_object_mixin.dart';
 
+part 'package:liquid_glass_renderer/src/rendering/glass_read_painter.dart';
 
 /// The real glass layer: encodes its shapes' geometry (an atlas, or one
 /// shape the final shader works out) and paints the final shader filter
@@ -284,6 +285,15 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   bool get _drawsOverSolid => (_solidBackdrop?.a ?? 0) == 1;
 
+  /// Whether the last composited frame drew the glass over the underlay's
+  /// copy rather than reading the backdrop.
+  @visibleForTesting
+  bool debugDrewOverCopy = false;
+
+  /// What the last plan has this glass do.
+  @visibleForTesting
+  SiteFate? get debugFate => _fate;
+
   @override
   void glowChanged() {
     _glowUniforms = null;
@@ -345,6 +355,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   bool get _rebindsBackdropFilter =>
       _bindsBackdropFilter && _rig.filterLayer != null;
+
+  bool get _readsBackdrop => switch (_fate) {
+    LeadFate(read: GlassRead(source: BackdropRead())) => true,
+    _ => !glassReadsCopies,
+  };
 
   @override
   bool get encodesGeometry => true;
@@ -702,6 +717,18 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     mapping: _backdropMapping,
   );
 
+  // Equal while the glass paints the same: an atlas stands as the encode
+  // that placed it, so asking draws none.
+  Object get _paints => switch (_geometry) {
+    AtlasGeometry() => (
+      _backdropDrawOver(
+        _bindingOf(AtlasGeometry.none, bounds: _bufferBounds),
+      ),
+      _encodes,
+    ),
+    _ => _backdropDraw,
+  };
+
   (GlassDraw, double, ImageFilter)? _backdropFilter;
 
   void _bindFilter() {
@@ -862,6 +889,47 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @override
   bool get mayRest => frameState == GlassFrameState.idle || !_geometryStale;
 
+  // This frame's place on the screen, for the glass's own draws: the glass's
+  // transform to the screen, the logical rect the shader draws and the sigma
+  // of the blur, in the screen's logical pixels, the shader frosts the copy
+  // for, 0 where the copy is blurred or the glass unfrosted. Only this glass
+  // reads it: the others of a read hear of it through its ask.
+  _Frame? _frame;
+
+  late final _GlassPainter _painter = _GlassPainter(this);
+
+  // Kept while the glass rests, so its ask stays equal with no new role.
+  PainterRole? _role;
+
+  PainterRole _roleAt(Matrix4 screen) {
+    final storage = screen.storage;
+    final x = storage[12];
+    final y = storage[13];
+    final held = _role;
+    if (held != null &&
+        held.originOnScreen.dx == x &&
+        held.originOnScreen.dy == y) {
+      return held;
+    }
+    return _role = PainterRole(_painter, originOnScreen: Offset(x, y));
+  }
+
+  _Frame? get _drawingFrame {
+    final frame = _frame;
+    assert(
+      frame != null,
+      'The glass was planned to draw a read without an ask this frame.',
+    );
+    return frame;
+  }
+
+  @override
+  SiteAsk ask(ViewPixels view) {
+    final (answer, frame) = _answer(view);
+    _frame = frame;
+    return answer;
+  }
+
   (SiteAsk, _Frame?) _answer(ViewPixels view) {
     final bounds = _filterMaterialBounds;
     if (!_rig.hasSlot || bounds == null || drawableEmpty) {
@@ -998,6 +1066,174 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     );
     return (answer, (screen: screen, logical: logical, shaderFrost: frost));
   }
+
+  SiteFate _fate = const HiddenFate();
+
+  Offset _encodedShift = Offset.zero;
+
+  // Where the origin of the canvas the glass paints in lies on the screen,
+  // with the glass's origin at [origin].
+  Offset _canvasOnScreen(Offset origin) => origin - _filterPaintOffset;
+
+  // Where the origin of the encoded shapes lies on the screen, in device
+  // pixels, with the glass's origin at [origin].
+  Offset _shapesOnScreen(Offset origin) =>
+      (origin + _encodedShift) * devicePixelRatio;
+
+  // What the glass is, as its geometry was last encoded.
+  ShapeCensus get _census => _geometry == null
+      ? ShapeCensus.none
+      : ShapeCensus(
+          shapes: _shapes.count,
+          field: _drift.tiling?.field != null,
+          looks: _drift.tiling?.looks != null,
+          leans: _shapes.leans,
+        );
+
+  PictureLayer? get _shadowsUnder =>
+      shadowsUnderGlass ? glassShadowPicture : null;
+
+  @override
+  void beginFate(SiteFate fate) {
+    _fate = fate;
+    _debugImageCopy = null;
+    final drawsOwnGeometry = switch (fate) {
+      HiddenFate() => false,
+      LeadFate(:final read) ||
+      FollowFate(:final read) => read.geometryKind is! SharedAtlas,
+    };
+    if (drawsOwnGeometry) _placeAtlas();
+    if (!_rig.hasSlot) {
+      _placeShadows(under: false);
+      return;
+    }
+    switch (fate) {
+      case HiddenFate():
+        compositionSeedSuppressed = true;
+        debugDrewOverCopy = false;
+        _rig.hide();
+        _placeShadows(under: false);
+      case LeadFate(:final read) when read.source is! BackdropRead:
+        // Glass over its copy reads no backdrop: an opacity pass around it
+        // needs no seed.
+        compositionSeedSuppressed = true;
+        debugDrewOverCopy = true;
+        _painter.beginRead(read);
+        _placeShadows(under: !glassShadowsFade);
+      case LeadFate():
+        break;
+      case FollowFate(:final read):
+        compositionSeedSuppressed = true;
+        debugDrewOverCopy = true;
+        // The glass over a band draws it, in the band's place.
+        if (read.bandPainter?.ask.role
+            case PainterRole(painter: _GlassPainter(:final layer))
+            when identical(layer, this)) {
+          _painter.beginRead(read);
+        }
+        _rig.hide();
+        // Another layer draws this glass. Its shadows lie under that layer's
+        // filter, or, over a band, stay cut outside the glass: a band's bar
+        // spends next to nothing on them.
+        if (_bandOf(read) == null) {
+          _placeShadows(under: true);
+          glassShadowPicture?.remove();
+        } else {
+          _placeShadows(under: false);
+        }
+    }
+  }
+
+  @override
+  void show(GlassRead read, ReadPixels pixels) {
+    switch (pixels) {
+      case BackdropPixels(:final group):
+        _showBackdrop(group);
+      case ScenePixels(:final corner):
+        final frame = _drawingFrame;
+        if (frame == null) {
+          _rig.hide();
+          return;
+        }
+        _painter.showScene(read, frame, corner);
+      case ImagePixels(:final copy):
+        final frame = _drawingFrame;
+        if (frame == null) {
+          _rig.hide();
+          return;
+        }
+        _painter.showImage(read, frame, copy);
+    }
+  }
+
+  void _showBackdrop(BackdropKey? group) {
+    compositionSeedSuppressed = false;
+    debugDrewOverCopy = false;
+    _placeShadows(under: false);
+    if (_bindsBackdropFilter) _bindFilter();
+    _rig.showBackdrop(group);
+  }
+
+  @override
+  void addOutput(SceneOut out, ReadCopy outer) {
+    if (_fate case LeadFate(:final read)) _painter.addOutput(out, outer, read);
+  }
+
+  @override
+  void onCompositorTranslated(Offset translation) {
+    // Nothing to map: a shape that appears repaints.
+    if (frameShapes.geometries.isEmpty) return;
+    // Glass with no filter or copy to draw reads no mapping: paint maps what it
+    // draws.
+    if (drawableEmpty || (!_rig.hasSlot && _rig.filterLayer == null)) {
+      _mappingMoved = true;
+      return;
+    }
+    // Chrome over a scroll keeps all of it, frame after frame. Glass that moved
+    // maps whatever the rest holds, so it asks for none of it.
+    final inputs = _mappingMoved
+        ? null
+        : (
+            translation,
+            _filterMaterialBounds,
+            _filterPaintOffset,
+            compositionProbeSeeding,
+            _frostSigmaForCurrentShapes(),
+            devicePixelRatio,
+            retainedClipBounds,
+            localPaintClipAbove(this),
+          );
+    if (inputs != null && inputs == _mappingInputs) return;
+    _mappingMoved = false;
+    _mappingInputs = inputs;
+    final clip = _filterClip;
+    if (clip != null && _rig.hasClip) {
+      _rig.clipTo(clip.shift(_filterPaintOffset));
+    }
+    final remapped = _remap();
+    if (remapped && _rebindsBackdropFilter) _bindFilter();
+  }
+
+  @override
+  void onCompositorTranslationMissed() {
+    // A pass-origin change (the opacity seed turning on, or an ancestor clip
+    // moving with paint-only changes inside it) moves no tracked transform,
+    // so the translation poll misses it. Where the filter cannot be rebound,
+    // the retained refresh re-syncs it or the glass repaints.
+    final remapped = _remap();
+    if (remapped && _rebindsBackdropFilter) _bindFilter();
+    if (_refreshRetainedGeometry()) return;
+    // A frame late: the composer asked [paintsLate] before paint, and
+    // marked this glass when it would come here. What it could not see
+    // reaches here: a shape under a follower whose leader moved this frame,
+    // as the leader's offset exists only after paint.
+    GlassComposer.repaint(this);
+  }
+
+  // The poll after paint would miss and the refresh could not take it: a
+  // mark now paints the glass in this frame.
+  @override
+  bool paintsLate() => compositorPollMisses && !_refreshTakesFrame;
 
   // The atlas texel for texel at the geometry buffer's corner.
   void _debugPaintGeometry(PaintingContext context, Offset offset) {
@@ -1180,3 +1416,5 @@ extension RenderLiquidGlassLayerDebug on RenderLiquidGlassLayer {
   /// The tiling of the latest atlas.
   Tiling? get debugTiling => _drift.tiling;
 }
+
+typedef _Frame = ({Matrix4 screen, Rect logical, double shaderFrost});

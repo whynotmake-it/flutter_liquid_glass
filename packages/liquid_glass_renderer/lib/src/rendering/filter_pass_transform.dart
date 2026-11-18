@@ -1,45 +1,33 @@
 import 'package:flutter/rendering.dart';
-import 'package:liquid_glass_renderer/src/internal/glass_composition_probe.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_capture.dart';
+import 'package:liquid_glass_renderer/src/rendering/follower_transform.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_composition_probe.dart';
+import 'package:liquid_glass_renderer/src/rendering/transform_tracking_render_object_mixin.dart';
 import 'package:meta/meta.dart';
 
 /// Transform from [owner]'s local coordinates to the logical coordinates of
-/// the render pass whose fragment coordinates its image filters see.
-///
-/// Filter fragment coordinates are local to the enclosing render pass. At the
-/// root that is the screen; inside a [LiquidGlassCapture] it is the capture's
-/// pixel-snapped clip. Inside a seeded fractional-opacity pass ([seeding]) it
-/// is that pass, which the engine bounds by the enclosing clips (including
-/// any capture's). A seeded pass around the effect itself (never inside a
-/// capture) is the innermost: pass [passOrigin], its screen-space top-left, to
-/// measure from it. The innermost pass wins. [translation] is retained
+/// the render pass its image filters run in, plus [translation], retained
 /// compositor motion applied below [owner].
+///
+/// Filter fragment coordinates are local to the innermost enclosing pass: the
+/// screen at the root, else a seeded fractional-opacity pass ([seeding])
+/// bounded by the enclosing clips.
 @internal
 Matrix4 filterPassTransform(
   RenderObject owner, {
   required bool seeding,
   required double devicePixelRatio,
-  Offset translation = Offset.zero,
-  Offset? passOrigin,
+  required Offset translation,
 }) {
   final Matrix4 transform;
-  final capture = RenderLiquidGlassCapture.enclosing(owner);
-  if (passOrigin != null) {
-    transform = owner.getTransformTo(null)
-      ..leftTranslateByDouble(-passOrigin.dx, -passOrigin.dy, 0, 1);
-  } else if (seeding) {
+  if (seeding) {
     final origin = GlassCompositionProbe.seededPassOrigin(
       owner,
       devicePixelRatio,
     );
-    transform = owner.getTransformTo(null)
+    transform = screenTransformOf(owner)
       ..leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
-  } else if (capture != null) {
-    transform = owner.getTransformTo(capture);
-    final origin = capture.passOrigin;
-    transform.leftTranslateByDouble(-origin.dx, -origin.dy, 0, 1);
   } else {
-    transform = owner.getTransformTo(null);
+    transform = screenTransformOf(owner);
   }
   if (translation != Offset.zero) {
     transform.multiply(
@@ -48,3 +36,12 @@ Matrix4 filterPassTransform(
   }
   return transform;
 }
+
+/// [node]'s transform to the screen, taken once a frame while a tracked
+/// object composites (see
+/// [TransformTrackingRenderObjectMixin.transformToScreen]).
+@internal
+Matrix4 screenTransformOf(RenderObject node) =>
+    node is TransformTrackingRenderObjectMixin
+    ? node.transformToScreen()
+    : transformToNow(node);

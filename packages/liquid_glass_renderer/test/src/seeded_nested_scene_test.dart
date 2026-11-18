@@ -2,13 +2,15 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
+import 'package:liquid_glass_renderer/src/plan/plan.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_composer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/shader_programs.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -41,17 +43,19 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
           ..physicalSize = const Size(240, 200)
           ..devicePixelRatio = 1;
         addTearDown(tester.view.reset);
+        // A read that holds still moves to an image the next frame, which
+        // draws a level apart from the read of the scene (NEAR): every frame
+        // compared here reads the scene.
+        debugGlassPrices = const PlanPrices(imageGpu: 1000000);
+        addTearDown(() => debugGlassPrices = const PlanPrices());
         final translation = ValueNotifier<Offset>(Offset.zero);
         addTearDown(translation.dispose);
         final opacity = AnimationController(vsync: tester, value: 1);
         addTearDown(opacity.dispose);
 
         await tester.runAsync(
-          () => MultiShaderBuilder.precacheShaders([
+          () => GlassShaderPrograms.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
 
@@ -116,7 +120,7 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
             );
             expect(scopes.length, greaterThanOrEqualTo(2));
             expect(
-              scopes.every((scope) => !scope.consolidatesFakeBackdrop),
+              scopes.every((scope) => !scope.fake),
               isTrue,
               reason: 'Both nested material passes must actually be real.',
             );
@@ -164,7 +168,7 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
             .toList();
         final counts = [
           for (final renderer in renderers)
-            renderer.gpuGeometryRenderer?.debugRenderCount,
+            renderer.gpuGeometryRenderer.debugRenderCount,
         ];
         opacity.value = 0.5;
         final half = await capture(label: 'half');
@@ -206,7 +210,7 @@ void runSeededNestedTests(SubmittedSceneCapture binding) {
         expect(
           [
             for (final renderer in renderers)
-              renderer.gpuGeometryRenderer?.debugRenderCount,
+              renderer.gpuGeometryRenderer.debugRenderCount,
           ],
           counts,
           reason: 'Alpha-only animation must not rebuild nested geometry.',
@@ -239,8 +243,8 @@ Widget _nestedForeground(bool fake, ValueNotifier<Offset> translation) =>
       fake: fake,
       settings: const LiquidGlassSettings(
         refractionHeight: 18,
-        frost: 4,
-        highlight: 0,
+        frost: LiquidGlassFrost.sigma(4),
+        glintStrength: 0,
       ),
       defaultAppearance: const LiquidGlassAppearance(tint: Color(0x4020A0FF)),
       child: Stack(
@@ -253,13 +257,13 @@ Widget _nestedForeground(bool fake, ValueNotifier<Offset> translation) =>
               builder: (_, offset, child) =>
                   Transform.translate(offset: offset, child: child),
               child: const LiquidGlass(
-                shape: LiquidRoundedRectangle(borderRadius: 24),
+                shape: LiquidRoundedRectangle(radius: 24),
                 child: SizedBox(
                   width: 140,
                   height: 110,
                   child: Center(
                     child: LiquidGlass(
-                      shape: LiquidRoundedRectangle(borderRadius: 16),
+                      shape: LiquidRoundedRectangle(radius: 16),
                       appearance: LiquidGlassAppearance(
                         tint: Color(0xC0FF6048),
                       ),
