@@ -2,20 +2,31 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/read.dart';
+import 'package:liquid_glass_renderer/src/rendering/shader_programs.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'submitted_scene_binding.dart';
 
 void main() => runWholeLayerFakeBlurTests(SubmittedSceneBinding());
 
 void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
-  for (final animated in [false, true]) {
+  for (final (animated, copies) in [
+    (false, false),
+    (true, false),
+    (false, true),
+    (true, true),
+  ]) {
     testWidgets('standalone whole fake layer retains blur with '
-        '${animated ? "FadeTransition" : "Opacity"}', (tester) async {
+        '${animated ? "FadeTransition" : "Opacity"} (copies=$copies)', (
+      tester,
+    ) async {
+      final readsCopies = glassReadsCopies;
+      glassReadsCopies = copies;
+      addTearDown(() => glassReadsCopies = readsCopies);
       final oldSize = (binding.captureWidth, binding.captureHeight);
       binding
         ..captureWidth = 240
@@ -32,20 +43,20 @@ void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
           ..captureHeight = oldSize.$2;
       });
       await tester.runAsync(
-        () => MultiShaderBuilder.precacheShaders([
+        () => GlassShaderPrograms.precacheShaders([
           ShaderKeys.fakeGlassSurface,
+          ShaderKeys.backdropFrost,
         ]),
       );
       final opacity = AnimationController(vsync: tester, value: 1);
       addTearDown(opacity.dispose);
       const settings = LiquidGlassSettings(
-        frost: 8,
-        highlight: 0,
+        frost: LiquidGlassFrost.sigma(8),
+        glintStrength: 0,
         contourStrength: 0,
         bevelShadowStrength: 0,
       );
-      const appearance = LiquidGlassAppearance();
-      const shape = LiquidRoundedRectangle(borderRadius: 16);
+      const shape = LiquidRoundedRectangle(radius: 16);
       const content = SizedBox(
         width: 176,
         height: 112,
@@ -58,7 +69,6 @@ void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
       );
       const glass = FakeGlass(
         settings: settings,
-        appearance: appearance,
         shape: shape,
         child: content,
       );
@@ -102,7 +112,7 @@ void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
                 format: ui.ImageByteFormat.png,
               );
               final path =
-                  '${Directory.systemTemp.path}/fake-whole-standalone-$animated-$alpha.png';
+                  '${Directory.systemTemp.path}/fake-whole-standalone-$animated-$copies-$alpha.png';
               await File(path).writeAsBytes(png!.buffer.asUint8List());
               debugPrint('FAKE_FADE_IMAGE $path');
             });
@@ -152,7 +162,7 @@ void runWholeLayerFakeBlurTests(SubmittedSceneCapture binding) {
         final measured = retained / signal;
         errors[entry.key] = (measured - expected).abs();
         debugPrint(
-          'FAKE_WHOLE_BLUR mode=standalone animated=$animated '
+          'FAKE_WHOLE_BLUR mode=standalone animated=$animated copies=$copies '
           'alpha=${entry.key} retained=$measured expected=$expected',
         );
       }

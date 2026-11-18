@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/painting/shader_constants.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
@@ -29,14 +30,16 @@ Future<({double top, double bottom})> _innerShadow(
           child: LiquidGlassLayer(
             fake: true,
             settings: settings,
-            defaultAppearance: const LiquidGlassAppearance.ios27RegularLight(),
+            defaultAppearance: const LiquidGlassAppearance.ios27Regular(
+              brightness: Brightness.light,
+            ),
             child: Stack(
               children: [
                 Positioned(
                   left: _origin.dx,
                   top: _origin.dy,
                   child: const LiquidGlass(
-                    shape: LiquidRoundedSuperellipse(borderRadius: 32),
+                    shape: LiquidRoundedSuperellipse(radius: 32),
                     child: SizedBox(width: 200, height: 64),
                   ),
                 ),
@@ -58,9 +61,9 @@ Future<({double top, double bottom})> _innerShadow(
   image.dispose();
   double luma(double x, double y) {
     final i = (y.round() * width + x.round()) * 4;
-    return 0.2126 * bytes.getUint8(i) +
-        0.7152 * bytes.getUint8(i + 1) +
-        0.0722 * bytes.getUint8(i + 2);
+    return lumaWeights.$1 * bytes.getUint8(i) +
+        lumaWeights.$2 * bytes.getUint8(i + 1) +
+        lumaWeights.$3 * bytes.getUint8(i + 2);
   }
 
   final x = _origin.dx + _size.width / 2;
@@ -72,9 +75,10 @@ Future<({double top, double bottom})> _innerShadow(
 }
 
 void main() {
-  final base = LiquidGlassSettings.ios27RegularLight(
-    frost: 0,
-  ).copyWith(highlight: 0, contourStrength: 0);
+  final base = const LiquidGlassSettings.ios27Regular(
+    brightness: Brightness.light,
+    frost: LiquidGlassFrost.sigma(0),
+  ).copyWith(glintStrength: 0, contourStrength: 0);
 
   testWidgets(
     'FakeGlass draws the preset inner shadow below the top wall only',

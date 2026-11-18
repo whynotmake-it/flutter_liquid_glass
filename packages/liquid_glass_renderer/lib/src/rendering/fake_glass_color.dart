@@ -1,47 +1,27 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/src/painting/glass_color_parameters.dart';
+import 'package:liquid_glass_renderer/src/painting/liquid_glass_backdrop_filter.dart';
+import 'package:liquid_glass_renderer/src/painting/liquid_glass_color_model.dart';
+import 'package:liquid_glass_renderer/src/painting/liquid_glass_settings.dart';
+import 'package:liquid_glass_renderer/src/painting/shader_constants.dart';
+import 'package:liquid_glass_renderer/src/rendering/appearance.dart';
+import 'package:liquid_glass_renderer/src/rendering/drawn_values.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_blur.dart';
 import 'package:meta/meta.dart';
 
-/// Affine tint-over-backdrop followed by saturation, expressed as Flutter's
-/// 4x5 color matrix: the same per-pixel result as a shader, but a native color
-/// filter on both Impeller and Skia.
+/// Saturation and a midtone secant of transmissionGamma as Flutter's 4x5
+/// color matrix, a native color filter on Impeller and Skia.
 @internal
 List<double> fakeGlassColorMatrix({
   required double saturation,
-  required Color tint,
   double transmissionGamma = 1,
   double opacity = 1,
 }) {
-  // Match the final shader's fitted Rec.709 saturation basis.
-  const luminanceRed = 0.2126;
-  const luminanceGreen = 0.7152;
-  const luminanceBlue = 0.0722;
-  final inverseSaturation = 1 - saturation;
-  final saturationRows = <(double, double, double)>[
-    (
-      luminanceRed * inverseSaturation + saturation,
-      luminanceGreen * inverseSaturation,
-      luminanceBlue * inverseSaturation,
-    ),
-    (
-      luminanceRed * inverseSaturation,
-      luminanceGreen * inverseSaturation + saturation,
-      luminanceBlue * inverseSaturation,
-    ),
-    (
-      luminanceRed * inverseSaturation,
-      luminanceGreen * inverseSaturation,
-      luminanceBlue * inverseSaturation + saturation,
-    ),
-  ];
-  final backdropWeight = 1 - tint.a;
-  // A color matrix cannot reproduce the real renderer's per-channel pow(),
-  // but a secant through the useful midtone range is a free approximation in
-  // the native filter we already need for tint/saturation. It preserves the
-  // characteristic lift from the toolbar preset's sub-unity gamma without
-  // adding another shader pass or backdrop sample.
+  // A color matrix cannot apply pow() per channel; a secant through 0.25 and
+  // 0.75 approximates transmissionGamma at midtones without another pass or
+  // backdrop sample.
   final gamma = math.max(transmissionGamma, 0.01);
   const lowerInput = 0.25;
   const upperInput = 0.75;
@@ -49,35 +29,17 @@ List<double> fakeGlassColorMatrix({
   final upperOutput = math.pow(upperInput, gamma).toDouble();
   final gammaScale = (upperOutput - lowerOutput) / (upperInput - lowerInput);
   final gammaBias = lowerOutput - gammaScale * lowerInput;
-
-  final filterOpacity = opacity.clamp(0.0, 1.0);
-  final result = <double>[];
-  for (final row in saturationRows) {
-    result
-      ..add(row.$1 * backdropWeight * gammaScale)
-      ..add(row.$2 * backdropWeight * gammaScale)
-      ..add(row.$3 * backdropWeight * gammaScale)
-      ..add(0)
-      // ColorFilter.matrix biases use the 0-255 channel scale.
-      ..add(
-        (tint.a * (row.$1 * tint.r + row.$2 * tint.g + row.$3 * tint.b) +
-                backdropWeight * gammaBias) *
-            255,
-      );
-  }
-  return result..addAll([0, 0, 0, filterOpacity, 0]);
+  return saturationMatrix(
+    saturation,
+    gain: gammaScale,
+    bias: gammaBias,
+    alpha: opacity.clamp(0.0, 1.0),
+  );
 }
 
-/// Least-squares line `slope * Y + offset` through the iOS 27 luminance
-/// transfer `(Y + lift * Y * (1 - Y)) ^ transmissionGamma` over `[0, 1]`.
-/// At unit gamma it is exactly `Y + lift / 6`.
-(double slope, double offset) _faceLuminanceLine(
-  double lift,
-  double transmissionGamma,
-) {
-  final gamma = math.max(transmissionGamma, 0.01);
-  double transfer(double y) =>
-      math.pow((y + lift * y * (1 - y)).clamp(0.0, 1.0), gamma).toDouble();
+// Least-squares line `slope * Y + offset` through [transfer] over `[0, 1]`,
+// sampled at 17 points.
+(double slope, double offset) _line(double Function(double y) transfer) {
   const samples = 17;
   var meanY = 0.0;
   var meanT = 0.0;
@@ -97,149 +59,240 @@ List<double> fakeGlassColorMatrix({
   return (slope, meanT - slope * meanY);
 }
 
-/// The complete untinted iOS 27 face as a 4x5 color matrix:
-/// `emission + transmittance * lum(Y) + chromaGain * (backdrop - Y)`.
+/// The complete untinted iOS 27 face (see `GlassColorParameters`) as a 4x5
+/// color matrix.
 ///
 /// Evaluating the whole face in the filter clamps only the final color, so
 /// amplified chroma is not clipped before the neutral wash attenuates it.
-/// The luminance transfer is replaced by its least-squares line.
+/// A matrix is linear in the backdrop, so the face of a grey backdrop,
+/// lift and [bleed] included, is replaced by its least-squares line, and
+/// the chroma takes the mean of its gain over the backdrop's luminance.
 @internal
 List<double> fakeGlassFaceMatrix({
   required Color emission,
   required double transmittance,
   required double lift,
   required double chromaGain,
+  GlassColorBleed bleed = const GlassColorBleed.none(),
   double transmissionGamma = 1,
   double opacity = 1,
 }) {
-  const luminance = [0.2126, 0.7152, 0.0722];
-  final (slope, offset) = _faceLuminanceLine(lift, transmissionGamma);
+  final luminance = [lumaWeights.$1, lumaWeights.$2, lumaWeights.$3];
   final emissionColor = [emission.r, emission.g, emission.b];
+  final glow =
+      luminance[0] * emission.r +
+      luminance[1] * emission.g +
+      luminance[2] * emission.b;
+  final gamma = math.max(transmissionGamma, 0.01);
+  double bare(double y) =>
+      glow +
+      transmittance * math.pow((y + lift * y * (1 - y)).clamp(0.0, 1.0), gamma);
+  final (slope, offset) = _line((y) => bleed.apply(bare(y), y));
+  const samples = 17;
+  var chroma = 0.0;
+  for (var i = 0; i < samples; i++) {
+    final y = i / (samples - 1);
+    final keep = 1 - y * lift / (1 + lift);
+    final weight = bleed.weightAt(bare(y));
+    chroma +=
+        ((1 - weight) * chromaGain * chromaKeep(keep) +
+            weight * bleed.saturation) /
+        samples;
+  }
   final result = <double>[];
   for (var row = 0; row < 3; row++) {
     for (var column = 0; column < 3; column++) {
       result.add(
-        luminance[column] * (transmittance * slope - chromaGain) +
-            (row == column ? chromaGain : 0),
+        luminance[column] * (slope - chroma) + (row == column ? chroma : 0),
       );
     }
     result
       ..add(0)
       // ColorFilter.matrix biases use the 0-255 channel scale.
-      ..add((emissionColor[row] + transmittance * offset) * 255);
+      ..add((emissionColor[row] - glow + offset) * 255);
   }
   return result..addAll([0, 0, 0, opacity.clamp(0.0, 1.0), 0]);
 }
 
-/// Builds the backdrop-only portion shared by standalone and consolidated
-/// fake glass. Tint remains in the analytic surface pass so contour
-/// transmittance can treat tint and backdrop energy independently.
+/// What fake glass draws of a [LiquidGlassSettings]: the fake painters take
+/// this, not the settings, so settings of one look draw alike.
 @internal
-ImageFilter? fakeGlassBackdropFilter(
-  LiquidGlassSettings settings,
-  LiquidGlassAppearance appearance, {
-  double deviceScale = 1,
-  double? shapeShortSide,
-}) => fakeGlassBackdropFilterParts(
-  settings,
-  appearance,
-  deviceScale: deviceScale,
-  shapeShortSide: shapeShortSide,
-)?.full;
+@immutable
+final class FakeGlassLook {
+  /// The look of [settings].
+  FakeGlassLook.of(LiquidGlassSettings settings)
+    : frost = settings.frostBase,
+      frostIsFitted = settings.frostIsFitted,
+      glintStrength = settings.glintStrength,
+      contourStrength = settings.contourStrength,
+      contourWidth = settings.contourWidth,
+      contourDirectionality = settings.contourDirectionality,
+      bevelShadowStrength = settings.bevelShadowStrength,
+      sliderPosition = settings.effectiveSliderPosition;
 
-/// A fake glass backdrop filter and its blur-free variant, for a pass that
-/// has already blurred its backdrop.
-@internal
-typedef FakeGlassFilterParts = ({
-  ImageFilter full,
-  ImageFilter withoutBlur,
-  double sigma,
-  TileMode tileMode,
-});
+  /// [FittedFrost.frostBase].
+  final double frost;
 
-/// Like [fakeGlassBackdropFilter], also returning the filter without its blur
-/// (just the color transfer), the blur's logical sigma and its tile mode.
-@internal
-FakeGlassFilterParts? fakeGlassBackdropFilterParts(
-  LiquidGlassSettings settings,
-  LiquidGlassAppearance appearance, {
-  double deviceScale = 1,
-  double? shapeShortSide,
-}) {
-  final visibility = appearance.visibility.clamp(0.0, 1.0);
-  if (visibility <= 0) return null;
-  final colorModel = appearance.colorModel;
-  final frost = settings.frostSigmaAt(
-    deviceScale,
-    shapeShortSide: shapeShortSide,
-  );
-  const tileMode = TileMode.mirror;
-  final blur = frost != 0
-      ? ImageFilter.blur(
-          sigmaX: frost,
-          sigmaY: frost,
-          tileMode: tileMode,
-        )
-      : null;
-  final faceTransfer = colorModel.faceTransfer(
-    tintAmount: settings.effectiveTintAmount,
-  );
-  final ColorFilter? colorTransfer;
-  if (faceTransfer != null) {
-    colorTransfer = ColorFilter.matrix(
-      fakeGlassFaceMatrix(
-        emission: faceTransfer.emission,
-        transmittance: faceTransfer.transmittance,
-        lift: faceTransfer.lift,
-        chromaGain: faceTransfer.chromaGain * colorModel.saturation,
-        transmissionGamma: colorModel.transmissionGamma,
-        opacity: visibility,
-      ),
-    );
-  } else {
-    final hasMaterialColorTransfer =
-        colorModel.saturation != 1 || colorModel.transmissionGamma != 1;
-    final hasColorTransfer =
-        hasMaterialColorTransfer || (blur != null && visibility < 1);
-    colorTransfer = hasColorTransfer
-        ? ColorFilter.matrix(
-            fakeGlassColorMatrix(
-              saturation: colorModel.saturation,
-              tint: const Color(0x00000000),
-              transmissionGamma: colorModel.transmissionGamma,
-              // A partially transparent filtered backdrop composites over the
-              // untouched backdrop, matching RealGlass's material fade without
-              // another backdrop sample. The opacity alone fades the transfer,
-              // like the face matrix above, so it fades linearly.
-              opacity: visibility,
-            ),
-          )
-        : null;
-  }
-  final full = switch ((blur, colorTransfer)) {
-    (final blur?, final colorTransfer?) => ImageFilter.compose(
-      inner: blur,
-      outer: colorTransfer,
-    ),
-    (final blur?, null) => blur,
-    (null, final colorTransfer?) => colorTransfer,
-    (null, null) => null,
-  };
-  if (full == null) return null;
-  return (
-    full: full,
-    withoutBlur: colorTransfer ?? fakeGlassIdentityFilter,
-    sigma: frost,
-    tileMode: tileMode,
+  /// [FittedFrost.frostIsFitted].
+  final bool frostIsFitted;
+
+  /// [LiquidGlassSettings.glintStrength].
+  final double glintStrength;
+
+  /// [LiquidGlassSettings.contourStrength].
+  final double contourStrength;
+
+  /// [LiquidGlassSettings.contourDirectionality].
+  final double contourDirectionality;
+
+  /// [LiquidGlassSettings.bevelShadowStrength].
+  final double bevelShadowStrength;
+
+  /// The slider position, clamped to `0` to `1`.
+  final double sliderPosition;
+
+  /// [DrawnSettings.contourWidth], which [contourStrength] decides.
+  final double contourWidth;
+
+  /// [FittedFrost.frostSigmaAt] of this look's frost.
+  double frostSigmaAt(double devicePixelRatio, {double? shapeShortSide}) =>
+      frostSigmaOf(
+        frost,
+        fitted: frostIsFitted,
+        devicePixelRatio: devicePixelRatio,
+        shapeShortSide: shapeShortSide,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is FakeGlassLook &&
+      other.frost == frost &&
+      other.frostIsFitted == frostIsFitted &&
+      other.glintStrength == glintStrength &&
+      other.contourStrength == contourStrength &&
+      other.contourDirectionality == contourDirectionality &&
+      other.bevelShadowStrength == bevelShadowStrength &&
+      other.sliderPosition == sliderPosition;
+
+  @override
+  int get hashCode => Object.hash(
+    frost,
+    frostIsFitted,
+    glintStrength,
+    contourStrength,
+    contourDirectionality,
+    bevelShadowStrength,
+    sliderPosition,
   );
 }
 
-/// The filter [FakeGlassFilterParts.withoutBlur] is for a glass that is only a
-/// blur: nothing is left to do once the pass has blurred its backdrop.
+/// A fake glass backdrop filter, and the frost `full` stands for when it
+/// blurs.
 @internal
-const ImageFilter fakeGlassIdentityFilter = ColorFilter.matrix(<double>[
-  1, 0, 0, 0, 0, //
-  0, 1, 0, 0, 0, //
-  0, 0, 1, 0, 0, //
-  0, 0, 0, 1, 0, //
-]);
+typedef FakeGlassFilterParts = ({
+  ImageFilter full,
+  LiquidGlassBackdropFrost? frost,
+});
+
+/// What fake glass does to the color of its backdrop: the untinted face of
+/// a parametric color model under its bleed, or else a saturation and a
+/// transmission gamma.
+@internal
+typedef FakeGlassTransfer = ({
+  ({Color emission, double transmittance, double lift, double chromaGain})?
+  face,
+  GlassColorBleed bleed,
+  double saturation,
+  double transmissionGamma,
+});
+
+/// The transfer fake glass wearing [model] applies to its backdrop in
+/// [look], or null where it leaves the backdrop's color as it is.
+@internal
+FakeGlassTransfer? fakeGlassTransfer(
+  FakeGlassLook look,
+  WornColorModel model,
+) {
+  final parameters = model.parameters;
+  if (parameters == null &&
+      model.saturation == 1 &&
+      model.transmissionGamma == 1) {
+    return null;
+  }
+  return (
+    face: parameters?.faceTransfer(sliderPosition: look.sliderPosition),
+    bleed: parameters?.bleed ?? const GlassColorBleed.none(),
+    saturation: model.saturation,
+    transmissionGamma: model.transmissionGamma,
+  );
+}
+
+/// Whether fake glass drawn in [look] and [appearance] changes its backdrop
+/// ([fakeGlassBackdropFilterParts] gives it a filter).
+@internal
+bool fakeGlassReadsBackdrop(
+  FakeGlassLook look,
+  WornAppearance appearance,
+) => fakeGlassBackdropFilterParts(look, appearance) != null;
+
+/// The backdrop filter of fake glass, standalone or consolidated, with its
+/// frost, or null where it leaves its backdrop as it is: it does not show,
+/// or it neither frosts it nor moves its color.
+@internal
+FakeGlassFilterParts? fakeGlassBackdropFilterParts(
+  FakeGlassLook look,
+  WornAppearance appearance, {
+  double devicePixelRatio = 1,
+  double? shapeShortSide,
+}) {
+  if (!appearance.shows) return null;
+  final visibility = appearance.visibility;
+  final sigma = look.frostSigmaAt(
+    devicePixelRatio,
+    shapeShortSide: shapeShortSide,
+  );
+  final matrix = switch (fakeGlassTransfer(look, appearance.colorModel)) {
+    (
+      face: final face?,
+      :final bleed,
+      :final saturation,
+      :final transmissionGamma,
+    ) =>
+      fakeGlassFaceMatrix(
+        emission: face.emission,
+        transmittance: face.transmittance,
+        lift: face.lift,
+        chromaGain: face.chromaGain * saturation,
+        bleed: bleed,
+        transmissionGamma: transmissionGamma,
+        opacity: visibility,
+      ),
+    (
+      face: null,
+      bleed: _,
+      :final saturation,
+      :final transmissionGamma,
+    ) =>
+      fakeGlassColorMatrix(
+        saturation: saturation,
+        transmissionGamma: transmissionGamma,
+        opacity: visibility,
+      ),
+    null when sigma != 0 && visibility < 1 => fakeGlassColorMatrix(
+      saturation: 1,
+      opacity: visibility,
+    ),
+    null => null,
+  };
+  if (sigma == 0) {
+    return matrix == null
+        ? null
+        : (full: ColorFilter.matrix(matrix), frost: null);
+  }
+  final frost = backdropFrost(
+    sigma: sigma,
+    colorMatrix: matrix,
+    tileMode: glassBlurTileMode,
+  );
+  return (full: frost.filter, frost: frost);
+}
