@@ -1,18 +1,31 @@
 import 'package:flutter/widgets.dart';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:liquid_glass_renderer/painting.dart';
 import 'package:meta/meta.dart';
 
+/// The error of glass built at [context] with no `LiquidGlassLayer` above it.
 @internal
-class LiquidGlassRenderScope extends InheritedWidget {
+FlutterError noLiquidGlassLayerError(BuildContext context) =>
+    FlutterError.fromParts([
+      ErrorSummary('No LiquidGlassLayer found.'),
+      ErrorDescription(
+        '${context.widget.runtimeType} draws its glass on the nearest '
+        'LiquidGlassLayer above it, and there is none.',
+      ),
+      ErrorHint('Wrap the glass in a LiquidGlassLayer.'),
+      context.describeElement('The context used was'),
+    ]);
+
+enum _ScopeAspect { settings, defaultAppearance }
+
+/// What a `LiquidGlassLayer` gives the widgets under it.
+@internal
+class LiquidGlassRenderScope extends InheritedModel<Object> {
   /// Creates a new [LiquidGlassRenderScope].
   const LiquidGlassRenderScope({
     required this.settings,
     required this.defaultAppearance,
     required super.child,
-    this.useFake = false,
-    this.consolidatesFakeBackdrop = false,
-    this.consolidatesFakeSurface = false,
-    this.backdropKey,
+    this.fake = false,
     super.key,
   });
 
@@ -20,51 +33,51 @@ class LiquidGlassRenderScope extends InheritedWidget {
 
   final LiquidGlassAppearance defaultAppearance;
 
-  final bool useFake;
+  /// Whether the layer is consolidated fake glass: shapes register with it
+  /// without backdrop filters of their own, and it paints each fake surface.
+  final bool fake;
 
-  /// Whether fake shapes register with the parent layer while omitting their
-  /// individual backdrop filters.
-  final bool consolidatesFakeBackdrop;
+  /// The scope of the nearest layer above [context], which there must be;
+  /// [context] rebuilds when any of it changes.
+  static LiquidGlassRenderScope of(BuildContext context) =>
+      maybeOf(context) ?? (throw noLiquidGlassLayerError(context));
 
-  /// Whether the parent layer paints each registered fake surface.
-  final bool consolidatesFakeSurface;
+  /// The scope of the nearest layer above [context], or null where there is
+  /// none; [context] rebuilds when any of it changes.
+  static LiquidGlassRenderScope? maybeOf(BuildContext context) =>
+      InheritedModel.inheritFrom<LiquidGlassRenderScope>(context);
 
-  /// The backdrop capture shared by glass effects in this scope, if any.
-  final BackdropKey? backdropKey;
+  /// The settings of the nearest layer above [context], or null where
+  /// there is none; [context] rebuilds when they change.
+  static LiquidGlassSettings? maybeSettingsOf(BuildContext context) =>
+      InheritedModel.inheritFrom<LiquidGlassRenderScope>(
+        context,
+        aspect: _ScopeAspect.settings,
+      )?.settings;
 
-  static LiquidGlassRenderScope of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
-    assert(
-      scope != null,
-      'No liquid glass renderer found in context. '
-      'Make sure to wrap your liquid glass widgets in a LiquidGlassLayer.',
-    );
-    return scope!;
-  }
-
-  /// Returns the nearest [LiquidGlassRenderScope] from the widget tree,
-  /// or `null` if there is none.
-  static LiquidGlassRenderScope? maybeOf(
-    BuildContext context, {
-    bool watch = true,
-  }) {
-    if (watch) {
-      return context
-          .dependOnInheritedWidgetOfExactType<LiquidGlassRenderScope>();
-    } else {
-      return context.getInheritedWidgetOfExactType<LiquidGlassRenderScope>();
-    }
-  }
+  /// The default appearance of the nearest layer above [context], which
+  /// there must be; [context] rebuilds when it changes.
+  static LiquidGlassAppearance defaultAppearanceOf(BuildContext context) =>
+      (InheritedModel.inheritFrom<LiquidGlassRenderScope>(
+                context,
+                aspect: _ScopeAspect.defaultAppearance,
+              ) ??
+              (throw noLiquidGlassLayerError(context)))
+          .defaultAppearance;
 
   @override
-  bool updateShouldNotify(covariant InheritedWidget oldWidget) {
-    return oldWidget is! LiquidGlassRenderScope ||
-        oldWidget.settings != settings ||
-        oldWidget.defaultAppearance != defaultAppearance ||
-        oldWidget.useFake != useFake ||
-        oldWidget.consolidatesFakeBackdrop != consolidatesFakeBackdrop ||
-        oldWidget.consolidatesFakeSurface != consolidatesFakeSurface ||
-        oldWidget.backdropKey != backdropKey;
-  }
+  bool updateShouldNotify(LiquidGlassRenderScope oldWidget) =>
+      oldWidget.settings != settings ||
+      oldWidget.defaultAppearance != defaultAppearance ||
+      oldWidget.fake != fake;
+
+  @override
+  bool updateShouldNotifyDependent(
+    LiquidGlassRenderScope oldWidget,
+    Set<Object> dependencies,
+  ) =>
+      dependencies.contains(_ScopeAspect.settings) &&
+          oldWidget.settings != settings ||
+      dependencies.contains(_ScopeAspect.defaultAppearance) &&
+          oldWidget.defaultAppearance != defaultAppearance;
 }

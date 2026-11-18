@@ -1,2 +1,2 @@
-/// Whether the code runs under `flutter test`: never on the web.
+/// Not read on the web.
 bool get runningUnderFlutterTest => false;

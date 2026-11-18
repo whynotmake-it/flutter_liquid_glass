@@ -7,6 +7,7 @@
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:liquid_glass_renderer/src/painting/shader_constants.dart';
 import 'package:meta/meta.dart';
 
 (double, double) _rseNAndXj(double ratio) {
@@ -41,11 +42,16 @@ import 'package:meta/meta.dart';
   return (n, 1.0 - 1.0 / kXj);
 }
 
-(double, double, Offset, double) _rseOctant(
-  double axis,
-  double radius,
-) {
-  if (radius <= 1e-3) return (0.0, 0.0, Offset.zero, 0.0);
+SquircleOctant _rseOctant(double axis, double radius) {
+  if (radius <= 1e-3) {
+    return SquircleOctant(
+      axis: axis,
+      degree: 0,
+      span: 0,
+      circleCenter: Offset.zero,
+      circleRadius: 0,
+    );
+  }
   final (n, xJOverA) = _rseNAndXj(2.0 * axis / radius);
   final xJ = xJOverA * axis;
   final yJ =
@@ -77,17 +83,17 @@ import 'package:meta/meta.dart';
     fromM.dx * fromJ.dy - fromM.dy * fromJ.dx,
     fromM.dx * fromJ.dx + fromM.dy * fromJ.dy,
   ).abs();
-  return (n, span, circleCenter, circleRadius);
+  return SquircleOctant(
+    axis: axis,
+    degree: n,
+    span: span,
+    circleCenter: circleCenter,
+    circleRadius: circleRadius,
+  );
 }
 
-/// Parameters of Flutter 3.47's rounded superellipse for its symmetric SDF
-/// (`sdfSquircle`), three vec4s: octant degrees and arc spans, circle
-/// centers, then semi-axes and circle radii. Flutter computes them when the
-/// geometry changes; mirroring that construction keeps lookup-table
-/// interpolation and circle fitting out of the fragment shader. Lengths are
-/// [size] units times [scale].
 @internal
-List<double> roundedSuperellipseParameters(
+SquircleParameters roundedSuperellipseParameters(
   Size size,
   double cornerRadius, {
   double scale = 1,
@@ -98,26 +104,126 @@ List<double> roundedSuperellipseParameters(
     cornerRadius * scale,
     min(halfWidth, halfHeight),
   );
-  final (topN, topSpan, topCenter, topRadius) = _rseOctant(
-    halfWidth,
-    radius,
+  return SquircleParameters(
+    top: _rseOctant(halfWidth, radius),
+    right: _rseOctant(halfHeight, radius),
   );
-  final (rightN, rightSpan, rightCenter, rightRadius) = _rseOctant(
-    halfHeight,
-    radius,
+}
+
+/// [roundedSuperellipseParameters] of the top and bottom halves of Flutter
+/// 3.47's rounded superellipse of [size] whose two top corners have radius
+/// [top] and two bottom corners [bottom]. Impeller's `MakeBoundsRadii` splits
+/// the sides where the radii divide them in their own ratio; each half is a
+/// symmetric rounded superellipse centered on that split line, and the shape
+/// is the top one above the line and the bottom one below it, as Impeller's
+/// quadrants are. Radii that do not fit are scaled down together
+/// ([RSuperellipse.scaleRadii]), as Impeller does. Lengths are [size] units
+/// times [scale].
+@internal
+SquirclePairParameters roundedSuperellipsePairParameters(
+  Size size,
+  double top,
+  double bottom, {
+  double scale = 1,
+}) {
+  final fitted = RSuperellipse.fromRectAndCorners(
+    Offset.zero & size,
+    topLeft: Radius.circular(top),
+    topRight: Radius.circular(top),
+    bottomLeft: Radius.circular(bottom),
+    bottomRight: Radius.circular(bottom),
+  ).scaleRadii();
+  final upper = top + bottom <= 0
+      ? size.height / 2
+      : size.height * top / (top + bottom);
+  final lower = size.height - upper;
+  return SquirclePairParameters(
+    top: roundedSuperellipseParameters(
+      Size(size.width, 2 * upper),
+      fitted.tlRadiusX,
+      scale: scale,
+    ),
+    bottom: roundedSuperellipseParameters(
+      Size(size.width, 2 * lower),
+      fitted.blRadiusX,
+      scale: scale,
+    ),
+    topRadius: fitted.tlRadiusX * scale,
+    bottomRadius: fitted.blRadiusX * scale,
   );
-  return <double>[
-    topN,
-    rightN,
-    topSpan,
-    rightSpan,
-    topCenter.dx,
-    topCenter.dy,
-    rightCenter.dx,
-    rightCenter.dy,
-    halfWidth,
-    halfHeight,
-    topRadius,
-    rightRadius,
-  ];
+}
+
+/// One of the two octants of a quadrant of Flutter 3.47's rounded
+/// superellipse: the one at the top side, whose semi-[axis] is half the width,
+/// or the one at the right side, whose semi-axis is half the height. Between
+/// the side and the circular cap of [circleRadius] around [circleCenter], which
+/// spans [span] radians, it is a superellipse of [degree].
+@internal
+@immutable
+class SquircleOctant {
+  const SquircleOctant({
+    required this.axis,
+    required this.degree,
+    required this.span,
+    required this.circleCenter,
+    required this.circleRadius,
+  });
+
+  final double axis;
+  final double degree;
+  final double span;
+  final Offset circleCenter;
+  final double circleRadius;
+}
+
+@internal
+@immutable
+class SquircleParameters {
+  const SquircleParameters({required this.top, required this.right});
+
+  final SquircleOctant top;
+  final SquircleOctant right;
+
+  /// The row `sdfSquircle` reads.
+  List<double> get floats => _floats(top.axis);
+
+  List<double> _floats(double topAxis) => laneRow(SquircleLane.values, {
+    SquircleLane.topDegree: top.degree,
+    SquircleLane.rightDegree: right.degree,
+    SquircleLane.topSpan: 1.0 - cos(top.span),
+    SquircleLane.rightSpan: 1.0 - cos(right.span),
+    SquircleLane.topCenterX: top.circleCenter.dx,
+    SquircleLane.topCenterY: top.circleCenter.dy,
+    SquircleLane.rightCenterX: right.circleCenter.dx,
+    SquircleLane.rightCenterY: right.circleCenter.dy,
+    SquircleLane.topAxis: topAxis,
+    SquircleLane.rightAxis: right.axis,
+    SquircleLane.topRadius: top.circleRadius,
+    SquircleLane.rightRadius: right.circleRadius,
+  });
+}
+
+@internal
+@immutable
+class SquirclePairParameters {
+  const SquirclePairParameters({
+    required this.top,
+    required this.bottom,
+    required this.topRadius,
+    required this.bottomRadius,
+  });
+
+  final SquircleParameters top;
+  final SquircleParameters bottom;
+
+  /// The radius of the two top corners, fitted and scaled.
+  final double topRadius;
+
+  /// The radius of the two bottom corners, fitted and scaled.
+  final double bottomRadius;
+
+  /// [bottom]'s floats as the geometry shaders read them: [bottomRadius] in
+  /// place of the semi-axis of its top octant, which is [top]'s
+  /// (`pairBottomRadius` in sdf.glsl).
+  List<double> get geometryBottomFloats => bottom._floats(bottomRadius);
 }
