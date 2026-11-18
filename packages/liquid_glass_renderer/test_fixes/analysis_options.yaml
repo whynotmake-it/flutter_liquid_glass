@@ -1,0 +1,2 @@
+# Keeps the package lints out: dart fix would apply their fixes too and the
+# results would no longer match the .expect files.

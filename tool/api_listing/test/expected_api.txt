@@ -1,0 +1,29 @@
+# package:sample/extra.dart
+class Extra
+  Extra.named()
+  static const int limit
+  set value(int value)
+enum Mode
+  slow,
+  fast,
+
+# package:sample/sample.dart
+typedef Callback = void Function(Engine)
+enum Mode (see package:sample/extra.dart)
+class Widget extends _Base
+  Widget(
+    int size, {
+    required Mode mode,
+    String label = ...,
+    @internal Engine? engine,
+  })
+  @internal Engine get engine
+  Hidden get hidden
+  final String label
+  final Mode mode
+  Shown shown<T extends Object>(T value)
+  final int size
+  overrides: toString
+int top(int a, [int b = ...])
+re-exported from package:dep:
+  Shown
