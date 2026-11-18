@@ -1,0 +1,21 @@
+name: apple_liquid_glass_accessibility_example
+description: Shows the accessibility settings apple_liquid_glass_accessibility reports.
+publish_to: none
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  apple_liquid_glass: ^1.0.0-dev.2
+  apple_liquid_glass_accessibility:
+    path: ../
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  lintervention: ^0.3.1

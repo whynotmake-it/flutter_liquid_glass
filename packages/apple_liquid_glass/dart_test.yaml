@@ -1,0 +1,3 @@
+tags:
+  macos_pixels:
+    description: "Compare captured glass pixels within tolerances measured on macOS without seeded passes; the macOS CI job runs them"

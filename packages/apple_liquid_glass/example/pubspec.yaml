@@ -1,0 +1,38 @@
+name: apple_liquid_glass_example
+description: A gallery of apple_liquid_glass - every control, menu and presentation on real glass.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  apple_liquid_glass:
+    path: ../
+  apple_liquid_glass_accessibility:
+    path: ../../apple_liquid_glass_accessibility
+  cupertino_icons: ^1.0.8
+  cupertino_ui: ^1.1.6
+  flutter:
+    sdk: flutter
+  kinesis: ^0.1.0-dev.1
+  liquid_glass_renderer: ^1.0.0-dev.2
+  video_player: ^2.14.1
+
+dev_dependencies:
+  flutter_gpu:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  lintervention: ^0.3.1
+  liquid_glass_test:
+    path: ../../../tool/liquid_glass_test
+
+flutter:
+  uses-material-design: false
+  assets:
+    - assets/backdrops/
+    - assets/video/

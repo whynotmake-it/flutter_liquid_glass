@@ -1,0 +1,8 @@
+# The defects: the (entry, check) pairs of the conformance suite that fail
+# today and should not, with what the check observed. Reviewed by hand: a
+# new failure fails the suite, and so does a line whose pair now passes.
+# The list only shrinks: UPDATE_CONFORMANCE=1 drops the lines that pass and
+# never adds one. The failures that are right live elsewhere: a reference
+# control's in its `fails`, a reviewed deviation in its entry's `exempt`.
+# Format: <entry> <check>: <reason>
+

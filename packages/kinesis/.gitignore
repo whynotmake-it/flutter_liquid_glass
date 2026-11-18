@@ -1,0 +1,3 @@
+build/
+# A library does not pin its dependencies.
+pubspec.lock
