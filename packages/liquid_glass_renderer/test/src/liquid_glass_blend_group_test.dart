@@ -1,9 +1,11 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/render_liquid_glass_geometry.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_blend_group.dart';
-import 'package:liquid_glass_renderer/src/rendering/liquid_glass_render_object.dart';
+import 'package:liquid_glass_renderer/src/painting/liquid_glass_shadow.dart';
+import 'package:liquid_glass_renderer/src/painting/shader_constants.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_render_link.dart';
+import 'package:liquid_glass_renderer/src/rendering/liquid_glass_blend_group.dart';
+import 'package:liquid_glass_renderer/src/rendering/render_liquid_glass_geometry.dart';
 
 import 'shared.dart';
 
@@ -29,13 +31,13 @@ void main() {
             key: blendGroupKey,
             child: const Row(
               children: [
-                LiquidGlass.grouped(
+                LiquidGlass(
                   shape: LiquidOval(),
                   child: SizedBox.square(dimension: 100),
                 ),
-                LiquidGlass.grouped(
+                LiquidGlass(
                   shape: LiquidRoundedSuperellipse(
-                    borderRadius: 20,
+                    radius: 20,
                   ),
                   child: SizedBox.square(dimension: 100),
                 ),
@@ -45,6 +47,55 @@ void main() {
         ),
       );
     }
+
+    testWidgets('a hidden shape leaves the group bounds to what shows', (
+      tester,
+    ) async {
+      Widget group({required double hidden}) => CupertinoApp(
+        home: Align(
+          alignment: Alignment.topLeft,
+          child: LiquidGlassLayer(
+            child: LiquidGlassBlendGroup(
+              blend: 8,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LiquidGlassVisibility(
+                    visibility: hidden,
+                    child: const LiquidGlass(
+                      shape: LiquidOval(),
+                      child: SizedBox.square(dimension: 100),
+                    ),
+                  ),
+                  const SizedBox(width: 200),
+                  const LiquidGlass(
+                    shape: LiquidOval(),
+                    child: SizedBox.square(dimension: 40),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      Rect bounds() => tester.allRenderObjects
+          .whereType<RenderLiquidGlassBlendGroup>()
+          .firstWhere((group) => group.geometryBlend == 8)
+          .maybeRebuildGeometry(const LiquidGlassAppearance())!
+          .bounds;
+
+      await tester.pumpWidget(group(hidden: 0));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(44, epsilon: 2));
+
+      await tester.pumpWidget(group(hidden: 0.5));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(344, epsilon: 2));
+
+      await tester.pumpWidget(group(hidden: 0));
+      await tester.pump();
+      expect(bounds().width, moreOrLessEquals(44, epsilon: 2));
+    });
 
     testWidgets('generates reusable GPU geometry metadata', (tester) async {
       await tester.pumpWidget(
@@ -66,7 +117,7 @@ void main() {
     testWidgets(
       'refreshes grouped shadows without rebuilding the geometry path',
       (tester) async {
-        var shadows = const <BoxShadow>[];
+        var shadows = const <LiquidGlassShadow>[];
         late StateSetter update;
         await tester.pumpWidget(
           CupertinoApp(
@@ -76,7 +127,7 @@ void main() {
                 builder: (context, setState) {
                   update = setState;
                   return LiquidGlassBlendGroup(
-                    child: LiquidGlass.grouped(
+                    child: LiquidGlass(
                       shadows: shadows,
                       shape: const LiquidOval(),
                       child: const SizedBox.square(dimension: 100),
@@ -94,12 +145,12 @@ void main() {
             .firstWhere(
               (renderObject) => renderObject.geometry?.shapes.length == 1,
             );
-        final originalRevision = renderObject.geometry!.matteRevision;
+        final originalRevision = renderObject.geometry!.revision;
         expect(renderObject.geometry!.shapes.single.shadows, isEmpty);
 
         update(() {
           shadows = const [
-            BoxShadow(
+            LiquidGlassShadow(
               color: Color(0x20000000),
               offset: Offset(0, 4),
               blurRadius: 8,
@@ -108,8 +159,11 @@ void main() {
         });
         await tester.pump();
 
-        expect(renderObject.geometry!.matteRevision, originalRevision);
-        expect(renderObject.geometry!.shapes.single.shadows, shadows);
+        expect(renderObject.geometry!.revision, originalRevision);
+        expect(
+          renderObject.geometry!.shapes.single.shadows,
+          castGlassShadows(shadows, Size.zero),
+        );
       },
       skip: skipProperGlassTests,
     );
@@ -126,12 +180,16 @@ void main() {
               child: LiquidGlassBlendGroup(
                 key: blendGroupKey,
                 child: Center(
-                  child: RawLiquidStretch(
-                    stretchPixels: const Offset(50, 0),
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: stretchedBy(
+                      const Offset(50, 0),
+                      const Size(100, 80),
+                    ),
                     child: Transform.rotate(
                       angle: .35,
-                      child: const LiquidGlass.grouped(
-                        shape: LiquidRoundedRectangle(borderRadius: 18),
+                      child: const LiquidGlass(
+                        shape: LiquidRoundedRectangle(radius: 18),
                         child: SizedBox(width: 100, height: 80),
                       ),
                     ),
@@ -170,19 +228,15 @@ void main() {
           if (message != null) messages.add(message);
         };
         try {
-          await tester.runAsync(LiquidGlass.precache);
+          await tester.runAsync(precacheLiquidGlass);
           await tester.pumpWidget(
             CupertinoApp(
               home: LiquidGlassLayer(
                 child: LiquidGlassBlendGroup(
                   child: Wrap(
                     children: [
-                      for (
-                        var i = 0;
-                        i <= LiquidGlassBlendGroup.maxShapesPerLayer;
-                        i++
-                      )
-                        const LiquidGlass.grouped(
+                      for (var i = 0; i <= geometryMaxShapesPerDraw; i++)
+                        const LiquidGlass(
                           shape: LiquidOval(),
                           child: SizedBox.square(dimension: 20),
                         ),

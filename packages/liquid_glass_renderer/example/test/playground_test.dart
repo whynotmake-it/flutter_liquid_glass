@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/app.dart';
@@ -21,11 +21,15 @@ void main() {
       );
       expect(
         light.settings,
-        withTestFrost(LiquidGlassSettings.ios27RegularLight()),
+        withTestFrost(
+          const LiquidGlassSettings.ios27Regular(brightness: Brightness.light),
+        ),
       );
       expect(
         light.withBrightness(Brightness.dark).settings,
-        withTestFrost(LiquidGlassSettings.ios27RegularDark()),
+        withTestFrost(
+          const LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
+        ),
       );
 
       final clear = GlassMaterial.preset(
@@ -38,25 +42,35 @@ void main() {
       );
     });
 
-    test('the Liquid Glass slider keeps edits and owns the blur', () {
-      for (final (style, frost) in [
-        (GlassStyle.clear, LiquidGlassSettings.ios27ClearFrost(1)),
-        (GlassStyle.regular, LiquidGlassSettings.ios27RegularFrost(1)),
-      ]) {
+    test('the Liquid Glass slider keeps edits and moves a fitted blur', () {
+      for (final style in [GlassStyle.clear, GlassStyle.regular]) {
         final preset = GlassMaterial.preset(
           style: style,
           brightness: Brightness.light,
         );
         final tinted = preset
             .withSettings(preset.settings.copyWith(refractionAmount: 12))
-            .withTintAmount(1);
+            .withSliderPosition(1);
 
         expect(tinted.edited, isTrue);
-        expect(tinted.settings.refractionAmount, 12);
-        expect(tinted.settings.tintAmount, 1);
         expect(
-          tinted.settings.frost,
-          withTestFrost(LiquidGlassSettings(frost: frost)).frost,
+          tinted.settings,
+          GlassMaterial.preset(
+            style: style,
+            brightness: Brightness.light,
+            sliderPosition: 1,
+          ).settings.copyWith(refractionAmount: 12),
+          reason: '$style',
+        );
+
+        const byHand = LiquidGlassFrost.sigma(3);
+        expect(
+          preset
+              .withSettings(preset.settings.copyWith(frost: byHand))
+              .withSliderPosition(1)
+              .settings
+              .frost,
+          byHand,
           reason: '$style',
         );
       }
@@ -68,18 +82,18 @@ void main() {
         brightness: Brightness.light,
       );
       expect(GlassStyle.loupe.followsSlider, isFalse);
-      expect(loupe.withTintAmount(1).settings, loupe.settings);
+      expect(loupe.withSliderPosition(1).settings, loupe.settings);
       final edited = loupe.withSettings(
         loupe.settings.copyWith(refractionAmount: 20),
       );
-      expect(edited.withTintAmount(1).settings, edited.settings);
+      expect(edited.withSliderPosition(1).settings, edited.settings);
     });
 
     test('reset restores the preset at the current slider position', () {
       final material = GlassMaterial.preset(
         style: GlassStyle.regular,
         brightness: Brightness.dark,
-      ).withTintAmount(0.5).withSettings(const LiquidGlassSettings());
+      ).withSliderPosition(0.5).withSettings(const LiquidGlassSettings());
 
       final reset = material.reset();
 
@@ -87,9 +101,9 @@ void main() {
       expect(
         reset.settings,
         withTestFrost(
-          LiquidGlassSettings.ios27Regular(
+          const LiquidGlassSettings.ios27Regular(
             brightness: Brightness.dark,
-            tintAmount: 0.5,
+            sliderPosition: 0.5,
           ),
         ),
       );
@@ -108,6 +122,28 @@ void main() {
         contains('  refractionHeight: 8.0,\n'),
         contains('  refractionAmount: 34.5,\n'),
         contains('  dispersion: -0.06,\n'),
+      ),
+    );
+    expect(
+      settingsSource(
+        const LiquidGlassSettings(
+          haze: LiquidGlassHaze(lighten: 0.5),
+        ),
+      ),
+      'const LiquidGlassSettings(\n'
+      '  haze: LiquidGlassHaze(sigma: 15.52, lighten: 0.5, darken: 0.0, '
+      'cover: 0.0),\n'
+      ')',
+    );
+    expect(
+      settingsSource(
+        const LiquidGlassSettings.ios27Clear(
+          frost: LiquidGlassFrost.sigma(2),
+        ).copyWith(refractionFitsShape: true),
+      ),
+      allOf(
+        contains('  frost: LiquidGlassFrost.sigma(2.0),\n'),
+        contains('  haze: LiquidGlassHaze.ios27Clear(),\n'),
       ),
     );
   });

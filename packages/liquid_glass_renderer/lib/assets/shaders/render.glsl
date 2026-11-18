@@ -4,10 +4,7 @@
 // lighting live in the geometry and final shaders; keep this include limited
 // to code the final pass uses.
 
-// Use the Rec.709 primaries for the material luminance basis. The host-Metal
-// color-card fit shows lower blue/cyan transfer error than the legacy Rec.601
-// weights, while preserving the neutral and solid-face guards.
-const vec3 LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
+#include "shader_constants.glsl"
 
 vec3 applySaturation(vec3 color, float saturation) {
     float luminance = dot(color, LUMA_WEIGHTS);

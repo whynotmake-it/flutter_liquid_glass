@@ -7,32 +7,28 @@
 // because Metal (framebuffer fetch) and Pixel 10 (no fetch) split passes
 // differently.
 //
-// Flutter GPU draws the geometry mattes in their own command buffers, which
-// are outside the scene Impeeler replays. These budgets cover the layer-tree
-// passes (backdrop capture, blur, shader filter, snapshot) that the scene
-// contributes. A change that adds another backdrop capture, blur pass or
-// saveLayer still fails these tests.
+// Flutter GPU draws the geometry atlases in their own command buffers, which
+// are outside the scene Impeeler replays.
 //
 // Impeeler's model is pinned to Flutter 3.47.1. When the SDK moves, re-measure
 // these budgets instead of widening them blindly.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:impeeler/impeeler.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
 const _settings = LiquidGlassSettings(
-  frost: 8,
+  frost: LiquidGlassFrost.sigma(8),
   refractionAmount: 30,
-  highlight: 0.5,
+  glintStrength: 0.5,
 );
 
-const _shape = LiquidRoundedSuperellipse(borderRadius: 28);
-const _backdropLayer = 'GeometryTransformTrackingLayer';
+const _shape = LiquidRoundedSuperellipse(radius: 28);
 
 typedef _Budget = ({int passes, double traffic});
 
@@ -107,7 +103,7 @@ Widget _blendGroup() => _background(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < 3; i++)
-            const LiquidGlass.grouped(
+            const LiquidGlass(
               shape: LiquidOval(),
               child: SizedBox.square(dimension: 80),
             ),
@@ -121,16 +117,20 @@ Widget _twoLayers() => _background(
   const Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      LiquidGlass.withOwnLayer(
+      LiquidGlassLayer(
         settings: _settings,
-        shape: _shape,
-        child: SizedBox(width: 160, height: 80),
+        child: LiquidGlass(
+          shape: _shape,
+          child: SizedBox(width: 160, height: 80),
+        ),
       ),
       SizedBox(width: 16),
-      LiquidGlass.withOwnLayer(
+      LiquidGlassLayer(
         settings: _settings,
-        shape: _shape,
-        child: SizedBox(width: 160, height: 80),
+        child: LiquidGlass(
+          shape: _shape,
+          child: SizedBox(width: 160, height: 80),
+        ),
       ),
     ],
   ),
@@ -145,10 +145,12 @@ Widget _nestedLayers() => _background(
         width: 240,
         height: 160,
         child: Center(
-          child: LiquidGlass.withOwnLayer(
+          child: LiquidGlassLayer(
             settings: _settings,
-            shape: LiquidRoundedSuperellipse(borderRadius: 20),
-            child: SizedBox(width: 120, height: 70),
+            child: LiquidGlass(
+              shape: LiquidRoundedSuperellipse(radius: 20),
+              child: SizedBox(width: 120, height: 70),
+            ),
           ),
         ),
       ),
@@ -165,9 +167,9 @@ Future<void> _pumpUntilGlassReady(WidgetTester tester) async {
     );
     final realLayers = tester.allRenderObjects
         .whereType<RenderLiquidGlassLayer>()
-        .where((layer) => layer.attached && layer.gpuGeometryRenderer != null);
+        .where((layer) => layer.attached);
     if (scopes.isNotEmpty &&
-        scopes.every((scope) => !scope.useFake) &&
+        scopes.every((scope) => !scope.fake) &&
         realLayers.isNotEmpty) {
       return;
     }
@@ -202,11 +204,6 @@ void _expectBudget(GpuReport report, Map<String, _Budget> budgets) {
         '${frame.traffic.relativeToPlainFrame.toStringAsFixed(2)}x traffic';
 
     // A silently unmodeled custom layer would make the estimate too low.
-    expect(
-      frame.sceneLayers,
-      contains(_backdropLayer),
-      reason: '$where; the glass backdrop layer was not read by Impeeler.',
-    );
     expect(frame.unmodeledLayers, isEmpty, reason: where);
     expect(frame.missingPictures, 0, reason: where);
     expect(
@@ -223,7 +220,6 @@ void _expectBudget(GpuReport report, Map<String, _Budget> budgets) {
 }
 
 void main() {
-  setUp(pinPlainBackdropPath);
   // This test file needs Impeeler's recording binding. It is installed here
   // rather than in flutter_test_config.dart because some test files install
   // their own specialized binding.

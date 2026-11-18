@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:apple_match_flutter/scene.dart';
 import 'package:apple_match_flutter/session.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 MatchScene testScene() {
   return MatchScene(

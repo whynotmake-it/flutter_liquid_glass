@@ -1,10 +1,6 @@
-// The harness drives the experimental JSON and color-model API on purpose.
-// ignore_for_file: experimental_member_use
-
-import 'package:flutter/material.dart';
-
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/loupe/liquid_glass_loupe.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'scene.dart';
 
@@ -12,12 +8,96 @@ import 'scene.dart';
 ///
 /// Shared by the per-launch capture path and the persistent hot-reload
 /// session so both render byte-identical scenes for the same settings.
-LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) =>
-    LiquidGlassSettings.fromJson(settings);
+///
+/// The keys are the harness's own (`settings/contract.json`), which the
+/// stored fits use: `highlight` is the glint strength and `tintAmount` the
+/// Liquid Glass slider position. An omitted `frost` is the frost fitted to
+/// iOS 27 regular glass, which follows the slider; a number is drawn as
+/// given.
+LiquidGlassSettings matchGlassSettings(Map<String, Object?> settings) {
+  const defaults = LiquidGlassSettings();
+  double number(String key, double fallback) =>
+      (settings[key] as num?)?.toDouble() ?? fallback;
+  return LiquidGlassSettings(
+    refractionHeight: number('refractionHeight', defaults.refractionHeight),
+    refractionAmount: number('refractionAmount', defaults.refractionAmount),
+    refractionFitsShape:
+        settings['refractionFitsShape'] as bool? ??
+        defaults.refractionFitsShape,
+    backdropShrink: number('backdropShrink', defaults.backdropShrink),
+    frost: switch (settings['frost']) {
+      final num sigma => LiquidGlassFrost.sigma(sigma.toDouble()),
+      _ => defaults.frost,
+    },
+    dispersion: number('dispersion', defaults.dispersion),
+    glintStrength: number('highlight', defaults.glintStrength),
+    contourStrength: number('contourStrength', defaults.contourStrength),
+    contourDirectionality: number(
+      'contourDirectionality',
+      defaults.contourDirectionality,
+    ),
+    bevelShadowStrength: number(
+      'bevelShadowStrength',
+      defaults.bevelShadowStrength,
+    ),
+    sliderPosition: number('tintAmount', defaults.sliderPosition),
+  );
+}
+
+/// [settings] under the harness's material keys, as [matchGlassSettings]
+/// reads them: a fitted frost is left out.
+Map<String, Object> matchSettingsJson(LiquidGlassSettings settings) => {
+  'refractionHeight': settings.refractionHeight,
+  'refractionAmount': settings.refractionAmount,
+  'refractionFitsShape': settings.refractionFitsShape,
+  'backdropShrink': settings.backdropShrink,
+  if (settings.frost case LiquidGlassFixedFrost(:final sigma)) 'frost': sigma,
+  'dispersion': settings.dispersion,
+  'highlight': settings.glintStrength,
+  'contourStrength': settings.contourStrength,
+  'contourDirectionality': settings.contourDirectionality,
+  'bevelShadowStrength': settings.bevelShadowStrength,
+  'tintAmount': settings.sliderPosition,
+};
+
+/// The color model a harness `colorModel` value names: `ios27Light`,
+/// `ios27Dark`, `ios27Clear` or `direct`, or one of them mapped to its
+/// adjustments (`{'ios27Dark': {'transmissionGamma': 1.1}}`).
+LiquidGlassColorModel matchColorModel(Object? value) {
+  double number(Object? value, double fallback) =>
+      (value as num?)?.toDouble() ?? fallback;
+  return switch (value) {
+    'ios27Light' => const LiquidGlassColorModel.ios27Regular(
+      brightness: Brightness.light,
+    ),
+    'ios27Dark' => const LiquidGlassColorModel.ios27Regular(
+      brightness: Brightness.dark,
+    ),
+    'ios27Clear' => const LiquidGlassColorModel.ios27Clear(),
+    {'ios27Light': final Map<String, Object?> light} =>
+      LiquidGlassColorModel.ios27Regular(
+        brightness: Brightness.light,
+        transmissionGamma: number(light['transmissionGamma'], 1),
+      ),
+    {'ios27Dark': final Map<String, Object?> dark} =>
+      LiquidGlassColorModel.ios27Regular(
+        brightness: Brightness.dark,
+        transmissionGamma: number(dark['transmissionGamma'], 1),
+      ),
+    'direct' => const LiquidGlassColorModel.direct(),
+    {'direct': final Map<String, Object?> direct} =>
+      LiquidGlassColorModel.direct(
+        saturation: number(direct['saturation'], 1),
+        transmissionGamma: number(direct['transmissionGamma'], 1),
+        vibrancy: number(direct['vibrancy'], 0),
+      ),
+    _ => throw ArgumentError.value(value, 'colorModel'),
+  };
+}
 
 /// Every settings key the harness reads; `settings/contract.json` mirrors it.
 const matchSettingsKeys = {
-  // LiquidGlassSettings.fromJson
+  // matchGlassSettings
   'refractionHeight', 'refractionAmount', 'refractionFitsShape',
   'backdropShrink', 'frost', 'dispersion', 'highlight', 'contourStrength',
   'contourDirectionality', 'bevelShadowStrength', 'tintAmount',
@@ -93,7 +173,7 @@ LiquidGlassAppearance matchGlassAppearance(
     );
   }
   final colorModel = settings.containsKey('colorModel')
-      ? LiquidGlassColorModel.fromJson(modelName)
+      ? matchColorModel(modelName)
       : clear
       ? const LiquidGlassColorModel.ios27Clear()
       : defaults.colorModel;
@@ -125,14 +205,14 @@ LiquidGlassAppearance matchGlassAppearance(
   );
 }
 
-List<BoxShadow> matchGlassShadows(Map<String, Object?> settings) {
+List<LiquidGlassShadow> matchGlassShadows(Map<String, Object?> settings) {
   double number(String key, double fallback) =>
       (settings[key] as num?)?.toDouble() ?? fallback;
-  BoxShadow? shadow(String prefix) {
+  LiquidGlassShadow? shadow(String prefix) {
     final alpha = number('${prefix}Alpha', 0.0);
     if (alpha <= 0.0) return null;
     final luminance = number('${prefix}Luminance', 0.0).round();
-    return BoxShadow(
+    return LiquidGlassShadow(
       color: Color.fromRGBO(luminance, luminance, luminance, alpha),
       offset: Offset(
         number('${prefix}OffsetX', 0.0),
@@ -159,11 +239,11 @@ LiquidShape matchGlassShape(
     return const LiquidOval();
   }
   if (sceneShapeKind == 'roundedSuperellipse') {
-    return LiquidRoundedSuperellipse(borderRadius: cornerRadius);
+    return LiquidRoundedSuperellipse(radius: cornerRadius);
   }
   return settings['shapeProfile'] == 'superellipse'
-      ? LiquidRoundedSuperellipse(borderRadius: cornerRadius)
-      : LiquidRoundedRectangle(borderRadius: cornerRadius);
+      ? LiquidRoundedSuperellipse(radius: cornerRadius)
+      : LiquidRoundedRectangle(radius: cornerRadius);
 }
 
 /// The deterministic capture scene: one probe background plus one glass shape.
@@ -306,7 +386,7 @@ class _MatchGlassSurface extends StatelessWidget {
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance appearance;
   final LiquidShape shape;
-  final List<BoxShadow> shadows;
+  final List<LiquidGlassShadow> shadows;
 
   @override
   Widget build(BuildContext context) => fake
@@ -317,12 +397,14 @@ class _MatchGlassSurface extends StatelessWidget {
           shadows: shadows,
           child: const SizedBox.expand(),
         )
-      : LiquidGlass.withOwnLayer(
+      : LiquidGlassLayer(
           settings: settings,
-          appearance: appearance,
-          shape: shape,
-          shadows: shadows,
-          child: const SizedBox.expand(),
+          defaultAppearance: appearance,
+          child: LiquidGlass(
+            shape: shape,
+            shadows: shadows,
+            child: const SizedBox.expand(),
+          ),
         );
 }
 
@@ -343,7 +425,7 @@ class _MatchMergePair extends StatelessWidget {
   final bool fake;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance appearance;
-  final List<BoxShadow> shadows;
+  final List<LiquidGlassShadow> shadows;
   final double blend;
   final List<(Rect, LiquidShape)> shapes;
 
@@ -358,7 +440,7 @@ class _MatchMergePair extends StatelessWidget {
           for (final (rect, shape) in shapes)
             Positioned.fromRect(
               rect: rect,
-              child: LiquidGlass.grouped(
+              child: LiquidGlass(
                 shape: shape,
                 appearance: appearance,
                 shadows: shadows,
@@ -388,7 +470,7 @@ class _MatchTabBar extends StatelessWidget {
   final double cornerRadius;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance appearance;
-  final List<BoxShadow> shadows;
+  final List<LiquidGlassShadow> shadows;
   final String probe;
 
   @override
@@ -401,12 +483,14 @@ class _MatchTabBar extends StatelessWidget {
         : _MatchTabItems(foreground: foreground);
     return Positioned.fromRect(
       rect: rect,
-      child: LiquidGlass.withOwnLayer(
+      child: LiquidGlassLayer(
         settings: settings,
-        appearance: appearance,
-        shape: LiquidRoundedSuperellipse(borderRadius: cornerRadius),
-        shadows: shadows,
-        child: child,
+        defaultAppearance: appearance,
+        child: LiquidGlass(
+          shape: LiquidRoundedSuperellipse(radius: cornerRadius),
+          shadows: shadows,
+          child: child,
+        ),
       ),
     );
   }
@@ -537,7 +621,7 @@ class _MatchLoupe extends StatelessWidget {
   final double cornerRadius;
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance appearance;
-  final List<BoxShadow> shadows;
+  final List<LiquidGlassShadow> shadows;
 
   @override
   Widget build(BuildContext context) {
@@ -546,14 +630,17 @@ class _MatchLoupe extends StatelessWidget {
       child: LiquidGlassLoupe(
         link: link,
         size: rect.size,
-        shape: LiquidRoundedRectangle(borderRadius: cornerRadius),
+        shape: LiquidRoundedRectangle(radius: cornerRadius),
         // Fitted to the iOS 27 loupe capture: interior rms 0.009 on both
         // grid probes.
         focalPointOffset: const Offset(0, 75),
         // The system text-selection loupe is a clear lens. Never let a
         // candidate's ordinary material vector turn this holdout into a
         // frosted, opaque pill or a full-face shader zoom.
-        settings: settings.copyWith(backdropShrink: 0, frost: 0),
+        settings: settings.copyWith(
+          backdropShrink: 0,
+          frost: LiquidGlassFrost.sigma(0),
+        ),
         appearance: const LiquidGlassAppearance(),
         shadows: shadows,
       ),

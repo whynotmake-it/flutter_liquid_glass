@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _outputPath = String.fromEnvironment('APPEARANCE_BLEND_CAPTURE_OUT');
 
@@ -66,12 +66,21 @@ class _ColorsScene extends StatelessWidget {
   final bool fake;
 
   static const _swatches = [
-    (Offset(-50, -50), LiquidGlassAppearance.ios27RegularLight()),
-    (Offset(50, -50), LiquidGlassAppearance.ios27RegularDark()),
+    (
+      Offset(-50, -50),
+      LiquidGlassAppearance.ios27Regular(brightness: Brightness.light),
+    ),
+    (
+      Offset(50, -50),
+      LiquidGlassAppearance.ios27Regular(brightness: Brightness.dark),
+    ),
     (Offset(-50, 50), LiquidGlassAppearance.ios27Clear()),
     (
       Offset(50, 50),
-      LiquidGlassAppearance.ios27RegularLight(tint: Color(0xFF0A84FF)),
+      LiquidGlassAppearance.ios27Regular(
+        brightness: Brightness.light,
+        tint: Color(0xFF0A84FF),
+      ),
     ),
   ];
 
@@ -106,7 +115,7 @@ class _ColorsScene extends StatelessWidget {
                 Positioned(
                   left: 180 + offset.dx - 54,
                   top: 180 + offset.dy - 54,
-                  child: LiquidGlass.grouped(
+                  child: LiquidGlass(
                     appearance: appearance,
                     shape: const LiquidOval(),
                     child: const SizedBox.square(dimension: 108),

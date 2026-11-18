@@ -1,8 +1,8 @@
-import 'package:integration_test/integration_test.dart';
-
 import '../../test/src/gpu_image_ownership_test.dart' as probe;
 
+import 'device_tests.dart';
+
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  deviceTests();
   probe.runGpuImageOwnershipTests();
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
 import 'package:motor/motor.dart';
@@ -18,29 +18,24 @@ class ControlGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidStretch(
-      child: LiquidGlass(
-        shape: shape,
-        shadows: glassShadows,
-        child: GlowContent(
-          child: MotionBuilder(
-            motion: const CupertinoMotion.smooth(),
-            converter: const ColorRgbMotionConverter(),
-            value: CupertinoColors.label.resolveFrom(context),
-            builder: (context, glyph, child) => IconTheme(
-              data: IconThemeData(color: glyph, size: controlGlyphSize),
-              child: DefaultTextStyle(
-                style: TextStyle(
-                  color: glyph,
-                  fontSize: 15,
-                  letterSpacing: -0.2,
-                ),
-                child: child!,
-              ),
+    return TouchGlass(
+      shape: shape,
+      child: MotionBuilder(
+        motion: const CupertinoMotion.smooth(),
+        converter: const ColorRgbMotionConverter(),
+        value: CupertinoColors.label.resolveFrom(context),
+        builder: (context, glyph, child) => IconTheme(
+          data: IconThemeData(color: glyph, size: controlGlyphSize),
+          child: DefaultTextStyle(
+            style: TextStyle(
+              color: glyph,
+              fontSize: 15,
+              letterSpacing: -0.2,
             ),
-            child: child,
+            child: child!,
           ),
         ),
+        child: child,
       ),
     );
   }

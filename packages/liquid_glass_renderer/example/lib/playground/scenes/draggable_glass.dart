@@ -1,25 +1,80 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 /// The soft drop shadow iOS gives floating glass.
 const glassShadows = [
-  BoxShadow(color: Color(0x1F000000), blurRadius: 24, offset: Offset(0, 8)),
+  LiquidGlassShadow(
+    color: Color(0x1F000000),
+    blurRadius: 24,
+    offset: Offset(0, 8),
+  ),
 ];
 
-/// Content of an interactive glass element, with the package's touch glow
-/// following the pointer beneath it.
-class GlowContent extends StatelessWidget {
-  const GlowContent({required this.child, super.key});
+class TouchGlass extends StatefulWidget {
+  const TouchGlass({
+    required this.shape,
+    required this.child,
+    this.appearance,
+    super.key,
+  });
 
+  final LiquidShape shape;
+
+  final LiquidGlassAppearance? appearance;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return GlassGlowLayer(
-      child: GlassGlow(glowColor: const Color(0x29FFFFFF), child: child),
-    );
+  State<TouchGlass> createState() => _TouchGlassState();
+}
+
+class _TouchGlassState extends State<TouchGlass> {
+  Offset? _touch;
+  late final _frame = ValueNotifier(_frameNow);
+
+  LiquidGlassShapeFrame get _frameNow => LiquidGlassShapeFrame(
+    shape: widget.shape,
+    appearance: widget.appearance,
+    shadows: glassShadows,
+    glow: switch (_touch) {
+      final touch? => LiquidGlassGlow(
+        center: touch,
+        radius: 24,
+        gain: 0.3,
+        wash: 0.04,
+      ),
+      null => null,
+    },
+  );
+
+  void _touchAt(Offset? touch) {
+    _touch = touch;
+    _frame.value = _frameNow;
   }
+
+  @override
+  void didUpdateWidget(TouchGlass oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _frame.value = _frameNow;
+  }
+
+  @override
+  void dispose() {
+    _frame.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (event) => _touchAt(event.localPosition),
+    onPointerMove: (event) => _touchAt(event.localPosition),
+    onPointerUp: (_) => _touchAt(null),
+    onPointerCancel: (_) => _touchAt(null),
+    child: LiquidGlass.live(
+      frame: _frame,
+      child: widget.child,
+    ),
+  );
 }
 
 /// Drags [child] from the first pointer contact, winning over the scrolling
@@ -70,8 +125,6 @@ class DraggableGlass extends StatefulWidget {
     required this.shape,
     this.offset = Offset.zero,
     this.position,
-    this.grouped = false,
-    this.interactive = true,
     this.appearance,
     this.child = const SizedBox.shrink(),
     super.key,
@@ -88,12 +141,6 @@ class DraggableGlass extends StatefulWidget {
 
   final Size size;
   final LiquidShape shape;
-
-  /// Whether the shape blends with its siblings in a [LiquidGlassBlendGroup].
-  final bool grouped;
-
-  /// Whether the shape stretches and glows under the pointer.
-  final bool interactive;
 
   final LiquidGlassAppearance? appearance;
   final Widget child;
@@ -125,22 +172,11 @@ class _DraggableGlassState extends State<DraggableGlass> {
 
   @override
   Widget build(BuildContext context) {
-    final content = Center(child: widget.child);
-    final child = widget.interactive ? GlowContent(child: content) : content;
-    Widget glass = widget.grouped
-        ? LiquidGlass.grouped(
-            shape: widget.shape,
-            appearance: widget.appearance,
-            shadows: glassShadows,
-            child: child,
-          )
-        : LiquidGlass(
-            shape: widget.shape,
-            appearance: widget.appearance,
-            shadows: glassShadows,
-            child: child,
-          );
-    if (widget.interactive) glass = LiquidStretch(child: glass);
+    final glass = TouchGlass(
+      shape: widget.shape,
+      appearance: widget.appearance,
+      child: Center(child: widget.child),
+    );
     return ValueListenableBuilder(
       valueListenable: _position,
       builder: (context, offset, child) {

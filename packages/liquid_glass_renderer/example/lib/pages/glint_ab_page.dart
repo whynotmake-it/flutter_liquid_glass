@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
@@ -11,7 +11,7 @@ enum _Side { none, apple, ours, both }
 /// Apple's side is a `UIGlassEffect` platform view registered by the iOS
 /// runner. "Apple" and "Ours" flip one capsule in place, "Both" stacks them
 /// and "None" shows the bare backdrop. The glint slider only changes this
-/// renderer's `highlight`. The line grid shows how far each glass displaces
+/// renderer's `glintStrength`. The line grid shows how far each glass displaces
 /// its backdrop.
 class GlintAbPage extends StatefulWidget {
   const GlintAbPage({super.key});
@@ -91,15 +91,17 @@ class _GlintAbPageState extends State<GlintAbPage> {
 
   Widget _ours(Brightness brightness) {
     final settings = _clear
-        ? LiquidGlassSettings.ios27Clear()
+        ? const LiquidGlassSettings.ios27Clear()
         : LiquidGlassSettings.ios27Regular(brightness: brightness);
-    return LiquidGlass.withOwnLayer(
-      settings: settings.copyWith(highlight: _glint),
-      appearance: _clear
+    return LiquidGlassLayer(
+      settings: settings.copyWith(glintStrength: _glint),
+      defaultAppearance: _clear
           ? const LiquidGlassAppearance.ios27Clear()
           : LiquidGlassAppearance.ios27Regular(brightness: brightness),
-      shape: LiquidRoundedRectangle(borderRadius: _size.height / 2),
-      child: SizedBox.fromSize(size: _size),
+      child: LiquidGlass(
+        shape: LiquidRoundedRectangle(radius: _size.height / 2),
+        child: SizedBox.fromSize(size: _size),
+      ),
     );
   }
 

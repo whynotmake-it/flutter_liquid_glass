@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -44,8 +44,12 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
       tint: Color(0x604080FF),
       colorModel: LiquidGlassColorModel.direct(saturation: 1.5),
     ),
-    'ios27 light': LiquidGlassAppearance.ios27RegularLight(),
-    'ios27 dark': LiquidGlassAppearance.ios27RegularDark(),
+    'ios27 light': LiquidGlassAppearance.ios27Regular(
+      brightness: Brightness.light,
+    ),
+    'ios27 dark': LiquidGlassAppearance.ios27Regular(
+      brightness: Brightness.dark,
+    ),
   };
 
   for (final fake in [false, true]) {
@@ -56,15 +60,13 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
           'visibility fades $name to the backdrop '
           '(fake=$fake, frost=$frost)',
           (tester) async {
+            // Until their programs load, copies frost and haze with
+            // stand-ins; the frames compared here have to draw alike.
+            await tester.runAsync(precacheLiquidGlass);
             tester.view
               ..physicalSize = Size(_width.toDouble(), _height.toDouble())
               ..devicePixelRatio = 1;
             addTearDown(tester.view.reset);
-            // flutter_tester renders a seeded pass of real glass wrongly (see
-            // `pinPlainBackdropPath`); a device runs the production defaults.
-            if (binding.isFlutterTester && !fake && frost > 0) {
-              pinPlainBackdropPath();
-            }
             final visibility = ValueNotifier<double>(1);
             addTearDown(visibility.dispose);
 
@@ -79,13 +81,15 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
                     Center(
                       child: LiquidGlassLayer(
                         fake: fake,
-                        settings: LiquidGlassSettings(frost: frost),
+                        settings: LiquidGlassSettings(
+                          frost: LiquidGlassFrost.sigma(frost),
+                        ),
                         child: ValueListenableBuilder<double>(
                           valueListenable: visibility,
                           builder: (_, value, _) => LiquidGlass(
                             appearance: appearance.copyWith(visibility: value),
                             shape: const LiquidRoundedSuperellipse(
-                              borderRadius: 40,
+                              radius: 40,
                             ),
                             child: const SizedBox(width: 120, height: 80),
                           ),
@@ -128,9 +132,6 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
 
             final full = await deviationAt(1);
             expect(full, greaterThan(0));
-            if (!binding.isFlutterTester && frost > 0) {
-              expect(seededPasses(tester), isNotEmpty, reason: 'seeds are on');
-            }
             expect(
               await deviationAt(0.5) / full,
               inInclusiveRange(0.25, 0.75),
@@ -139,7 +140,8 @@ void runVisibilityFadeTests(TestWidgetsFlutterBinding testBinding) {
             expect(
               await deviationAt(0.02) / full,
               lessThan(0.05),
-              reason: 'Nearly hidden glass must already be nearly the '
+              reason:
+                  'Nearly hidden glass must already be nearly the '
                   'backdrop, or it pops when it reaches zero.',
             );
             visibility.value = 0;

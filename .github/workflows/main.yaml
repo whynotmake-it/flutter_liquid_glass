@@ -21,7 +21,9 @@ jobs:
   flutter-check:
     name: Build Check
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # With the widget packages the tests alone take about 18 minutes, and
+    # analysis and setup another 2; Latest Flutter runs the same tests in 30.
+    timeout-minutes: 30
     permissions:
       pull-requests: write
       contents: write
@@ -44,13 +46,64 @@ jobs:
       - name: 🧪 Run Analyze
         run: melos run analyze
 
+      - name: 🔧 Check dart fix data
+        run: melos run fix-data
+
       - name: 📝 Run Tests without goldens
-        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'goldens')
         run: melos run test-without-goldens
 
-      - name: 📝 Run Tests without goldens, with the production defaults
-        run: melos run test:defaults
 
+  oldest_flutter:
+    name: Oldest Flutter
+    # The pubspecs take Flutter 3.47.0 and up, so the tests also run on the
+    # newest 3.47 release: code that needs a newer Flutter fails here before
+    # a user on 3.47 meets it. Move it with the pubspecs' lower bound.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.x
+          cache: true
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+
+      - name: 📝 Run Tests without goldens
+        run: melos run test-without-goldens
+
+  latest_flutter:
+    name: Latest Flutter
+    # The tests also run on the newest stable release: a release that breaks
+    # them shows here before a user of it meets it. Analysis stays on the
+    # version .fvmrc pins, where a new release's deprecations are not yet
+    # reported.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 📚 Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ⓜ️ Set up Melos
+        uses: bluefireteam/melos-action@v3
+
+      - name: 📝 Run Tests without goldens
+        run: melos run test-without-goldens
 
   skia_build:
     name: Skia Build Check
@@ -79,6 +132,7 @@ jobs:
         run: |
           flutter create --platforms web .
           flutter build web
+
 
   check_generation:
     name: Check Code Generation
@@ -112,9 +166,9 @@ jobs:
     name: Run Golden Tests
     # Only run on main or if PR is labeled with "goldens"
     if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'goldens')
-    # The macOS goldens are rendered with `flutter test --update-goldens`,
-    # which must be run on a host matching this image's macOS version
-    # (macOS 27.0.1 / 26A434, `xcode-27`).
+    # The macOS goldens are rendered with `flutter test --update-goldens` on
+    # macOS 27.2.1 (26B131). This image still runs macOS 27.0.1 (26A434),
+    # which draws the same pixels.
     runs-on: xcode-27
     steps:
       - name: 📚 Checkout
@@ -138,4 +192,5 @@ jobs:
         id: coverage-report
         uses: whynotmake-it/dart-coverage-assistant@v1.1
         with:
-          generate_badges: pr
+          # A fork's token cannot push the badge branch or open its pull request.
+          generate_badges: ${{ github.repository == 'whynotmake-it/flutter_liquid_glass' && 'pr' || 'false' }}

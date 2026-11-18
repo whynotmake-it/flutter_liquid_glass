@@ -4,36 +4,46 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('parses native GPU intervals and Metal allocation lifetimes', () async {
-    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
-    addTearDown(() => fixture.deleteSync(recursive: true));
-    final traces = Directory('${fixture.path}/traces')..createSync();
-    _writeScenario(fixture, scenario: 'staticSingle');
-    File('${traces.path}/staticSingle.gpu.xml').writeAsStringSync(_gpuXml);
-    File(
-      '${traces.path}/staticSingle.metal-resources.xml',
-    ).writeAsStringSync(_metalXml);
+  test(
+    'parses native GPU intervals and Metal allocation lifetimes',
+    // The first parser subprocess of the suite also runs the build hooks,
+    // which compile every shader when nothing has built them yet: more than
+    // the default 30 s on a cold runner.
+    timeout: const Timeout(Duration(minutes: 3)),
+    () async {
+      final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+      addTearDown(() => fixture.deleteSync(recursive: true));
+      final traces = Directory('${fixture.path}/traces')..createSync();
+      _writeScenario(fixture, scenario: 'staticSingle');
+      File('${traces.path}/staticSingle.gpu.xml').writeAsStringSync(_gpuXml);
+      File(
+        '${traces.path}/staticSingle.metal-resources.xml',
+      ).writeAsStringSync(_metalXml);
 
-    final result = await _runParser(fixture, enforce: true);
+      final result = await _runParser(fixture, enforce: true);
 
-    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-    final summary = jsonDecode(
-      File('${fixture.path}/summary.json').readAsStringSync(),
-    ) as Map<String, dynamic>;
-    final scenario =
-        (summary['scenarioRuns'] as List<dynamic>).single
-            as Map<String, dynamic>;
-    final gpu = scenario['gpu'] as Map<String, dynamic>;
-    final metal = scenario['metal'] as Map<String, dynamic>;
-    expect(gpu['intervalCount'], 3);
-    expect(gpu['busyMs'], closeTo(200, .001));
-    expect(gpu['intervalP95Ms'], closeTo(100, .001));
-    expect(metal['allocationCount'], 2);
-    expect(metal['deallocationCount'], 1);
-    expect(metal['cumulativeAllocatedMb'], closeTo(150 / 1048576, 1e-9));
-    expect(scenario['nativeFootprintRetainedDeltaMb'], closeTo(10, 1e-9));
-    expect(scenario['nativeFootprintPeakAbovePreMeasureMb'], closeTo(40, 1e-9));
-  });
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      final summary = jsonDecode(
+        File('${fixture.path}/summary.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final scenario =
+          (summary['scenarioRuns'] as List<dynamic>).single
+              as Map<String, dynamic>;
+      final gpu = scenario['gpu'] as Map<String, dynamic>;
+      final metal = scenario['metal'] as Map<String, dynamic>;
+      expect(gpu['intervalCount'], 3);
+      expect(gpu['busyMs'], closeTo(200, .001));
+      expect(gpu['intervalP95Ms'], closeTo(100, .001));
+      expect(metal['allocationCount'], 2);
+      expect(metal['deallocationCount'], 1);
+      expect(metal['cumulativeAllocatedMb'], closeTo(150 / 1048576, 1e-9));
+      expect(scenario['nativeFootprintRetainedDeltaMb'], closeTo(10, 1e-9));
+      expect(
+        scenario['nativeFootprintPeakAbovePreMeasureMb'],
+        closeTo(40, 1e-9),
+      );
+    },
+  );
 
   test('ignores wrapped u64 durations from clipped trace rows', () async {
     final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
@@ -762,27 +772,27 @@ LIQUID_GLASS_BENCHMARK_MEASURE_END:staticSingle:1789120801500000:30
   test(
     'require-complete fails failed and missing runs when enforcement is off',
     () async {
-    final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
-    addTearDown(() => fixture.deleteSync(recursive: true));
-    final failures = Directory('${fixture.path}/failures')..createSync();
-    File(
-      '${failures.path}/failedScenario.r1.txt',
-    ).writeAsStringSync('thermal gate was not reached');
+      final fixture = await Directory.systemTemp.createTemp('glass-benchmark-');
+      addTearDown(() => fixture.deleteSync(recursive: true));
+      final failures = Directory('${fixture.path}/failures')..createSync();
+      File(
+        '${failures.path}/failedScenario.r1.txt',
+      ).writeAsStringSync('thermal gate was not reached');
 
-    final result = await _runParser(
-      fixture,
-      enforce: false,
-      expectedScenarios: 'failedScenario',
-      requireComplete: true,
-    );
+      final result = await _runParser(
+        fixture,
+        enforce: false,
+        expectedScenarios: 'failedScenario',
+        requireComplete: true,
+      );
 
-    expect(result.exitCode, 1);
-    expect(result.stderr, contains('failedScenario r1 failed'));
-    expect(result.stderr, contains('failedScenario is missing'));
-    expect(
-      File('${fixture.path}/summary.json').existsSync(),
-      isTrue,
-    );
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('failedScenario r1 failed'));
+      expect(result.stderr, contains('failedScenario is missing'));
+      expect(
+        File('${fixture.path}/summary.json').existsSync(),
+        isTrue,
+      );
     },
   );
 

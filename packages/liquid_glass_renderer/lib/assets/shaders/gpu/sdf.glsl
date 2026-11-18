@@ -1,155 +1,44 @@
 // Copyright 2025, Tim Lehmann for whynotmake.it
-//
-// sdfRRect, rseSuperellipse, sdfSquircle and sdfEllipse are adapted from
-// Flutter's Impeller shaders (impeller/entity/shaders/uber_sdf.frag and
-// sdf_functions.glsl, Flutter 3.47.1):
-//   Copyright 2013 The Flutter Authors. All rights reserved.
-//   Use of this source code is governed by a BSD-style license that can be
-//   found in third_party/flutter/LICENSE.
-// rseSuperellipse also derives from Inigo Quilez's superellipse distance
-// (https://iquilezles.org/articles/ellipsedist/), MIT License,
-// Copyright © 2015 Inigo Quilez; see third_party/inigo_quilez/LICENSE.
 
 // Three vec4s per shape: primitive parameters, inverse affine basis, and
 // transformed center/distance/group data. RSE parameters use three vec4s per
 // shape: degrees/(1 - cos span), circle centers, and semi-axes/radii. This is the
-// lossless symmetric subset of Flutter's Impeller UberSDF payload; the public
-// shape API has one uniform corner radius, so its signed scale is always 1.
-//
-// IMPORTANT: Every shader that includes this file must declare a
-// `uniform vec4 uShapeData[MAX_SHAPES * 3];`,
-// `uniform vec4 uRseData[MAX_SHAPES * 3];` and
-// `uniform vec4 uShapeBounds[MAX_SHAPES];` *before* the include. The SDF
-// helpers below read these uniforms directly rather than taking them as
-// parameters, so no shape array is ever passed, and copied, by value.
-#ifndef MAX_SHAPES
-#define MAX_SHAPES 16
+// lossless symmetric subset of Flutter's Impeller UberSDF payload: corners
+// are circular, so its signed scale is always 1.
+
+// The helpers read the shapes from the uniforms rather than taking them as
+// parameters, so no shape array is ever passed, and copied, by value. A
+// shader that declares uShapeData, uRseData and uShapeBounds itself
+// (shape_geometry.glsl) defines GEOMETRY_UNIFORMS_GLSL first.
+#ifndef GEOMETRY_UNIFORMS_GLSL
+#include "geometry_uniforms.glsl"
 #endif
 
-float sdfRRect( in vec2 p, in vec2 b, in float r ) {
-    float shortest = min(b.x, b.y);
-    r = min(r, shortest);
-    vec2 q = abs(p)-b+r;
-    return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r;
-}
+#include "shader_constants.glsl"
 
-// Signed distance to the implicit superellipse used by Flutter's RSE shader.
-// The six fixed bisection steps are the same bounded-cost approximation used
-// by Flutter and are sufficient at device-pixel scale.
-float rseSuperellipse(vec2 p, float n) {
-    const float twoPi = 6.28318531;
-    p = abs(p);
-    if (p.y > p.x) p = p.yx;
+#include "shape_sdf.glsl"
 
-    n = 2.0 / n;
-    float xa = 0.0;
-    float xb = twoPi / 8.0;
-    for (int i = 0; i < 6; i++) {
-        float x = 0.5 * (xa + xb);
-        float c = cos(x);
-        float s = sin(x);
-        float cn = pow(c, n);
-        float sn = pow(s, n);
-        float y = (p.x - cn) * cn * s * s -
-            (p.y - sn) * sn * c * c;
-        if (y < 0.0) xa = x;
-        else xb = x;
-    }
-
-    vec2 qa = pow(vec2(cos(xa), sin(xa)), vec2(n));
-    vec2 qb = pow(vec2(cos(xb), sin(xb)), vec2(n));
-    vec2 pa = p - qa;
-    vec2 ba = qb - qa;
-    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
-    return length(pa - ba * h) * sign(pa.x * ba.y - pa.y * ba.x);
-}
-
-float sdfSquircle(
-    vec2 p,
-    vec2 b,
-    float r,
-    vec4 degreeAndSpans,
-    vec4 circleCenters,
-    vec4 semiAxisAndRadii
-) {
-    if (r <= 1e-4) {
-        return max(abs(p).x - b.x, abs(p).y - b.y);
-    }
-    // This is Flutter 3.47's distanceFromRoundedSuperellipse from
-    // `impeller/entity/shaders/uber_sdf.frag`, with its symmetric scale folded
-    // out. Keeping the CPU-fitted semi-axes and circular-cap radii instead of
-    // reconstructing the cap radius in the fragment avoids the small
-    // straight-to-corner lip caused by divergent floating-point constructions.
-    vec2 local = abs(p);
-    vec2 normalized = local;
-    float c = semiAxisAndRadii.x - semiAxisAndRadii.y;
-    vec2 octant;
-    float degree;
-    float cosSpan;
-    float axis;
-    float circleRadius;
-    vec2 circleCenter;
-    if (normalized.y + c > normalized.x) {
-        octant = normalized + vec2(0.0, c);
-        degree = degreeAndSpans.x;
-        axis = semiAxisAndRadii.x;
-        cosSpan = 1.0 - degreeAndSpans.z;
-        circleCenter = circleCenters.xy;
-        circleRadius = semiAxisAndRadii.z;
-    } else {
-        octant = normalized.yx - vec2(0.0, c);
-        degree = degreeAndSpans.y;
-        axis = semiAxisAndRadii.y;
-        cosSpan = 1.0 - degreeAndSpans.w;
-        circleCenter = circleCenters.zw;
-        circleRadius = semiAxisAndRadii.w;
-    }
-    // Inside the circular cap's angular span around the 45-degree diagonal.
-    // The span arrives as 1 - cos(span), so this is Flutter's atan2 test
-    // without the trigonometry, and a zero payload still means no cap.
-    vec2 relative = octant - circleCenter;
-    float relativeLength = length(relative);
-    if (dot(relative, vec2(0.70710678)) > relativeLength * cosSpan) {
-        return relativeLength - circleRadius;
-    }
-    if (degree < 2.0) {
-        return max(abs(octant).x - axis, abs(octant).y - axis);
-    }
-    return rseSuperellipse(octant / max(axis, 1e-4), degree) * axis;
-}
-
-float sdfEllipse(vec2 p, vec2 r) {
-    // Impeller's oval SDF: a fixed five-step Newton solve. Closed-form
-    // approximations divide by |p| near the center, which leaves a pinhole in
-    // non-circular ovals.
-    r = max(r, 1e-4);
-    p = abs(p);
-    vec2 q = r * (p - r);
-    float angle = q.x < q.y ? 1.570796327 : 0.0;
-    for (int i = 0; i < 5; i++) {
-        vec2 cs = vec2(cos(angle), sin(angle));
-        vec2 u = r * cs;
-        vec2 v = r * vec2(-cs.y, cs.x);
-        angle += dot(p - u, v) /
-            max(dot(p - u, u) + dot(v, v), 1e-6);
-    }
-    float distance = length(p - r * vec2(cos(angle), sin(angle)));
-    return dot(p / r, p / r) > 1.0 ? distance : -distance;
-}
+// Whether a scene sample carries its shapes' look (looks.glsl), blended by
+// the smooth union's weight over its full radius, as halfMinor is.
+#ifndef SCENE_LOOKS
+#define SCENE_LOOKS 0
+#endif
+#if SCENE_LOOKS
+#include "looks.glsl"
+#endif
 
 float getShapeSDF(
     float type,
     vec2 p,
-    vec2 center,
     vec2 size,
     float r,
     vec4 rseDegreeAndSpans,
     vec4 rseCircleCenters,
     vec4 rseSemiAxisAndRadii
 ) {
-    if (type == 1.0) { // squircle
+    if (type == SHAPE_SQUIRCLE) {
         return sdfSquircle(
-            p - center,
+            p,
             size / 2.0,
             r,
             rseDegreeAndSpans,
@@ -157,32 +46,28 @@ float getShapeSDF(
             rseSemiAxisAndRadii
         );
     }
-    if (type == 2.0) { // ellipse
-        return sdfEllipse(p - center, size / 2.0);
+    if (type == SHAPE_ELLIPSE) {
+        return sdfEllipse(p, size / 2.0);
     }
-    if (type == 3.0) { // rounded rectangle
-        return sdfRRect(p - center, size / 2.0, r);
+    if (type == SHAPE_ROUNDED_RECTANGLE) {
+        return sdfRRect(p, size / 2.0, r);
     }
     return 1e9; // none
 }
 
-// Reads the globally declared `uShapeData` uniform directly (see note above).
 struct SceneSample {
     float distance;
     float halfMinor;
-    float curvatureFactor;
     // Gradients of the distance (see getShapeGradients), blended like the
     // distance itself for a group. `normal` has the true corners and sets the
     // blend angle; `opticalNormal` has smoothed corners and drives
     // refraction, lighting and antialiasing.
     vec2 normal;
     vec2 opticalNormal;
+#if SCENE_LOOKS
+    Look look;
+#endif
 };
-
-// Apple's glass turns its optical normal before a corner starts, as if the
-// corner radius were larger; normals from a 1.5x radius match iOS 27 card
-// corners. Capsules are unchanged.
-const float kOpticalCornerRadiusScale = 1.5;
 
 // Scene-space gradients of a primitive's distance: xy with its true corners
 // (the blend angle), zw with corners from a radius scaled by
@@ -205,7 +90,7 @@ vec4 getShapeGradients(
     vec2 halfSize = primitive.yz * 0.5;
     vec2 exact;
     vec2 optical;
-    if (primitive.x == 2.0) {
+    if (primitive.x == SHAPE_ELLIPSE) {
         exact = normalize(localPoint / max(halfSize * halfSize, 1e-4));
         optical = exact;
     } else {
@@ -233,18 +118,43 @@ vec4 getShapeGradients(
     return vec4(toScene * exact, toScene * optical);
 }
 
-// Smooth-union radius for two surfaces with normals na and nb. It scales with
-// the chord between the normals: zero where the surfaces are aligned, such as
-// the collinear sides of shapes in a row, and the full blend where they face
-// each other across a gap. A plain smooth minimum lifts aligned edges near a
-// join by up to k/4; this keeps them straight while concave joins and
-// bridges still round. The iOS 27 GlassEffectContainer captures in
-// example/tool/apple_match follow this within half a point, including the
-// sub-point rise it leaves where two rounded corners meet.
+// What turns the optical gradient of a shape of [size], at [localPoint] from
+// its center in its own axes, toward the line from its center: added to a
+// gradient one long and made one long again, the two are mixed by
+// turn / (1 + turn).
+//
+// iOS 27 mixes the normal of large regular glass half and half with the
+// line from its center, taken where the shape is a square, so what shows
+// through its rim leans along the edge near the corners. The center itself
+// lies deeper than a bevel reads.
+vec2 leanToCenter(
+    vec2 localPoint,
+    vec2 size,
+    vec4 inverseBasis,
+    float distanceScale,
+    float turn
+) {
+    vec2 line = normalize(localPoint / size + 1e-6) * (turn * distanceScale);
+    return vec2(
+        inverseBasis.x * line.x + inverseBasis.z * line.y,
+        inverseBasis.y * line.x + inverseBasis.w * line.y
+    );
+}
+
+// Smooth-union radius for two surfaces with normals na and nb:
+// k sin^2(theta / 2) = k (1 - cos theta) / 2, theta the angle between them.
+// Zero where the surfaces are aligned, such as the collinear sides of shapes
+// in a row, and the full blend where they face each other across a gap. A
+// plain smooth minimum lifts aligned edges near a join by up to k/4; this
+// keeps them straight while concave joins and bridges still round. On an
+// iOS 27 device, the necks of UIGlassContainerEffect and SwiftUI's
+// GlassEffectContainer give this radius within one percent.
 float angularBlendRadius(float k, vec2 na, vec2 nb) {
-    // Clamped because stretched shapes have gradients longer than 1; the
-    // empty-pixel budget in sceneBoundsOutsideSquared assumes k at most.
-    return k * min(0.5 * length(na - nb), 1.0);
+    // Divided by the lengths so only the angle counts: gradients of stretched
+    // shapes and of blended groups can be shorter than 1. The empty-pixel
+    // reach a strip's quad carries assumes a radius of k at most.
+    float cosine = dot(na, nb) / max(length(na) * length(nb), 1e-8);
+    return k * clamp(0.5 * (1.0 - cosine), 0.0, 1.0);
 }
 
 // Weight of the first operand in a polynomial smooth minimum of radius k. It
@@ -253,26 +163,42 @@ float smoothMinWeight(float a, float b, float k) {
     return clamp(0.5 + (b - a) / (2.0 * max(k, 1e-4)), 0.0, 1.0);
 }
 
-float getShapeCurvatureFactor(
-    float type,
-    vec2 localPoint,
-    vec2 size,
-    float rawRadius
-) {
-    if (type == 2.0) { // ellipse
-        return 1.0;
+int pairBottomRow(int index) {
+    return (MAX_SHAPES + index) * SQUIRCLE_ROW_VEC4S;
+}
+
+PairSplit pairSplit(int index) {
+    return PairSplit(
+        uRseData[index * SQUIRCLE_ROW_VEC4S + SQUIRCLE_AXES_AND_RADII].y,
+        uRseData[pairBottomRow(index) + SQUIRCLE_AXES_AND_RADII].y
+    );
+}
+
+// The bottom radius sits where the bottom half's half width would, which is
+// the top's (SquirclePairParameters.geometryBottomFloats).
+float pairBottomRadius(int index) {
+    return uRseData[pairBottomRow(index) + SQUIRCLE_AXES_AND_RADII].x;
+}
+
+// The half of pair [index] the local point p lies in: moves p to that half's
+// center on the split line and makes primitive that half's own squircle, its
+// box twice the half's height. Both halves are vertical at the sides on the
+// line, so the outline is continuous and exact there. Returns the half's first
+// uRseData row.
+int resolvePairHalf(int index, inout vec2 p, inout vec4 primitive) {
+    PairSplit split = pairSplit(index);
+    p = fromSplitLine(p, split);
+    if (p.y > 0.0) {
+        primitive = vec4(
+            SHAPE_SQUIRCLE,
+            primitive.y,
+            2.0 * split.below,
+            pairBottomRadius(index)
+        );
+        return pairBottomRow(index);
     }
-    vec2 halfSize = size * 0.5;
-    float radius = min(rawRadius, min(halfSize.x, halfSize.y));
-    if (radius <= 1e-4) {
-        return 0.0;
-    }
-    // Rounded rectangles, capsules, and Flutter's continuous rounded
-    // superellipse all share the same straight-to-corner support. A signed
-    // one-pixel transition avoids a hard lighting cutoff at the join while
-    // leaving the exact distance implementation unchanged.
-    vec2 cornerPosition = abs(localPoint) - (halfSize - radius);
-    return smoothstep(-1.0, 1.0, min(cornerPosition.x, cornerPosition.y));
+    primitive = vec4(SHAPE_SQUIRCLE, primitive.y, 2.0 * split.above, primitive.w);
+    return index * SQUIRCLE_ROW_VEC4S;
 }
 
 float getShapeDistance(
@@ -282,36 +208,39 @@ float getShapeDistance(
     vec4 inverseBasis,
     vec4 placement
 ) {
-    vec4 rseDegreeAndSpans = uRseData[index * 3];
-    vec4 rseCircleCenters = uRseData[index * 3 + 1];
-    vec4 rseSemiAxisAndRadii = uRseData[index * 3 + 2];
     vec2 delta = p - placement.xy;
     vec2 localPoint = vec2(
         inverseBasis.x * delta.x + inverseBasis.y * delta.y,
         inverseBasis.z * delta.x + inverseBasis.w * delta.y
     );
+    int rse = index * SQUIRCLE_ROW_VEC4S;
+    bool pair = primitive.x == SHAPE_SQUIRCLE_PAIR;
+    if (pair) {
+        rse = resolvePairHalf(index, localPoint, primitive);
+    }
+    vec4 rseDegreeAndSpans = uRseData[rse + SQUIRCLE_DEGREES_AND_SPANS];
+    vec4 rseCircleCenters = uRseData[rse + SQUIRCLE_CIRCLE_CENTERS];
+    vec4 rseSemiAxisAndRadii = uRseData[rse + SQUIRCLE_AXES_AND_RADII];
+    // Back from pairBottomRadius to the half width.
+    if (pair) {
+        rseSemiAxisAndRadii.x = 0.5 * primitive.y;
+    }
     float localDistance = getShapeSDF(
         primitive.x,
         localPoint,
-        vec2(0.0),
         primitive.yz,
         primitive.w,
         rseDegreeAndSpans,
         rseCircleCenters,
         rseSemiAxisAndRadii
     );
+    if (pair) {
+        localDistance = max(
+            localDistance,
+            -pairOtherEdge(localPoint, pairSplit(index)).distance
+        );
+    }
     return localDistance * placement.z;
-}
-
-float getShapeDistanceFromArray(int index, vec2 p) {
-    int baseIndex = index * 3;
-    return getShapeDistance(
-        index,
-        p,
-        uShapeData[baseIndex],
-        uShapeData[baseIndex + 1],
-        uShapeData[baseIndex + 2]
-    );
 }
 
 // Squared distance from p to the matte-space box around a primitive. The box
@@ -332,34 +261,46 @@ bool cannotAffectGroup(vec4 bounds, vec2 p, float reach) {
         : outsideSquared >= reach * reach;
 }
 
-// Squared outside distance for the complete scene plus its maximum possible
-// smooth-union expansion. Comparing squared values avoids one square root per
-// shape in the empty-pixel fast path.
-vec2 sceneBoundsOutsideSquared(vec2 p, int numShapes) {
+// Squared distance from p to the nearest box of the count shapes from row
+// first. Comparing squared values avoids one square root per shape in the
+// empty-pixel fast path.
+//
+// Rows are masked to the block here and below: a software GPU runs both
+// sides of a branch, the side not taken on whatever its inputs decode to.
+float sceneBoundsOutsideSquared(vec2 p, int first, int count) {
     float lowerBoundSquared = 1e18;
-    float smoothingBudget = 0.0;
-    int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
+    int shapeCount = count < MAX_SHAPES ? count : MAX_SHAPES;
     for (int i = 0; i < MAX_SHAPES; i++) {
         if (i >= shapeCount) break;
-        vec4 bounds = uShapeBounds[i];
         lowerBoundSquared = min(
             lowerBoundSquared,
-            shapeBoundsDistanceSquared(bounds, p)
+            shapeBoundsDistanceSquared(uShapeBounds[(first + i) & SHAPE_INDEX_MASK], p)
         );
-        float marker = uShapeData[i * 3 + 2].w;
-        if (marker >= 0.0) {
-            smoothingBudget += marker * 0.25;
-        }
     }
-    return vec2(lowerBoundSquared, smoothingBudget);
+    return lowerBoundSquared;
+}
+
+// The same over the shapes a strip lists (listedSceneSample).
+float listedBoundsOutsideSquared(vec2 p, vec4 members) {
+    float lowerBoundSquared = 1e18;
+    for (int slot = 0; slot < 4; slot++) {
+        float member = members[slot];
+        if (member >= MEMBER_NONE) break;
+        int i = int(member) & SHAPE_INDEX_MASK;
+        lowerBoundSquared = min(
+            lowerBoundSquared,
+            shapeBoundsDistanceSquared(uShapeBounds[i], p)
+        );
+    }
+    return lowerBoundSquared;
 }
 
 // A single shape is never blended, so it skips the exact-corner gradient.
 SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
-    int baseIndex = index * 3;
-    vec4 primitive = uShapeData[baseIndex];
-    vec4 inverseBasis = uShapeData[baseIndex + 1];
-    vec4 placement = uShapeData[baseIndex + 2];
+    int baseIndex = index * SHAPE_ROW_VEC4S;
+    vec4 primitive = uShapeData[baseIndex + SHAPE_PRIMITIVE];
+    vec4 inverseBasis = uShapeData[baseIndex + SHAPE_INVERSE_BASIS];
+    vec4 placement = uShapeData[baseIndex + SHAPE_PLACEMENT];
     SceneSample resultSample;
     resultSample.distance = getShapeDistance(
         index,
@@ -368,31 +309,65 @@ SceneSample getShapeSampleFromArray(int index, vec2 p, bool blended) {
         inverseBasis,
         placement
     );
+#ifdef SHAPE_ALONE
     // The placement scale is the same scale applied to the signed distance,
     // so this is the shape's local half-minor extent in scene pixels. Keeping
     // it beside the SDF avoids a second traversal and lets optical spread be
     // shape-relative rather than thickness-relative.
     resultSample.halfMinor = 0.5 * min(primitive.y, primitive.z) * placement.z;
-    // Lighting depth is shape-class aware but constant within a primitive.
-    // Per-fragment rounded-rect curvature regions expose their medial/sector
-    // boundaries as rectangular or V-shaped shading seams. Ellipses need the
-    // deeper size response observed in the circle holdout; rounded and
-    // continuous-superellipse primitives use the shallower response. Smooth
-    // unions interpolate this value below.
-    resultSample.curvatureFactor = primitive.x == 2.0 ? 1.0 : 0.0;
+#else
+    // The same of the smallest shape this one blends with: iOS 27 sizes the
+    // lens of every glass in a container by its smallest.
+    resultSample.halfMinor = uShapeLens[index].x;
+#endif
     vec2 delta = p - placement.xy;
+    vec2 localPoint = vec2(
+        inverseBasis.x * delta.x + inverseBasis.y * delta.y,
+        inverseBasis.z * delta.x + inverseBasis.w * delta.y
+    );
+#ifndef SHAPE_ALONE
+    vec2 lean = leanToCenter(
+        localPoint,
+        primitive.yz,
+        inverseBasis,
+        placement.z,
+        uShapeLens[index].y
+    );
+#endif
+    bool pair = primitive.x == SHAPE_SQUIRCLE_PAIR;
+    if (pair) {
+        resolvePairHalf(index, localPoint, primitive);
+    }
     vec4 gradients = getShapeGradients(
         primitive,
         inverseBasis,
         placement.z,
-        vec2(
-            inverseBasis.x * delta.x + inverseBasis.y * delta.y,
-            inverseBasis.z * delta.x + inverseBasis.w * delta.y
-        ),
+        localPoint,
         blended
     );
+    if (pair) {
+        // Where the other half's edge sets the depth, it sets the normal too.
+        PairEdge edge = pairOtherEdge(localPoint, pairSplit(index));
+        if (edge.distance * placement.z <= -resultSample.distance + 1e-4) {
+            vec2 normal = mat2(
+                inverseBasis.x, inverseBasis.y,
+                inverseBasis.z, inverseBasis.w
+            ) * edge.normal * placement.z;
+            gradients = vec4(normal, normal);
+        }
+    }
     resultSample.normal = gradients.xy;
+#ifdef SHAPE_ALONE
     resultSample.opticalNormal = gradients.zw;
+#else
+    // As long as it was: a smooth union reads how long the gradients are.
+    resultSample.opticalNormal = uShapeLens[index].y > 0.0
+        ? normalize(gradients.zw + lean) * length(gradients.zw)
+        : gradients.zw;
+#endif
+#if SCENE_LOOKS
+    resultSample.look = lookAt(index);
+#endif
     return resultSample;
 }
 
@@ -404,17 +379,12 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
     float e = max(blend - abs(a.distance - b.distance), 0.0);
     float distance = min(a.distance, b.distance) -
         e * e * 0.25 / max(blend, 1e-4);
-    // Follow the same bounded smooth-min blend used for the distance field so
-    // the shape-relative profile remains continuous at a smooth group seam.
+    // Weighted over the union's full radius, so the shape-relative profile
+    // and the look stay continuous across a smooth group seam.
     float weightA = smoothMinWeight(a.distance, b.distance, k);
     SceneSample result;
     result.distance = distance;
     result.halfMinor = mix(b.halfMinor, a.halfMinor, weightA);
-    result.curvatureFactor = mix(
-        b.curvatureFactor,
-        a.curvatureFactor,
-        weightA
-    );
     // The distance's gradient splits by the smooth minimum's own weight. Not
     // renormalized, so it shortens at a bridge's saddle like the distance
     // field's gradient does.
@@ -425,35 +395,96 @@ SceneSample smoothUnionSample(SceneSample a, SceneSample b, float k) {
         a.opticalNormal,
         gradientWeightA
     );
+#if SCENE_LOOKS
+    result.look = mixLooks(a.look, b.look, weightA);
+#endif
     return result;
 }
 
-SceneSample sceneSample(vec2 p, int numShapes) {
+// The scene of the count shapes from row first, in chain order.
+SceneSample sceneSample(vec2 p, int first, int count) {
     SceneSample empty;
     empty.distance = 1e9;
     empty.halfMinor = 0.0;
-    empty.curvatureFactor = 0.0;
     empty.normal = vec2(0.0);
     empty.opticalNormal = vec2(0.0);
-    if (numShapes <= 0) {
+#if SCENE_LOOKS
+    empty.look = Look(vec4(0.0), vec4(0.0), vec4(0.0));
+#endif
+    if (count <= 0) {
         return empty;
     }
-    if (numShapes == 1) {
-        return getShapeSampleFromArray(0, p, false);
+    if (count == 1) {
+        return getShapeSampleFromArray(first & SHAPE_INDEX_MASK, p, false);
     }
-    
+
     SceneSample result = empty;
     SceneSample groupResult = empty;
-    int shapeCount = numShapes < MAX_SHAPES ? numShapes : MAX_SHAPES;
-    for (int i = 0; i < MAX_SHAPES; i++) {
-        if (i >= shapeCount) break;
-        float marker = uShapeData[i * 3 + 2].w;
+    int shapeCount = count < MAX_SHAPES ? count : MAX_SHAPES;
+    for (int n = 0; n < MAX_SHAPES; n++) {
+        if (n >= shapeCount) break;
+        int i = (first + n) & SHAPE_INDEX_MASK;
+        float marker = uShapeData[i * SHAPE_ROW_VEC4S + SHAPE_PLACEMENT].w;
         bool startsGroup = marker < 0.0;
         float groupBlend = startsGroup ? -marker - 1.0 : marker;
         // Once a group has an exact candidate, an enclosing-box lower bound
         // beyond its smooth-union support proves this primitive cannot affect
         // the result. This avoids the much more expensive RSE/ellipse solve
         // for distant shapes while retaining original evaluation order.
+        if (
+            !startsGroup &&
+            cannotAffectGroup(
+                uShapeBounds[i],
+                p,
+                groupResult.distance + groupBlend
+            )
+        ) {
+            continue;
+        }
+        SceneSample shapeValue = getShapeSampleFromArray(i, p, true);
+        if (startsGroup) {
+            result = result.distance < groupResult.distance ? result : groupResult;
+            groupResult = shapeValue;
+        } else {
+            groupResult = smoothUnionSample(
+                groupResult,
+                shapeValue,
+                groupBlend
+            );
+        }
+    }
+    return result.distance <= groupResult.distance ? result : groupResult;
+}
+
+// The scene of the up to four shapes a strip lists, in chain order: each
+// member a shape's row. The tiler lists every shape that
+// changes the scene anywhere on the strip (geometry_tiling.dart), so this
+// is sceneSample without the shapes that leave it as it is.
+SceneSample listedSceneSample(vec2 p, vec4 members) {
+    if (members.y >= MEMBER_NONE) {
+        return getShapeSampleFromArray(
+            int(members.x) & SHAPE_INDEX_MASK,
+            p,
+            false
+        );
+    }
+    SceneSample empty;
+    empty.distance = 1e9;
+    empty.halfMinor = 0.0;
+    empty.normal = vec2(0.0);
+    empty.opticalNormal = vec2(0.0);
+#if SCENE_LOOKS
+    empty.look = Look(vec4(0.0), vec4(0.0), vec4(0.0));
+#endif
+    SceneSample result = empty;
+    SceneSample groupResult = empty;
+    for (int slot = 0; slot < 4; slot++) {
+        float member = members[slot];
+        if (member >= MEMBER_NONE) break;
+        bool startsGroup = member >= MEMBER_STARTS_GROUP;
+        int i = int(member) & SHAPE_INDEX_MASK;
+        float marker = uShapeData[i * SHAPE_ROW_VEC4S + SHAPE_PLACEMENT].w;
+        float groupBlend = marker < 0.0 ? -marker - 1.0 : marker;
         if (
             !startsGroup &&
             cannotAffectGroup(

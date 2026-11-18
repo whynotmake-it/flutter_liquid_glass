@@ -1,19 +1,18 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
 void main() {
-  setUp(pinPlainBackdropPath);
   // 6 device px of frost at 3x: nonzero, so the filter composes a blur
   // pass.
-  const blurred = LiquidGlassSettings(highlight: 0);
+  const blurred = LiquidGlassSettings(glintStrength: 0);
 
   const glass = LiquidGlass(
-    shape: LiquidRoundedSuperellipse(borderRadius: 40),
+    shape: LiquidRoundedSuperellipse(radius: 40),
     child: SizedBox(width: 160, height: 110),
   );
 
@@ -125,13 +124,15 @@ void main() {
           tester,
           clipped(
             LiquidGlassLayer(
-              settings: LiquidGlassSettings(highlight: 0, frost: frost),
+              settings: LiquidGlassSettings(
+                glintStrength: 0,
+                frost: LiquidGlassFrost.sigma(frost),
+              ),
               child: glass,
             ),
           ),
         );
         final layer = glassLayer(tester);
-        expect(layer.blurPassSigma, 0);
         expect(layer.debugBackdropSampleBounds, layer.debugFilterBounds);
       },
       skip: skipProperGlassTests,

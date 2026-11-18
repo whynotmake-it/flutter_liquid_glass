@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
-import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
-import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
+import 'package:liquid_glass_renderer/src/rendering/appearance.dart';
+import 'package:liquid_glass_renderer/src/rendering/fake_glass_color.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
-import 'package:liquid_glass_renderer/src/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/shader_programs.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 import 'submitted_scene_binding.dart';
@@ -39,11 +39,8 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           ..devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         await tester.runAsync(
-          () => MultiShaderBuilder.precacheShaders([
+          () => GlassShaderPrograms.precacheShaders([
             ShaderKeys.fakeGlassSurface,
-            ShaderKeys.liquidGlassRender,
-            ShaderKeys.liquidGlassMaterialRender,
-            ShaderKeys.liquidGlassTintRender,
           ]),
         );
         final opacity = AnimationController(vsync: tester, value: 1);
@@ -55,7 +52,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           builder: (_, value, child) => Opacity(opacity: value, child: child),
         );
         const shape = LiquidGlass(
-          shape: LiquidRoundedRectangle(borderRadius: 20),
+          shape: LiquidRoundedRectangle(radius: 20),
           child: SizedBox(
             width: 160,
             height: 100,
@@ -74,12 +71,16 @@ void runOpacityTests(SubmittedSceneCapture binding) {
             child: BackdropFilter(
               filter: kind == 'native'
                   ? ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8)
-                  : fakeGlassBackdropFilter(
-                      const LiquidGlassSettings(frost: 8),
-                      LiquidGlassAppearance.ios27Regular(
-                        brightness: Brightness.light,
+                  : fakeGlassBackdropFilterParts(
+                      FakeGlassLook.of(
+                        const LiquidGlassSettings(
+                          frost: LiquidGlassFrost.sigma(8),
+                        ),
                       ),
-                    )!,
+                      const LiquidGlassAppearance.ios27Regular(
+                        brightness: Brightness.light,
+                      ).wornByNone,
+                    )!.full,
               child: kind == 'nativeMaterial'
                   ? const SizedBox(
                       width: 160,
@@ -112,8 +113,8 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           final layer = LiquidGlassLayer(
             fake: kind == 'fake',
             settings: const LiquidGlassSettings(
-              frost: 8,
-              highlight: 0,
+              frost: LiquidGlassFrost.sigma(8),
+              glintStrength: 0,
             ),
             child: shape,
           );
@@ -160,7 +161,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         final renderer = kind == 'real'
             ? tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last
             : null;
-        final geometryCount = renderer?.gpuGeometryRenderer?.debugRenderCount;
+        final geometryCount = renderer?.gpuGeometryRenderer.debugRenderCount;
         final almost = await capture(254 / 255);
         final half = await capture(0.5);
         final zero = await capture(0);
@@ -173,7 +174,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
         expect(restorationError, lessThanOrEqualTo(3));
         if (renderer != null) {
           expect(
-            renderer.gpuGeometryRenderer?.debugRenderCount,
+            renderer.gpuGeometryRenderer.debugRenderCount,
             geometryCount,
           );
         }
@@ -209,22 +210,14 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           reason:
               'Opacity must actually fade the material, not just its child.',
         );
-        // Glass under a fractional opacity paints without its native seed
-        // (a seed's pass is only planned in the root pass), so at 255/255 the
-        // seeded fake glass cuts its outline by clearing the pass outside it,
-        // which antialiases a few pixels of a rounded corner differently from
-        // the clip the plain path uses (9 levels on 4 pixels on Metal, see
-        // `native_seed_parity_test.dart`). Everything else is continuous.
-        final seededOutline =
-            kind == 'fake' && SeededBackdropPassLayer.mode != BackdropSeed.none;
         expect(
           maxJump,
-          lessThanOrEqualTo(seededOutline ? 16 : 3),
+          lessThanOrEqualTo(3),
           reason: 'Discontinuity at opaque; half-opacity error=$halfError',
         );
         expect(
           jumpsOverThree,
-          lessThanOrEqualTo(seededOutline ? 16 : 0),
+          lessThanOrEqualTo(0),
           reason: 'Only a few outline pixels may jump at opaque',
         );
         expect(
@@ -233,7 +226,7 @@ void runOpacityTests(SubmittedSceneCapture binding) {
           reason: 'Zero opacity must leave only the backdrop.',
         );
         // The same outline pixels, halved: `full` is one end of the blend.
-        expect(halfError, lessThanOrEqualTo(seededOutline ? 8 : 3));
+        expect(halfError, lessThanOrEqualTo(3));
       },
       skip:
           (kind == 'real' && skipProperGlassTests) ||

@@ -1,292 +1,330 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/rendering/read.dart';
 
 import 'shared.dart';
 
 void main() {
-  setUp(pinPlainBackdropPath);
-  RenderLiquidGlassLayer findLayer(WidgetTester tester) {
-    return tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
-  }
+  // The filter kept here is the backdrop filter of glass that reads its
+  // backdrop; glass that reads a copy draws it through the read's filter.
+  group('glass reading its backdrop', () {
+    setUp(() {
+      final readsCopies = glassReadsCopies;
+      glassReadsCopies = false;
+      addTearDown(() => glassReadsCopies = readsCopies);
+    });
 
-  Widget glass({
-    LiquidGlassSettings settings = const LiquidGlassSettings(),
-    LiquidGlassAppearance? appearance,
-  }) {
-    return CupertinoApp(
-      home: LiquidGlassLayer(
-        settings: settings,
-        child: LiquidGlass(
-          shape: const LiquidOval(),
-          appearance: appearance,
-          child: const SizedBox.square(dimension: 80),
+    RenderLiquidGlassLayer findLayer(WidgetTester tester) {
+      return tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
+    }
+
+    Widget glass({
+      LiquidGlassSettings settings = const LiquidGlassSettings(),
+      LiquidGlassAppearance? appearance,
+    }) {
+      return CupertinoApp(
+        home: LiquidGlassLayer(
+          settings: settings,
+          child: LiquidGlass(
+            shape: const LiquidOval(),
+            appearance: appearance,
+            child: const SizedBox.square(dimension: 80),
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  testWidgets(
-    'uniform visibility animation reuses cached geometry',
-    (tester) async {
-      final visibility = ValueNotifier<double>(1);
-      addTearDown(visibility.dispose);
-      await tester.pumpWidget(
-        CupertinoApp(
-          home: LiquidGlassLayer(
-            child: ValueListenableBuilder<double>(
-              valueListenable: visibility,
-              child: const LiquidGlass(
-                shape: LiquidOval(),
-                child: SizedBox.square(dimension: 80),
-              ),
-              builder: (_, value, child) => LiquidGlassVisibility(
-                visibility: value,
-                child: child!,
+    testWidgets(
+      'uniform visibility animation reuses cached geometry',
+      (tester) async {
+        final visibility = ValueNotifier<double>(1);
+        addTearDown(visibility.dispose);
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: LiquidGlassLayer(
+              child: ValueListenableBuilder<double>(
+                valueListenable: visibility,
+                child: const LiquidGlass(
+                  shape: LiquidOval(),
+                  child: SizedBox.square(dimension: 80),
+                ),
+                builder: (_, value, child) => LiquidGlassVisibility(
+                  visibility: value,
+                  child: child!,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final layer = findLayer(tester);
-      final renderer = layer.gpuGeometryRenderer!;
-      final count = renderer.debugRenderCount;
-      for (var frame = 1; frame <= 30; frame++) {
-        visibility.value = 1 - frame / 32;
-        await tester.pump(const Duration(milliseconds: 16));
-        expect(
-          renderer.debugRenderCount,
-          count,
-          reason: 'Uniform material changes must not regenerate the SDF.',
         );
-      }
-    },
-    skip: skipProperGlassTests,
-  );
+        await tester.pumpAndSettle();
+        final layer = findLayer(tester);
+        final renderer = layer.gpuGeometryRenderer;
+        final count = renderer.debugRenderCount;
+        for (var frame = 1; frame <= 30; frame++) {
+          visibility.value = 1 - frame / 32;
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            renderer.debugRenderCount,
+            count,
+            reason: 'Uniform material changes must not regenerate the SDF.',
+          );
+        }
+      },
+      skip: skipProperGlassTests,
+    );
 
-  testWidgets(
-    'backdrop-only animation reuses cached geometry and filter',
-    (tester) async {
-      final backdrop = ValueNotifier(const Color(0xFF102030));
-      addTearDown(backdrop.dispose);
-      await tester.pumpWidget(
-        CupertinoApp(
-          home: Stack(
-            children: [
-              Positioned.fill(
-                child: ValueListenableBuilder<Color>(
-                  valueListenable: backdrop,
-                  builder: (_, color, _) => ColoredBox(color: color),
-                ),
-              ),
-              const Center(
-                child: LiquidGlassLayer(
-                  child: LiquidGlass(
-                    shape: LiquidOval(),
-                    child: SizedBox.square(dimension: 80),
+    testWidgets(
+      'backdrop-only animation reuses cached geometry and filter',
+      (tester) async {
+        final backdrop = ValueNotifier(const Color(0xFF102030));
+        addTearDown(backdrop.dispose);
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: Stack(
+              children: [
+                Positioned.fill(
+                  child: ValueListenableBuilder<Color>(
+                    valueListenable: backdrop,
+                    builder: (_, color, _) => ColoredBox(color: color),
                   ),
                 ),
-              ),
-            ],
+                const Center(
+                  child: LiquidGlassLayer(
+                    child: LiquidGlass(
+                      shape: LiquidOval(),
+                      child: SizedBox.square(dimension: 80),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final layer = findLayer(tester);
-      final renderer = layer.gpuGeometryRenderer!;
-      final count = renderer.debugRenderCount;
-      final filter = layer.debugBackdropFilterLayer?.filter;
-      expect(filter, isNotNull);
-      for (var frame = 0; frame < 30; frame++) {
-        backdrop.value = Color(0xFF102031 + frame * 0x010101);
-        await tester.pump(const Duration(milliseconds: 16));
-        expect(renderer.debugRenderCount, count);
-        expect(layer.debugBackdropFilterLayer?.filter, same(filter));
-      }
-    },
-    skip: skipProperGlassTests,
-  );
+        );
+        await tester.pumpAndSettle();
+        final layer = findLayer(tester);
+        final renderer = layer.gpuGeometryRenderer;
+        final count = renderer.debugRenderCount;
+        final filter = layer.debugBackdropFilterLayer?.filter;
+        expect(filter, isNotNull);
+        for (var frame = 0; frame < 30; frame++) {
+          backdrop.value = Color(0xFF102031 + frame * 0x010101);
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(renderer.debugRenderCount, count);
+          expect(layer.debugBackdropFilterLayer?.filter, same(filter));
+        }
+      },
+      skip: skipProperGlassTests,
+    );
 
-  testWidgets(
-    'reuses the composed filter while shader inputs are unchanged',
-    (tester) async {
-      await tester.pumpWidget(glass());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'reuses the composed filter while shader inputs are unchanged',
+      (tester) async {
+        await tester.pumpWidget(glass());
+        await tester.pumpAndSettle();
 
-      final renderObject = findLayer(tester);
-      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
-      expect(firstFilter, isNotNull);
-      expect(
-        renderObject.debugBackdropFilterLayer?.parent,
-        isA<ClipRectLayer>(),
-        reason: 'The material filter remains directly clipped.',
-      );
+        final renderObject = findLayer(tester);
+        final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+        expect(firstFilter, isNotNull);
+        expect(
+          renderObject.debugBackdropFilterLayer?.parent,
+          isA<ClipRectLayer>(),
+          reason: 'The material filter remains directly clipped.',
+        );
 
-      // A repaint with identical geometry, transform, and settings must not
-      // allocate new filters: the native filter snapshots the shader uniforms
-      // at creation, so reuse is only valid while all inputs are unchanged.
-      renderObject.markNeedsPaint();
-      await tester.pump();
+        // A repaint with identical geometry, transform, and settings must not
+        // allocate new filters: the native filter snapshots the shader uniforms
+        // at creation, so reuse is only valid while all inputs are unchanged.
+        renderObject.markNeedsPaint();
+        await tester.pump();
 
-      expect(
-        renderObject.debugBackdropFilterLayer?.filter,
-        same(firstFilter),
-      );
-    },
-    skip: skipProperGlassTests,
-  );
+        expect(
+          renderObject.debugBackdropFilterLayer?.filter,
+          same(firstFilter),
+        );
+      },
+      skip: skipProperGlassTests,
+    );
 
-  testWidgets(
-    'material updates preserve filter clipping and reuse unchanged geometry',
-    (tester) async {
-      await tester.pumpWidget(glass());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'material updates preserve filter clipping and reuse unchanged geometry',
+      (tester) async {
+        await tester.pumpWidget(glass());
+        await tester.pumpAndSettle();
 
-      final renderObject = findLayer(tester);
-      expect(
-        renderObject.debugBackdropFilterLayer?.parent,
-        isA<ClipRectLayer>(),
-      );
-      final firstGeometry = renderObject.gpuGeometryRenderer?.debugRenderCount;
+        final renderObject = findLayer(tester);
+        expect(
+          renderObject.debugBackdropFilterLayer?.parent,
+          isA<ClipRectLayer>(),
+        );
+        final firstGeometry = renderObject.gpuGeometryRenderer.debugRenderCount;
 
-      renderObject.markNeedsPaint();
-      await tester.pump();
+        renderObject.markNeedsPaint();
+        await tester.pump();
 
-      expect(
-        renderObject.debugBackdropFilterLayer?.parent,
-        isA<ClipRectLayer>(),
-      );
-      expect(renderObject.gpuGeometryRenderer?.debugRenderCount, firstGeometry);
+        expect(
+          renderObject.debugBackdropFilterLayer?.parent,
+          isA<ClipRectLayer>(),
+        );
+        expect(
+          renderObject.gpuGeometryRenderer.debugRenderCount,
+          firstGeometry,
+        );
 
-      await tester.pumpWidget(
-        glass(
-          settings: const LiquidGlassSettings(frost: 8),
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          glass(
+            settings: const LiquidGlassSettings(
+              frost: LiquidGlassFrost.sigma(8),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(
-        renderObject.debugBackdropFilterLayer?.parent,
-        isA<ClipRectLayer>(),
-      );
-    },
-    skip: skipProperGlassTests,
-  );
+        expect(
+          renderObject.debugBackdropFilterLayer?.parent,
+          isA<ClipRectLayer>(),
+        );
+      },
+      skip: skipProperGlassTests,
+    );
 
-  testWidgets(
-    'rebuilds the filter when settings change the shader uniforms',
-    (tester) async {
-      await tester.pumpWidget(glass());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'rebuilds the filter only when settings change the shader uniforms',
+      (tester) async {
+        await tester.pumpWidget(glass());
+        await tester.pumpAndSettle();
 
-      final renderObject = findLayer(tester);
-      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
-      expect(firstFilter, isNotNull);
+        final renderObject = findLayer(tester);
+        final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+        expect(firstFilter, isNotNull);
 
-      await tester.pumpWidget(
-        glass(settings: const LiquidGlassSettings(frost: 8)),
-      );
-      await tester.pumpAndSettle();
+        // The default frost passed explicitly: other settings, the same
+        // uniforms and blur.
+        await tester.pumpWidget(
+          glass(
+            settings: const LiquidGlassSettings(
+              frost: LiquidGlassFrost.sigma(8),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          renderObject.debugBackdropFilterLayer?.filter,
+          same(firstFilter),
+        );
 
-      final rebuilt = renderObject.debugBackdropFilterLayer?.filter;
-      expect(rebuilt, isNotNull);
-      expect(rebuilt, isNot(same(firstFilter)));
-    },
-    skip: skipProperGlassTests,
-  );
+        await tester.pumpWidget(
+          glass(
+            settings: const LiquidGlassSettings(
+              frost: LiquidGlassFrost.sigma(8),
+              glintStrength: 0.3,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-  testWidgets(
-    'snapshots new coordinates without rerendering geometry on ancestor motion',
-    (tester) async {
-      Widget movedGlass(Offset offset) => CupertinoApp(
-        home: Transform.translate(
-          offset: offset,
-          child: glass(),
-        ),
-      );
+        final rebuilt = renderObject.debugBackdropFilterLayer?.filter;
+        expect(rebuilt, isNotNull);
+        expect(rebuilt, isNot(same(firstFilter)));
+      },
+      skip: skipProperGlassTests,
+    );
 
-      await tester.pumpWidget(movedGlass(Offset.zero));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'snapshots new coordinates without rerendering geometry on ancestor '
+      'motion',
+      (tester) async {
+        Widget movedGlass(Offset offset) => CupertinoApp(
+          home: Transform.translate(
+            offset: offset,
+            child: glass(),
+          ),
+        );
 
-      final renderObject = findLayer(tester);
-      final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
-      expect(firstFilter, isNotNull);
+        await tester.pumpWidget(movedGlass(Offset.zero));
+        await tester.pumpAndSettle();
 
-      final geometryPasses = renderObject.gpuGeometryRenderer!.debugRenderCount;
+        final renderObject = findLayer(tester);
+        final firstFilter = renderObject.debugBackdropFilterLayer?.filter;
+        expect(firstFilter, isNotNull);
 
-      await tester.pumpWidget(movedGlass(const Offset(12, 8)));
-      // The geometry stays retained, but each native filter must capture its
-      // own coordinates instead of mutating an older frame's shared texture.
-      tester.binding.scheduleFrame();
-      await tester.pump();
+        final geometryPasses =
+            renderObject.gpuGeometryRenderer.debugRenderCount;
 
-      expect(
-        renderObject.debugBackdropFilterLayer?.filter,
-        isNot(same(firstFilter)),
-      );
-      expect(
-        renderObject.gpuGeometryRenderer!.debugRenderCount,
-        geometryPasses,
-      );
-    },
-    skip: skipProperGlassTests,
-  );
+        await tester.pumpWidget(movedGlass(const Offset(12, 8)));
+        // The geometry stays retained, but each native filter must capture its
+        // own coordinates instead of mutating an older frame's shared texture.
+        tester.binding.scheduleFrame();
+        await tester.pump();
 
-  testWidgets(
-    'drops the backdrop filter while the sample is idle',
-    (tester) async {
-      await tester.pumpWidget(glass());
-      await tester.pumpAndSettle();
+        expect(
+          renderObject.debugBackdropFilterLayer?.filter,
+          isNot(same(firstFilter)),
+        );
+        expect(
+          renderObject.gpuGeometryRenderer.debugRenderCount,
+          geometryPasses,
+        );
+      },
+      skip: skipProperGlassTests,
+    );
 
-      final renderObject = findLayer(tester);
-      expect(renderObject.debugBackdropFilterLayer, isNotNull);
-      final initialRenders = renderObject.gpuGeometryRenderer!.debugRenderCount;
+    testWidgets(
+      'drops the backdrop filter while the sample is idle',
+      (tester) async {
+        await tester.pumpWidget(glass());
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        glass(appearance: const LiquidGlassAppearance(visibility: 0)),
-      );
-      await tester.pumpAndSettle();
+        final renderObject = findLayer(tester);
+        expect(renderObject.debugBackdropFilterLayer, isNotNull);
+        final initialRenders =
+            renderObject.gpuGeometryRenderer.debugRenderCount;
 
-      expect(renderObject.debugBackdropFilterLayer, isNull);
-      expect(
-        renderObject.gpuGeometryRenderer!.debugRenderCount,
-        initialRenders,
-      );
+        await tester.pumpWidget(
+          glass(appearance: const LiquidGlassAppearance(visibility: 0)),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(glass());
-      await tester.pumpAndSettle();
+        expect(renderObject.debugBackdropFilterLayer, isNull);
+        expect(
+          renderObject.gpuGeometryRenderer.debugRenderCount,
+          initialRenders,
+        );
 
-      expect(renderObject.debugBackdropFilterLayer, isNotNull);
-    },
-    skip: skipProperGlassTests,
-  );
+        await tester.pumpWidget(glass());
+        await tester.pumpAndSettle();
 
-  testWidgets(
-    'keeps geometry matte bounds in layer space across ancestor motion',
-    (tester) async {
-      Widget movedGlass(Offset offset) => CupertinoApp(
-        home: Transform.translate(
-          offset: offset,
-          child: glass(),
-        ),
-      );
+        expect(renderObject.debugBackdropFilterLayer, isNotNull);
+      },
+      skip: skipProperGlassTests,
+    );
 
-      await tester.pumpWidget(movedGlass(Offset.zero));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'keeps buffer bounds in layer space across ancestor motion',
+      (tester) async {
+        Widget movedGlass(Offset offset) => CupertinoApp(
+          home: Transform.translate(
+            offset: offset,
+            child: glass(),
+          ),
+        );
 
-      final renderObject = findLayer(tester);
-      final matteBounds = renderObject.debugGeometryMatteBounds;
-      expect(matteBounds, isNot(Rect.zero));
+        await tester.pumpWidget(movedGlass(Offset.zero));
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(movedGlass(const Offset(40, -18)));
-      tester.binding.scheduleFrame();
-      await tester.pump();
+        final renderObject = findLayer(tester);
+        final bufferBounds = renderObject.debugBufferBounds;
+        expect(bufferBounds, isNot(Rect.zero));
 
-      expect(renderObject.debugGeometryMatteBounds, matteBounds);
-    },
-    skip: skipProperGlassTests,
-  );
+        await tester.pumpWidget(movedGlass(const Offset(40, -18)));
+        tester.binding.scheduleFrame();
+        await tester.pump();
+
+        expect(renderObject.debugBufferBounds, bufferBounds);
+      },
+      skip: skipProperGlassTests,
+    );
+  });
 }

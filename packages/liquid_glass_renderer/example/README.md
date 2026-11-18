@@ -5,10 +5,10 @@ root with:
 
 ```sh
 cd packages/liquid_glass_renderer/example
-fvm flutter run -d macos
+flutter run --enable-impeller --enable-flutter-gpu -d macos
 ```
 
-Use `fvm flutter devices` to pick an iOS or Android Impeller device instead of
+Use `flutter devices` to pick an iOS or Android Impeller device instead of
 `macos`.
 
 The stage fills the window and shows glass over backdrops that page
@@ -23,23 +23,22 @@ past its top drags it closed. The sheet controls:
 - **Scene**: everyday controls, shapes that merge in a `LiquidGlassBlendGroup`,
   light, dark, clear and tinted glass blending in one layer, and
   `LiquidGlassLoupe`s magnifying the backdrop.
-- **Material**: the Regular, Toolbar, Clear and Loupe presets in light or
+- **Material**: the Regular, Clear and Loupe presets in light or
   dark. The Liquid Glass slider sets
-  `LiquidGlassSettings.tintAmount` and the preset's blur
-  (`ios27RegularFrost`, `ios27ClearFrost`). The loupe ignores it, as on iOS.
+  `LiquidGlassSettings.sliderPosition`, which the preset's frost and haze
+  follow. The loupe ignores it, as on iOS.
 - **FakeGlass** instead of the full renderer, plus **Refraction** and
   **Lighting** controls. **Copy as Dart** puts the current
   `LiquidGlassSettings` on the clipboard.
 
-Interactive glass shows the package's `GlassGlow` under the pointer. All glass
-on the stage, including the settings button, renders in a single
+All glass on the stage, including the settings button, renders in a single
 `LiquidGlassLayer`; each loupe brings its own. The sheet has no glass and only
 exists while it is open.
 
 For a deterministic grid backdrop and a fixed blur (useful for screenshots):
 
 ```sh
-fvm flutter run -d macos \
+flutter run -d macos \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BACKGROUND=true \
   --dart-define=LIQUID_GLASS_EXAMPLE_TEST_BLUR=0
 ```

@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
@@ -17,13 +17,17 @@ class ColorsScene extends StatelessWidget {
       label: 'Light',
       offset: Offset(-50, -50),
       glyph: Color(0xFF000000),
-      appearance: LiquidGlassAppearance.ios27RegularLight(),
+      appearance: LiquidGlassAppearance.ios27Regular(
+        brightness: Brightness.light,
+      ),
     ),
     (
       label: 'Dark',
       offset: Offset(50, -50),
       glyph: Color(0xFFFFFFFF),
-      appearance: LiquidGlassAppearance.ios27RegularDark(),
+      appearance: LiquidGlassAppearance.ios27Regular(
+        brightness: Brightness.dark,
+      ),
     ),
     (
       label: 'Clear',
@@ -35,7 +39,8 @@ class ColorsScene extends StatelessWidget {
       label: 'Blue',
       offset: Offset(50, 50),
       glyph: Color(0xFFFFFFFF),
-      appearance: LiquidGlassAppearance.ios27RegularLight(
+      appearance: LiquidGlassAppearance.ios27Regular(
+        brightness: Brightness.light,
         tint: Color(0xFF0A84FF),
       ),
     ),
@@ -58,7 +63,6 @@ class ColorsScene extends StatelessWidget {
                   offset: swatch.offset,
                   size: const Size.square(108),
                   shape: const LiquidOval(),
-                  grouped: true,
                   appearance: swatch.appearance,
                   child: Text(
                     swatch.label,

@@ -1,10 +1,15 @@
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
+import 'package:liquid_glass_renderer/src/plan/plan.dart';
+import 'package:liquid_glass_renderer/src/plan/plan_result.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_composer.dart';
+import 'package:liquid_glass_renderer/src/rendering/glass_form.dart';
+import 'package:liquid_glass_renderer/src/rendering/transform_tracking_render_object_mixin.dart';
+import 'package:material_ui/material_ui.dart';
 
 const expectFlutterGpuFallback = bool.fromEnvironment(
   'EXPECT_FLUTTER_GPU_FALLBACK',
@@ -19,6 +24,21 @@ bool get skipProperGlassTests =>
 /// empty variant.
 bool get skipGoldenTests => skipProperGlassTests || !Platform.isMacOS;
 
+void expectGeneratedFile(String path, String text) {
+  final file = File(path);
+  if (const bool.fromEnvironment('UPDATE_SHADER_CONSTANTS')) {
+    file.writeAsStringSync(text);
+    return;
+  }
+  expect(
+    file.readAsStringSync(),
+    text,
+    reason:
+        '$path is generated: run with '
+        '--dart-define=UPDATE_SHADER_CONSTANTS=true.',
+  );
+}
+
 /// Compares [actual] with the pixel reference at [path], on macOS only.
 ///
 /// References are rendered by `flutter test --update-goldens` on the macOS
@@ -32,11 +52,23 @@ Future<void> expectMacOSGolden(Object? actual, String path) async {
 final testScenarioConstraints = BoxConstraints.tight(const Size(500, 500));
 
 const settingsWithoutLighting = LiquidGlassSettings(
-  highlight: 0,
+  glintStrength: 0,
   contourStrength: 0,
   bevelShadowStrength: 0,
-  frost: 0,
+  frost: LiquidGlassFrost.sigma(0),
 );
+
+Matrix4 stretchedBy(Offset pull, Size size) {
+  final relX = pull.dx.abs() / size.width;
+  final relY = pull.dy.abs() / size.height;
+  final baseX = 1 + relX;
+  final baseY = 1 + relY;
+  final areaGrowth = 1 + math.sqrt(relX * relX + relY * relY) * 0.5;
+  final correction = math.sqrt(areaGrowth / (baseX * baseY));
+  final move = pull * 1.5;
+  return Matrix4.translationValues(move.dx, move.dy, 0)
+    ..scaleByDouble(baseX * correction, baseY * correction, 1, 1);
+}
 
 Widget buildWithGridPaper(Widget child) {
   return ColoredBox(
@@ -59,36 +91,41 @@ Widget buildWithGridPaper(Widget child) {
   );
 }
 
-/// Pins the optimization that changes what the plain backdrop path draws or
-/// how many passes it costs (the native seeds) off for the current test, so it
-/// measures that path whatever `--dart-define`s set the default to
-/// (`melos run test:defaults` runs the suite with the production one). A test
-/// that wants seeds turns them on itself, after this. Call it from `setUp`;
-/// the flag is restored after the test.
-///
-/// Also used by the tests that compare captured pixels of real glass, in
-/// flutter_tester: it renders a seeded pass of real glass wrongly there
-/// (colour and alpha, differently from run to run: the foreground painted
-/// after the pass is erased, or the whole frame comes out partly transparent),
-/// while macOS Metal renders it exactly as the plain path does. The same
-/// scenes run unpinned on a device by the `*_device_test.dart` wrappers in
-/// `example/integration_test`.
-void pinPlainBackdropPath() {
-  final override = SeededBackdropPassLayer.debugModeOverride;
-  SeededBackdropPassLayer.debugModeOverride = BackdropSeed.none;
-  addTearDown(() => SeededBackdropPassLayer.debugModeOverride = override);
+/// Draws every copy of the current test into an image, as copies asked for
+/// with a filter always are, for tests of how images are shared and held.
+void copyIntoImages() {
+  debugGlassPolicy = const PlanPolicy(maxTargets: 0);
+  addTearDown(() => debugGlassPolicy = const PlanPolicy());
 }
 
-/// The passes of the current frame that are natively seeded.
-///
-/// A device run uses the production defaults, so a scene with a blurred glass
-/// has some; a host run pins them off (see [pinPlainBackdropPath]).
-List<SeededBackdropPassLayer> seededPasses(WidgetTester tester) => tester
-    .binding
-    .renderViews
-    .single
-    .debugLayer!
-    .depthFirstIterateChildren()
-    .whereType<SeededBackdropPassLayer>()
-    .where((pass) => pass.nativeSeed != BackdropSeed.none)
-    .toList();
+/// What the plans of the current test decided.
+final class PlanWatch {
+  /// Watches every plan from here to the end of the test.
+  PlanWatch() {
+    GlassComposer.debugOnPlan = _note;
+    addTearDown(() => GlassComposer.debugOnPlan = null);
+  }
+
+  final _changes = Map<Object, int>.identity();
+
+  /// The last plan.
+  GlassPlan? last;
+
+  void _note(GlassForm form, GlassPlan plan) {
+    last = plan;
+    for (var i = 0; i < plan.fates.length; i++) {
+      final read = switch (plan.fates[i]) {
+        LeadFate(:final read) || FollowFate(:final read) => read,
+        HiddenFate() => null,
+      };
+      if (read == null || !read.changed) continue;
+      final id = form.sites[i].id;
+      final site = id is TransformTrackingLayer ? id.trackedSite! : id;
+      _changes[site] = (_changes[site] ?? 0) + 1;
+    }
+  }
+
+  /// In how many plans the read of [site], a render object or a filter layer,
+  /// held something new.
+  int changes(Object site) => _changes[site] ?? 0;
+}

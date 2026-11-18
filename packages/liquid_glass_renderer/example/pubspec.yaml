@@ -4,15 +4,17 @@ publish_to: 'none'
 version: 0.1.0
 
 environment:
-  sdk: ">=3.13.0 <3.14.0"
-  flutter: ">=3.47.0 <3.48.0"
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
 
 dependencies:
   cupertino_icons: ^1.0.8
+  cupertino_ui: ^1.1.6
   flutter:
     sdk: flutter
   liquid_glass_renderer:
     path: ../
+  material_ui: ^1.11.0
   motor: ^1.1.0
   stupid_simple_sheet: ^1.0.0-dev.4
 

@@ -1,0 +1,14 @@
+name: layer_rules
+description: >-
+  Holds a package of this workspace to its library layers: one folder per
+  library, imports through the libraries below in a configured order, banned
+  imports and patterns, and a reviewed list of debt that only shrinks.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+
+dev_dependencies:
+  lintervention: ^0.3.1
+  test: any

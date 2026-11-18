@@ -1,28 +1,24 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/transform_tracking_repaint_boundary_mixin.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
-/// Coverage for [TransformTrackingRenderObjectMixin]: the cases where a glass
+/// Coverage for `TransformTrackingRenderObjectMixin`: the cases where a glass
 /// shape's composited position can change while the owning layer's paint()
-/// never runs. Without the tracking layer nothing schedules the matte update,
-/// so these tests must fail if the sentinel in
+/// never runs. Without the tracking layer nothing schedules the geometry
+/// update, so these tests must fail if the sentinel in
 /// updateSubtreeNeedsAddToScene stops polling.
 void main() {
   RenderLiquidGlassLayer layerOf(WidgetTester tester) =>
-      tester.allRenderObjects
-          .whereType<RenderLiquidGlassLayer>()
-          .where((renderObject) => renderObject.gpuGeometryRenderer != null)
-          .last;
+      tester.allRenderObjects.whereType<RenderLiquidGlassLayer>().last;
 
   testWidgets(
-    'updates the matte when a repaint boundary retransforms a shape',
+    'updates the geometry when a repaint boundary retransforms a shape',
     (tester) async {
       tester.view
         ..physicalSize = const Size(500, 500)
@@ -43,7 +39,7 @@ void main() {
                   child: Transform.rotate(
                     angle: value,
                     child: const LiquidGlass(
-                      shape: LiquidRoundedRectangle(borderRadius: 20),
+                      shape: LiquidRoundedRectangle(radius: 20),
                       child: SizedBox(width: 100, height: 80),
                     ),
                   ),
@@ -57,7 +53,7 @@ void main() {
       await tester.pump();
 
       final layer = layerOf(tester);
-      final initialBounds = layer.debugGeometryMatteBounds;
+      final initialBounds = layer.debugBufferBounds;
       final initialPaints = layer.debugPaintCount;
 
       angle.value = 0.5;
@@ -73,19 +69,19 @@ void main() {
             'compositor updates.',
       );
       expect(
-        layer.debugGeometryMatteBounds,
+        layer.debugBufferBounds,
         isNot(initialBounds),
         reason:
-            'The matte must follow a compositor-only transform change. '
+            'The geometry must follow a compositor-only transform change. '
             'Without transform tracking nothing schedules the update and '
-            'the matte stays stale forever.',
+            'the geometry stays stale forever.',
       );
     },
     skip: skipProperGlassTests,
   );
 
   testWidgets(
-    'updates the matte when only one of two shapes moves',
+    'updates the geometry when only one of two shapes moves',
     (tester) async {
       tester.view
         ..physicalSize = const Size(500, 500)
@@ -110,7 +106,7 @@ void main() {
                       child: Transform.scale(
                         scale: value,
                         child: const LiquidGlass(
-                          shape: LiquidRoundedRectangle(borderRadius: 20),
+                          shape: LiquidRoundedRectangle(radius: 20),
                           child: SizedBox(width: 100, height: 80),
                         ),
                       ),
@@ -122,7 +118,7 @@ void main() {
                   left: 300,
                   child: RepaintBoundary(
                     child: LiquidGlass(
-                      shape: LiquidRoundedRectangle(borderRadius: 20),
+                      shape: LiquidRoundedRectangle(radius: 20),
                       child: SizedBox(width: 100, height: 80),
                     ),
                   ),
@@ -136,7 +132,7 @@ void main() {
       await tester.pump();
 
       final layer = layerOf(tester);
-      final initialBounds = layer.debugGeometryMatteBounds;
+      final initialBounds = layer.debugBufferBounds;
       final initialPaints = layer.debugPaintCount;
 
       scale.value = 1.5;
@@ -144,10 +140,10 @@ void main() {
 
       expect(layer.debugPaintCount, initialPaints);
       expect(
-        layer.debugGeometryMatteBounds.width,
+        layer.debugBufferBounds.width,
         greaterThan(initialBounds.width),
         reason:
-            'Relative motion between shapes changes the matte contents; '
+            'Relative motion between shapes changes the geometry; '
             'only the tracker can schedule the retained re-render.',
       );
     },
@@ -176,7 +172,7 @@ void main() {
                 children: const [
                   SizedBox(height: 200),
                   LiquidGlass(
-                    shape: LiquidRoundedRectangle(borderRadius: 20),
+                    shape: LiquidRoundedRectangle(radius: 20),
                     child: SizedBox(width: 100, height: 80),
                   ),
                   SizedBox(height: 400),
@@ -208,7 +204,7 @@ void main() {
         reason:
             'The scroll moved the shape relative to the layer through layer '
             'offsets only. The tracker must patch the retained effect '
-            'layer offset in the same frame — without it the matte is left '
+            'layer offset in the same frame — without it the geometry is left '
             'behind while the content scrolls.',
       );
     },
@@ -217,7 +213,7 @@ void main() {
 
   group('paint-time transforms', () {
     testWidgets(
-      'matte ignores a paint-time pushTransform (documented gap)',
+      'geometry ignores a paint-time pushTransform (documented gap)',
       (tester) async {
         tester.view
           ..physicalSize = const Size(500, 500)
@@ -237,7 +233,7 @@ void main() {
                   builder: (_, value, __) => _PaintTimeTransform(
                     angle: value,
                     child: const LiquidGlass(
-                      shape: LiquidRoundedRectangle(borderRadius: 20),
+                      shape: LiquidRoundedRectangle(radius: 20),
                       child: SizedBox(width: 100, height: 80),
                     ),
                   ),
@@ -250,22 +246,18 @@ void main() {
         await tester.pump();
 
         final layer = layerOf(tester);
-        final initialBounds = layer.debugGeometryMatteBounds;
+        final initialBounds = layer.debugBufferBounds;
 
         angle.value = 0.5;
         await tester.pump();
         await tester.pump();
 
-        // The child render object is rotated on screen, but the matte keeps
-        // its unrotated bounds because getTransformTo cannot see the
-        // paint-time TransformLayer. If this starts failing, the tracking
-        // learned to read composited transforms — update the expectation.
         expect(
-          layer.debugGeometryMatteBounds,
+          layer.debugBufferBounds,
           initialBounds,
           reason:
               'Paint-time pushTransform is invisible to applyPaintTransform '
-              'and therefore to the matte. This test documents the current '
+              'and therefore to the geometry. This test documents the current '
               'gap; it must flip once transforms are read from the layer '
               'tree.',
         );
@@ -290,8 +282,7 @@ class _PaintTimeTransform extends SingleChildRenderObjectWidget {
   void updateRenderObject(
     BuildContext context,
     _RenderPaintTimeTransform renderObject,
-  ) =>
-      renderObject.angle = angle;
+  ) => renderObject.angle = angle;
 }
 
 class _RenderPaintTimeTransform extends RenderProxyBox {

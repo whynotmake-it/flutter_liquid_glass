@@ -1,7 +1,7 @@
 # Example tooling
 
-Run everything from the `example/` directory with Flutter 3.47.1 (Impeller
-only).
+Run everything from the `example/` directory with the Flutter version the
+repository's `.fvmrc` names (Impeller only).
 
 | Path | What it is |
 | --- | --- |

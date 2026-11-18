@@ -5,7 +5,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
@@ -21,13 +21,19 @@ void main() {
       const CupertinoApp(home: _TestBottomBar(fake: true)),
     );
 
-    final lens = tester.widget<LiquidGlass>(
-      find.byKey(const ValueKey('bottom-bar-drag-glass')),
+    final lens = tester.widget<LiquidGlassLayer>(
+      find
+          .ancestor(
+            of: find.byKey(const ValueKey('bottom-bar-drag-glass')),
+            matching: find.byType(LiquidGlassLayer),
+          )
+          .first,
     );
-    expect(lens.appearance?.tint.a, 0);
-    expect(lens.appearance?.colorModel.saturation, 1);
-    expect(lens.appearance?.colorModel.transmissionGamma, 1);
-    expect(lens.appearance?.colorModel.vibrancy, 0);
+    expect(lens.defaultAppearance?.tint.a, 0);
+    expect(
+      lens.defaultAppearance?.colorModel,
+      const LiquidGlassColorModel.direct(),
+    );
   });
 
   testWidgets(
