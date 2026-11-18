@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:motor/motor.dart';
 
 /// A capsule segmented control whose thumb springs between segments.

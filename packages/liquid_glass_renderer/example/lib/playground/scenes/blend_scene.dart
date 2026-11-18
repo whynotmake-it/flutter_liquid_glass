@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/scenes/draggable_glass.dart';
@@ -28,8 +28,7 @@ class BlendScene extends StatelessWidget {
                   center: center,
                   offset: const Offset(-18, 44),
                   size: const Size(196, 64),
-                  shape: const LiquidRoundedSuperellipse(borderRadius: 32),
-                  grouped: true,
+                  shape: const LiquidRoundedSuperellipse(radius: 32),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -44,7 +43,6 @@ class BlendScene extends StatelessWidget {
                   offset: const Offset(118, 44),
                   size: const Size(64, 64),
                   shape: const LiquidOval(),
-                  grouped: true,
                   child: const Icon(CupertinoIcons.textformat),
                 ),
                 DraggableGlass(
@@ -52,7 +50,6 @@ class BlendScene extends StatelessWidget {
                   offset: const Offset(-28, -54),
                   size: const Size(88, 88),
                   shape: const LiquidOval(),
-                  grouped: true,
                   child: const Icon(CupertinoIcons.plus, size: 32),
                 ),
               ],

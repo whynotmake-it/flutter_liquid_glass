@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/bottom_bar/ios_bottom_bar.dart';
@@ -189,7 +189,7 @@ class _ButtonCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ControlGlass(
-      shape: const LiquidRoundedSuperellipse(borderRadius: 24),
+      shape: const LiquidRoundedSuperellipse(radius: 24),
       child: SizedBox(
         height: topControlSize,
         child: Padding(

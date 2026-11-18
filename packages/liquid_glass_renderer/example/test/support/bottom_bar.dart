@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:motor/motor.dart';
 
@@ -100,9 +100,9 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
                 tabCount: widget.tabs.length,
                 indicatorColor: widget.indicatorColor,
                 onTabChanged: widget.onTabSelected,
-                child: LiquidGlass.grouped(
+                child: LiquidGlass(
                   clipBehavior: Clip.none,
-                  shape: const LiquidRoundedSuperellipse(borderRadius: 32),
+                  shape: const LiquidRoundedSuperellipse(radius: 32),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     height: widget.barHeight,
@@ -131,7 +131,7 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
 
     // Reuse an ambient layer when possible. The bar keeps its own blend group,
     // so sharing the expensive backdrop does not merge it with sibling glass.
-    if (LiquidGlassLayer.existsIn(context)) return content;
+    if (LiquidGlassLayer.maybeSettingsOf(context) != null) return content;
     return LiquidGlassLayer(
       settings: glassSettings,
       fake: widget.fake,
@@ -304,30 +304,17 @@ class _ExtraButtonState extends State<_ExtraButton> {
       ),
     );
 
+    final glass = LiquidGlass(shape: const LiquidOval(), child: icon);
     final button = loupeMagnification > 1.0
-        ? SizedBox.square(
-            dimension: widget.config.size,
-            child: LiquidGlass.grouped(
-              shape: const LiquidOval(),
-              // Do not put the icon in a glow layer here. A loupe is a
-              // clear pre-shader magnifier; the icon should stay crisp and
-              // the only material treatment should be the thin glass rim.
-              child: icon,
-            ),
-          )
-        : LiquidGlass.grouped(
-            shape: const LiquidOval(),
-            child: GlassGlow(child: icon),
-          );
+        ? SizedBox.square(dimension: widget.config.size, child: glass)
+        : glass;
 
     return GestureDetector(
       onTap: widget.config.onTap,
-      child: LiquidStretch(
-        child: Semantics(
-          button: true,
-          label: widget.config.label,
-          child: button,
-        ),
+      child: Semantics(
+        button: true,
+        label: widget.config.label,
+        child: button,
       ),
     );
   }
@@ -577,38 +564,40 @@ class _TabIndicatorState extends State<_TabIndicator>
                       tabCount: widget.tabCount,
                       alignment: alignment,
                       thickness: thickness,
-                      child: LiquidGlass.withOwnLayer(
-                        key: const ValueKey('bottom-bar-drag-glass'),
+                      child: LiquidGlassLayer(
                         // This is a clear selection lens, not another toolbar
                         // material. Keep its backdrop transmission neutral
                         // even when the ambient layer uses the fitted iOS tint.
-                        appearance: LiquidGlassAppearance(
+                        defaultAppearance: LiquidGlassAppearance(
                           visibility: thickness,
                         ),
-                        shadows: const [
-                          BoxShadow(
-                            color: Color.from(
-                              alpha: 0.1,
-                              red: 0,
-                              green: 0,
-                              blue: 0,
-                            ),
-                            blurRadius: 30,
-                          ),
-                        ],
                         fake: widget.fake,
                         settings: const LiquidGlassSettings(
                           refractionHeight: 24,
                           refractionAmount: 40,
                           backdropShrink: .08,
                           dispersion: .1,
-                          frost: 0,
+                          frost: LiquidGlassFrost.sigma(0),
                           contourStrength: .1,
                         ),
-                        shape: const LiquidRoundedSuperellipse(
-                          borderRadius: 64,
+                        child: const LiquidGlass(
+                          key: ValueKey('bottom-bar-drag-glass'),
+                          shadows: [
+                            LiquidGlassShadow(
+                              color: Color.from(
+                                alpha: 0.1,
+                                red: 0,
+                                green: 0,
+                                blue: 0,
+                              ),
+                              blurRadius: 30,
+                            ),
+                          ],
+                          shape: LiquidRoundedSuperellipse(
+                            radius: 64,
+                          ),
+                          child: SizedBox.expand(),
                         ),
-                        child: const GlassGlow(child: SizedBox.expand()),
                       ),
                     ),
                   if (widget.fake) child!,

@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
 /// Corner radius of the sheet that hosts the inspector.
 const panelRadius = 34.0;

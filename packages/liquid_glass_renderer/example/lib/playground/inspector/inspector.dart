@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/backdrops.dart';
@@ -146,7 +146,7 @@ class _MaterialControls extends StatelessWidget {
                 if (material.style.followsSlider)
                   SliderRow(
                     title: 'Liquid Glass',
-                    value: material.tintAmount,
+                    value: material.sliderPosition,
                     min: 0,
                     max: 1,
                     minLabel: 'Clear',
@@ -154,7 +154,7 @@ class _MaterialControls extends StatelessWidget {
                     onChanged: (amount) => state.material.value = state
                         .material
                         .value
-                        .withTintAmount(amount),
+                        .withSliderPosition(amount),
                   ),
                 if (scene.usesBlending)
                   ValueListenableBuilder(
@@ -338,21 +338,55 @@ class _ActionsState extends State<_Actions> {
 /// Dart source for [settings], listing only fields that differ from the
 /// defaults.
 String settingsSource(LiquidGlassSettings settings) {
-  // ignore: experimental_member_use
-  final defaults = const LiquidGlassSettings().toJson();
-  String literal(Object value) => switch (value) {
-    final double v =>
-      v
-          .toStringAsFixed(3)
-          .replaceFirst(RegExp(r'0+$'), '')
-          .replaceFirst(RegExp(r'\.$'), '.0'),
-    _ => '$value',
-  };
+  final defaults = _arguments(const LiquidGlassSettings());
   final fields = [
-    // ignore: experimental_member_use
-    for (final MapEntry(:key, :value) in settings.toJson().entries)
-      if (value != defaults[key]) '  $key: ${literal(value)},',
+    for (final MapEntry(:key, :value) in _arguments(settings).entries)
+      if (value != defaults[key]) '  $key: ${_literal(value)},',
   ];
   if (fields.isEmpty) return 'const LiquidGlassSettings()';
   return 'const LiquidGlassSettings(\n${fields.join('\n')}\n)';
 }
+
+Map<String, Object> _arguments(LiquidGlassSettings settings) => {
+  'refractionHeight': settings.refractionHeight,
+  'refractionAmount': settings.refractionAmount,
+  'refractionFitsShape': settings.refractionFitsShape,
+  'backdropShrink': settings.backdropShrink,
+  'backdropPull': settings.backdropPull,
+  'backdropPullDepth': settings.backdropPullDepth,
+  'aberration': settings.aberration,
+  'aberrationDepth': settings.aberrationDepth,
+  'frost': settings.frost,
+  'dispersion': settings.dispersion,
+  'glintStrength': settings.glintStrength,
+  'contourStrength': settings.contourStrength,
+  'contourDirectionality': settings.contourDirectionality,
+  'bevelShadowStrength': settings.bevelShadowStrength,
+  'sliderPosition': settings.sliderPosition,
+  'haze': settings.haze,
+};
+
+String _literal(Object value) => switch (value) {
+  final double v =>
+    v
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '.0'),
+  LiquidGlassFixedFrost(:final sigma) =>
+    'LiquidGlassFrost.sigma(${_literal(sigma)})',
+  LiquidGlassIos27RegularFrost() => 'LiquidGlassFrost.ios27Regular()',
+  LiquidGlassIos27ClearFrost() => 'LiquidGlassFrost.ios27Clear()',
+  LiquidGlassFixedHaze(
+    :final sigma,
+    :final lighten,
+    :final darken,
+    :final cover,
+  ) =>
+    'LiquidGlassHaze(sigma: ${_literal(sigma)}, '
+        'lighten: ${_literal(lighten)}, darken: ${_literal(darken)}, '
+        'cover: ${_literal(cover)})',
+  LiquidGlassIos27RegularHaze(:final brightness) =>
+    'LiquidGlassHaze.ios27Regular(brightness: $brightness)',
+  LiquidGlassIos27ClearHaze() => 'LiquidGlassHaze.ios27Clear()',
+  _ => '$value',
+};

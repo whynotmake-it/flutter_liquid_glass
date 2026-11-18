@@ -1,12 +1,12 @@
 // This regression intentionally inspects the renderer's compositor counters.
 // ignore_for_file: invalid_use_of_internal_member
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/liquid_glass_render_scope.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
 import 'package:liquid_glass_renderer/src/rendering/liquid_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/widgets/liquid_glass_render_scope.dart';
 
 import '../../test/src/submitted_scene_binding.dart';
 import 'support/scrolling_glass.dart';
@@ -29,9 +29,12 @@ void main() {
             CupertinoApp(
               home: LiquidGlassLayer(
                 fake: fake,
-                settings: LiquidGlassSettings.ios27RegularLight(),
-                defaultAppearance:
-                    const LiquidGlassAppearance.ios27RegularLight(),
+                settings: const LiquidGlassSettings.ios27Regular(
+                  brightness: Brightness.light,
+                ),
+                defaultAppearance: const LiquidGlassAppearance.ios27Regular(
+                  brightness: Brightness.light,
+                ),
                 child: ScrollingGlass(blended: blended),
               ),
             ),
@@ -44,7 +47,7 @@ void main() {
                   .widgetList<LiquidGlassRenderScope>(
                     find.byType(LiquidGlassRenderScope),
                   )
-                  .every((s) => !s.consolidatesFakeBackdrop)) {
+                  .every((s) => !s.fake)) {
                 break;
               }
             }
@@ -59,7 +62,7 @@ void main() {
                   .widgetList<LiquidGlassRenderScope>(
                     find.byType(LiquidGlassRenderScope),
                   )
-                  .every((s) => !s.consolidatesFakeBackdrop),
+                  .every((s) => !s.fake),
               isTrue,
               reason:
                   'Real glass falls back to fake glass unless the tests run '

@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _outputPath = String.fromEnvironment('PER_SHAPE_CAPTURE_OUT');
 
@@ -97,9 +97,9 @@ class _DefaultAppearance extends StatelessWidget {
         settings: LiquidGlassSettings.ios27Regular(brightness: brightness),
         child: const Center(
           child: LiquidGlass(
-            shape: LiquidRoundedSuperellipse(borderRadius: 42),
+            shape: LiquidRoundedSuperellipse(radius: 42),
             shadows: [
-              BoxShadow(
+              LiquidGlassShadow(
                 color: Color(0x33000000),
                 offset: Offset(0, 6),
                 blurRadius: 14,
@@ -120,7 +120,10 @@ class _ColorAxes extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Backdrop(
     child: LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
+      settings: LiquidGlassSettings.ios27Regular(
+        brightness: Brightness.light,
+        frost: LiquidGlassFrost.sigma(0),
+      ),
       child: Center(
         child: Wrap(
           spacing: 18,
@@ -161,7 +164,7 @@ class _AppearanceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LiquidGlass(
     appearance: appearance,
-    shape: const LiquidRoundedSuperellipse(borderRadius: 24),
+    shape: const LiquidRoundedSuperellipse(radius: 24),
     child: const SizedBox(width: 210, height: 110),
   );
 }
@@ -172,7 +175,10 @@ class _MergedAppearance extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Backdrop(
     child: LiquidGlassLayer(
-      settings: LiquidGlassSettings.ios27RegularLight(frost: 0),
+      settings: LiquidGlassSettings.ios27Regular(
+        brightness: Brightness.light,
+        frost: LiquidGlassFrost.sigma(0),
+      ),
       child: Center(
         child: LiquidGlassBlendGroup(
           blend: 38,
@@ -184,19 +190,19 @@ class _MergedAppearance extends StatelessWidget {
                 Positioned(
                   left: 38,
                   top: 48,
-                  child: LiquidGlass.grouped(
+                  child: LiquidGlass(
                     appearance: LiquidGlassAppearance(
                       tint: Color(0xA8FFFFFF),
                       colorModel: LiquidGlassColorModel.direct(saturation: .8),
                     ),
-                    shape: LiquidRoundedSuperellipse(borderRadius: 34),
+                    shape: LiquidRoundedSuperellipse(radius: 34),
                     child: SizedBox(width: 220, height: 120),
                   ),
                 ),
                 Positioned(
                   left: 192,
                   top: 48,
-                  child: LiquidGlass.grouped(
+                  child: LiquidGlass(
                     appearance: LiquidGlassAppearance(
                       tint: Color(0xA52B7CFF),
                       colorModel: LiquidGlassColorModel.direct(
@@ -205,14 +211,14 @@ class _MergedAppearance extends StatelessWidget {
                         vibrancy: .2,
                       ),
                     ),
-                    shape: LiquidRoundedSuperellipse(borderRadius: 34),
+                    shape: LiquidRoundedSuperellipse(radius: 34),
                     child: SizedBox(width: 220, height: 120),
                   ),
                 ),
                 Positioned(
                   left: 136,
                   top: 142,
-                  child: LiquidGlass.grouped(
+                  child: LiquidGlass(
                     appearance: LiquidGlassAppearance(
                       tint: Color(0xA8FF6D58),
                       visibility: .5,
@@ -224,7 +230,7 @@ class _MergedAppearance extends StatelessWidget {
                 Positioned(
                   right: 12,
                   bottom: 4,
-                  child: LiquidGlass.grouped(
+                  child: LiquidGlass(
                     appearance: LiquidGlassAppearance(visibility: 0),
                     shape: LiquidOval(),
                     child: SizedBox.square(dimension: 72),

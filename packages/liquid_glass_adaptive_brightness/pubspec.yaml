@@ -7,7 +7,7 @@ homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_adaptive_brightness
 
 environment:
-  sdk: ">=3.13.0 <3.14.0"
+  sdk: ">=3.13.0 <4.0.0"
   flutter: ">=3.47.0"
 
 dependencies:
@@ -19,3 +19,4 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   lintervention: ^0.3.1
+  material_ui: ^1.11.0

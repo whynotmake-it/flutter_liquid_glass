@@ -10,6 +10,7 @@ example/lib/pages/glint_ab_page.dart
 example/macos/DerivedData/
 test/src/failures/
 test/src/goldens/
+test_fixes/
 **/.snaptest/
 
 # Repository-only media that the package README does not use. The generated

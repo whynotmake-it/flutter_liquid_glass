@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer_example/playground/inspector/grouped_list.dart';
 import 'package:liquid_glass_renderer_example/playground/playground_state.dart';
@@ -63,11 +63,14 @@ class MaterialSections extends StatelessWidget {
                 ),
                 SliderRow(
                   title: 'Blur',
-                  value: settings.frost,
+                  value: _fixedBlur(settings.frost) ?? 0,
                   min: 0,
                   max: 30,
-                  format: _points,
-                  onChanged: (v) => edit(settings.copyWith(frost: v)),
+                  format: (v) => _fixedBlur(settings.frost) == null
+                      ? 'iOS 27'
+                      : _points(v),
+                  onChanged: (v) =>
+                      edit(settings.copyWith(frost: LiquidGlassFrost.sigma(v))),
                 ),
                 SwitchRow(
                   title: 'Fit Small Shapes',
@@ -83,14 +86,14 @@ class MaterialSections extends StatelessWidget {
               children: [
                 SliderRow(
                   title: 'Glint',
-                  value: settings.highlight,
+                  value: settings.glintStrength,
                   min: 0,
                   max: 2,
                   format: (v) => v.toStringAsFixed(2),
-                  onChanged: (v) => edit(settings.copyWith(highlight: v)),
+                  onChanged: (v) => edit(settings.copyWith(glintStrength: v)),
                 ),
                 SliderRow(
-                  title: 'Border',
+                  title: 'Contour',
                   value: settings.contourStrength,
                   min: 0,
                   max: 1,
@@ -117,6 +120,13 @@ class MaterialSections extends StatelessWidget {
 }
 
 String _points(double value) => '${value.toStringAsFixed(1)} pt';
+
+// The blur of a frost set by hand, or null for one fitted to iOS 27, which
+// follows the Liquid Glass slider and the size of the glass.
+double? _fixedBlur(LiquidGlassFrost frost) => switch (frost) {
+  LiquidGlassFixedFrost(:final sigma) => sigma,
+  LiquidGlassIos27RegularFrost() || LiquidGlassIos27ClearFrost() => null,
+};
 
 /// Largest dispersion on the slider. At ±2 one channel no longer refracts and
 /// the other refracts twice as far; beyond it the channels cross over.

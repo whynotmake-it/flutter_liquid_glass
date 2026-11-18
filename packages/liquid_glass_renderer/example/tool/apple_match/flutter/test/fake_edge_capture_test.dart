@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _outputPath = String.fromEnvironment('FAKE_EDGE_CAPTURE_OUT');
 
@@ -92,7 +92,7 @@ class _Shapes extends StatelessWidget {
       LiquidGlassLayer(
         fake: fake,
         settings: _noBackdrop
-            ? const LiquidGlassSettings(frost: 0)
+            ? const LiquidGlassSettings(frost: LiquidGlassFrost.sigma(0))
             : LiquidGlassSettings.ios27Regular(brightness: brightness),
         defaultAppearance: _noBackdrop
             ? const LiquidGlassAppearance(tint: Color(0x66FFFFFF))
@@ -104,7 +104,7 @@ class _Shapes extends StatelessWidget {
               left: 20,
               top: 20,
               child: LiquidGlass(
-                shape: LiquidRoundedSuperellipse(borderRadius: 9000),
+                shape: LiquidRoundedSuperellipse(radius: 9000),
                 child: SizedBox(width: 120, height: 44),
               ),
             ),
@@ -113,7 +113,7 @@ class _Shapes extends StatelessWidget {
               left: 20,
               top: 90,
               child: LiquidGlass(
-                shape: LiquidRoundedSuperellipse(borderRadius: 32),
+                shape: LiquidRoundedSuperellipse(radius: 32),
                 child: SizedBox(width: 320, height: 64),
               ),
             ),
@@ -122,7 +122,7 @@ class _Shapes extends StatelessWidget {
               left: 20,
               top: 180,
               child: LiquidGlass(
-                shape: LiquidRoundedSuperellipse(borderRadius: 24),
+                shape: LiquidRoundedSuperellipse(radius: 24),
                 child: SizedBox(width: 200, height: 100),
               ),
             ),

@@ -25,7 +25,7 @@ class GlassMaterial {
   const GlassMaterial({
     required this.style,
     required this.brightness,
-    required this.tintAmount,
+    required this.sliderPosition,
     required this.settings,
     required this.appearance,
     this.edited = false,
@@ -34,13 +34,13 @@ class GlassMaterial {
   factory GlassMaterial.preset({
     required GlassStyle style,
     required Brightness brightness,
-    double tintAmount = 0,
+    double sliderPosition = 0,
   }) => GlassMaterial(
     style: style,
     brightness: brightness,
-    tintAmount: tintAmount,
+    sliderPosition: sliderPosition,
     settings: withTestFrost(
-      style.settings(brightness: brightness, tintAmount: tintAmount),
+      style.settings(brightness: brightness, sliderPosition: sliderPosition),
     ),
     appearance: style.appearance(brightness),
   );
@@ -49,7 +49,7 @@ class GlassMaterial {
   final Brightness brightness;
 
   /// Position of the iOS 27 Liquid Glass slider, `0` Clear to `1` Tinted.
-  final double tintAmount;
+  final double sliderPosition;
 
   final LiquidGlassSettings settings;
   final LiquidGlassAppearance appearance;
@@ -60,39 +60,37 @@ class GlassMaterial {
   GlassMaterial withStyle(GlassStyle value) => GlassMaterial.preset(
     style: value,
     brightness: brightness,
-    tintAmount: tintAmount,
+    sliderPosition: sliderPosition,
   );
 
   GlassMaterial withBrightness(Brightness value) {
     final preset = GlassMaterial.preset(
       style: style,
       brightness: value,
-      tintAmount: tintAmount,
+      sliderPosition: sliderPosition,
     );
     return edited ? preset.withSettings(settings) : preset;
   }
 
   /// Moves the Liquid Glass slider while keeping manual edits.
   ///
-  /// Every iOS 27 style derives its blur from the slider, so frost is the one
-  /// setting the slider owns. The loupe ignores the slider.
-  GlassMaterial withTintAmount(double value) {
+  /// A fitted frost and haze follow the slider; a blur set by hand stays.
+  /// The loupe ignores the slider.
+  GlassMaterial withSliderPosition(double value) {
     final preset = GlassMaterial.preset(
       style: style,
       brightness: brightness,
-      tintAmount: value,
+      sliderPosition: value,
     );
     if (!edited) return preset;
     if (!style.followsSlider) return preset.withSettings(settings);
-    return preset.withSettings(
-      settings.copyWith(tintAmount: value, frost: preset.settings.frost),
-    );
+    return preset.withSettings(settings.copyWith(sliderPosition: value));
   }
 
   GlassMaterial withSettings(LiquidGlassSettings value) => GlassMaterial(
     style: style,
     brightness: brightness,
-    tintAmount: tintAmount,
+    sliderPosition: sliderPosition,
     settings: value,
     appearance: appearance,
     edited: true,
@@ -101,7 +99,7 @@ class GlassMaterial {
   GlassMaterial reset() => GlassMaterial.preset(
     style: style,
     brightness: brightness,
-    tintAmount: tintAmount,
+    sliderPosition: sliderPosition,
   );
 }
 
@@ -221,7 +219,7 @@ extension SelectValueListenable<S> on ValueListenable<S> {
 /// Replaces the blur of [settings] in deterministic harness runs.
 LiquidGlassSettings withTestFrost(LiquidGlassSettings settings) =>
     _useTestBackground
-    ? settings.copyWith(frost: _testBlur.toDouble())
+    ? settings.copyWith(frost: LiquidGlassFrost.sigma(_testBlur.toDouble()))
     : settings;
 
 /// Deterministic grid backdrop and frost for screenshots and harness runs.
