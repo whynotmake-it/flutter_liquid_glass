@@ -1124,6 +1124,11 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
           leans: _shapes.leans,
         );
 
+  ui.Picture? _shadowUnderRead() {
+    _placeShadows(under: true);
+    return glassShadowPicture?.picture;
+  }
+
   PictureLayer? get _shadowsUnder =>
       shadowsUnderGlass ? glassShadowPicture : null;
 
@@ -1211,6 +1216,17 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   @override
   void addOutput(SceneOut out, ReadCopy outer) {
     if (_fate case LeadFate(:final read)) _painter.addOutput(out, outer, read);
+  }
+
+  // Glass over its copy paints its silhouettes opaquely over the slot, so
+  // its shadows lie under it in the slot, whole, rather than over it cut
+  // outside the silhouettes: the cut is a stencil clip of the shadow
+  // groups' bounds, the dearest part of drawing them. The copy is taken
+  // under the glass's own layer, so it never holds them.
+  void _placeShadows({required bool under}) {
+    if (under == shadowsUnderGlass) return;
+    shadowsUnderGlass = under;
+    if (glassShadowPicture != null) recordGlassShadows(retainedPaintOffset);
   }
 
   @override

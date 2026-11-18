@@ -192,6 +192,18 @@ final class _GlassPainter implements ReadPainter {
     );
   }
 
+  List<(ui.Picture, Offset)> _shadowsOfOthers(GlassRead read, _Frame frame) {
+    if (_bandOf(read) != null) return const [];
+    final storage = frame.screen.storage;
+    final canvas = layer._canvasOnScreen(Offset(storage[12], storage[13]));
+    return [
+      for (final (glass, role, _) in _glassIn(read))
+        if (!identical(glass, layer))
+          if (glass._shadowUnderRead() case final picture?)
+            (picture, glass._canvasOnScreen(role.originOnScreen) - canvas),
+    ];
+  }
+
   // The hard edge around glass far apart, in the screen's device pixels, or
   // null where it fills most of [copyLayer]: rejecting the pixels no glass
   // paints saved 0.6 ms of GPU time over twelve buttons on the Pixel 6a.
