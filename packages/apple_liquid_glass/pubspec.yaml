@@ -4,18 +4,40 @@ version: 1.0.0-dev.2
 
 homepage: https://whynotmake.it
 repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/apple_liquid_glass
+issue_tracker: https://github.com/whynotmake-it/flutter_liquid_glass/issues
+
+topics:
+  - liquid-glass
+  - ios
+  - widgets
+  - cupertino
+  - animation
 
 environment:
-  sdk: ">=3.13.0 <3.14.0"
+  sdk: ">=3.13.0 <4.0.0"
   flutter: ">=3.47.0"
+
+platforms:
+  android:
+  ios:
+  macos:
+  web:
 
 dependencies:
   flutter:
     sdk: flutter
+  kinesis: ^0.1.0-dev.1
   liquid_glass_renderer: ^1.0.0-dev.2
+  meta: ^1.16.0
 
 dev_dependencies:
+  api_listing:
+    path: ../../tool/api_listing
+  cupertino_ui: ^1.1.6
   flutter_test:
     sdk: flutter
+  layer_rules:
+    path: ../../tool/layer_rules
+  leak_tracker_flutter_testing: ^3.0.10
   lintervention: ^0.3.1
-  mocktail: ^1.0.3
+  material_ui: ^1.11.0

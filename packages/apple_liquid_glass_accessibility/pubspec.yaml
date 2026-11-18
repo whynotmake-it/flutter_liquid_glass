@@ -1,0 +1,29 @@
+name: apple_liquid_glass_accessibility
+description: Feeds the iOS and macOS accessibility settings Flutter does not report into apple_liquid_glass.
+version: 0.1.0-dev.1
+publish_to: none
+
+homepage: https://whynotmake.it
+repository: https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/apple_liquid_glass_accessibility
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  apple_liquid_glass: ^1.0.0-dev.2
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lintervention: ^0.3.1
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: AppleLiquidGlassAccessibilityPlugin
+      macos:
+        pluginClass: AppleLiquidGlassAccessibilityPlugin
