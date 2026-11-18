@@ -1,7 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_renderer/src/internal/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/painting/shader_constants.dart';
+import 'package:liquid_glass_renderer/src/rendering/flutter_gpu_geometry_renderer.dart';
+import 'package:liquid_glass_renderer/src/rendering/geometry_tiling.dart';
+import 'package:liquid_glass_renderer/src/rendering/shaders.dart';
+import 'package:liquid_glass_renderer/src/rendering/shape_set.dart';
 
 import 'gpu_test_helpers.dart';
 
@@ -15,15 +19,15 @@ const _expectFallback = bool.fromEnvironment('EXPECT_FLUTTER_GPU_FALLBACK');
 /// + [dy]).
 class _Shape {
   const _Shape.rect(this.x, this.width, this.height, this.radius, {this.dy = 0})
-    : type = 3;
+    : type = RawShapeType.roundedRectangle;
   const _Shape.circle(this.x, double diameter)
-    : type = 2,
+    : type = RawShapeType.ellipse,
       dy = 0,
       width = diameter,
       height = diameter,
       radius = 0;
 
-  final double type;
+  final RawShapeType type;
   final double x;
   final double dy;
   final double width;
@@ -38,7 +42,9 @@ class _Shape {
   double distance(double px, double py) {
     final qx = (px - x).abs();
     final qy = (py - _centerY - dy).abs();
-    if (type == 2) return math.sqrt(qx * qx + qy * qy) - width / 2;
+    if (type == RawShapeType.ellipse) {
+      return math.sqrt(qx * qx + qy * qy) - width / 2;
+    }
     final r = math.min(radius, math.min(width, height) / 2);
     final ox = qx - width / 2 + r;
     final oy = qy - height / 2 + r;
@@ -49,7 +55,7 @@ class _Shape {
   }
 }
 
-/// Coverage of one blend group, read back from the geometry matte: `true`
+/// Coverage of one blend group, read back from the geometry atlas: `true`
 /// where the pixel center lies inside the merged shape.
 typedef _Mask = List<List<bool>>;
 
@@ -60,8 +66,8 @@ void main() {
 
   setUpAll(() async {
     if (_expectFallback) return;
-    renderer = await FlutterGpuGeometryRenderer.fromAsset(
-      'build/shaderbundles/liquid_glass_renderer.shaderbundle',
+    renderer = FlutterGpuGeometryRenderer(
+      await GeometryBundle.load(ShaderKeys.gpuGeometryShaderBundle),
     );
   });
 
@@ -71,39 +77,39 @@ void main() {
 
   Future<_Mask> render(List<_Shape> shapes, {double blend = _blend}) async {
     final shapeData = <double>[
-      for (final (index, shape) in shapes.indexed) ...[
-        shape.type, shape.width, shape.height, shape.radius, //
-        1, 0, 0, 1, //
-        shape.x,
-        _centerY + shape.dy,
-        1,
-        if (index == 0) -(blend + 1) else blend,
-      ],
+      for (final (index, shape) in shapes.indexed)
+        ...ShapeSet.row(
+          type: shape.type,
+          width: shape.width,
+          height: shape.height,
+          radius: shape.radius,
+          center: Offset(shape.x, _centerY + shape.dy),
+          blend: blend,
+          startsGroup: index == 0,
+        ),
     ];
-    final result = renderer.render(
-      width: _width,
-      height: _height,
-      shapeData: shapeData,
-      numShapes: shapes.length,
-      boundsData: [
-        for (final shape in shapes) ...[
-          shape.left, shape.top, shape.right, shape.bottom, //
-        ],
-      ],
-      refractionHeight: 10,
-      refractionAmount: 30,
-      offsetX: 0,
-      offsetY: 0,
-      matteScale: testMatteScale,
+    final atlas = await AtlasTexels.read(
+      renderer
+          .renderAtlas(
+            Tiling.shapes(
+              ShapeSet.rows(
+                shapes: shapeData,
+                boxes: [
+                  for (final shape in shapes) ...[
+                    shape.left, shape.top, shape.right, shape.bottom, //
+                  ],
+                ],
+              ),
+              width: _width,
+              height: _height,
+              reach: testReach,
+            ),
+          )
+          .image,
     );
-    final field = await readGeometryField(result.image);
-    // The first channel is the distance to the edge, positive inside.
     return [
       for (var y = 0; y < _height; y++)
-        [
-          for (var x = 0; x < _width; x++)
-            fieldInwardAt(field, result.textureWidth, x, y) >= 0,
-        ],
+        [for (var x = 0; x < _width; x++) atlas.inwardAt(x, y) >= 0],
     ];
   }
 

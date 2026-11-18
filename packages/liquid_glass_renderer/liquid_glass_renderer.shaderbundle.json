@@ -1,18 +1,62 @@
 {
-    "GeometryVertex": {
+    "TileVertex": {
         "type": "vertex",
-        "file": "lib/assets/shaders/gpu/geometry_vertex.glsl"
+        "file": "lib/assets/shaders/gpu/tile_vertex.glsl"
     },
-    "GeometryFragment": {
+    "TileShapesFragment": {
         "type": "fragment",
-        "file": "lib/assets/shaders/gpu/geometry_fragment.glsl"
+        "file": "lib/assets/shaders/gpu/tile_shapes_fragment.glsl"
     },
-    "MaterialGradientFragment": {
+    "TileShapesTintFragment": {
         "type": "fragment",
-        "file": "lib/assets/shaders/gpu/material_gradient_fragment.glsl"
+        "file": "lib/assets/shaders/gpu/tile_shapes_tint_fragment.glsl"
     },
-    "MaterialTintGradientFragment": {
+    "TileShapesLooksFragment": {
         "type": "fragment",
-        "file": "lib/assets/shaders/gpu/material_tint_gradient_fragment.glsl"
+        "file": "lib/assets/shaders/gpu/tile_shapes_looks_fragment.glsl"
+    },
+    "TileFieldFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_fragment.glsl"
+    },
+    "TileFieldTintFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_tint_fragment.glsl"
+    },
+    "TileFieldLooksFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_looks_fragment.glsl"
+    },
+    "TileShapesOnlyGeometryFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_shapes_only_geometry_fragment.glsl"
+    },
+    "TileShapesOnlyTintFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_shapes_only_tint_fragment.glsl"
+    },
+    "TileShapesOnlyResponseFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_shapes_only_response_fragment.glsl"
+    },
+    "TileShapesOnlyWeightsFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_shapes_only_weights_fragment.glsl"
+    },
+    "TileFieldOnlyGeometryFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_only_geometry_fragment.glsl"
+    },
+    "TileFieldOnlyTintFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_only_tint_fragment.glsl"
+    },
+    "TileFieldOnlyResponseFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_only_response_fragment.glsl"
+    },
+    "TileFieldOnlyWeightsFragment": {
+        "type": "fragment",
+        "file": "lib/assets/shaders/gpu/tile_field_only_weights_fragment.glsl"
     }
 }
