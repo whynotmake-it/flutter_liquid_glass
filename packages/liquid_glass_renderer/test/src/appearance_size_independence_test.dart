@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:liquid_glass_renderer/src/internal/backdrop_seed.dart';
-import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/rendering/appearance.dart';
 import 'package:liquid_glass_renderer/src/rendering/consolidated_fake_glass_layer.dart';
+import 'package:liquid_glass_renderer/src/rendering/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/widgets/consolidated_fake_glass_layer.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'shared.dart';
 
@@ -19,14 +20,16 @@ class _Pills extends StatelessWidget {
 
   final bool fake;
 
-  static const _appearance = LiquidGlassAppearance.ios27RegularDark();
+  static const _appearance = LiquidGlassAppearance.ios27Regular(
+    brightness: Brightness.dark,
+  );
 
   Widget _pill(double left, double size, {double visibility = 1}) => Positioned(
     left: left,
     top: 100 - size / 2,
     child: LiquidGlass(
       appearance: _appearance.copyWith(visibility: visibility),
-      shape: const LiquidRoundedSuperellipse(borderRadius: 20),
+      shape: const LiquidRoundedSuperellipse(radius: 20),
       child: SizedBox.square(dimension: size),
     ),
   );
@@ -36,7 +39,9 @@ class _Pills extends StatelessWidget {
   Widget _layer(List<Widget> pills) => LiquidGlassLayer(
     fake: fake,
     defaultAppearance: _appearance,
-    settings: LiquidGlassSettings.ios27Regular(brightness: Brightness.dark),
+    settings: const LiquidGlassSettings.ios27Regular(
+      brightness: Brightness.dark,
+    ),
     child: Stack(children: pills),
   );
 
@@ -58,8 +63,8 @@ class _Pills extends StatelessWidget {
 }
 
 void main() {
-  // A shape's appearance must not depend on the other shapes in its layer:
-  // the dark model has no size response (see GlassColorParameters.ios27Dark).
+  // A shape wears the model of its own size (LiquidGlassColorModel.at),
+  // whatever the sizes of the other shapes in its layer.
   for (final fake in [true, false]) {
     testWidgets(
       'a dark ${fake ? 'fake' : 'real'} pill looks the same whatever shares '
@@ -115,22 +120,25 @@ void main() {
     );
   }
 
-  test('the FakeGlass filter does not change with the size of the shape', () {
-    final settings = LiquidGlassSettings.ios27Regular(
+  test('the FakeGlass filter takes its color from the appearance alone', () {
+    const settings = LiquidGlassSettings.ios27Regular(
       brightness: Brightness.dark,
     );
-    String colorOf(double shortSide) {
-      final filter = fakeGlassBackdropFilter(
-        settings,
-        _Pills._appearance,
-        deviceScale: _dpr,
+    String colorOf(double worn, double shortSide) {
+      final filter = fakeGlassBackdropFilterParts(
+        FakeGlassLook.of(settings),
+        _Pills._appearance.wear(Size.square(worn)),
+        devicePixelRatio: _dpr,
         shapeShortSide: shortSide,
-      ).toString();
-      // The blur still follows the layer's size; the color must not.
+      )!.full.toString();
       return filter.substring(filter.indexOf('ColorFilter'));
     }
 
-    expect(colorOf(40), colorOf(140));
+    // The blur follows the layer's size; the color follows the size the
+    // appearance is worn at.
+    expect(colorOf(140, 40), colorOf(140, 140));
+    expect(colorOf(40, 140), colorOf(60, 140));
+    expect(colorOf(40, 140), isNot(colorOf(140, 140)));
   });
 
   // A fully visible FakeGlass shape is painted with the layer's shared
@@ -155,23 +163,16 @@ void main() {
           find.byType(ConsolidatedFakeGlassLayer),
         )
         .toList();
-    // In a seeded pass the blur is the seed's, not the filter's.
     double sigmaOf(BackdropFilterLayer layer) {
-      var filter = layer.filter;
-      for (Layer? l = layer.parent; l != null; l = l.parent) {
-        if (l is SeededBackdropPassLayer) {
-          if (l.nativeSeed == BackdropSeed.blur) filter = l.debugSeedFilter!;
-          break;
-        }
-      }
-      final match = RegExp(r'blur\(([\d.]+),').firstMatch(filter.toString());
+      final match = RegExp(
+        r'blur\(([\d.]+),',
+      ).firstMatch(layer.filter.toString());
       return double.parse(match!.group(1)!);
     }
 
     // The middle layer: the 140 pt pill fading next to a 40 pt pill.
     final fading = layers[1];
     expect(fading.debugSeparateBackdropLayers, hasLength(1));
-    // Seeds that share a key differ by SeededBackdropPassLayer.seedSigmaStep.
     expect(
       sigmaOf(fading.debugSeparateBackdropLayers.single),
       closeTo(sigmaOf(fading.debugBackdropFilterLayer!), 0.01),
