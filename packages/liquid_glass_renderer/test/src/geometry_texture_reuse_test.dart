@@ -430,4 +430,69 @@ void runGeometryTextureReuseTests() {
     },
     skip: skipProperGlassTests,
   );
+
+  testWidgets(
+    'a reused texture keeps nothing of the larger matte it held',
+    (tester) async {
+      const size = 256;
+      const center = size / 2;
+      ui.Image render(
+        FlutterGpuGeometryRenderer renderer,
+        double halfWidth,
+        double halfHeight,
+      ) => renderer
+          .render(
+            width: size,
+            height: size,
+            shapeData: [
+              3, halfWidth, halfHeight, 8, // Rounded rectangle.
+              1, 0, 0, 1, // Identity inverse affine basis.
+              center, center, 1, -1, // Center, scale, new group marker.
+            ],
+            boundsData: [
+              center - halfWidth,
+              center - halfHeight,
+              center + halfWidth,
+              center + halfHeight,
+            ],
+            numShapes: 1,
+            refractionAmount: 24,
+            refractionHeight: 10,
+            contourExtent: 6,
+            offsetX: 0,
+            offsetY: 0,
+            matteScale: testMatteScale,
+          )
+          .image;
+
+      final renderer = (await tester.runAsync(createGeometryRenderer))!;
+      // A shape filling the matte draws the whole texture; a small one only
+      // the texels near it, after clearing the rest. Every texture of the
+      // ring holds the large matte before the small one reuses it.
+      for (var frame = 0; frame < 6; frame++) {
+        render(renderer, 120 + frame * 0.5, 120);
+        await tester.pumpWidget(const SizedBox());
+      }
+      final reusedBefore = _reused;
+      late ui.Image reusedImage;
+      for (var frame = 0; frame < 6; frame++) {
+        reusedImage = render(renderer, 30 + frame * 0.5, 20);
+        await tester.pumpWidget(const SizedBox());
+      }
+      expect(_reused - reusedBefore, greaterThan(0));
+      final reused = reusedImage.clone();
+      addTearDown(reused.dispose);
+
+      final freshRenderer = (await tester.runAsync(createGeometryRenderer))!;
+      final fresh = render(freshRenderer, 32.5, 20).clone();
+      addTearDown(fresh.dispose);
+
+      const texels = size ~/ testMatteScale + 1;
+      expect(
+        await _fieldRegion(tester, reused, texels, texels),
+        await _fieldRegion(tester, fresh, texels, texels),
+      );
+    },
+    skip: skipProperGlassTests,
+  );
 }

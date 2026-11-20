@@ -236,7 +236,6 @@ class FlutterGpuGeometryRenderer {
   // Latest matte. Older scenes retain their own native references.
   gpu.Texture? _texture;
   ui.Image? _image;
-  gpu.RenderTarget? _renderTarget;
   gpu.RenderTarget? _clearingRenderTarget;
   gpu.Texture? _materialTexture;
   ui.Image? _materialImage;
@@ -327,7 +326,6 @@ class FlutterGpuGeometryRenderer {
         // Release our handle; earlier submitted scenes hold their own.
         _image?.dispose();
         _image = null;
-        _renderTarget = null;
         _clearingRenderTarget = null;
         _texture = null;
         assert(() {
@@ -335,8 +333,8 @@ class FlutterGpuGeometryRenderer {
           return true;
         }(), 'Track replaced geometry textures in debug builds.');
       }
-      // The shader writes every texel of the sub-rect; the rest of the texture
-      // is undefined and never sampled, so no clear or copy is needed.
+      // The rest of the texture outside the sub-rect is never sampled, so a
+      // new texture needs no copy of the old one.
       // The low-res matte has a texel on both edges of the matte, so it
       // needs one more texel than width / scale in each direction.
       final matte = _mattes.next(
@@ -347,7 +345,6 @@ class FlutterGpuGeometryRenderer {
         maxHeight: viewHeight ~/ scale + 1,
       );
       _texture = matte.texture;
-      _renderTarget = matte.renderTarget;
       _clearingRenderTarget = matte.clearingRenderTarget;
       _image = _texture!.asImage();
       assert(() {
@@ -434,10 +431,15 @@ class FlutterGpuGeometryRenderer {
         return true;
       }(), 'Track matte draws in debug builds.');
       final geometryCommandBuffer = gpu.gpuContext.createCommandBuffer();
-      // Only texels near a shape hold anything but "far outside". When those
-      // are a small part of the low-res matte, clear the texture to "far
-      // outside" and draw just that part. The clear writes the same value the
-      // shader would.
+      // Only texels near a shape hold anything but "far outside". Every pass
+      // clears the texture to "far outside", and when those texels are a
+      // small part of the low-res matte it draws just that part. The clear
+      // writes the same value the shader would.
+      //
+      // Always use the same load action on a matte texture: Impeller's Vulkan
+      // backend caches one VkRenderPass per texture, keyed without the load
+      // action, so after one `dontCare` pass the texture is never cleared
+      // again and texels of a larger earlier matte survive the scissor.
       final passWidth = matteWidth ~/ scale + 1;
       final passHeight = matteHeight ~/ scale + 1;
       final drawRect = _occupiedRect(
@@ -452,9 +454,7 @@ class FlutterGpuGeometryRenderer {
         scale: scale,
       );
       final geometryPass =
-          geometryCommandBuffer.createRenderPass(
-              drawRect == null ? _renderTarget! : _clearingRenderTarget!,
-            )
+          geometryCommandBuffer.createRenderPass(_clearingRenderTarget!)
             ..bindPipeline(_pipeline)
             ..setPrimitiveType(gpu.PrimitiveType.triangleStrip)
             ..bindUniform(_uniformSlot, uniformView)
@@ -516,7 +516,7 @@ class FlutterGpuGeometryRenderer {
   /// for a whole rectangle: a texel farther from every shape's box than the
   /// border, two texels and the blend radius is "far outside". Without shape
   /// boxes there is nothing to go on, and when the rectangle covers most of
-  /// the texture, the clear isn't worth it.
+  /// the texture, the scissor isn't worth it.
   static _PixelRect? _occupiedRect({
     required List<double> shapeData,
     required List<double> boundsData,
@@ -565,9 +565,8 @@ class FlutterGpuGeometryRenderer {
     final tx1 = ((x1 + scale - 1) ~/ scale + 2).clamp(0, width ~/ scale + 1);
     final ty1 = ((y1 + scale - 1) ~/ scale + 2).clamp(0, height ~/ scale + 1);
     if (tx1 <= tx0 || ty1 <= ty0) return const _PixelRect(0, 0, 1, 1);
-    // On some GPUs a clear writes the whole texture once more. The low-res
-    // matte is small, so that costs little, but it only pays off when most of
-    // the texture can be skipped.
+    // The pass clears the whole texture either way; below 90% of it, a
+    // scissor skips the shader on the rest.
     final textureWidth = width ~/ scale + 1;
     final textureHeight = height ~/ scale + 1;
     if ((tx1 - tx0) * (ty1 - ty0) > 0.9 * textureWidth * textureHeight) {
@@ -856,7 +855,6 @@ class FlutterGpuGeometryRenderer {
   void releaseOutput() {
     _mattes.release();
     _materials.release();
-    _renderTarget = null;
     _clearingRenderTarget = null;
     _image?.dispose();
     _image = null;
