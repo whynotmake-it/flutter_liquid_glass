@@ -91,6 +91,11 @@ class MultiShaderBuilder extends StatefulWidget {
   /// When this future has completed, any newly created [MultiShaderBuilder]s
   /// that reference these assets will be guaranteed to immediately have access
   /// to the shaders.
+  /// The program of [assetKey] once it is loaded (by a builder or
+  /// [precacheShader]), else null.
+  static ui.FragmentProgram? cachedProgram(String assetKey) =>
+      _MultiShaderBuilderState._shaderCache[assetKey];
+
   static Future<void> precacheShaders(List<String> assetKeys) {
     return Future.wait(
       assetKeys.map(precacheShader),

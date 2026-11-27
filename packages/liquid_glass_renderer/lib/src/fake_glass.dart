@@ -8,6 +8,7 @@ import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:liquid_glass_renderer/src/glass_shadow.dart';
 import 'package:liquid_glass_renderer/src/internal/backdrop_capture_debug.dart';
 import 'package:liquid_glass_renderer/src/internal/fake_glass_color.dart';
+import 'package:liquid_glass_renderer/src/internal/fake_glass_shader_slots.dart';
 import 'package:liquid_glass_renderer/src/internal/multi_shader_builder.dart';
 import 'package:liquid_glass_renderer/src/internal/optimized_clip.dart';
 import 'package:liquid_glass_renderer/src/internal/paint_fake_glass_surface.dart';
@@ -375,6 +376,13 @@ class RenderFakeGlass extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  /// A shader per draw (surface, glint, border ring); see
+  /// [FakeGlassShaderSlots].
+  final _shaderSlots = FakeGlassShaderSlots();
+
+  @visibleForTesting
+  FakeGlassShaderSlots get debugShaderSlots => _shaderSlots;
+
   @visibleForTesting
   int debugPaintCount = 0;
 
@@ -502,7 +510,7 @@ class RenderFakeGlass extends RenderProxyBox {
       ..clipPath(ring);
     paintFakeGlassSurface(
       canvas,
-      shader: _surfaceShader!,
+      shader: _shaderSlots.shaderFor(_FakePass.borderRing, _surfaceShader!),
       size: size,
       shape: shape,
       settings: settings,
@@ -554,7 +562,7 @@ class RenderFakeGlass extends RenderProxyBox {
     }
     paintFakeGlassSurface(
       canvas,
-      shader: shader,
+      shader: _shaderSlots.shaderFor(_FakePass.surface, shader),
       size: size,
       shape: shape,
       settings: settings,
@@ -564,7 +572,7 @@ class RenderFakeGlass extends RenderProxyBox {
     if (settings.highlight * appearance.visibility > 0) {
       paintFakeGlassSurface(
         canvas,
-        shader: shader,
+        shader: _shaderSlots.shaderFor(_FakePass.glint, shader),
         size: size,
         shape: shape,
         settings: settings,
@@ -575,4 +583,13 @@ class RenderFakeGlass extends RenderProxyBox {
     }
     canvas.restore();
   }
+
+  @override
+  void dispose() {
+    _shaderSlots.dispose();
+    super.dispose();
+  }
 }
+
+/// The draws of one FakeGlass surface, each with its own shader.
+enum _FakePass { surface, glint, borderRing }
