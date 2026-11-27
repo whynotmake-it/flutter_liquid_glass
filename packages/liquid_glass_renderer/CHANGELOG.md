@@ -1,3 +1,13 @@
+## 1.0.0-dev.3
+
+ - **FIX**(deps): restore the Dart SDK upper bound (#272).
+
+    pub.dev rejects published packages without an upper SDK bound, which
+    broke the release dry run after #264. Cap at the next major version.
+
+ - **FIX**(deps): loosen sdk constraint to support modern dart versions (#264).
+ - **FIX**(liquid_glass_renderer): skip glass shapes their ancestors don't paint (#255).
+
 ## 1.0.0-dev.2
 
  - **PERF**(liquid_glass_renderer): keep the FakeGlass filter while its blur holds (#250).
