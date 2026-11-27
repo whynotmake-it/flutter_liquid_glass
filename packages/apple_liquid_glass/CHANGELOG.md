@@ -1,3 +1,12 @@
+## 1.0.0-dev.3
+
+ - **FIX**(deps): restore the Dart SDK upper bound (#272).
+
+    pub.dev rejects published packages without an upper SDK bound, which
+    broke the release dry run after #264. Cap at the next major version.
+
+ - **FIX**(deps): loosen sdk constraint to support modern dart versions (#264).
+
 ## 1.0.0-dev.2
 
  - Update a dependency to the latest release.
